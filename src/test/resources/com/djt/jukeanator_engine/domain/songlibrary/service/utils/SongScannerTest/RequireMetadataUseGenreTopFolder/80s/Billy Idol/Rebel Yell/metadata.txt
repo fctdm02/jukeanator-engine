@@ -1,0 +1,4 @@
+CoverArtURL=https://i.discogs.com/DCD942e7fa0i6pe5F_AB7x3UKwBYLBLQcfZn-G7kfH4/rs:fit/g:sm/q:90/h:500/w:500/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTM1ODgw/NjEtMTMzNjQwNTM2/MC5qcGVn.jpeg
+ReleaseDate=1984
+RecordLabel=Chrysalis
+HasExplicit=false

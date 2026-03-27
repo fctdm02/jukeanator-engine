@@ -1,0 +1,16 @@
+# src/test/resources/application-test.yml
+
+spring:
+  application:
+    name: jukeanator-engine
+
+song-library:
+  repository-type: filesystem   # filesystem | postgres
+  root-path: R:\\Rock_On_Third
+  requires-metadata: false
+  use-genre: true
+  use-top-folder-for-genre: true
+
+  discogs:
+    consumer-key: vBSFEvNtGflHQnULBNnL
+    consumer-secret: AOOYhlvSshYkJieLRrdTCUoLcsWACfWW
