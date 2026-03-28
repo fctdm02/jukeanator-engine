@@ -1,0 +1,208 @@
+Can one use JavaFx with a Spring Boot application?  If so, how?
+
+Yes—you absolutely can use JavaFX with Spring Boot, and it’s actually a great combo:
+
+Spring Boot → dependency injection, config, services, REST clients
+JavaFX → rich desktop UI
+
+The trick is: you don’t let Spring Boot start a web server UI—you let JavaFX own the UI, and use Spring as the backend container.
+
+🧠 High-level architecture
+JavaFX Application (UI)
+        ↓
+Spring ApplicationContext (DI container)
+        ↓
+Services (SongLibraryService, Client, etc.)
+✅ Step 1 — Add dependencies
+Maven
+<dependencies>
+
+    <!-- Spring Boot -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter</artifactId>
+    </dependency>
+
+    <!-- JavaFX -->
+    <dependency>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-controls</artifactId>
+        <version>21</version>
+    </dependency>
+
+    <dependency>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-fxml</artifactId>
+        <version>21</version>
+    </dependency>
+
+</dependencies>
+✅ Step 2 — Create a JavaFX + Spring Boot bootstrap
+
+You do NOT use SpringApplication.run() directly in main.
+
+Instead:
+
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.stage.Stage;
+
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
+
+public class JavaFxSpringApp extends Application {
+
+    private ConfigurableApplicationContext context;
+
+    @Override
+    public void init() {
+        context = new SpringApplicationBuilder(JukeanatorEngineApplication.class)
+                .run();
+    }
+
+    @Override
+    public void start(Stage stage) {
+        // Load UI here (we'll wire Spring into it next)
+        stage.setTitle("JukeANator");
+        stage.show();
+    }
+
+    @Override
+    public void stop() {
+        context.close();
+        Platform.exit();
+    }
+
+    public static void main(String[] args) {
+        launch(args); // JavaFX starts here
+    }
+}
+✅ Step 3 — Let Spring manage your controllers
+Example JavaFX controller:
+import org.springframework.stereotype.Component;
+
+@Component
+public class MainViewController {
+
+    private final SongLibraryService songLibraryService;
+
+    public MainViewController(SongLibraryService songLibraryService) {
+        this.songLibraryService = songLibraryService;
+    }
+
+    public void loadGenres() {
+        var genres = songLibraryService.getGenres();
+        genres.forEach(g -> System.out.println(g.getName()));
+    }
+}
+✅ Step 4 — Connect JavaFX FXML to Spring
+
+JavaFX normally creates controllers itself ❌
+We want Spring to create them ✅
+
+So you override the controller factory:
+
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+
+@Override
+public void start(Stage stage) throws Exception {
+
+    FXMLLoader loader = new FXMLLoader(
+            getClass().getResource("/fxml/main-view.fxml")
+    );
+
+    loader.setControllerFactory(context::getBean);
+
+    Parent root = loader.load();
+
+    stage.setScene(new Scene(root));
+    stage.setTitle("JukeANator");
+    stage.show();
+}
+✅ Step 5 — Example FXML
+<?xml version="1.0" encoding="UTF-8"?>
+
+<VBox xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.djt.jukeanator_engine.ui.MainViewController">
+
+    <Button text="Load Genres" onAction="#loadGenres"/>
+
+</VBox>
+✅ Step 6 — Disable web server (important)
+
+If this is a desktop app, disable Tomcat:
+
+spring:
+  main:
+    web-application-type: none
+✅ Optional: Use your REST API instead
+
+If your JavaFX app is a client, not embedded:
+
+Keep Spring Boot server separate
+Use your SongLibraryClient (RestClient) inside JavaFX
+@Component
+public class MainViewController {
+
+    private final SongLibraryClient client;
+
+    public MainViewController(SongLibraryClient client) {
+        this.client = client;
+    }
+}
+⚠️ Common pitfalls
+❌ 1. JavaFX controller not managed by Spring
+
+Fix → loader.setControllerFactory(context::getBean)
+
+❌ 2. Two application lifecycles fighting
+
+Fix → JavaFX owns lifecycle, Spring runs inside it
+
+❌ 3. Blocking UI thread
+
+If you call:
+
+songLibraryService.scanFileSystemForSongs(...)
+
+👉 Wrap in background thread:
+
+new Thread(() -> {
+    songLibraryService.scanFileSystemForSongs(...);
+}).start();
+
+(or use Task)
+
+🚀 Best architecture options
+Option A — Monolith (simple)
+JavaFX + Spring Boot in same app
+Direct service calls
+Option B — Client/Server (recommended long-term)
+Spring Boot → REST API
+JavaFX → client using RestClient
+🧠 Recommendation for your project
+
+Given your setup:
+
+👉 You already built a REST API
+👉 You already built a Java client
+
+Best path:
+
+Spring Boot API  ←→  JavaFX client (RestClient)
+🎯 Summary
+
+Yes, JavaFX + Spring Boot works great if you:
+
+Start JavaFX first (Application.launch)
+Boot Spring inside init()
+Use Spring for DI
+Hook FXML controllers via setControllerFactory
+Disable web server if not needed
+
+If you want, I can:
+
+Build a full JavaFX UI for your SongLibrary (genres/artists/albums) and wire SongLibraryClient into it for a working UI screen

@@ -1,0 +1,324 @@
+Let’s build you a working JavaFX UI + Spring-powered client for your Song Library. This will:
+
+Call your REST API via SongLibraryClient
+Display Genres → Artists → Albums
+Be clean, modern, and extensible
+🧠 Final Architecture
+JavaFX UI (FXML)
+     ↓
+Spring-managed Controllers
+     ↓
+SongLibraryClient (RestClient)
+     ↓
+Spring Boot API
+✅ 1. JavaFX Main App (bootstraps Spring)
+package com.djt.jukeanator_engine.ui;
+
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
+
+import com.djt.jukeanator_engine.JukeanatorEngineApplication;
+
+public class JavaFxApp extends Application {
+
+    private ConfigurableApplicationContext context;
+
+    @Override
+    public void init() {
+        context = new SpringApplicationBuilder(JukeanatorEngineApplication.class)
+                .run();
+    }
+
+    @Override
+    public void start(Stage stage) throws Exception {
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main-view.fxml"));
+        loader.setControllerFactory(context::getBean);
+
+        Scene scene = new Scene(loader.load(), 900, 600);
+
+        stage.setTitle("JukeANator");
+        stage.setScene(scene);
+        stage.show();
+    }
+
+    @Override
+    public void stop() {
+        context.close();
+        Platform.exit();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
+✅ 2. Spring Config for Client
+package com.djt.jukeanator_engine.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import com.djt.jukeanator_engine.client.SongLibraryClient;
+
+@Configuration
+public class ClientConfig {
+
+    @Bean
+    public SongLibraryClient songLibraryClient() {
+        return new SongLibraryClient("http://localhost:8080");
+    }
+}
+✅ 3. Main JavaFX Controller
+package com.djt.jukeanator_engine.ui;
+
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.fxml.FXML;
+import javafx.scene.control.*;
+
+import org.springframework.stereotype.Component;
+
+import com.djt.jukeanator_engine.client.SongLibraryClient;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.*;
+
+import java.util.List;
+
+@Component
+public class MainViewController {
+
+    private final SongLibraryClient client;
+
+    public MainViewController(SongLibraryClient client) {
+        this.client = client;
+    }
+
+    @FXML private ListView<GenreDto> genreList;
+    @FXML private ListView<ArtistDto> artistList;
+    @FXML private ListView<AlbumDto> albumList;
+    @FXML private Button refreshButton;
+
+    @FXML
+    public void initialize() {
+        setupCellFactories();
+        loadGenres();
+    }
+
+    private void setupCellFactories() {
+        genreList.setCellFactory(lv -> new ListCell<>() {
+            @Override protected void updateItem(GenreDto item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty ? null : item.getName());
+            }
+        });
+
+        artistList.setCellFactory(lv -> new ListCell<>() {
+            @Override protected void updateItem(ArtistDto item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty ? null : item.getName());
+            }
+        });
+
+        albumList.setCellFactory(lv -> new ListCell<>() {
+            @Override protected void updateItem(AlbumDto item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty ? null : item.getName());
+            }
+        });
+    }
+
+    @FXML
+    private void loadGenres() {
+        runAsync(() -> {
+            List<GenreDto> genres = client.getGenres();
+            Platform.runLater(() ->
+                genreList.setItems(FXCollections.observableArrayList(genres))
+            );
+        });
+    }
+
+    @FXML
+    private void onRefresh() {
+        loadGenres();
+    }
+
+    @FXML
+    private void onGenreSelected() {
+        GenreDto selected = genreList.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        runAsync(() -> {
+            List<ArtistDto> artists = client.getArtists();
+            Platform.runLater(() ->
+                artistList.setItems(FXCollections.observableArrayList(artists))
+            );
+        });
+    }
+
+    @FXML
+    private void onArtistSelected() {
+        ArtistDto selected = artistList.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        runAsync(() -> {
+            List<AlbumDto> albums = client.getAlbums();
+            Platform.runLater(() ->
+                albumList.setItems(FXCollections.observableArrayList(albums))
+            );
+        });
+    }
+
+    private void runAsync(Runnable task) {
+        new Thread(() -> {
+            try {
+                task.run();
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> showError(e));
+            }
+        }).start();
+    }
+
+    private void showError(Exception e) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setHeaderText("Error");
+        alert.setContentText(e.getMessage());
+        alert.showAndWait();
+    }
+}
+✅ 4. FXML UI Layout
+
+src/main/resources/fxml/main-view.fxml
+
+<?xml version="1.0" encoding="UTF-8"?>
+
+<HBox xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.djt.jukeanator_engine.ui.MainViewController"
+      spacing="10" prefWidth="900" prefHeight="600">
+
+    <VBox spacing="5">
+        <Label text="Genres"/>
+        <ListView fx:id="genreList" onMouseClicked="#onGenreSelected"/>
+    </VBox>
+
+    <VBox spacing="5">
+        <Label text="Artists"/>
+        <ListView fx:id="artistList" onMouseClicked="#onArtistSelected"/>
+    </VBox>
+
+    <VBox spacing="5">
+        <Label text="Albums"/>
+        <ListView fx:id="albumList"/>
+    </VBox>
+
+    <VBox spacing="10">
+        <Button fx:id="refreshButton" text="Refresh" onAction="#onRefresh"/>
+    </VBox>
+
+</HBox>
+✅ 5. Improve UX (optional but recommended)
+Add loading indicator
+@FXML private ProgressIndicator loading;
+
+Wrap calls:
+
+Platform.runLater(() -> loading.setVisible(true));
+...
+Platform.runLater(() -> loading.setVisible(false));
+✅ 6. What you now have
+
+✔ Fully working JavaFX UI
+✔ Spring-managed controllers
+✔ REST client integration
+✔ Async-safe UI (no freezing)
+✔ Clean separation of concerns
+
+🚀 Next upgrades (high value)
+
+If you want to take this further:
+
+🔹 Filter artists by genre (real behavior)
+
+Right now:
+
+client.getArtists()
+
+Better:
+
+client.getArtistsByGenre(genreName)
+🔹 Add scan button
+client.scan(new ScanRequest(...))
+🔹 Add search box
+TextField searchField;
+🔹 Add album details panel
+Cover art
+Metadata
+Track list
+🎯 Summary
+
+You now have a complete desktop UI powered by your Spring API:
+
+JavaFX = UI
+Spring = DI + config
+REST client = integration layer
+
+If you want next step, I can:
+
+Add album artwork rendering
+Add tree view instead of 3 lists (much better UX)
+Or convert this into a modern styled UI (CSS + dark mode)
+
+
+
+
+/*
+package com.djt.jukeanator_engine.ui;
+
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
+
+import com.djt.jukeanator_engine.JukeanatorEngineApplication;
+
+public class JavaFxApp extends Application {
+
+    private ConfigurableApplicationContext context;
+
+    @Override
+    public void init() {
+        context = new SpringApplicationBuilder(JukeanatorEngineApplication.class)
+                .run();
+    }
+
+    @Override
+    public void start(Stage stage) throws Exception {
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main-view.fxml"));
+        loader.setControllerFactory(context::getBean);
+
+        Scene scene = new Scene(loader.load(), 900, 600);
+
+        stage.setTitle("JukeANator");
+        stage.setScene(scene);
+        stage.show();
+    }
+
+    @Override
+    public void stop() {
+        context.close();
+        Platform.exit();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
+*/
