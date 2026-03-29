@@ -7,8 +7,6 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 
 /**
@@ -42,14 +40,6 @@ public class SongScannerTest {
     // STEP 3: ASSERT
     assertNotNull(root, "root was null");
     
-    List<GenreFolderEntity> genres = root.getAllGenres();
-    assertNotNull(root, "genres was null");
-    assertFalse(genres.isEmpty(), "genres expected to be non-empty");
-    
-    List<ArtistFolderEntity> artists = root.getAllArtists();
-    assertNotNull(root, "artists was null");
-    assertFalse(artists.isEmpty(), "artists expected to be non-empty");
-
     List<AlbumFolderEntity> albums = root.getAllAlbums();
     assertNotNull(root, "albums was null");
     assertFalse(albums.isEmpty(), "albums expected to be non-empty");    

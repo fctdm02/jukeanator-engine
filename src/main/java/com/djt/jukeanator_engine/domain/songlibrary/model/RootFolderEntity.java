@@ -79,50 +79,6 @@ public class RootFolderEntity extends FolderEntity {
     return foldersToPrune;
   }
 
-  public List<GenreFolderEntity> getAllGenres() {
-    
-    Set<GenreFolderEntity> set = new TreeSet<>();
-    
-    for (FolderEntity childFolder : getChildFolders()) {
-
-      if (childFolder instanceof GenreFolderEntity) {
-
-        set.add((GenreFolderEntity)childFolder);
-
-      } else {
-
-        childFolder.getAllGenres(set);
-
-      }
-    }
-    
-    ArrayList<GenreFolderEntity> list = new ArrayList<>();
-    list.addAll(set);    
-    return list;
-  }
-
-  public List<ArtistFolderEntity> getAllArtists() {
-    
-    Set<ArtistFolderEntity> allArtists = new TreeSet<>();
-    
-    for (FolderEntity childFolder : getChildFolders()) {
-
-      if (childFolder instanceof ArtistFolderEntity) {
-
-        allArtists.add((ArtistFolderEntity)childFolder);
-
-      } else {
-
-        childFolder.getAllArtists(allArtists);
-
-      }
-    }
-    
-    ArrayList<ArtistFolderEntity> list = new ArrayList<>();
-    list.addAll(allArtists);    
-    return list;
-  }
-  
   public List<AlbumFolderEntity> getAllAlbums() {
     
     Set<AlbumFolderEntity> allAlbums = new TreeSet<>();
@@ -149,7 +105,7 @@ public class RootFolderEntity extends FolderEntity {
   public FolderEntity getParentFolder() {
     throw new IllegalStateException("getParentFolder() cannot be called on the Root");
   }
-
+  
   @Override
   public String getNaturalIdentity() {
 

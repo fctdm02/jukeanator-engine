@@ -14,10 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 
 /**
  * @author tmyers
@@ -58,7 +55,7 @@ public class SongLibraryServiceTest {
     
     // STEP 1: ARRANGE
     String scanPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder";
-    songLibraryService.setScanPath(scanPath);
+    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanPath);
     Set<String> acceptedSongFileExtensions = Set.of(".mp3");
     
     
@@ -68,13 +65,7 @@ public class SongLibraryServiceTest {
     
     // STEP 3: ASSERT    
     assertNotNull(root, "Root should not be null");
-    List<GenreFolderEntity> genres = songLibraryService.getGenres();
-    List<ArtistFolderEntity> artists = songLibraryService.getArtists();
     List<AlbumFolderEntity> albums = songLibraryService.getAlbums();    
-    assertNotNull(genres, "genres should not be null");
-    assertFalse(genres.isEmpty(), "genres should not be empty");
-    assertNotNull(artists, "artists should not be null");
-    assertFalse(artists.isEmpty(), "artists should not be empty");
     assertNotNull(albums, "albums should not be null");
     assertFalse(albums.isEmpty(), "albums should not be empty");
   }
@@ -84,26 +75,19 @@ public class SongLibraryServiceTest {
     
     // STEP 1: ARRANGE
     String scanPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder";
-    songLibraryService.setScanPath(scanPath);
-    songLibraryService.initializeSongLibrary();
+    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanPath);
+    ((SongLibraryServiceImpl)songLibraryService).initializeSongLibrary();
 
     
     // STEP 2: ACT
-    List<GenreFolderEntity> genres = songLibraryService.getGenres();
-    List<ArtistFolderEntity> artists = songLibraryService.getArtists();
+    List<String> genres = songLibraryService.getGenres();
     List<AlbumFolderEntity> albums = songLibraryService.getAlbums();
-    List<SongFileEntity> songs = songLibraryService.getSongs();
     
     
     // STEP 3: ASSERT
     assertNotNull(genres, "genres should not be null");
     assertFalse(genres.isEmpty(), "genres should not be empty");
-    assertNotNull(artists, "artists should not be null");
-    assertFalse(artists.isEmpty(), "artists should not be empty");
     assertNotNull(albums, "albums should not be null");
     assertFalse(albums.isEmpty(), "albums should not be empty");
-    assertNotNull(songs, "songs should not be null");
-    assertFalse(songs.isEmpty(), "songs should not be empty");    
-  }
-   
+  }   
 }

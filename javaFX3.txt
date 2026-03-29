@@ -1,0 +1,226 @@
+Create a spring boot application, Maven based, that is a JavaFX UI anc calls SongLibraryClient.getGenres() to display a list of genres
+
+Here’s a simple Spring Boot + JavaFX (Maven) application that calls SongLibraryClient.getGenres() and displays the genres in a UI list.
+
+🧱 1. Project Structure
+springboot-javafx-genres/
+├── pom.xml
+├── src/main/java/com/example/app/
+│   ├── MainApp.java
+│   ├── SpringBootApp.java
+│   ├── config/SpringContextHolder.java
+│   ├── ui/GenreController.java
+│   ├── service/SongLibraryClient.java
+│   └── model/Genre.java
+└── src/main/resources/
+    └── genre-view.fxml
+📦 2. pom.xml
+
+Make sure you include Spring Boot + JavaFX:
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" ...>
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>springboot-javafx-genres</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <java.version>17</java.version>
+        <javafx.version>21</javafx.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- JavaFX -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Spring Boot -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- JavaFX run support -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>com.example.app.MainApp</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+🚀 3. Spring Boot Entry
+package com.example.app;
+
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class SpringBootApp {
+}
+🔗 4. JavaFX + Spring Boot Bootstrap
+package com.example.app;
+
+import javafx.application.Application;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
+
+public class MainApp extends Application {
+
+    private ConfigurableApplicationContext context;
+
+    @Override
+    public void init() {
+        context = new SpringApplicationBuilder(SpringBootApp.class).run();
+    }
+
+    @Override
+    public void start(Stage stage) throws Exception {
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/genre-view.fxml"));
+        loader.setControllerFactory(context::getBean);
+
+        stage.setScene(new Scene(loader.load()));
+        stage.setTitle("Genres");
+        stage.show();
+    }
+
+    @Override
+    public void stop() {
+        context.close();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
+🎯 5. Model
+package com.example.app.model;
+
+public class Genre {
+    private String name;
+
+    public Genre() {}
+
+    public Genre(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+📡 6. SongLibraryClient
+
+Stub implementation (replace with real API call):
+
+package com.example.app.service;
+
+import com.example.app.model.Genre;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class SongLibraryClient {
+
+    public List<Genre> getGenres() {
+        return List.of(
+            new Genre("Rock"),
+            new Genre("Pop"),
+            new Genre("Jazz"),
+            new Genre("Classical")
+        );
+    }
+}
+🎮 7. JavaFX Controller
+package com.example.app.ui;
+
+import com.example.app.model.Genre;
+import com.example.app.service.SongLibraryClient;
+import javafx.collections.FXCollections;
+import javafx.fxml.FXML;
+import javafx.scene.control.ListView;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+public class GenreController {
+
+    @FXML
+    private ListView<String> genreListView;
+
+    private final SongLibraryClient client;
+
+    public GenreController(SongLibraryClient client) {
+        this.client = client;
+    }
+
+    @FXML
+    public void initialize() {
+        List<Genre> genres = client.getGenres();
+
+        genreListView.setItems(
+            FXCollections.observableArrayList(
+                genres.stream().map(Genre::getName).toList()
+            )
+        );
+    }
+}
+🖼️ 8. FXML UI (genre-view.fxml)
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.AnchorPane?>
+
+<AnchorPane xmlns:fx="http://javafx.com/fxml">
+    <children>
+        <ListView fx:id="genreListView"
+                  layoutX="20"
+                  layoutY="20"
+                  prefWidth="300"
+                  prefHeight="400"/>
+    </children>
+</AnchorPane>
+▶️ 9. Run the App
+mvn clean javafx:run
+✅ What You Get
+Spring-managed beans (dependency injection works in controllers)
+JavaFX UI
+Calls SongLibraryClient.getGenres()
+Displays genres in a ListView
+⚡ Optional Improvements
+Replace SongLibraryClient with a REST client (e.g., WebClient)
+Add loading spinner / async calls
+Add genre selection handling
+Use TableView instead of ListView
+
+If you want, I can extend this to:
+
+Call a real REST API
+Add search/filter UI
+Package as a native desktop app (jlink/jpackage)

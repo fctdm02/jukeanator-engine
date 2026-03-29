@@ -5,10 +5,7 @@ import java.util.Set;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 
 /**
  * @author tmyers
@@ -17,38 +14,15 @@ public interface SongLibraryService extends AggregateRootService<RootFolderEntit
 
   /**
    * 
-   */
-  void initializeSongLibrary();
-  
-  /**
-   * 
-   * @param scanPath
-   */
-  void setScanPath(String scanPath);
-  
-  /**
-   * 
    * @return
    */
-  List<GenreFolderEntity> getGenres();
+  List<String> getGenres();
 
-  /**
-   * 
-   * @return
-   */
-  List<ArtistFolderEntity> getArtists();
-  
   /**
    * 
    * @return
    */
   List<AlbumFolderEntity> getAlbums();
-
-  /**
-   * 
-   * @return
-   */
-  List<SongFileEntity> getSongs();
   
   /**
    * 

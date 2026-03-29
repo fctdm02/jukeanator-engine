@@ -7,56 +7,22 @@ import org.springframework.web.client.RestClient;
 
 import com.djt.jukeanator_engine.domain.songlibrary.dto.*;
 
-public class SongLibraryClient {
+public class SongLibraryServiceClient {
 
     private final RestClient restClient;
 
-    public SongLibraryClient(String baseUrl) {
+    public SongLibraryServiceClient(String baseUrl) {
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .build();
     }
 
     // ----------------------------------------
-    // Initialize
-    // ----------------------------------------
-    public void initialize() {
-        restClient.post()
-                .uri("/api/song-library/initialize")
-                .retrieve()
-                .toBodilessEntity();
-    }
-
-    // ----------------------------------------
-    // Set scan path
-    // ----------------------------------------
-    public void setScanPath(String path) {
-        SetScanPathRequest request = new SetScanPathRequest();
-        request.setScanPath(path);
-
-        restClient.post()
-                .uri("/api/song-library/scan-path")
-                .body(request)
-                .retrieve()
-                .toBodilessEntity();
-    }
-
-    // ----------------------------------------
     // Get genres
     // ----------------------------------------
-    public List<GenreDto> getGenres() {
+    public List<String> getGenres() {
         return restClient.get()
                 .uri("/api/song-library/genres")
-                .retrieve()
-                .body(new ParameterizedTypeReference<>() {});
-    }
-
-    // ----------------------------------------
-    // Get artists
-    // ----------------------------------------
-    public List<ArtistDto> getArtists() {
-        return restClient.get()
-                .uri("/api/song-library/artists")
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {});
     }

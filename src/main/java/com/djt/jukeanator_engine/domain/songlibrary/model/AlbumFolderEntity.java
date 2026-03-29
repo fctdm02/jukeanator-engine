@@ -4,6 +4,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 
 public class AlbumFolderEntity extends FolderEntity {
   private static final long serialVersionUID = 1L;
@@ -60,6 +61,34 @@ public class AlbumFolderEntity extends FolderEntity {
     throw new EntityDoesNotExistException(
         "Child Song with name: [" + name + "] not found in [" + this.getNaturalIdentity() + "].");
   }
+
+  public ArtistFolderEntity getParentArtist() {
+    
+    FolderEntity parentFolder = this.getParentFolder();
+    while (parentFolder instanceof RootFolderEntity == false) {
+
+      if (parentFolder instanceof ArtistFolderEntity) {
+        return (ArtistFolderEntity)parentFolder;
+      } else {
+        parentFolder = parentFolder.getParentFolder();
+      }
+    }
+    return new ArtistFolderEntity(parentFolder, "Compilations");
+  }
+  
+  public GenreFolderEntity getParentGenre() {
+    
+    FolderEntity parentFolder = this.getParentFolder();
+    while (parentFolder instanceof RootFolderEntity == false) {
+
+      if (parentFolder instanceof GenreFolderEntity) {
+        return (GenreFolderEntity)parentFolder;
+      } else {
+        parentFolder = parentFolder.getParentFolder();
+      }
+    }    
+    throw new SongLibraryException("Album: " + this.getNaturalIdentity() + " does not have a parent genre");
+  }
   
   public boolean hasValidCoverArt() {
     return this.coverArt.isValid();
@@ -76,4 +105,20 @@ public class AlbumFolderEntity extends FolderEntity {
   public void createMetadataEntity() {
     this.metaData = new AlbumMetaDataFileEntity(this, METADATA_FILENAME);
   }
+  
+  public boolean hasExplicit() {
+    return this.metaData.hasExplicit();
+  }
+  
+  public String getRecordLabel() {
+    return this.metaData.getRecordLabel();
+  }
+  
+  public String getReleaseDate() {
+    return this.metaData.getReleaseDate();
+  }
+  
+  public String getCoverArtPath() {
+    return this.coverArt.getNaturalIdentity();
+  }  
 }

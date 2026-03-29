@@ -8,9 +8,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.FolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 
 /**
@@ -85,10 +88,49 @@ public final class SongScanner {
 
     // Prune all children that do not contain AlbumFolders
     rootFolder.pruneNonAlbumContainingChildFolders();
-
-    // See if any album needs to have cover art, record label, release
-    // date or explicit lyrics metadata retrieved from Discogs
+    
     List<AlbumFolderEntity> albums = rootFolder.getAllAlbums();
+    for (AlbumFolderEntity album : albums) {
+
+      // A historical quirk is that for "Soundtracks", there is no Artist level, as it was
+      // originally assumed all albums would be compilations
+      FolderEntity parentFolder = album.getParentFolder();
+      if (!parentFolder.getName().equalsIgnoreCase("Soundtracks") && parentFolder instanceof ArtistFolderEntity == false) {
+                
+        parentFolder.getParentFolder().convertChildFolderToArtistFolder(parentFolder);
+      }
+      
+      if (useGenre) {
+
+        RootFolderEntity rootFolder = null;
+        FolderEntity folderToConvertToGenreFolder = null;
+
+        if (useTopFolderForGenre) {
+
+          while (parentFolder instanceof RootFolderEntity == false) {
+
+            folderToConvertToGenreFolder = parentFolder;
+            parentFolder = parentFolder.getParentFolder();
+
+            if (parentFolder instanceof RootFolderEntity) {
+              rootFolder = (RootFolderEntity) parentFolder;
+            }
+          }
+          
+          if (folderToConvertToGenreFolder instanceof GenreFolderEntity == false) {
+            rootFolder.convertChildFolderToGenreFolder(folderToConvertToGenreFolder);  
+          }          
+
+        } else {
+
+          throw new SongLibraryException("useTopFolderForGenre=false not implemented yet!");
+
+        }
+      }
+    }
+    
+    // See if any album needs to have cover art, record label, release
+    // date or explicit lyrics metadata retrieved from Discogs    
     for (AlbumFolderEntity album : albums) {
 
       String albumPath = album.getNaturalIdentity();
@@ -138,8 +180,7 @@ public final class SongScanner {
             process(childFolder);
 
           } catch (EntityAlreadyExistsException eaee) {
-            // TODO: TDM: Handle or log the exception
-            eaee.printStackTrace();
+            throw new SongLibraryException(eaee.getMessage(), eaee);
           }
         } else if (parentFolder instanceof RootFolderEntity == false && !isHidden && child.isFile()
             && this.acceptedSongFileExtensions.contains(getFileExtension(child))) {
@@ -154,12 +195,7 @@ public final class SongScanner {
 
     if (!songFilenames.isEmpty()) {
 
-      parentFolder.getParentFolder().convertChildFolderToAlbumFolder(
-          parentFolder, 
-          songFilenames,
-          useGenre, 
-          useTopFolderForGenre);
-
+      parentFolder.getParentFolder().convertChildFolderToAlbumFolder(parentFolder, songFilenames);
     }
   }
 

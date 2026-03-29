@@ -62,8 +62,16 @@ public class FolderEntity extends AbstractLibraryEntity {
     return this.childFolders.remove(childFolder);
   }
 
-  public AlbumFolderEntity convertChildFolderToAlbumFolder(FolderEntity childFolder,
-      List<String> songFilenames, boolean useGenre, boolean useTopFolderForGenre) {
+  public RootFolderEntity getRootFolder() {
+
+    FolderEntity parentFolder = this.getParentFolder();
+    while (parentFolder instanceof RootFolderEntity == false) {
+      parentFolder = parentFolder.getParentFolder();
+    }
+    return (RootFolderEntity) parentFolder;
+  }
+  
+  public AlbumFolderEntity convertChildFolderToAlbumFolder(FolderEntity childFolder, List<String> songFilenames) {
 
     try {
 
@@ -71,9 +79,6 @@ public class FolderEntity extends AbstractLibraryEntity {
 
       AlbumFolderEntity albumFolder = new AlbumFolderEntity(this, childFolder.getName());
 
-      // System.out.println(" Found album: " + albumFolder.getName());
-
-      FolderEntity parentFolder = albumFolder.getParentFolder();
       this.addChildFolder(albumFolder);
 
       for (String songFilename : songFilenames) {
@@ -83,39 +88,6 @@ public class FolderEntity extends AbstractLibraryEntity {
       albumFolder.createCoverArtEntity();
       albumFolder.createMetadataEntity();
 
-      // A historical quirk is that for "Soundtracks", there is no Artist level, as it was
-      // originally assumed all albums would be compilations
-      if (!parentFolder.getName().equalsIgnoreCase("Soundtracks")
-          && parentFolder instanceof ArtistFolderEntity == false) {
-
-        parentFolder.getParentFolder().convertChildFolderToArtistFolder(parentFolder, useGenre,
-            useTopFolderForGenre);
-
-      } else if (this instanceof GenreFolderEntity == false) {
-
-        if (useGenre) {
-
-          RootFolderEntity rootFolder = null;
-          FolderEntity folderToConvertToGenreFolder = null;
-
-          if (useTopFolderForGenre) {
-
-            while (parentFolder instanceof RootFolderEntity == false) {
-
-              folderToConvertToGenreFolder = parentFolder;
-              parentFolder = parentFolder.getParentFolder();
-              rootFolder = (RootFolderEntity) parentFolder;
-            }
-            rootFolder.convertChildFolderToGenreFolder(folderToConvertToGenreFolder);
-
-          } else {
-
-            throw new SongLibraryException("useTopFolderForGenre=false not implemented yet!");
-
-          }
-        }
-      }
-
       return albumFolder;
 
     } catch (EntityDoesNotExistException | EntityAlreadyExistsException e) {
@@ -123,17 +95,7 @@ public class FolderEntity extends AbstractLibraryEntity {
     }
   }
 
-  public RootFolderEntity getRootFolder() {
-
-    FolderEntity parentFolder = this.getParentFolder();
-    while (parentFolder instanceof RootFolderEntity == false) {
-      parentFolder = parentFolder.getParentFolder();
-    }
-    return (RootFolderEntity) parentFolder;
-  }
-
-  public ArtistFolderEntity convertChildFolderToArtistFolder(FolderEntity childFolder,
-      boolean useGenre, boolean useTopFolderForGenre) {
+  public ArtistFolderEntity convertChildFolderToArtistFolder(FolderEntity childFolder) {
 
     try {
 
@@ -144,41 +106,13 @@ public class FolderEntity extends AbstractLibraryEntity {
 
       this.removeChild(this.childFolders, childFolder);
 
-      ArtistFolderEntity artistFolder =
-          new ArtistFolderEntity(this, childFolder.getName(), childFolder.getChildFolders());
-
-      // System.out.println(" Found artist: " + artistFolder.getName());
+      ArtistFolderEntity artistFolder = new ArtistFolderEntity(this, childFolder.getName(), childFolder.getChildFolders());
 
       FolderEntity parentFolder = artistFolder.getParentFolder();
       parentFolder.addChildFolder(artistFolder);
 
       for (FolderEntity cf : childFolder.getChildFolders()) {
         cf.setParentFolder(artistFolder);
-      }
-
-      if (useGenre) {
-
-        RootFolderEntity rootFolder = null;
-        FolderEntity folderToConvertToGenreFolder = null;
-
-        if (useTopFolderForGenre) {
-
-          while (parentFolder instanceof RootFolderEntity == false) {
-
-            folderToConvertToGenreFolder = parentFolder;
-            parentFolder = parentFolder.getParentFolder();
-
-            if (parentFolder instanceof RootFolderEntity) {
-              rootFolder = (RootFolderEntity) parentFolder;
-            }
-          }
-          rootFolder.convertChildFolderToGenreFolder(folderToConvertToGenreFolder);
-
-        } else {
-
-          throw new SongLibraryException("useTopFolderForGenre=false not implemented yet!");
-
-        }
       }
 
       return artistFolder;
@@ -199,11 +133,7 @@ public class FolderEntity extends AbstractLibraryEntity {
 
       this.removeChild(this.childFolders, childFolder);
 
-      GenreFolderEntity genreFolder =
-          new GenreFolderEntity(this, childFolder.getName(), childFolder.getChildFolders());
-
-      // TODO: Convert to log4j
-      System.out.println("Found genre: " + genreFolder.getName());
+      GenreFolderEntity genreFolder = new GenreFolderEntity(this, childFolder.getName(), childFolder.getChildFolders());
 
       this.addChildFolder(genreFolder);
 

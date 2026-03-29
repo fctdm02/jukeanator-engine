@@ -1,38 +1,44 @@
 package com.djt.jukeanator_engine.domain.songlibrary.mapper;
 
+import java.util.ArrayList;
+import java.util.List;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 
 /**
  * @author tmyers
  */
 public final class SongLibraryMapper {
+  
+  public static List<AlbumDto> toDto(List<AlbumFolderEntity> albumEntities) {
+    
+    List<AlbumDto> albumDtos = new ArrayList<>();
+    
+    for (AlbumFolderEntity albumEntity: albumEntities) {
+      
+      List<SongDto> songDtos = new ArrayList<>();
+      for (SongFileEntity songEntity: albumEntity.getChildSongs()) {
+        songDtos.add(new SongDto(
+            songEntity.getName(), 
+            songEntity.getNumPlays()));
+      }
+      
+      AlbumDto albumDto = new AlbumDto(
+          albumEntities.indexOf(albumEntity), 
+          albumEntity.getName(),
+          albumEntity.getParentGenre().getName(),
+          albumEntity.getParentArtist().getName(), 
+          albumEntity.hasExplicit(), 
+          albumEntity.getRecordLabel(),
+          albumEntity.getReleaseDate(), 
+          albumEntity.getCoverArtPath(), 
+          songDtos);
 
-    public static GenreDto toDto(GenreFolderEntity genre) {
-        return new GenreDto(genre.getName());
-    }
-
-    public static ArtistDto toDto(ArtistFolderEntity artist) {
-        return new ArtistDto(artist.getName());
-    }
-
-    public static AlbumDto toDto(AlbumFolderEntity album) {
-        return new AlbumDto(
-            album.getName(),
-            album.getParentFolder().getName() // artist
-        );
+      albumDtos.add(albumDto);
     }
     
-    public static SongDto toDto(SongFileEntity song) {
-      return new SongDto(
-          song.getName(),
-          song.getParentFolder().getName() // album
-      );
-  }    
+    return albumDtos;
+  }
 }

@@ -15,10 +15,7 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
@@ -36,10 +33,8 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
   private SongScanner songScanner;
   private boolean isInitialized;
   
-  private List<GenreFolderEntity> genres = new ArrayList<>();
-  private List<ArtistFolderEntity> artists = new ArrayList<>();
+  private List<String> genres = new ArrayList<>();
   private List<AlbumFolderEntity> albums = new ArrayList<>();
-  private List<SongFileEntity> songs = new ArrayList<>();
 
   public SongLibraryServiceImpl(
       String scanPath,
@@ -60,21 +55,12 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
   
   // Service methods
   @Override  
-  public List<GenreFolderEntity> getGenres() {
+  public List<String> getGenres() {
     
     if (!isInitialized) {
       throw new SongLibraryException("SongLibraryService has not been initialized yet!");
     }
     return genres;
-  }
-
-  @Override
-  public List<ArtistFolderEntity> getArtists() {
-    
-    if (!isInitialized) {
-      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
-    }    
-    return artists;
   }
 
   @Override
@@ -84,15 +70,6 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
       throw new SongLibraryException("SongLibraryService has not been initialized yet!");
     }
     return albums;
-  }   
-  
-  @Override
-  public List<SongFileEntity> getSongs() {
-    
-    if (!isInitialized) {
-      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
-    }
-    return songs;
   }   
   
   @Override
@@ -160,7 +137,6 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
     throw new SongLibraryException("Not implemented yet!");
   }
 
-  @Override
   public void initializeSongLibrary() {
     
     // If we cannot load the song library from disk at startup, then assume a new install and return an
@@ -179,19 +155,19 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
       this.root = new RootFolderEntity();
     }
     
-    this.genres = this.root.getAllGenres();
-    this.artists = this.root.getAllArtists();
     this.albums = this.root.getAllAlbums();
     
-    this.songs = new ArrayList<>();
-    for (AlbumFolderEntity album : albums) {
-      songs.addAll(album.getChildSongs());
+    this.genres.clear();
+    for (AlbumFolderEntity album : this.albums) {
+      String genre = album.getParentGenre().getName();
+      if (!this.genres.contains(genre)) {
+        this.genres.add(genre);
+      }
     }
     
     this.isInitialized = true;
   }  
   
-  @Override
   public void setScanPath(String scanPath) {
     
     if (this.songLibraryRepository instanceof SongLibraryRepositoryFileSystemImpl) {
