@@ -93,7 +93,8 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
       initializeSongLibrary();
       
       return root;
-      
+    } catch (SongLibraryException sle) {
+    	throw sle;      
     } catch (Exception e) {
       throw new SongScanFailedException("Could not scan file system for songs in: "
           + scanPath 
