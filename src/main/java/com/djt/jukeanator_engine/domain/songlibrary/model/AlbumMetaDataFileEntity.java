@@ -14,11 +14,13 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
 
   private static final long serialVersionUID = 1L;
 
+  public static final String Genre = "Genre";
   public static final String CoverArtURL = "CoverArtURL";
   public static final String RecordLabel = "RecordLabel";
   public static final String ReleaseDate = "ReleaseDate";
   public static final String HasExplicit = "HasExplicit";
 
+  private String genre = "";
   private String coverArtUrl = "";
   private String recordLabel = "";
   private String releaseDate = "";
@@ -36,6 +38,11 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
     return getRecordLabel() != null && !getRecordLabel().isEmpty();
   }
 
+  public String getGenre() {
+	 ensureLoaded();
+	 return genre;
+  }
+  
   public String getCoverArtUrl() {
     ensureLoaded();
     return coverArtUrl;
@@ -75,7 +82,10 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
       String line;
 
       while ((line = reader.readLine()) != null) {
-        if (line.startsWith("CoverArtURL=")) {
+    	  
+        if (line.startsWith("Genre=")) {
+        	coverArtUrl = line.substring("Genre=".length());
+        } else if (line.startsWith("CoverArtURL=")) {
           coverArtUrl = line.substring("CoverArtURL=".length());
         } else if (line.startsWith("RecordLabel=")) {
           recordLabel = line.substring("RecordLabel=".length());
@@ -96,6 +106,7 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
   public void writeMetadataToFileSystem(Map<String, String> metadata) {
 
     // Populate fields safely
+	this.genre = safe(metadata.getOrDefault(Genre, ""));
     this.coverArtUrl = safe(metadata.getOrDefault(CoverArtURL, ""));
     this.recordLabel = safe(metadata.getOrDefault(RecordLabel, "Unknown"));
     this.releaseDate = safe(metadata.getOrDefault(ReleaseDate, ""));
@@ -111,6 +122,8 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
 
       try (BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
 
+        writer.write("Genre=" + genre);
+        writer.newLine();    	  
         writer.write("CoverArtURL=" + coverArtUrl);
         writer.newLine();
         writer.write("ReleaseDate=" + releaseDate);

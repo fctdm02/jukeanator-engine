@@ -34,6 +34,8 @@ public final class DiscogsClientWrapper {
 
   public static final String USER_AGENT = "JukeANatorUserAgent/1.0";
 
+  private String consumerKey;
+  private String consumerSecret;
   private Discogs discogsClient;
 
   @Bean
@@ -48,9 +50,20 @@ public final class DiscogsClientWrapper {
 
     requireNonNull(consumerKey, "consumerKey cannot be null");
     requireNonNull(consumerSecret, "consumerSecret cannot be null");
+    this.consumerKey = consumerKey;
+    this.consumerSecret = consumerSecret;
 
-    discogsClient =
-        Discogs.newKeySecretAuthenticatedInstance(consumerKey, consumerSecret, USER_AGENT);
+    discogsClient = Discogs.newKeySecretAuthenticatedInstance(this.consumerKey, this.consumerSecret, USER_AGENT);
+  }
+  
+  public boolean hasValidApiKey() {
+	  
+	  if (this.consumerKey.isBlank() || this.consumerKey.equalsIgnoreCase("DUMMY") 
+			  || this.consumerSecret.isBlank() || this.consumerSecret.equalsIgnoreCase("DUMMY")) {
+		  
+		  return false;
+	  }
+	  return true;
   }
 
   public Map<String, String> searchForAlbumMetadata(String artist, String album) {
@@ -73,15 +86,33 @@ public final class DiscogsClientWrapper {
     if (searchResults != null && !searchResults.isEmpty()) {
 
       SearchResult searchResult = searchResults.get(0);
+      
+      List<String> genres = searchResult.getGenre();
+      if (genres != null && !genres.isEmpty() && !genres.get(0).isBlank()) {
+    	  albumMetadataResults.put(AlbumMetaDataFileEntity.Genre, GenreNormalizer.normalize(genres.get(0)));  
+      }
 
-      albumMetadataResults.put(AlbumMetaDataFileEntity.CoverArtURL, searchResult.getCoverImage());
+      String coverArtUrl = searchResult.getCoverImage();
+      if (coverArtUrl != null && !coverArtUrl.trim().isBlank()) {
+    	  albumMetadataResults.put(AlbumMetaDataFileEntity.CoverArtURL, coverArtUrl);  
+      }      
 
       List<String> labels = searchResult.getLabel();
-      if (labels != null && !labels.isEmpty()) {
+      if (labels != null && !labels.isEmpty() && !labels.get(0).isBlank()) {
         albumMetadataResults.put(AlbumMetaDataFileEntity.RecordLabel, labels.get(0));
       }
 
-      albumMetadataResults.put(AlbumMetaDataFileEntity.ReleaseDate, searchResult.getYear());
+      String releaseDate = "";
+      String year = searchResult.getYear();
+      if (year != null && !year.trim().isBlank()) {
+    	  
+    	  if (year.length() > 4) {
+    		  releaseDate = year.substring(0, 4);
+		  } else {
+			releaseDate = year;
+		  }	
+    	  albumMetadataResults.put(AlbumMetaDataFileEntity.ReleaseDate, releaseDate);  
+      }
 
       if (searchResult.getTitle().toLowerCase().contains("explicit")) {
         albumMetadataResults.put(AlbumMetaDataFileEntity.HasExplicit, "true");

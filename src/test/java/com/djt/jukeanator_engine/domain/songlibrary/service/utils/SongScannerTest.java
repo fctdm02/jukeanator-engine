@@ -19,12 +19,16 @@ public class SongScannerTest {
 
     // STEP 1: ARRANGE
     DiscogsClientWrapper discogsClientWrapper = DiscogsClientWrapperTest.createDiscogsClientWrapper();
+    MusicBrainzClientWrapper musicBrainzClientWrapper = new MusicBrainzClientWrapper();
+    JAudioTaggerClient jAudioTaggerClient = new JAudioTaggerClient();
     CoverArtDownloader coverArtDownloader = new CoverArtDownloader();
     boolean requiresMetadata = true;
     boolean useGenre = true;
     boolean useTopFolderForGenre = true;
     SongScanner songScanner = new SongScanner(
-        discogsClientWrapper, 
+        discogsClientWrapper,
+        musicBrainzClientWrapper,
+        jAudioTaggerClient,
         coverArtDownloader,
         requiresMetadata, 
         useGenre, 

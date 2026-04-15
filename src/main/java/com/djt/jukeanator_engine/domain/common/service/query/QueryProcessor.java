@@ -28,5 +28,5 @@ public interface QueryProcessor<S extends QueryRequest, R extends QueryResponse<
    * 
    * @return The query response
    */
-  R query(S queryRequest);
+  R processQuery(S queryRequest);
 }

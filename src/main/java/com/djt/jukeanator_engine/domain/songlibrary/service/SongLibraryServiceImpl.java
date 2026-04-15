@@ -133,7 +133,7 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
 
   // Query methods
   @Override
-  public QueryResponse<QueryRequest, QueryResponseItem> query(QueryRequest queryRequest) {
+  public QueryResponse<QueryRequest, QueryResponseItem> processQuery(QueryRequest queryRequest) {
 
     throw new SongLibraryException("Not implemented yet!");
   }

@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.service.config;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryPostgresImpl;
@@ -9,6 +10,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryServiceImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.CoverArtDownloader;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.DiscogsClientWrapper;
+import com.djt.jukeanator_engine.domain.songlibrary.service.utils.JAudioTaggerClient;
+import com.djt.jukeanator_engine.domain.songlibrary.service.utils.MusicBrainzClientWrapper;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
 
@@ -23,6 +26,16 @@ public class SongLibraryConfig {
         );
     }
 
+    @Bean
+    public MusicBrainzClientWrapper musicBrainzClientWrapper() {
+        return new MusicBrainzClientWrapper();
+    }
+
+    @Bean
+    public JAudioTaggerClient jAudioTaggerClient() {
+        return new JAudioTaggerClient();
+    }
+    
     @Bean
     public CoverArtDownloader coverArtDownloader() {
         return new CoverArtDownloader();
@@ -58,11 +71,15 @@ public class SongLibraryConfig {
     public SongScanner songScanner(
             SongLibraryProperties props,
             DiscogsClientWrapper discogsClientWrapper,
+            MusicBrainzClientWrapper musicBrainzClientWrapper,
+            JAudioTaggerClient jAudioTaggerClient,
             CoverArtDownloader coverArtDownloader
     ) {
         return new SongScanner(
                 discogsClientWrapper,
-                coverArtDownloader,
+                musicBrainzClientWrapper,
+                jAudioTaggerClient,
+                coverArtDownloader,                
                 props.isRequiresMetadata(),
                 props.isUseGenre(),
                 props.isUseTopFolderForGenre()
