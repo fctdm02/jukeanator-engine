@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import java.util.List;
 import java.util.Set;
+
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
@@ -18,6 +19,12 @@ public interface SongLibraryService extends AggregateRootService<RootFolderEntit
    */
   List<String> getGenres();
 
+  /**
+   * 
+   * @return
+   */
+  List<String> getArtists();
+  
   /**
    * 
    * @return

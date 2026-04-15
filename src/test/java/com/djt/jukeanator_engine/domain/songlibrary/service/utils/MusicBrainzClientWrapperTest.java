@@ -23,10 +23,11 @@ public class MusicBrainzClientWrapperTest {
 	MusicBrainzClientWrapper musicBrainzClientWrapper = new MusicBrainzClientWrapper();
     String artist = "Billy Idol";
     String album = "Vital Idol";
+    boolean useGenre = true;
 
 
     // STEP 2: ACT
-    Map<String, String> albumMetadataResults = musicBrainzClientWrapper.searchForAlbumMetadata(artist, album);
+    Map<String, String> albumMetadataResults = musicBrainzClientWrapper.searchForAlbumMetadata(artist, album, useGenre);
 
 
     // STEP 3: ASSERT
@@ -44,5 +45,9 @@ public class MusicBrainzClientWrapperTest {
     expected = "1985";
     actual = albumMetadataResults.get(AlbumMetaDataFileEntity.ReleaseDate);     
     assertEquals(expected, actual, "releaseDate is incorrect");
+    
+    expected = "Rock";
+    actual = albumMetadataResults.get(AlbumMetaDataFileEntity.Genre);     
+    assertEquals(expected, actual, "genre is incorrect");    
   }
 }

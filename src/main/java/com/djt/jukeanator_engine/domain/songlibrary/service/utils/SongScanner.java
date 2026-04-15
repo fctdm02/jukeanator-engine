@@ -236,7 +236,7 @@ public final class SongScanner {
 			if (!hasValidCoverArt || (requiresMetadata && !hasValidMetadata)) {
 
 				albumMetadataResults = this.musicBrainzClientWrapper
-						.searchForAlbumMetadata(album.getParentFolder().getName(), album.getName());
+						.searchForAlbumMetadata(album.getParentFolder().getName(), album.getName(), this.useGenre);
 				
 				if ((albumMetadataResults == null || albumMetadataResults.isEmpty()) && this.discogsClientWrapper.hasValidApiKey()) {
 

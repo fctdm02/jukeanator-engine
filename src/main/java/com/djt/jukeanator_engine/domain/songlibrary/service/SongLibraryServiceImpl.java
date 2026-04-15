@@ -1,11 +1,14 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import static java.util.Objects.requireNonNull;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResponse;
@@ -34,7 +37,8 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
   private boolean isInitialized;
   
   private List<String> genres = new ArrayList<>();
-  private List<AlbumFolderEntity> albums = new ArrayList<>();
+  private List<String> artists = new ArrayList<>();
+  private List<AlbumFolderEntity> albums = new ArrayList<>();  
 
   public SongLibraryServiceImpl(
       String scanPath,
@@ -63,6 +67,15 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
     return genres;
   }
 
+  @Override
+  public List<String> getArtists() {
+    
+    if (!isInitialized) {
+      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
+    }
+    return artists;
+  }   
+  
   @Override
   public List<AlbumFolderEntity> getAlbums() {
     
@@ -157,9 +170,16 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
     }
     
     this.albums = this.root.getAllAlbums();
-    
+    this.artists.clear();    
     this.genres.clear();
+    
     for (AlbumFolderEntity album : this.albums) {
+    	
+      String artist = album.getParentArtist().getName();
+      if (!this.artists.contains(artist)) {
+    	  this.artists.add(artist);
+      }    	
+    	
       String genre = album.getParentGenre().getName();
       if (!this.genres.contains(genre)) {
         this.genres.add(genre);

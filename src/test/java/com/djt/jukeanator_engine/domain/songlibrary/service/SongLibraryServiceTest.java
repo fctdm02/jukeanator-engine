@@ -81,12 +81,17 @@ public class SongLibraryServiceTest {
     
     // STEP 2: ACT
     List<String> genres = songLibraryService.getGenres();
+    List<String> artists = songLibraryService.getArtists();
     List<AlbumFolderEntity> albums = songLibraryService.getAlbums();
     
     
     // STEP 3: ASSERT
     assertNotNull(genres, "genres should not be null");
     assertFalse(genres.isEmpty(), "genres should not be empty");
+
+    assertNotNull(artists, "artists should not be null");
+    assertFalse(artists.isEmpty(), "artists should not be empty");
+    
     assertNotNull(albums, "albums should not be null");
     assertFalse(albums.isEmpty(), "albums should not be empty");
   }   

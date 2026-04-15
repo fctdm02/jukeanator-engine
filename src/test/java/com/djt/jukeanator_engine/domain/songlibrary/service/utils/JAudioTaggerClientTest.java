@@ -125,13 +125,14 @@ public class JAudioTaggerClientTest {
 		cleanup();
 	}
 
-	@Test
+	//@Test
 	public void renameSongFromTag_ONEOFF() throws IOException {
 
 		// STEP 1: ARRANGE
 	    DiscogsClientWrapper discogsClientWrapper = DiscogsClientWrapperTest.createDiscogsClientWrapper();
 	    MusicBrainzClientWrapper musicBrainzClientWrapper = new MusicBrainzClientWrapper();
 	    CoverArtDownloader coverArtDownloader = new CoverArtDownloader();
+	    boolean useGenre = false;
 		
 		JAudioTaggerClient jAudioTaggerClient = new JAudioTaggerClient();
 		File parentDir = new File("/home/tmyers/Music/Spotify");
@@ -148,24 +149,29 @@ public class JAudioTaggerClientTest {
 					Map<String, String> albumMetadataResults = new HashMap<>();
 
 					Map<String, String> tags = jAudioTaggerClient.getTags(file.getAbsolutePath());
-					String artist = tags.get(JAudioTaggerClient.ARTIST_NAME);
-					String album = tags.get(JAudioTaggerClient.ALBUM_NAME);
-					albumMetadataResults = musicBrainzClientWrapper.searchForAlbumMetadata(artist, album);
-					genre = albumMetadataResults.get(AlbumMetaDataFileEntity.Genre);
-					
-					if ((genre == null || genre.isBlank()) && discogsClientWrapper.hasValidApiKey()) {
+					String genreTag = tags.get(JAudioTaggerClient.GENRE_NAME);
+					if (genreTag == null || genreTag.isBlank()) {
 
-						tags = jAudioTaggerClient.getTags(file.getAbsolutePath());
-						artist = tags.get(JAudioTaggerClient.ARTIST_NAME);
-						album = tags.get(JAudioTaggerClient.ALBUM_NAME);
-						albumMetadataResults = discogsClientWrapper.searchForAlbumMetadata(artist, album);
+						String artist = tags.get(JAudioTaggerClient.ARTIST_NAME);
+						String album = tags.get(JAudioTaggerClient.ALBUM_NAME);
+						albumMetadataResults = musicBrainzClientWrapper.searchForAlbumMetadata(artist, album, useGenre);
 						genre = albumMetadataResults.get(AlbumMetaDataFileEntity.Genre);
-					}					
-					
-					if (genre != null && !genre.isBlank()) {
+						
+						if ((genre == null || genre.isBlank()) && discogsClientWrapper.hasValidApiKey()) {
 
-					    jAudioTaggerClient.embedGenre(genre, file.getAbsolutePath());
-					}					
+							tags = jAudioTaggerClient.getTags(file.getAbsolutePath());
+							artist = tags.get(JAudioTaggerClient.ARTIST_NAME);
+							album = tags.get(JAudioTaggerClient.ALBUM_NAME);
+							albumMetadataResults = discogsClientWrapper.searchForAlbumMetadata(artist, album);
+							genre = albumMetadataResults.get(AlbumMetaDataFileEntity.Genre);
+						}					
+						
+						if (genre != null && !genre.isBlank() && !genre.equals("Other")) {
+
+							System.out.println(i + " of " + size + ": Genre for: " + file.getAbsolutePath() + " is: " + genre);
+						    jAudioTaggerClient.embedGenre(genre, file.getAbsolutePath());
+						}					
+					}
 				}
 				
 				if (!jAudioTaggerClient.hasCoverArt(file.getAbsolutePath())) {
@@ -176,7 +182,7 @@ public class JAudioTaggerClientTest {
 					Map<String, String> tags = jAudioTaggerClient.getTags(file.getAbsolutePath());
 					String artist = tags.get(JAudioTaggerClient.ARTIST_NAME);
 					String album = tags.get(JAudioTaggerClient.ALBUM_NAME);
-					albumMetadataResults = musicBrainzClientWrapper.searchForAlbumMetadata(artist, album);
+					albumMetadataResults = musicBrainzClientWrapper.searchForAlbumMetadata(artist, album, useGenre);
 					coverArtUrl = albumMetadataResults.get(AlbumMetaDataFileEntity.CoverArtURL);
 					
 					if ((coverArtUrl == null || coverArtUrl.isBlank()) && discogsClientWrapper.hasValidApiKey()) {
@@ -197,8 +203,8 @@ public class JAudioTaggerClientTest {
 					}
 				}
 				
-				Path renamedFile = jAudioTaggerClient.renameSongFromTag(file.getAbsolutePath(), false);
-				System.out.println(i + " of " + size + ": Renamed " + file.getAbsolutePath() + " to: " + renamedFile);				
+				//Path renamedFile = jAudioTaggerClient.renameSongFromTag(file.getAbsolutePath(), false);
+				//System.out.println(i + " of " + size + ": Renamed " + file.getAbsolutePath() + " to: " + renamedFile);				
 			}
 		}
 	}

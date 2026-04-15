@@ -1,21 +1,23 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service.utils;
 
-import org.springframework.web.client.RestClient;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.RestClient;
 
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Single-threaded API, virtual-thread executed, fully rate-limited MusicBrainz client.
@@ -59,16 +61,16 @@ public class MusicBrainzClientWrapper {
     // =========================================================
     // PUBLIC BLOCKING API (NO EXPLICIT CONCURRENCY)
     // =========================================================
-    public Map<String, String> searchForAlbumMetadata(String artist, String album) {
+    public Map<String, String> searchForAlbumMetadata(String artist, String album, boolean useGenre) {
     	
     	Map<String, String> albumMetadataResults = new HashMap<>();
     	
-    	AlbumResult albumResult = lookupAlbum(artist, album);
+    	AlbumResult albumResult = lookupAlbum(artist, album, useGenre);
     	if (albumResult != null) {
 
         	String genre = albumResult.genre;
     		if (genre != null && !genre.trim().isBlank()) {
-    		    albumMetadataResults.put(AlbumMetaDataFileEntity.Genre, genre);
+    		    albumMetadataResults.put(AlbumMetaDataFileEntity.Genre, GenreNormalizer.normalize(genre));
     		}		
     		
     		String coverArtUrl = albumResult.coverArtUrl;
@@ -99,11 +101,11 @@ public class MusicBrainzClientWrapper {
 		return albumMetadataResults;    	
     }
 
-    private AlbumResult lookupAlbum(String artist, String album) {
+    private AlbumResult lookupAlbum(String artist, String album, boolean useGenre) {
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
 
-            return executor.submit(() -> executeLookup(artist, album))
+            return executor.submit(() -> executeLookup(artist, album, useGenre))
                            .get();   // correct for Future
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -114,7 +116,7 @@ public class MusicBrainzClientWrapper {
     // CORE LOGIC (SEQUENTIAL INSIDE VIRTUAL THREAD)
     // =========================================================
 
-    private AlbumResult executeLookup(String artist, String album) {
+    private AlbumResult executeLookup(String artist, String album, boolean useGenre) {
 
         String query = String.format("artist:\"%s\" AND release:\"%s\"", artist, album);
 
@@ -144,7 +146,7 @@ public class MusicBrainzClientWrapper {
             return client.get()
                 .uri(uriBuilder -> uriBuilder
                     .path("/release/{id}")
-                    .queryParam("inc", "labels+tags")
+                    .queryParam("inc", "labels+tags+genres+recordings")
                     .queryParam("fmt", "json")
                     .build(best.id))
                 .retrieve()
@@ -160,7 +162,7 @@ public class MusicBrainzClientWrapper {
                 .findFirst()
                 .orElse(null);
         }
-
+        
         // genre
         String genre = null;
         if (full != null && full.tags != null) {
@@ -169,6 +171,15 @@ public class MusicBrainzClientWrapper {
                 .map(t -> t.name)
                 .findFirst()
                 .orElse(null);
+        }
+        if (useGenre && genre == null) {
+        	Optional<String> artistMbid = findArtistMbid(artist);
+        	if (artistMbid.isPresent()) {
+        		Optional<String> topGenre = getTopGenreByArtist(artistMbid.get());
+        		if (topGenre.isPresent()) {
+        			genre = topGenre.get();
+        		}
+        	}        	
         }
 
         String coverArt = "https://coverartarchive.org/release/" + best.id + "/front";
@@ -182,6 +193,59 @@ public class MusicBrainzClientWrapper {
         );
     }
 
+    public Optional<String> findArtistMbid(String artistName) {
+
+        ArtistSearchResponse response = executeWithRetry(() -> {
+            acquireRateLimit();
+
+            return client.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/artist")
+                            .queryParam("query", "artist:" + artistName)
+                            .queryParam("fmt", "json")
+                            .build())
+                    .retrieve()
+                    .body(ArtistSearchResponse.class);
+        });
+
+        if (response == null || response.artists() == null || response.artists().isEmpty()) {
+            return Optional.empty();
+        }
+
+        return response.artists().stream()
+                .filter(a -> a.name() != null)
+                .sorted(Comparator
+                        .comparing((ArtistSummary a) -> a.name().equalsIgnoreCase(artistName) ? 0 : 1)
+                        .thenComparing(a -> a.disambiguation() == null ? 1 : 0))
+                .map(ArtistSummary::id)
+                .findFirst();
+    }
+    
+    public Optional<String> getTopGenreByArtist(String artistMbid) {
+
+        ArtistResponse response = executeWithRetry(() -> {
+            acquireRateLimit();
+
+            return client.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/artist/{mbid}")
+                            .queryParam("inc", "genres")
+                            .queryParam("fmt", "json")
+                            .build(artistMbid))
+                    .retrieve()
+                    .body(ArtistResponse.class);
+        });
+
+        if (response == null || response.genres() == null || response.genres().isEmpty()) {
+            return Optional.empty();
+        }
+
+        return response.genres().stream()
+                .filter(g -> g.name() != null && g.count() != null)
+                .max(Comparator.comparingInt(Genre::count))
+                .map(Genre::name);
+    }
+    
     // =========================================================
     // RATE LIMIT + RETRY
     // =========================================================
@@ -275,4 +339,24 @@ public class MusicBrainzClientWrapper {
         public String name;
         public int count;
     }
+    
+    public record ArtistSearchResponse(List<ArtistSummary> artists) {}
+
+    public record ArtistSummary(
+            String id,
+            String name,
+            String disambiguation,
+            String country
+    ) {}
+    
+    public record ArtistResponse(
+            String id,
+            String name,
+            List<Genre> genres
+    ) {}
+
+    public record Genre(
+            String name,
+            Integer count
+    ) {}    
 }
