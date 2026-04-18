@@ -141,7 +141,10 @@ public final class SongScanner {
 
 		// See if any album needs to have cover art, record label, release
 		// date or explicit lyrics metadata retrieved from Discogs
-		for (AlbumFolderEntity album : albums) {
+		for (int i=0; i < albums.size(); i++) {
+			
+			AlbumFolderEntity album = albums.get(i);
+			album.setPersistentIdentity(i);
 
 			String albumPath = album.getNaturalIdentity();
 			String coverArtPath = albumPath + File.separator + AlbumFolderEntity.COVER_ART_FILENAME;
@@ -154,9 +157,9 @@ public final class SongScanner {
 			Set<SongFileEntity> songs = album.getChildSongs();
 			List<SongFileEntity> songList = new ArrayList<>();
 			songList.addAll(songs);
-			for (int i=0; i < songList.size(); i++) {
+			for (int j=0; j < songList.size(); j++) {
 				
-				SongFileEntity song = songList.get(i);
+				SongFileEntity song = songList.get(j);
 				
 				String songFile = song.getNaturalIdentity();
 				if (!hasValidCoverArt) {
@@ -226,7 +229,7 @@ public final class SongScanner {
 							if (trackNumber != null && trackNumber.intValue() > 0) {
 								song.setTrackNumber(trackNumber);
 							} else {
-								song.setTrackNumber(Integer.valueOf(i));	
+								song.setTrackNumber(Integer.valueOf(j));
 							}							
 						}					
 					}					

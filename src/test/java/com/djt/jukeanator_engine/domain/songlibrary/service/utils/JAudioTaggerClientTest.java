@@ -135,7 +135,7 @@ public class JAudioTaggerClientTest {
 	    boolean useGenre = false;
 		
 		JAudioTaggerClient jAudioTaggerClient = new JAudioTaggerClient();
-		File parentDir = new File("/home/tmyers/Music/Spotify");
+		File parentDir = new File("/home/tmyers/Music/AllMusic");
 		File[] files = parentDir.listFiles();
 		int size = files.length;
 		for (int i=0; i < size; i++) {
@@ -203,8 +203,8 @@ public class JAudioTaggerClientTest {
 					}
 				}
 				
-				//Path renamedFile = jAudioTaggerClient.renameSongFromTag(file.getAbsolutePath(), false);
-				//System.out.println(i + " of " + size + ": Renamed " + file.getAbsolutePath() + " to: " + renamedFile);				
+				Path renamedFile = jAudioTaggerClient.renameSongFromTag(file.getAbsolutePath(), false);
+				System.out.println(i + " of " + size + ": Renamed " + file.getAbsolutePath() + " to: " + renamedFile);				
 			}
 		}
 	}

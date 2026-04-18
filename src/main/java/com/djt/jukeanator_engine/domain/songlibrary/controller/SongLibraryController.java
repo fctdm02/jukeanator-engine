@@ -34,7 +34,7 @@ public class SongLibraryController {
     }
 
     @GetMapping("/artists")
-    public List<String> getArtist() {
+    public List<String> getArtists() {
     	return songLibraryService.getArtists();
     }
     
