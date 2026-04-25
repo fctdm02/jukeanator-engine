@@ -1,4 +1,4 @@
-package com.djt.jukeanator_engine.domain.songlibrary.service.utils;
+package com.djt.jukeanator_engine.domain.songlibrary.repository;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -9,17 +9,12 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 
-/**
- * @author tmyers
- * 
- *         Reads and writes to the filesystem the object input/output stream for the song library
- */
 public final class SongLibraryObjectPersistor {
 
   public SongLibraryObjectPersistor() {  
   }
 
-  public RootFolderEntity loadSongLibrary(String filePath) throws ClassNotFoundException, IOException {
+  public RootFolderEntity loadSongLibraryFromDisk(String filePath) throws ClassNotFoundException, IOException {
 
     try (FileInputStream fis = new FileInputStream(filePath);
         BufferedInputStream bis = new BufferedInputStream(fis);

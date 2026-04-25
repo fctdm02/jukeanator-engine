@@ -10,8 +10,6 @@ import java.util.TreeSet;
 public class RootFolderEntity extends FolderEntity {
   private static final long serialVersionUID = 1L;
   
-  public static final String SONG_LIBRARY_FILENAME = "JukeANator.oos";
-
   private String rootPrefix;
 
   public RootFolderEntity() {}

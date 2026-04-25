@@ -6,25 +6,26 @@ import java.io.IOException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongLibraryObjectPersistor;
 
 /**
  * @author tmyers
  */
 public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRepository {
   
+  public static final String SONG_LIBRARY_FILENAME = "JukeANator.oos";
+	
   private SongLibraryObjectPersistor songLibraryObjectPersistor;
   private String filePath;
   
   public SongLibraryRepositoryFileSystemImpl(String basePath) {
     requireNonNull(basePath, "basePath cannot be null");
-    filePath = basePath + File.separator + RootFolderEntity.SONG_LIBRARY_FILENAME;
+    filePath = basePath + File.separator + SONG_LIBRARY_FILENAME;
     this.songLibraryObjectPersistor = new SongLibraryObjectPersistor(); 
   }
   
   public void setBasePath(String basePath) {    
     requireNonNull(basePath, "basePath cannot be null");
-    filePath = basePath + File.separator + RootFolderEntity.SONG_LIBRARY_FILENAME;
+    filePath = basePath + File.separator + SONG_LIBRARY_FILENAME;
   }
 
   @Override
@@ -33,7 +34,7 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
     try {
       
       // TODO: How to reconcile naturalIdentity with filePath?
-      return this.songLibraryObjectPersistor.loadSongLibrary(filePath);
+      return this.songLibraryObjectPersistor.loadSongLibraryFromDisk(filePath);
       
     } catch (ClassNotFoundException | IOException e) {
       throw new EntityDoesNotExistException("Could not read song library from disk with naturalIdentity: " 

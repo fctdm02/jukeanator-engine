@@ -3,6 +3,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryPostgresImpl;
@@ -12,8 +13,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.utils.CoverArtDownlo
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.DiscogsClientWrapper;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.JAudioTaggerClient;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.MusicBrainzClientWrapper;
-import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
+import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueObjectPersistor;
 
 @Configuration
 public class SongLibraryConfig {
@@ -44,6 +45,11 @@ public class SongLibraryConfig {
     @Bean
     public SongLibraryObjectPersistor songLibraryObjectPersistor() {
         return new SongLibraryObjectPersistor();
+    }
+
+    @Bean
+    public SongQueueObjectPersistor songQueueObjectPersistor() {
+        return new SongQueueObjectPersistor();
     }
     
     @Bean
