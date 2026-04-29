@@ -47,4 +47,9 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
     List<SongQueueEntryEntity> list = getSongs();
     return list.indexOf(entry);
   }
+  
+  public boolean removeSongFromQueue(SongQueueEntryEntity songQueueEntry) {
+    
+    return this.songs.remove(songQueueEntry);
+  }
 }

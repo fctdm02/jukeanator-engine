@@ -24,4 +24,10 @@ public interface SongQueueService extends AggregateRootService<SongQueueRootEnti
    * @return
    */
   int addSongToQueue(SongFileEntity song, Integer priority);
+  
+  /**
+   * 
+   * @return
+   */
+  SongQueueEntryEntity getFirstEntryInSongQueue();
 }

@@ -51,7 +51,24 @@ public final class SongQueueServiceImpl implements SongQueueService {
   public int addSongToQueue(SongFileEntity song, Integer priority) {
     
     return songQueue.addSongToQueue(song, priority);
-  }  
+  }
+  
+  @Override
+  public SongQueueEntryEntity getFirstEntryInSongQueue() {
+    
+    List<SongQueueEntryEntity> songs = songQueue.getSongs();
+    
+    if (!songs.isEmpty()) {
+      
+      SongQueueEntryEntity songQueueEntry = songs.get(0);
+      
+      songQueue.removeSongFromQueue(songQueueEntry);
+      
+      return songQueueEntry;
+    }
+    
+    return null;
+  }
 
   // Repository methods
   @Override

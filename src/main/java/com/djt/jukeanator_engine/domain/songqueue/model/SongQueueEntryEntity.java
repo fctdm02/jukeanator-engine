@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.songqueue.model;
 
 import static java.util.Objects.requireNonNull;
+import com.djt.jukeanator_engine.domain.common.model.AbstractEntity;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 
@@ -29,7 +30,23 @@ public class SongQueueEntryEntity extends AbstractPersistentEntity {
   public Integer getPriority() {
     return priority;
   }
+
+  @Override
+  public int compareTo(AbstractEntity obj) {
+
+    if (obj instanceof SongQueueEntryEntity) {
+
+      SongQueueEntryEntity that = (SongQueueEntryEntity)obj;
+      
+      Integer thisPriority = this.getPriority();
+      Integer thatPriority = that.getPriority();
+      
+      return thisPriority.compareTo(thatPriority);
+    }
+    throw new IllegalStateException("Cannot compare this: " + this + " to an instance of: " + obj.getClassAndNaturalIdentity());
+  }
   
+  @Override
   public String getNaturalIdentity() {
     
     StringBuilder sb = new StringBuilder();
