@@ -10,13 +10,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntity;
@@ -26,8 +26,19 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntit
  */
 public class JAudioTaggerClientTest {
 
+	private static final Path TEST_DATA_DIR = Path.of("src", "test", "resources", "com", "djt", "jukeanator_engine", "domain", "songlibrary", "service", "utils", "JAudioTaggerClientTest");
+	private static final Path ORIGINAL_SONG_PATH = TEST_DATA_DIR.resolve("01 Rebel Yell.mp3");
+	private static final Path RENAMED_SONG_PATH = TEST_DATA_DIR.resolve("Billy Idol-01-Rebel Yell.mp3");
+	private static final Path COVER_ART_PATH = TEST_DATA_DIR.resolve("cover.jpg");
+
 	@BeforeAll
 	public static void beforeAll() throws IOException {
+
+		cleanup();
+	}
+
+	@BeforeEach
+	public void beforeEach() throws IOException {
 
 		cleanup();
 	}
@@ -40,16 +51,12 @@ public class JAudioTaggerClientTest {
 
 	public static void cleanup() throws IOException {
 
-		String coverArtPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/JAudioTaggerClientTest/cover.jpg";
-		Path path = Path.of(coverArtPath);
-		Files.deleteIfExists(path);
-
-		String songPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/JAudioTaggerClientTest/Billy Idol-01-Rebel Yell.mp3";
-		File songFile = new File(songPath);
+		Files.deleteIfExists(COVER_ART_PATH);
+		File songFile = RENAMED_SONG_PATH.toFile();
 		if (songFile.exists()) {
-			
-			Path source = Paths.get(songPath);		
-	        Path target = Paths.get("src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/JAudioTaggerClientTest/01 Rebel Yell.mp3");                
+
+			Path source = RENAMED_SONG_PATH;
+	        Path target = ORIGINAL_SONG_PATH;
 			try {
 				Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);	
 			} catch (NoSuchFileException nsfe) {
@@ -62,7 +69,7 @@ public class JAudioTaggerClientTest {
 
 		// STEP 1: ARRANGE
 		JAudioTaggerClient jAudioTaggerClient = new JAudioTaggerClient();
-		String songFile = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/JAudioTaggerClientTest/01 Rebel Yell.mp3";
+		String songFile = ORIGINAL_SONG_PATH.toString();
 
 		
 		// STEP 2: ACT
@@ -95,8 +102,8 @@ public class JAudioTaggerClientTest {
 
 		// STEP 1: ARRANGE
 		JAudioTaggerClient jAudioTaggerClient = new JAudioTaggerClient();
-		String songFile = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/JAudioTaggerClientTest/01 Rebel Yell.mp3";
-		String coverArtPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/JAudioTaggerClientTest/cover.jpg";
+		String songFile = ORIGINAL_SONG_PATH.toString();
+		String coverArtPath = COVER_ART_PATH.toString();
 
 		
 		// STEP 2: ACT
@@ -112,7 +119,7 @@ public class JAudioTaggerClientTest {
 
 		// STEP 1: ARRANGE
 		JAudioTaggerClient jAudioTaggerClient = new JAudioTaggerClient();
-		String songFile = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/JAudioTaggerClientTest/01 Rebel Yell.mp3";
+		String songFile = ORIGINAL_SONG_PATH.toString();
 		
 		
 		// STEP 2: ACT
@@ -120,8 +127,8 @@ public class JAudioTaggerClientTest {
 
 		
 		// STEP 3: ASSERT
-		String expectedRenamedSongFile = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/JAudioTaggerClientTest/Billy Idol-01-Rebel Yell.mp3";
-		assertEquals(expectedRenamedSongFile.toString(), renamedSongFile.toString(), "renamedSongFile expected to be: " + expectedRenamedSongFile + ", but instead was: " + renamedSongFile);
+		Path expectedRenamedSongFile = RENAMED_SONG_PATH;
+		assertEquals(expectedRenamedSongFile.normalize(), renamedSongFile.normalize(), "renamedSongFile expected to be: " + expectedRenamedSongFile + ", but instead was: " + renamedSongFile);
 		cleanup();
 	}
 

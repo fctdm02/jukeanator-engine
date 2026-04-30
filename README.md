@@ -99,10 +99,39 @@ Testcontainers has been configured to use the following Docker images:
 
 Please review the tags of the used images and set them to the same as you're running in production.
 
+#### Docker setup for tests (Windows, Linux, macOS)
+
+`mvn clean package` runs integration tests that use Testcontainers + PostgreSQL. Docker must be installed and the daemon must be reachable.
+
+- **Windows**: install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and ensure it is running.
+- **macOS**: install Docker Desktop, [Colima](https://github.com/abiosoft/colima), or [Rancher Desktop](https://rancherdesktop.io/).
+- **Linux**: install Docker Engine and ensure your user can run Docker commands.
+
+Quick verification:
+
+```
+docker version
+docker run --rm postgres:latest --version
+```
+
+If you are using Colima on macOS, export Docker host before running Maven:
+
+```
+export DOCKER_HOST=unix://${HOME}/.colima/default/docker.sock
+./mvnw clean package
+```
+
+Windows PowerShell equivalent:
+
+```
+docker version
+docker run --rm postgres:latest --version
+.\mvnw.cmd clean package
+```
+
 ### Maven Parent overrides
 
 Due to Maven's design, elements are inherited from the parent POM to the project POM.
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
-
