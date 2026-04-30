@@ -1,4 +1,4 @@
-package com.djt.jukeanator_engine.domain.songlibrary.service.config;
+package com.djt.jukeanator_engine.config;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,6 +9,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryReposi
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryPostgresImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryServiceImpl;
+import com.djt.jukeanator_engine.domain.songlibrary.service.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.CoverArtDownloader;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.DiscogsClientWrapper;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.JAudioTaggerClient;
@@ -17,7 +18,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueObjectPersistor;
 
 @Configuration
-public class SongLibraryConfig {
+public class ApplicationConfig {
 
     @Bean
     public DiscogsClientWrapper discogsClientWrapper(SongLibraryProperties props) {

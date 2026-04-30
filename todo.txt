@@ -1,0 +1,478 @@
+Describe the needed REST API to support this mobile app, in terms of a Java 21 Spring Boot controller, as well as any DTOs
+
+3 minutes ago
+
+Planning API endpoints and data structures (6 seconds)
+
+Here's how I'd shape the backend in Java 21 + Spring Boot. Java 21 makes this nice because every DTO can be a record, which keeps the contract tight and immutable.
+
+High-level resource map
+
+The mobile app touches five concerns: catalog (read-only), search, queue, now-playing, and credits. I'd split them into focused controllers under one base path, e.g. /api/v1. The "venue" (a single jukebox unit) is implicit from the authenticated client; multi-tenant deployments would carry a venueId either in the JWT or as a path prefix like /venues/{venueId}/....
+
+GET    /catalog/artists                  list, paged + ?letter=A
+
+GET    /catalog/artists/{id}             artist detail (with albums + top tracks)
+
+GET    /catalog/albums/{id}              album detail (with tracks)
+
+GET    /catalog/genres                   list of genre tiles + counts
+
+GET    /catalog/genres/{slug}/tracks     tracks for a genre (incl. TOP_40, NEW_RELEASES)
+
+GET    /catalog/tracks/popular           "Hot Tracks" rail
+
+GET    /search?q=...                     bundled artists + albums + tracks
+
+GET    /queue                            current queue + now-playing snapshot
+
+POST   /queue                            add a track (returns updated queue + new credit balance)
+
+DELETE /queue/{queueItemId}              remove
+
+PATCH  /queue/{queueItemId}              reorder (body: { newPosition })
+
+POST   /queue/skip                       admin/staff only
+
+GET    /now-playing                      lightweight snapshot for the Now Playing tab
+
+GET    /credits                          balance + recent purchases
+
+POST   /credits/purchase                 buy a pack (idempotent via Idempotency-Key header)
+
+For the live feel (queue updates from other patrons, progress ticks), I'd layer a single STOMP-over-WebSocket endpoint: /ws with topics /topic/venue/{venueId}/queue and /topic/venue/{venueId}/now-playing. The REST endpoints stay authoritative; the socket just pushes deltas.
+
+Controllers
+
+@RestController
+
+@RequestMapping("/api/v1/catalog")
+
+@RequiredArgsConstructor
+
+class CatalogController {
+
+    private final CatalogService catalog;
+
+    @GetMapping("/artists")
+
+    PageResponse<ArtistSummaryDto> listArtists(
+
+            @RequestParam(required = false) String letter,
+
+            @RequestParam(required = false) String q,
+
+            @PageableDefault(size = 50, sort = "name") Pageable pageable) {
+
+        return catalog.listArtists(letter, q, pageable);
+
+    }
+
+    @GetMapping("/artists/{id}")
+
+    ArtistDetailDto artist(@PathVariable UUID id) {
+
+        return catalog.getArtist(id);
+
+    }
+
+    @GetMapping("/albums/{id}")
+
+    AlbumDetailDto album(@PathVariable UUID id) {
+
+        return catalog.getAlbum(id);
+
+    }
+
+    @GetMapping("/genres")
+
+    List<GenreTileDto> genres() { return catalog.listGenres(); }
+
+    @GetMapping("/genres/{slug}/tracks")
+
+    List<TrackSummaryDto> genreTracks(@PathVariable String slug) {
+
+        return catalog.tracksForGenre(slug); // handles TOP_40 / NEW_RELEASES specially
+
+    }
+
+    @GetMapping("/tracks/popular")
+
+    List<TrackSummaryDto> popular(@RequestParam(defaultValue = "8") int limit) {
+
+        return catalog.popularTracks(limit);
+
+    }
+
+}
+
+@RestController
+
+@RequestMapping("/api/v1/search")
+
+@RequiredArgsConstructor
+
+class SearchController {
+
+    private final SearchService search;
+
+    @GetMapping
+
+    SearchResultsDto search(@RequestParam @Size(min = 1, max = 64) String q,
+
+                            @RequestParam(defaultValue = "12") int limit) {
+
+        return search.search(q, limit);
+
+    }
+
+}
+
+@RestController
+
+@RequestMapping("/api/v1/queue")
+
+@RequiredArgsConstructor
+
+class QueueController {
+
+    private final QueueService queue;
+
+    @GetMapping
+
+    QueueSnapshotDto current(@AuthenticationPrincipal Patron patron) {
+
+        return queue.snapshotFor(patron.venueId());
+
+    }
+
+    @PostMapping
+
+    ResponseEntity<QueueAddResultDto> add(@AuthenticationPrincipal Patron patron,
+
+                                          @RequestBody @Valid AddToQueueRequest body) {
+
+        var result = queue.add(patron, body); // throws InsufficientCreditsException -> 402
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+
+    }
+
+    @DeleteMapping("/{queueItemId}")
+
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+
+    void remove(@AuthenticationPrincipal Patron patron, @PathVariable UUID queueItemId) {
+
+        queue.remove(patron, queueItemId);
+
+    }
+
+    @PatchMapping("/{queueItemId}")
+
+    QueueSnapshotDto reorder(@AuthenticationPrincipal Patron patron,
+
+                             @PathVariable UUID queueItemId,
+
+                             @RequestBody @Valid ReorderRequest body) {
+
+        return queue.reorder(patron, queueItemId, body.newPosition());
+
+    }
+
+    @PostMapping("/skip")
+
+    @PreAuthorize("hasRole('STAFF')")
+
+    QueueSnapshotDto skip(@AuthenticationPrincipal Patron staff) {
+
+        return queue.skipNext(staff.venueId());
+
+    }
+
+}
+
+@RestController
+
+@RequestMapping("/api/v1/now-playing")
+
+@RequiredArgsConstructor
+
+class NowPlayingController {
+
+    private final PlaybackService playback;
+
+    @GetMapping
+
+    NowPlayingDto current(@AuthenticationPrincipal Patron patron) {
+
+        return playback.currentFor(patron.venueId());
+
+    }
+
+}
+
+@RestController
+
+@RequestMapping("/api/v1/credits")
+
+@RequiredArgsConstructor
+
+class CreditsController {
+
+    private final CreditsService credits;
+
+    @GetMapping
+
+    CreditsBalanceDto balance(@AuthenticationPrincipal Patron patron) {
+
+        return credits.balanceFor(patron);
+
+    }
+
+    @PostMapping("/purchase")
+
+    CreditsBalanceDto purchase(@AuthenticationPrincipal Patron patron,
+
+                               @RequestHeader("Idempotency-Key") String idempotencyKey,
+
+                               @RequestBody @Valid CreditPurchaseRequest body) {
+
+        return credits.purchase(patron, body, idempotencyKey);
+
+    }
+
+}
+
+DTOs (Java 21 records)
+
+// ---------- Catalog ----------
+
+public record ArtistSummaryDto(
+
+        UUID id,
+
+        String name,
+
+        long playCount,
+
+        String initial          // for the A-Z rail
+
+) {}
+
+public record ArtistDetailDto(
+
+        UUID id,
+
+        String name,
+
+        String bio,
+
+        long playCount,
+
+        List<String> genres,
+
+        List<AlbumSummaryDto> albums,
+
+        List<TrackSummaryDto> topTracks
+
+) {}
+
+public record AlbumSummaryDto(
+
+        UUID id,
+
+        String title,
+
+        int year,
+
+        URI coverUrl,           // signed URL or CDN path; null -> client uses gradient placeholder
+
+        UUID artistId,
+
+        String artistName
+
+) {}
+
+public record AlbumDetailDto(
+
+        UUID id,
+
+        String title,
+
+        int year,
+
+        URI coverUrl,
+
+        UUID artistId,
+
+        String artistName,
+
+        Duration totalDuration,
+
+        List<TrackSummaryDto> tracks
+
+) {}
+
+public record TrackSummaryDto(
+
+        UUID id,
+
+        String title,
+
+        Duration duration,
+
+        long plays,
+
+        UUID artistId,
+
+        String artistName,
+
+        UUID albumId,
+
+        String albumTitle,
+
+        URI coverUrl,
+
+        String genre
+
+) {}
+
+public record GenreTileDto(
+
+        String slug,            // "ROCK", "TOP_40", "NEW_RELEASES" ...
+
+        String label,
+
+        long trackCount,
+
+        String primaryColor,    // hex, drives the neon tile gradient
+
+        String secondaryColor
+
+) {}
+
+// ---------- Search ----------
+
+public record SearchResultsDto(
+
+        String query,
+
+        List<ArtistSummaryDto> artists,
+
+        List<AlbumSummaryDto> albums,
+
+        List<TrackSummaryDto> tracks
+
+) {}
+
+// ---------- Queue / now-playing ----------
+
+public record QueueItemDto(
+
+        UUID id,
+
+        int position,
+
+        TrackSummaryDto track,
+
+        String addedBy,         // "TABLE 7" / display name
+
+        Instant queuedAt
+
+) {}
+
+public record NowPlayingDto(
+
+        QueueItemDto item,      // null when idle
+
+        Instant startedAt,
+
+        Duration elapsed,
+
+        boolean isPlaying
+
+) {}
+
+public record QueueSnapshotDto(
+
+        NowPlayingDto nowPlaying,
+
+        List<QueueItemDto> upcoming,
+
+        Duration totalUpcomingDuration
+
+) {}
+
+public record AddToQueueRequest(
+
+        @NotNull UUID trackId,
+
+        @Size(max = 32) String addedBy   // optional table/handle
+
+) {}
+
+public record ReorderRequest(
+
+        @Min(0) int newPosition
+
+) {}
+
+public record QueueAddResultDto(
+
+        QueueItemDto added,
+
+        QueueSnapshotDto snapshot,
+
+        int remainingCredits
+
+) {}
+
+// ---------- Credits ----------
+
+public record CreditsBalanceDto(
+
+        int balance,
+
+        Instant updatedAt,
+
+        List<CreditPackDto> availablePacks
+
+) {}
+
+public record CreditPackDto(
+
+        String sku,             // "PACK_1", "PACK_5", "PACK_12"
+
+        int plays,
+
+        String displayPrice,    // "$1", "$4", "$8"
+
+        String currency,        // "USD"
+
+        long priceMinor         // 100, 400, 800
+
+) {}
+
+public record CreditPurchaseRequest(
+
+        @NotBlank String sku,
+
+        @NotBlank String paymentToken   // from Stripe / Apple Pay / etc.
+
+) {}
+
+A few design notes worth flagging
+
+Use records, not Lombok DTOs. Records give you immutability + equals/hashCode/toString for free, and serialize cleanly with Jackson out of the box on Spring Boot 3+.
+Money as minor units. priceMinor keeps you out of BigDecimal/double trouble; format on the client.
+Idempotency on /credits/purchase. Critical for mobile retries — the Idempotency-Key header lets you safely de-duplicate without double-charging.
+Insufficient credits should be HTTP 402 ("Payment Required") via @ControllerAdvice mapping InsufficientCreditsException → ProblemDetail. The current mobile app already shows an "OUT OF PLAYS" toast that maps cleanly to that response.
+Pagination. Use Spring's Page<T> for /catalog/artists, but wrap it in a leaner PageResponse<T> record so you don't leak Spring's PageImpl JSON shape (which is unstable and Spring even warns about it).
+Cover art URLs. Return either a CDN URL or null. Letting the client decide to render a gradient placeholder (which it already does) means you don't have to ship actual art for every album.
+Genre slugs. Send a stable slug (ROCK, NEW_RELEASES) plus a human label and the two hex colors for the tile. That keeps the mobile theme data-driven instead of hard-coding the palette.
+Live updates. Add @MessageMapping controllers backed by Spring's STOMP support so other devices see the queue change in real time. The REST endpoints publish to the topic after every mutation.
+Auth. A patron is anonymous-but-persistent (a device-bound JWT works well). Staff get a STAFF role that unlocks /queue/skip and any future admin endpoints. Server-side venueId resolution prevents one bar's queue from leaking into another.
+If you want, I can turn this into an OpenAPI spec next so the mobile app could consume generated TypeScript clients and Zod schemas through the same workflow the rest of this monorepo already uses.
+
+ 
