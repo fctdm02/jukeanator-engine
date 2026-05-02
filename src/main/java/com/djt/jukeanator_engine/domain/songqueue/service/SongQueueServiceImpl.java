@@ -11,7 +11,10 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
+import com.djt.jukeanator_engine.domain.songqueue.exception.SongQueueException;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
@@ -23,12 +26,15 @@ public final class SongQueueServiceImpl implements SongQueueService {
 
   private static final Logger log = LoggerFactory.getLogger(SongQueueServiceImpl.class);
   
+  private SongLibraryService songLibraryService;
   private SongQueueRepository songQueueRepository;
   private SongQueueRootEntity songQueue;
   
-  public SongQueueServiceImpl(SongQueueRepository songQueueRepository) {
+  public SongQueueServiceImpl(SongLibraryService songLibraryService, SongQueueRepository songQueueRepository) {
 
+      requireNonNull(songLibraryService, "songLibraryService cannot be null");
       requireNonNull(songQueueRepository, "songQueueRepository cannot be null");
+      this.songLibraryService = songLibraryService;      
       this.songQueueRepository = songQueueRepository;
       
       try {
@@ -48,9 +54,22 @@ public final class SongQueueServiceImpl implements SongQueueService {
   }
   
   @Override
-  public int addSongToQueue(SongFileEntity song, Integer priority) {
+  public Integer addSongToQueue(Integer albumId, Integer songId, Integer priority) {
     
-    return songQueue.addSongToQueue(song, priority);
+    try {
+      List<AlbumFolderEntity> albums = this.songLibraryService.getAlbums();
+      AlbumFolderEntity album = albums.get(albumId);
+      if (album != null) {
+        
+        SongFileEntity song = album.getChildSong(songId);
+        if (song != null) {
+          
+          return songQueue.addSongToQueue(song, priority);    
+        }
+      }    
+    } catch (EntityDoesNotExistException e) { }
+    
+    throw new SongQueueException("Could not add song to queue, albumId: " + albumId + ", songId: " + songId + ", priority: " + priority);
   }
   
   @Override

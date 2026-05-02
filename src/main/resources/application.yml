@@ -14,3 +14,6 @@ song-library:
   discogs:
     consumer-key: vBSFEvNtGflHQnULBNnL
     consumer-secret: AOOYhlvSshYkJieLRrdTCUoLcsWACfWW
+    
+song-queue:
+  repository-type: filesystem   # filesystem | postgres

@@ -160,6 +160,7 @@ public final class SongScanner {
 			for (int j=0; j < songList.size(); j++) {
 				
 				SongFileEntity song = songList.get(j);
+				album.setPersistentIdentity(j);
 				
 				String songFile = song.getNaturalIdentity();
 				if (!hasValidCoverArt) {

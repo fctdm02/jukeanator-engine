@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.songlibrary.controller;
 
+import static java.util.Objects.requireNonNull;
 import java.io.IOException;
 import java.util.List;
 
@@ -22,35 +23,34 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 @RequestMapping("/api/song-library")
 public class SongLibraryController {
 
-    private final SongLibraryService songLibraryService;
+  private final SongLibraryService songLibraryService;
 
-    public SongLibraryController(SongLibraryService songLibraryService) {
-        this.songLibraryService = songLibraryService;
-    }
+  public SongLibraryController(SongLibraryService songLibraryService) {
+    requireNonNull(songLibraryService, "songLibraryService cannot be null");
+    this.songLibraryService = songLibraryService;
+  }
 
-    @GetMapping("/genres")
-    public List<String> getGenres() {
-        return songLibraryService.getGenres();
-    }
+  @GetMapping("/genres")
+  public List<String> getGenres() {
+    return songLibraryService.getGenres();
+  }
 
-    @GetMapping("/artists")
-    public List<String> getArtists() {
-    	return songLibraryService.getArtists();
-    }
-    
-    @GetMapping("/albums")
-    public List<AlbumDto> getAlbums() {
-      return SongLibraryMapper.toDto(this.songLibraryService.getAlbums());
-    }
-    
-    @PostMapping("/scan")
-    public ResponseEntity<Void> scanFileSystem(@RequestBody ScanRequest request) throws IOException {
+  @GetMapping("/artists")
+  public List<String> getArtists() {
+    return songLibraryService.getArtists();
+  }
 
-        songLibraryService.scanFileSystemForSongs(
-                request.getScanPath(),
-                request.getAcceptedExtensions()
-        );
+  @GetMapping("/albums")
+  public List<AlbumDto> getAlbums() {
+    return SongLibraryMapper.toDto(this.songLibraryService.getAlbums());
+  }
 
-        return ResponseEntity.ok().build();
-    }
+  @PostMapping("/scan")
+  public ResponseEntity<Void> scanFileSystem(@RequestBody ScanRequest request) throws IOException {
+
+    songLibraryService.scanFileSystemForSongs(request.getScanPath(),
+        request.getAcceptedExtensions());
+
+    return ResponseEntity.ok().build();
+  }
 }

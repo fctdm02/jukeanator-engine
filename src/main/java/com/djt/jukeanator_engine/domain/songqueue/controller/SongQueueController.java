@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.songqueue.controller;
 
+import static java.util.Objects.requireNonNull;
 import java.io.IOException;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -8,7 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
@@ -23,6 +24,7 @@ public class SongQueueController {
   private final SongQueueService songQueueService;
 
   public SongQueueController(SongQueueService songQueueService) {
+    requireNonNull(songQueueService, "songQueueService cannot be null");
     this.songQueueService = songQueueService;
   }
 
@@ -32,10 +34,9 @@ public class SongQueueController {
   }
 
   @PostMapping("/addSong")
-  public ResponseEntity<Void> addSongToQueue(@RequestBody ScanRequest request) throws IOException {
+  public ResponseEntity<Void> addSongToQueue(@RequestBody AddSongToQueueRequest request) throws IOException {
 
-    // TODO: Implement (need to add search capability to song library service and have all persistent identities set for songs/albums and do a strict lookup of song based on that)
-    songQueueService.addSongToQueue(null, null);
+    songQueueService.addSongToQueue(request.getAlbumId(), request.getSongId(), request.getPriority());
 
     return ResponseEntity.ok().build();
   }

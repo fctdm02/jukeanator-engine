@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.domain.songqueue.service;
 
 import java.util.List;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
-import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 
@@ -18,12 +17,12 @@ public interface SongQueueService extends AggregateRootService<SongQueueRootEnti
   List<SongQueueEntryEntity> getQueuedSongs();
 
   /**
-   * 
-   * @param song
+   * @param albumId
+   * @param songId
    * @param priority
    * @return
    */
-  int addSongToQueue(SongFileEntity song, Integer priority);
+  Integer addSongToQueue(Integer albumId, Integer songId, Integer priority);
   
   /**
    * 
