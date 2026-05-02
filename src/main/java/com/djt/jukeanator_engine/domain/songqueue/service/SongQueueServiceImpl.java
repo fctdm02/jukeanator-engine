@@ -42,7 +42,7 @@ public final class SongQueueServiceImpl implements SongQueueService {
   
   // Service methods
   @Override
-  public List<SongQueueEntryEntity> getSongs() {
+  public List<SongQueueEntryEntity> getQueuedSongs() {
     
     return songQueue.getSongs();
   }

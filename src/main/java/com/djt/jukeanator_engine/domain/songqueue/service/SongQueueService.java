@@ -15,7 +15,7 @@ public interface SongQueueService extends AggregateRootService<SongQueueRootEnti
    * 
    * @return
    */
-  List<SongQueueEntryEntity> getSongs();
+  List<SongQueueEntryEntity> getQueuedSongs();
 
   /**
    * 
