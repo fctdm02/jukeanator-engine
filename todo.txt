@@ -465,14 +465,32 @@ public record CreditPurchaseRequest(
 A few design notes worth flagging
 
 Use records, not Lombok DTOs. Records give you immutability + equals/hashCode/toString for free, and serialize cleanly with Jackson out of the box on Spring Boot 3+.
+
 Money as minor units. priceMinor keeps you out of BigDecimal/double trouble; format on the client.
+
 Idempotency on /credits/purchase. Critical for mobile retries — the Idempotency-Key header lets you safely de-duplicate without double-charging.
-Insufficient credits should be HTTP 402 ("Payment Required") via @ControllerAdvice mapping InsufficientCreditsException → ProblemDetail. The current mobile app already shows an "OUT OF PLAYS" toast that maps cleanly to that response.
-Pagination. Use Spring's Page<T> for /catalog/artists, but wrap it in a leaner PageResponse<T> record so you don't leak Spring's PageImpl JSON shape (which is unstable and Spring even warns about it).
-Cover art URLs. Return either a CDN URL or null. Letting the client decide to render a gradient placeholder (which it already does) means you don't have to ship actual art for every album.
+
+Insufficient credits should be HTTP 402 ("Payment Required") via @ControllerAdvice mapping InsufficientCreditsException → ProblemDetail. The current mobile app already 
+shows an "OUT OF PLAYS" toast that maps cleanly to that response.
+
+Pagination. Use Spring's Page<T> for /catalog/artists, but wrap it in a leaner PageResponse<T> record so you don't leak Spring's PageImpl JSON shape (which is unstable 
+and Spring even warns about it).
+
+Cover art URLs. Return either a CDN URL or null. Letting the client decide to render a gradient placeholder (which it already does) means you don't have to ship actual art
+for every album.
+ 
 Genre slugs. Send a stable slug (ROCK, NEW_RELEASES) plus a human label and the two hex colors for the tile. That keeps the mobile theme data-driven instead of hard-coding the palette.
-Live updates. Add @MessageMapping controllers backed by Spring's STOMP support so other devices see the queue change in real time. The REST endpoints publish to the topic after every mutation.
-Auth. A patron is anonymous-but-persistent (a device-bound JWT works well). Staff get a STAFF role that unlocks /queue/skip and any future admin endpoints. Server-side venueId resolution prevents one bar's queue from leaking into another.
-If you want, I can turn this into an OpenAPI spec next so the mobile app could consume generated TypeScript clients and Zod schemas through the same workflow the rest of this monorepo already uses.
+
+Live updates. Add @MessageMapping controllers backed by Spring's STOMP support so other devices see the queue change in real time. 
+The REST endpoints publish to the topic after every mutation.
+
+Auth. A patron is anonymous-but-persistent (a device-bound JWT works well). 
+
+Staff get a STAFF role that unlocks /queue/skip and any future admin endpoints. 
+
+Server-side venueId resolution prevents one bar's queue from leaking into another.
+
+If you want, I can turn this into an OpenAPI spec next so the mobile app could consume generated TypeScript clients and Zod schemas through the same workflow the 
+rest of this monorepo already uses.
 
  

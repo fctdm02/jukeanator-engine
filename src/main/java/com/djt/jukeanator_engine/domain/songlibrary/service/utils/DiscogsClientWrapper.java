@@ -12,9 +12,9 @@ import com.amilesend.discogs.Discogs;
 import com.amilesend.discogs.model.database.SearchRequest;
 import com.amilesend.discogs.model.database.SearchResponse;
 import com.amilesend.discogs.model.database.type.SearchResult;
+import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.service.config.SongLibraryProperties;
 
 /**
  * @author tmyers

@@ -3,18 +3,19 @@ package com.djt.jukeanator_engine.config;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryPostgresImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryServiceImpl;
-import com.djt.jukeanator_engine.domain.songlibrary.service.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.CoverArtDownloader;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.DiscogsClientWrapper;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.JAudioTaggerClient;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.MusicBrainzClientWrapper;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
+import com.djt.jukeanator_engine.domain.songqueue.config.SongQueueProperties;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueObjectPersistor;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryFileSystemImpl;
@@ -90,14 +91,14 @@ public class ApplicationConfig {
   @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "filesystem",
       matchIfMissing = true // default
   )
-  public SongQueueRepository songQueueRepositoryFileSystemImpl(SongLibraryProperties props) {
+  public SongQueueRepository songQueueRepositoryFileSystemImpl(SongQueueProperties props) {
     return new SongQueueRepositoryFileSystemImpl(props.getRootPath() // basePath = rootPath
     );
   }
   
   @Bean
   @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "postgres")
-  public SongQueueRepository songQueueRepositoryPostgresImpl(SongLibraryProperties props) {
+  public SongQueueRepository songQueueRepositoryPostgresImpl(SongQueueProperties props) {
     return new SongQueueRepositoryPostgresImpl();
   }
 
