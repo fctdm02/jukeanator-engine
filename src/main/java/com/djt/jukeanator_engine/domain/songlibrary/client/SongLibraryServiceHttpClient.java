@@ -7,11 +7,11 @@ import org.springframework.web.client.RestClient;
 
 import com.djt.jukeanator_engine.domain.songlibrary.dto.*;
 
-public class SongLibraryServiceClient {
+public class SongLibraryServiceHttpClient {
 
     private final RestClient restClient;
 
-    public SongLibraryServiceClient(String baseUrl) {
+    public SongLibraryServiceHttpClient(String baseUrl) {
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .build();

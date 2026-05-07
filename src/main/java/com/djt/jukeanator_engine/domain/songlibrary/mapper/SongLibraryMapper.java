@@ -19,8 +19,11 @@ public final class SongLibraryMapper {
     for (AlbumFolderEntity albumEntity: albumEntities) {
       
       List<SongDto> songDtos = new ArrayList<>();
-      for (SongFileEntity songEntity: albumEntity.getChildSongs()) {
+      List<SongFileEntity> songEntities = new ArrayList<>();
+      songEntities.addAll(albumEntity.getChildSongs());
+      for (SongFileEntity songEntity: songEntities) {
         songDtos.add(new SongDto(
+            songEntities.indexOf(songEntity),
             songEntity.getName(), 
             songEntity.getNumPlays()));
       }

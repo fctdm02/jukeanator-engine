@@ -9,21 +9,26 @@ import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
  * @author tmyers
  */
 public final class SongQueueMapper {
-  
+
   public static List<SongQueueEntryDto> toDto(List<SongQueueEntryEntity> entities) {
-    
+
     List<SongQueueEntryDto> dtos = new ArrayList<>();
-    
-    for (SongQueueEntryEntity entity: entities) {
-            
-      SongQueueEntryDto dto = new SongQueueEntryDto(
-          entity.getSong().getName(),
-          entity.getSong().getNumPlays(),
-          entity.getPriority());
+
+    for (SongQueueEntryEntity entity : entities) {
+
+      SongQueueEntryDto dto = toDto(entity);
 
       dtos.add(dto);
     }
-    
+
     return dtos;
+  }
+
+  public static SongQueueEntryDto toDto(SongQueueEntryEntity entity) {
+
+    SongQueueEntryDto dto = new SongQueueEntryDto(entity.getSong().getName(),
+        entity.getSong().getNumPlays(), entity.getPriority());
+
+    return dto;
   }
 }

@@ -3,17 +3,14 @@ package com.djt.jukeanator_engine.domain.songlibrary.controller;
 import static java.util.Objects.requireNonNull;
 import java.io.IOException;
 import java.util.List;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
-import com.djt.jukeanator_engine.domain.songlibrary.mapper.SongLibraryMapper;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
 /**
@@ -42,7 +39,7 @@ public class SongLibraryController {
 
   @GetMapping("/albums")
   public List<AlbumDto> getAlbums() {
-    return SongLibraryMapper.toDto(this.songLibraryService.getAlbums());
+    return songLibraryService.getAlbums();
   }
 
   @PostMapping("/scan")

@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
-import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 
 /**
@@ -30,7 +29,7 @@ public class SongQueueController {
 
   @GetMapping("/queuedSongs")
   public List<SongQueueEntryDto> getQueuedSongs() {
-    return SongQueueMapper.toDto(this.songQueueService.getQueuedSongs());
+    return songQueueService.getQueuedSongs();
   }
 
   @PostMapping("/addSong")

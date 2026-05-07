@@ -1,22 +1,22 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import static java.util.Objects.requireNonNull;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
+import com.djt.jukeanator_engine.domain.songlibrary.mapper.SongLibraryMapper;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
@@ -26,7 +26,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
 /**
  * @author tmyers
  */
-public final class SongLibraryServiceImpl implements SongLibraryService {
+public final class SongLibraryServiceImpl implements SongLibraryService, AggregateRootService<RootFolderEntity> {
 
   private static final Logger log = LoggerFactory.getLogger(SongLibraryServiceImpl.class);
   
@@ -48,7 +48,6 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
       requireNonNull(scanPath, "scanPath cannot be null");
       requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
       requireNonNull(songScanner, "songScanner cannot be null");
-
       this.scanPath = scanPath;
       this.songLibraryRepository = songLibraryRepository;
       this.songScanner = songScanner;
@@ -77,16 +76,16 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
   }   
   
   @Override
-  public List<AlbumFolderEntity> getAlbums() {
+  public List<AlbumDto> getAlbums() {
     
     if (!isInitialized) {
       throw new SongLibraryException("SongLibraryService has not been initialized yet!");
     }
-    return albums;
+    return SongLibraryMapper.toDto(albums);
   }   
   
   @Override
-  public RootFolderEntity scanFileSystemForSongs(
+  public Integer scanFileSystemForSongs(
       String scanPath,
       Set<String> acceptedSongFileExtensions) throws SongScanFailedException {
 
@@ -105,7 +104,7 @@ public final class SongLibraryServiceImpl implements SongLibraryService {
       // Initialize the song library
       initializeSongLibrary();
       
-      return root;
+      return Integer.valueOf(albums.size());
     } catch (SongLibraryException sle) {
     	throw sle;      
     } catch (Exception e) {

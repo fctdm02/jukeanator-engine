@@ -103,8 +103,10 @@ public class ApplicationConfig {
   }
 
   @Bean
-  public SongQueueService songQueueService(SongLibraryService songLibraryService,
+  public SongQueueService songQueueService(
+      SongLibraryProperties props,
+      SongLibraryRepository songLibraryRepository,
       SongQueueRepository repository) {
-    return new SongQueueServiceImpl(songLibraryService, repository);
+    return new SongQueueServiceImpl(props.getRootPath(), songLibraryRepository, repository);
   }
 }

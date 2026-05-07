@@ -4,7 +4,7 @@ import java.util.List;
 
 public class AlbumDto {
   
-  private Integer id;
+  private Integer albumId;
   private String title;
   private String genre;
   private String artist;
@@ -15,7 +15,7 @@ public class AlbumDto {
   private List<SongDto> songs;
 
   public AlbumDto(
-      Integer id, 
+      Integer albumId, 
       String title,
       String genre,
       String artist, 
@@ -25,7 +25,7 @@ public class AlbumDto {
       String coverArtPath, 
       List<SongDto> songs) {
     super();
-    this.id = id;
+    this.albumId = albumId;
     this.title = title;
     this.genre = genre;
     this.artist = artist;
@@ -36,8 +36,8 @@ public class AlbumDto {
     this.songs = songs;
   }
 
-  public Integer getId() {
-    return id;
+  public Integer getAlbumId() {
+    return albumId;
   }
 
   public String getTitle() {

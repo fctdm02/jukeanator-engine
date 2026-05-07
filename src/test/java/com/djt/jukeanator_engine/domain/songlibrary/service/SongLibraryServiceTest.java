@@ -13,8 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 
 /**
  * @author tmyers
@@ -60,12 +59,12 @@ public class SongLibraryServiceTest {
     
     
     // STEP 2: ACT
-    RootFolderEntity root = songLibraryService.scanFileSystemForSongs(scanPath, acceptedSongFileExtensions);
+    Integer numAlbums = songLibraryService.scanFileSystemForSongs(scanPath, acceptedSongFileExtensions);
     
     
     // STEP 3: ASSERT    
-    assertNotNull(root, "Root should not be null");
-    List<AlbumFolderEntity> albums = songLibraryService.getAlbums();    
+    assertNotNull(numAlbums, "numAlbums should not be null");
+    List<AlbumDto> albums = songLibraryService.getAlbums();    
     assertNotNull(albums, "albums should not be null");
     assertFalse(albums.isEmpty(), "albums should not be empty");
   }
@@ -82,7 +81,7 @@ public class SongLibraryServiceTest {
     // STEP 2: ACT
     List<String> genres = songLibraryService.getGenres();
     List<String> artists = songLibraryService.getArtists();
-    List<AlbumFolderEntity> albums = songLibraryService.getAlbums();
+    List<AlbumDto> albums = songLibraryService.getAlbums();
     
     
     // STEP 3: ASSERT

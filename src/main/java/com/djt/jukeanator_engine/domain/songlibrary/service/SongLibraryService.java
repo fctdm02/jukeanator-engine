@@ -2,16 +2,13 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import java.util.List;
 import java.util.Set;
-
-import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
-import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 
 /**
  * @author tmyers
  */
-public interface SongLibraryService extends AggregateRootService<RootFolderEntity> {
+public interface SongLibraryService {
 
   /**
    * 
@@ -29,14 +26,14 @@ public interface SongLibraryService extends AggregateRootService<RootFolderEntit
    * 
    * @return
    */
-  List<AlbumFolderEntity> getAlbums();
+  List<AlbumDto> getAlbums();
   
   /**
    * 
    * @param scanPath
    * @param acceptedSongFileExtensions
-   * @return
+   * @return number of albums scanned
    * @throws SongScanFailedException
    */
-  RootFolderEntity scanFileSystemForSongs(String scanPath, Set<String> acceptedSongFileExtensions) throws SongScanFailedException;
+  Integer scanFileSystemForSongs(String scanPath, Set<String> acceptedSongFileExtensions) throws SongScanFailedException;
 }
