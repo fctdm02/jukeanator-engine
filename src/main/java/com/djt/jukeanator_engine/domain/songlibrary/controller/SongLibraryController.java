@@ -1,16 +1,14 @@
 package com.djt.jukeanator_engine.domain.songlibrary.controller;
 
 import static java.util.Objects.requireNonNull;
-import java.io.IOException;
+
 import java.util.List;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import java.util.Set;
+
+import org.springframework.web.bind.annotation.*;
+
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
 /**
@@ -18,7 +16,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
  */
 @RestController
 @RequestMapping("/api/song-library")
-public class SongLibraryController {
+public class SongLibraryController implements SongLibraryService {
 
   private final SongLibraryService songLibraryService;
 
@@ -27,27 +25,29 @@ public class SongLibraryController {
     this.songLibraryService = songLibraryService;
   }
 
+  @Override
   @GetMapping("/genres")
   public List<String> getGenres() {
     return songLibraryService.getGenres();
   }
 
+  @Override
   @GetMapping("/artists")
   public List<String> getArtists() {
     return songLibraryService.getArtists();
   }
 
+  @Override
   @GetMapping("/albums")
   public List<AlbumDto> getAlbums() {
     return songLibraryService.getAlbums();
   }
 
+  @Override
   @PostMapping("/scan")
-  public ResponseEntity<Void> scanFileSystem(@RequestBody ScanRequest request) throws IOException {
+  public Integer scanFileSystemForSongs(@RequestParam String scanPath,
+      @RequestParam Set<String> acceptedSongFileExtensions) throws SongScanFailedException {
 
-    songLibraryService.scanFileSystemForSongs(request.getScanPath(),
-        request.getAcceptedExtensions());
-
-    return ResponseEntity.ok().build();
+    return songLibraryService.scanFileSystemForSongs(scanPath, acceptedSongFileExtensions);
   }
 }
