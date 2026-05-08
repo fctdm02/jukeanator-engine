@@ -25,6 +25,10 @@ public class SongFileEntity extends AbstractFileEntity {
 	public void setNumPlays(Integer numPlays) {
 		this.numPlays = numPlays;
 	}
+	
+	public AlbumFolderEntity getAlbum() {
+	  return (AlbumFolderEntity)this.getParentFolder();
+	}
 
 	public String getArtistName() {
 

@@ -33,11 +33,11 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
   
   private String rootPath;
   private SongLibraryRepository songLibraryRepository;
+  private RootFolderEntity songLibraryRoot;
   
   private SongQueueRepository songQueueRepository;
   private SongQueueRootEntity songQueueRoot;
   
-  private RootFolderEntity songLibraryRoot;
   private List<String> genres = new ArrayList<>();
   private List<String> artists = new ArrayList<>();
   private List<AlbumFolderEntity> albums = new ArrayList<>(); 
@@ -57,7 +57,7 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
       // Initialize the song library root and song queue
       initialize();
       
-      log.info("Using song queue: " + this.songQueueRoot);
+      log.info("Using song library root: " + this.songLibraryRoot);
   }
   
   // Service methods
@@ -140,28 +140,18 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
   private void initialize() {
 
     // If we cannot load the song library from disk at startup, then assume a new install and return an
-    // empty root folder.  The application will automatically ask the user to scan for songs at startup. 
+    // empty root folder. The application will automatically ask the user to scan for songs at startup.
     try {
       this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(rootPath);
     } catch (EntityDoesNotExistException ednee) {
-      
-      log.error("Could not load song library from: " 
-          + rootPath
-          + ", using empty song library root for now, error: " 
-          + ednee.getMessage());
-      
+      log.error("Could not load song library from: " + rootPath + ", using empty song library root for now, error: " + ednee.getMessage());
       this.songQueueRoot = new SongQueueRootEntity(rootPath);
     }
-    
+
     try {
       this.songQueueRoot = this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
     } catch (EntityDoesNotExistException ednee) {
-      
-      log.error("Could not load song queue from: " 
-          + rootPath
-          + ", using empty song library root for now, error: " 
-          + ednee.getMessage());
-      
+      log.error("Could not load song queue from: " + rootPath + ", using empty song library root for now, error: " + ednee.getMessage());
       this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
     }
         

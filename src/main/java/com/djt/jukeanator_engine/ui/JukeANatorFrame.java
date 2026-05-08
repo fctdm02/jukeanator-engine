@@ -3,7 +3,6 @@ package com.djt.jukeanator_engine.ui;
 import java.awt.BorderLayout;
 import java.awt.Font;
 import java.util.List;
-
 import javax.swing.DefaultListModel;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -11,8 +10,7 @@ import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.SwingConstants;
-
-import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
+import com.djt.jukeanator_engine.domain.songplayer.dto.NowPlayingSongDto;
 
 public class JukeANatorFrame extends JFrame {
 
@@ -101,13 +99,13 @@ public class JukeANatorFrame extends JFrame {
    *
    * @param songDto current song queue entry
    */
-  public void setNowPlaying(SongQueueEntryDto songDto) {
+  public void setNowPlaying(NowPlayingSongDto songDto) {
 
-    if (songDto == null || songDto.getName() == null) {
+    if (songDto == null) {
       nowPlayingValueLabel.setText("");
       return;
     }
 
-    nowPlayingValueLabel.setText(songDto.getName());
+    nowPlayingValueLabel.setText(songDto.getSong());
   }
 }

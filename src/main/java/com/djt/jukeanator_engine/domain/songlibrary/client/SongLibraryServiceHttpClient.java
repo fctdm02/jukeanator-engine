@@ -11,6 +11,11 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
+/**
+ * HTTP client implementation of SongLibraryService.
+ * 
+ * @author tmyers
+ */
 public class SongLibraryServiceHttpClient implements SongLibraryService {
 
   private final RestClient restClient;

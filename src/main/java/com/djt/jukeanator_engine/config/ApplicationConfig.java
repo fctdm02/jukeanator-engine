@@ -15,6 +15,9 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.utils.DiscogsClientW
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.JAudioTaggerClient;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.MusicBrainzClientWrapper;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
+import com.djt.jukeanator_engine.domain.songplayer.config.SongPlayerProperties;
+import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
+import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerServiceImpl;
 import com.djt.jukeanator_engine.domain.songqueue.config.SongQueueProperties;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueObjectPersistor;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
@@ -82,12 +85,6 @@ public class ApplicationConfig {
   }
 
   @Bean
-  public SongLibraryService songLibraryService(SongLibraryProperties props,
-      SongLibraryRepository repository, SongScanner songScanner) {
-    return new SongLibraryServiceImpl(props.getRootPath(), repository, songScanner);
-  }
-
-  @Bean
   @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "filesystem",
       matchIfMissing = true // default
   )
@@ -103,10 +100,40 @@ public class ApplicationConfig {
   }
 
   @Bean
+  public SongLibraryService songLibraryService(
+      SongLibraryProperties songLibraryProperties,
+      SongLibraryRepository repository, 
+      SongScanner songScanner) {
+    
+    return new SongLibraryServiceImpl(
+        songLibraryProperties.getRootPath(), 
+        repository, 
+        songScanner);
+  }
+  
+  @Bean
   public SongQueueService songQueueService(
-      SongLibraryProperties props,
+      SongLibraryProperties songLibraryProperties,
       SongLibraryRepository songLibraryRepository,
       SongQueueRepository repository) {
-    return new SongQueueServiceImpl(props.getRootPath(), songLibraryRepository, repository);
+    
+    return new SongQueueServiceImpl(
+        songLibraryProperties.getRootPath(), 
+        songLibraryRepository, 
+        repository);
   }
+  
+  @Bean
+  public SongPlayerService songPlayerService(
+      SongPlayerProperties songPlayerProperties,
+      SongLibraryProperties songLibraryProperties,
+      SongLibraryRepository songLibraryRepository,
+      SongQueueRepository repository) {
+    
+    return new SongPlayerServiceImpl(
+        songPlayerProperties.getPlayerType(),
+        songLibraryProperties.getRootPath(), 
+        songLibraryRepository, 
+        repository);
+  }  
 }
