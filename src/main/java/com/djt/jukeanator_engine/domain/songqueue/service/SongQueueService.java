@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.songqueue.service;
 
 import java.util.List;
+import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 
 /**
@@ -15,12 +16,10 @@ public interface SongQueueService {
   List<SongQueueEntryDto> getQueuedSongs();
 
   /**
-   * @param albumId
-   * @param songId
-   * @param priority
+   * @param addSongToQueueRequest
    * @return
    */
-  Integer addSongToQueue(Integer albumId, Integer songId, Integer priority);
+  Integer addSongToQueue(AddSongToQueueRequest addSongToQueueRequest);
   
   /**
    * 

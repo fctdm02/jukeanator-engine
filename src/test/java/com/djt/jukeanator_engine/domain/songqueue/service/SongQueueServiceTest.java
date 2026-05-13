@@ -19,6 +19,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryServiceImpl;
+import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 
 /**
@@ -81,7 +82,8 @@ public class SongQueueServiceTest {
     Integer albumId = album.getAlbumId();
     Integer songId = song.getSongId();
     Integer priority = Integer.valueOf(1);
-    Integer songQueueIndex = songQueueService.addSongToQueue(albumId, songId, priority);
+    AddSongToQueueRequest addSongToQueueRequest = new AddSongToQueueRequest(albumId, songId, priority);
+    Integer songQueueIndex = songQueueService.addSongToQueue(addSongToQueueRequest);
     assertNotNull(songQueueIndex, "songQueueIndex should not be null");
     assertTrue(songQueueIndex >= 0, "songQueueIndex should be non-zero");
     

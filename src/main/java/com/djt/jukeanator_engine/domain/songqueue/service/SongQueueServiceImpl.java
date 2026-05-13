@@ -1,10 +1,13 @@
 package com.djt.jukeanator_engine.domain.songqueue.service;
 
 import static java.util.Objects.requireNonNull;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
@@ -12,20 +15,20 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
+import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
+import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
+import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.exception.SongQueueException;
 import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
-import org.springframework.context.event.EventListener;
-
-import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 
 /**
  * @author tmyers
@@ -33,6 +36,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongs
 public final class SongQueueServiceImpl implements SongQueueService, AggregateRootService<SongQueueRootEntity> {
 
   private static final Logger log = LoggerFactory.getLogger(SongQueueServiceImpl.class);
+  
+  private final ApplicationEventPublisher eventPublisher;
   
   private String rootPath;
   private SongLibraryRepository songLibraryRepository;
@@ -48,14 +53,18 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
   public SongQueueServiceImpl(
       String rootPath,
       SongLibraryRepository songLibraryRepository, 
-      SongQueueRepository songQueueRepository) {
+      SongQueueRepository songQueueRepository,
+      ApplicationEventPublisher eventPublisher) {
 
       requireNonNull(rootPath, "rootPath cannot be null");
       requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
       requireNonNull(songQueueRepository, "songQueueRepository cannot be null");
+      requireNonNull(eventPublisher, "eventPublisher cannot be null");
+      
       this.rootPath = rootPath;
       this.songLibraryRepository = songLibraryRepository;      
       this.songQueueRepository = songQueueRepository;
+      this.eventPublisher = eventPublisher;
 
       // Initialize the song library root and song queue
       initialize();
@@ -71,7 +80,11 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
   }
   
   @Override
-  public Integer addSongToQueue(Integer albumId, Integer songId, Integer priority) {
+  public Integer addSongToQueue(AddSongToQueueRequest addSongToQueueRequest) {
+    
+    Integer albumId = addSongToQueueRequest.getAlbumId();
+    Integer songId = addSongToQueueRequest.getSongId();
+    Integer priority = addSongToQueueRequest.getPriority();
     
     try {
       AlbumFolderEntity album = albums.get(albumId);
@@ -80,7 +93,18 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
           
-          return songQueueRoot.addSongToQueue(song, priority);    
+          Integer songQueueIndex = songQueueRoot.addSongToQueue(song, priority);
+
+          // Publish the event
+          eventPublisher.publishEvent(
+              new AddSongToQueueEvent(
+                  albumId,
+                  songId,
+                  priority,
+                  songQueueIndex,
+                  Instant.now()));
+          
+          return songQueueIndex;          
         }
       }         
     } catch (EntityDoesNotExistException e) { }

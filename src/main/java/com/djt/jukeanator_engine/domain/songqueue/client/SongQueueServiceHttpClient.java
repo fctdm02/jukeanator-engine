@@ -34,19 +34,11 @@ public class SongQueueServiceHttpClient implements SongQueueService {
   }
 
   @Override
-  public Integer addSongToQueue(
-      Integer albumId,
-      Integer songId,
-      Integer priority) {
-
-    AddSongToQueueRequest request = new AddSongToQueueRequest();
-    request.setAlbumId(albumId);
-    request.setSongId(songId);
-    request.setPriority(priority);
+  public Integer addSongToQueue(AddSongToQueueRequest addSongToQueueRequest) {
 
     return restClient.post()
         .uri("/api/song-queue/addSong")
-        .body(request)
+        .body(addSongToQueueRequest)
         .retrieve()
         .body(Integer.class);
   }

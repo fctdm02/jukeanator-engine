@@ -44,18 +44,8 @@ public class SongQueueController implements SongQueueService {
    * HTTP adapter endpoint using request DTO.
    */
   @PostMapping("/addSong")
-  public Integer addSongToQueue(@RequestBody AddSongToQueueRequest request) {
+  public Integer addSongToQueue(@RequestBody AddSongToQueueRequest addSongToQueueRequest) {
 
-    return songQueueService.addSongToQueue(request.getAlbumId(), request.getSongId(),
-        request.getPriority());
-  }
-
-  /**
-   * Interface implementation.
-   */
-  @Override
-  public Integer addSongToQueue(Integer albumId, Integer songId, Integer priority) {
-
-    return songQueueService.addSongToQueue(albumId, songId, priority);
+    return songQueueService.addSongToQueue(addSongToQueueRequest);
   }
 }

@@ -31,33 +31,40 @@ import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
 public class ApplicationConfig {
 
   @Bean
-  public DiscogsClientWrapper discogsClientWrapper(SongLibraryProperties props) {
-    return new DiscogsClientWrapper(props.getDiscogs().getConsumerKey(),
-        props.getDiscogs().getConsumerSecret());
+  public DiscogsClientWrapper discogsClientWrapper(SongLibraryProperties songLibraryProperties) {
+    
+    return new DiscogsClientWrapper(
+        songLibraryProperties.getDiscogs().getConsumerKey(),
+        songLibraryProperties.getDiscogs().getConsumerSecret());
   }
 
   @Bean
   public MusicBrainzClientWrapper musicBrainzClientWrapper() {
+    
     return new MusicBrainzClientWrapper();
   }
 
   @Bean
   public JAudioTaggerClient jAudioTaggerClient() {
+    
     return new JAudioTaggerClient();
   }
 
   @Bean
   public CoverArtDownloader coverArtDownloader() {
+    
     return new CoverArtDownloader();
   }
 
   @Bean
   public SongLibraryObjectPersistor songLibraryObjectPersistor() {
+    
     return new SongLibraryObjectPersistor();
   }
 
   @Bean
   public SongQueueObjectPersistor songQueueObjectPersistor() {
+    
     return new SongQueueObjectPersistor();
   }
 
@@ -65,14 +72,16 @@ public class ApplicationConfig {
   @ConditionalOnProperty(name = "song-library.repository-type", havingValue = "filesystem",
       matchIfMissing = true // default
   )
-  public SongLibraryRepository songLibraryRepositoryFileSystemImpl(SongLibraryProperties props) {
-    return new SongLibraryRepositoryFileSystemImpl(props.getRootPath() // basePath = rootPath
+  public SongLibraryRepository songLibraryRepositoryFileSystemImpl(SongLibraryProperties songLibraryProperties) {
+    
+    return new SongLibraryRepositoryFileSystemImpl(songLibraryProperties.getRootPath() // basePath = rootPath
     );
   }
 
   @Bean
   @ConditionalOnProperty(name = "song-library.repository-type", havingValue = "postgres")
-  public SongLibraryRepository songLibraryRepositoryPostgresImpl(SongLibraryProperties props) {
+  public SongLibraryRepository songLibraryRepositoryPostgresImpl(SongLibraryProperties songLibraryProperties) {
+    
     return new SongLibraryRepositoryPostgresImpl();
   }
 
@@ -83,6 +92,7 @@ public class ApplicationConfig {
       MusicBrainzClientWrapper musicBrainzClientWrapper,
       JAudioTaggerClient jAudioTaggerClient, 
       CoverArtDownloader coverArtDownloader) {
+    
     return new SongScanner(
         discogsClientWrapper, 
         musicBrainzClientWrapper, 
@@ -98,14 +108,16 @@ public class ApplicationConfig {
   @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "filesystem",
       matchIfMissing = true // default
   )
-  public SongQueueRepository songQueueRepositoryFileSystemImpl(SongQueueProperties props) {
-    return new SongQueueRepositoryFileSystemImpl(props.getRootPath() // basePath = rootPath
+  public SongQueueRepository songQueueRepositoryFileSystemImpl(SongQueueProperties songQueueProperties) {
+    
+    return new SongQueueRepositoryFileSystemImpl(songQueueProperties.getRootPath() // basePath = rootPath
     );
   }
   
   @Bean
   @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "postgres")
-  public SongQueueRepository songQueueRepositoryPostgresImpl(SongQueueProperties props) {
+  public SongQueueRepository songQueueRepositoryPostgresImpl(SongQueueProperties songQueueProperties) {
+    
     return new SongQueueRepositoryPostgresImpl();
   }
 
@@ -125,14 +137,16 @@ public class ApplicationConfig {
   
   @Bean
   public SongQueueService songQueueService(
-      SongLibraryProperties songLibraryProperties,
+      SongQueueProperties songQueueProperties,
       SongLibraryRepository songLibraryRepository,
-      SongQueueRepository repository) {
+      SongQueueRepository songQueueRepository,
+      ApplicationEventPublisher eventPublisher) {
     
     return new SongQueueServiceImpl(
-        songLibraryProperties.getRootPath(), 
+        songQueueProperties.getRootPath(), 
         songLibraryRepository, 
-        repository);
+        songQueueRepository,
+        eventPublisher);
   }
   
   @Bean
@@ -140,12 +154,14 @@ public class ApplicationConfig {
       SongPlayerProperties songPlayerProperties,
       SongLibraryProperties songLibraryProperties,
       SongLibraryRepository songLibraryRepository,
-      SongQueueRepository repository) {
+      SongQueueRepository songQueueRepository,
+      ApplicationEventPublisher eventPublisher) {
     
     return new SongPlayerServiceImpl(
         songPlayerProperties.getPlayerType(),
         songLibraryProperties.getRootPath(), 
         songLibraryRepository, 
-        repository);
+        songQueueRepository,
+        eventPublisher);
   }  
 }

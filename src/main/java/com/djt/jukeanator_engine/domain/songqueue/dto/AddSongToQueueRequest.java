@@ -6,6 +6,14 @@ public class AddSongToQueueRequest {
   private Integer songId;
   private Integer priority;
 
+  public AddSongToQueueRequest() {}
+
+  public AddSongToQueueRequest(Integer albumId, Integer songId, Integer priority) {
+    this.albumId = albumId;
+    this.songId = songId;
+    this.priority = priority;
+  }
+
   public Integer getAlbumId() {
     return albumId;
   }

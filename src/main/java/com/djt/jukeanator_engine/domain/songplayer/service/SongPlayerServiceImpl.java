@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
@@ -21,6 +22,8 @@ import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository
 public final class SongPlayerServiceImpl implements SongPlayerService {
 
   private static final Logger log = LoggerFactory.getLogger(SongPlayerServiceImpl.class);
+  
+  private final ApplicationEventPublisher eventPublisher;
   
   private String playerType;
 
@@ -40,15 +43,18 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
       String playerType,
       String rootPath, 
       SongLibraryRepository songLibraryRepository, 
-      SongQueueRepository songQueueRepository) {
-
+      SongQueueRepository songQueueRepository,
+      ApplicationEventPublisher eventPublisher) {
     
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
     requireNonNull(songQueueRepository, "songQueueRepository cannot be null");
+    requireNonNull(eventPublisher, "eventPublisher cannot be null");
+    
     this.rootPath = rootPath;
     this.songLibraryRepository = songLibraryRepository;
     this.songQueueRepository = songQueueRepository;
+    this.eventPublisher = eventPublisher;
 
     // Initialize the song library root and song queue
     initialize();

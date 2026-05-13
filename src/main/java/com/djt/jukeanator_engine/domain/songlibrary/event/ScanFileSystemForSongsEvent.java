@@ -4,6 +4,6 @@ import java.time.Instant;
 
 public record ScanFileSystemForSongsEvent(
     String scanPath, 
-    int albumCount, 
+    Integer albumCount, 
     Instant occurredAt) {
 }
