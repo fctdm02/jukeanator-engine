@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.controller;
 
 import static java.util.Objects.requireNonNull;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,7 +22,8 @@ public class SongLibraryController implements SongLibraryService {
 
   private final SongLibraryService songLibraryService;
 
-  public SongLibraryController(SongLibraryService songLibraryService) {
+  public SongLibraryController(@Qualifier("songLibraryService") SongLibraryService songLibraryService) {
+    
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
     this.songLibraryService = songLibraryService;
   }

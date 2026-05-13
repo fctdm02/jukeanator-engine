@@ -106,6 +106,7 @@ public class JukeANatorFrame extends JFrame {
       return;
     }
 
-    nowPlayingValueLabel.setText(songDto.getSong());
+    String songName = songDto.getSong();
+    nowPlayingValueLabel.setText(songName);
   }
 }
