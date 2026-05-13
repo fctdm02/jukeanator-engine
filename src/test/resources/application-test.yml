@@ -11,10 +11,13 @@ song-library:
   requires-metadata: false
   use-genre: true
   use-top-folder-for-genre: true
-
   discogs:
     consumer-key: vBSFEvNtGflHQnULBNnL
     consumer-secret: AOOYhlvSshYkJieLRrdTCUoLcsWACfWW
+  accepted-song-file-extensions:
+  - .mp3
+  - .flac
+  - .wav
 
 song-queue:
   repository-type: filesystem   # filesystem | postgres

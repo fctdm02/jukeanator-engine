@@ -77,12 +77,21 @@ public class ApplicationConfig {
   }
 
   @Bean
-  public SongScanner songScanner(SongLibraryProperties props,
-      DiscogsClientWrapper discogsClientWrapper, MusicBrainzClientWrapper musicBrainzClientWrapper,
-      JAudioTaggerClient jAudioTaggerClient, CoverArtDownloader coverArtDownloader) {
-    return new SongScanner(discogsClientWrapper, musicBrainzClientWrapper, jAudioTaggerClient,
-        coverArtDownloader, props.isRequiresMetadata(), props.isUseGenre(),
-        props.isUseTopFolderForGenre());
+  public SongScanner songScanner(
+      SongLibraryProperties songLibraryProperties,
+      DiscogsClientWrapper discogsClientWrapper, 
+      MusicBrainzClientWrapper musicBrainzClientWrapper,
+      JAudioTaggerClient jAudioTaggerClient, 
+      CoverArtDownloader coverArtDownloader) {
+    return new SongScanner(
+        discogsClientWrapper, 
+        musicBrainzClientWrapper, 
+        jAudioTaggerClient,
+        coverArtDownloader, 
+        songLibraryProperties.isRequiresMetadata(), 
+        songLibraryProperties.isUseGenre(),
+        songLibraryProperties.isUseTopFolderForGenre(),
+        songLibraryProperties.getAcceptedSongFileExtensions());
   }
 
   @Bean

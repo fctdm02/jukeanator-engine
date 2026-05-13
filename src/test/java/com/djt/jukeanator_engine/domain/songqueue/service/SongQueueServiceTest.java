@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -16,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryServiceImpl;
@@ -63,10 +63,9 @@ public class SongQueueServiceTest {
   void lifecycle() throws IOException {
     
     // Scan for songs
-    String scanPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder";
-    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanPath);
-    Set<String> acceptedSongFileExtensions = Set.of(".mp3");
-    Integer numAlbums = songLibraryService.scanFileSystemForSongs(scanPath, acceptedSongFileExtensions);
+    ScanRequest scanRequest = new ScanRequest("src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
+    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanRequest);
+    Integer numAlbums = songLibraryService.scanFileSystemForSongs(scanRequest);
     assertNotNull(numAlbums, "numAlbums should not be null");
     List<AlbumDto> albums = songLibraryService.getAlbums();    
     assertNotNull(albums, "albums should not be null");

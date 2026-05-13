@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.songlibrary.config;
 
+import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -12,6 +13,7 @@ public class SongLibraryProperties {
   private boolean requiresMetadata;
   private boolean useGenre;
   private boolean useTopFolderForGenre;
+  private Set<String> acceptedSongFileExtensions;
 
   private Discogs discogs = new Discogs();
 
@@ -72,6 +74,10 @@ public class SongLibraryProperties {
   public boolean isUseTopFolderForGenre() {
     return useTopFolderForGenre;
   }
+  
+  public Set<String> getAcceptedSongFileExtensions() {
+    return this.acceptedSongFileExtensions;
+  }
 
   public void setUseTopFolderForGenre(boolean useTopFolderForGenre) {
     this.useTopFolderForGenre = useTopFolderForGenre;
@@ -83,5 +89,9 @@ public class SongLibraryProperties {
 
   public void setDiscogs(Discogs discogs) {
     this.discogs = discogs;
+  }
+  
+  public void setAcceptedSongFileExtensions(Set<String> acceptedSongFileExtensions) {
+    this.acceptedSongFileExtensions = acceptedSongFileExtensions;
   }
 }

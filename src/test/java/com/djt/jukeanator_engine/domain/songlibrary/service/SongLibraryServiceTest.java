@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -14,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 
 /**
  * @author tmyers
@@ -53,13 +53,12 @@ public class SongLibraryServiceTest {
   void scanFileSystemForSongs() throws IOException {
     
     // STEP 1: ARRANGE
-    String scanPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder";
-    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanPath);
-    Set<String> acceptedSongFileExtensions = Set.of(".mp3");
+    ScanRequest scanRequest = new ScanRequest("src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
+    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanRequest);
     
     
     // STEP 2: ACT
-    Integer numAlbums = songLibraryService.scanFileSystemForSongs(scanPath, acceptedSongFileExtensions);
+    Integer numAlbums = songLibraryService.scanFileSystemForSongs(scanRequest);
     
     
     // STEP 3: ASSERT    
@@ -73,8 +72,8 @@ public class SongLibraryServiceTest {
   void getLists() throws IOException {
     
     // STEP 1: ARRANGE
-    String scanPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder";
-    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanPath);
+    ScanRequest scanRequest = new ScanRequest("src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
+    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanRequest);
     ((SongLibraryServiceImpl)songLibraryService).initializeSongLibrary();
 
     

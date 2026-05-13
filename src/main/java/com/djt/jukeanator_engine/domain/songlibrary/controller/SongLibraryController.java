@@ -1,13 +1,14 @@
 package com.djt.jukeanator_engine.domain.songlibrary.controller;
 
 import static java.util.Objects.requireNonNull;
-
 import java.util.List;
-import java.util.Set;
-
-import org.springframework.web.bind.annotation.*;
-
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
@@ -43,11 +44,9 @@ public class SongLibraryController implements SongLibraryService {
     return songLibraryService.getAlbums();
   }
 
-  @Override
   @PostMapping("/scan")
-  public Integer scanFileSystemForSongs(@RequestParam String scanPath,
-      @RequestParam Set<String> acceptedSongFileExtensions) throws SongScanFailedException {
+  public Integer scanFileSystemForSongs(@RequestBody ScanRequest scanRequest) throws SongScanFailedException {
 
-    return songLibraryService.scanFileSystemForSongs(scanPath, acceptedSongFileExtensions);
+    return songLibraryService.scanFileSystemForSongs(scanRequest);
   }
 }

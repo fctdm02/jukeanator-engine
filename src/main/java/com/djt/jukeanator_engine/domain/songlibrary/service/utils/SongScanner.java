@@ -25,11 +25,11 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
  */
 public final class SongScanner {
 
-	private RootFolderEntity rootFolder;
-	private Set<String> acceptedSongFileExtensions;
+	private RootFolderEntity rootFolder;	
 	private boolean requiresMetadata;
 	private boolean useGenre;
 	private boolean useTopFolderForGenre;
+	private Set<String> acceptedSongFileExtensions;
 
 	private DiscogsClientWrapper discogsClientWrapper;
 	private MusicBrainzClientWrapper musicBrainzClientWrapper;
@@ -43,11 +43,13 @@ public final class SongScanner {
 			CoverArtDownloader coverArtDownloader, 
 			boolean requiresMetadata, 
 			boolean useGenre,
-			boolean useTopFolderForGenre) {
+			boolean useTopFolderForGenre,
+			Set<String> acceptedSongFileExtensions) {
 		requireNonNull(discogsClientWrapper, "discogsClientWrapper cannot be null");
 		requireNonNull(musicBrainzClientWrapper, "musicBrainzClientWrapper cannot be null");
 		requireNonNull(jAudioTaggerClient, "jAudioTaggerClient cannot be null");
 		requireNonNull(coverArtDownloader, "coverArtDownloader cannot be null");
+		requireNonNull(acceptedSongFileExtensions, "acceptedSongFileExtensions cannot be null");		
 		this.discogsClientWrapper = discogsClientWrapper;
 		this.musicBrainzClientWrapper = musicBrainzClientWrapper;
 		this.jAudioTaggerClient = jAudioTaggerClient;
@@ -55,31 +57,25 @@ public final class SongScanner {
 		this.requiresMetadata = requiresMetadata;
 		this.useGenre = useGenre;
 		this.useTopFolderForGenre = useTopFolderForGenre;
+		this.acceptedSongFileExtensions = acceptedSongFileExtensions;
+		if (this.acceptedSongFileExtensions.isEmpty()) {
+		  throw new IllegalStateException("Accepted File Extensions cannot be empty.");
+		}
+	}
+	
+	public Set<String> getAcceptedSongFileExtensions() {
+	  return this.acceptedSongFileExtensions;
 	}
 
 	/**
 	 * 
 	 * @param scanPath
-	 * @param acceptedSongFileExtensions
-	 * @param useGenre
-	 * @param useTopFolderForGenre
 	 * @return
 	 * @throws IOException
 	 */
-	public RootFolderEntity scanFileSystemForSongs(String scanPath, Set<String> acceptedSongFileExtensions)
-			throws IOException {
-
-		if (acceptedSongFileExtensions == null || acceptedSongFileExtensions.isEmpty()) {
-			throw new IllegalStateException("acceptedSongFileExtensions cannot be null/empty");
-		}
-		this.acceptedSongFileExtensions = acceptedSongFileExtensions;
+	public RootFolderEntity scanFileSystemForSongs(String scanPath) throws IOException {
 
 		File file = new File(scanPath);
-		if (file == null || !file.exists() || !file.isDirectory()) {
-			throw new IllegalStateException(
-					"scanPath must specify a root directory that holds songs with file extensions: "
-							+ acceptedSongFileExtensions);
-		}
 
 		String rootPrefix = "";
 		String filePath = file.getAbsolutePath();
@@ -285,8 +281,11 @@ public final class SongScanner {
 					} catch (EntityAlreadyExistsException eaee) {
 						throw new SongLibraryException(eaee.getMessage(), eaee);
 					}
-				} else if (parentFolder instanceof RootFolderEntity == false && !isHidden && child.isFile()
-						&& this.acceptedSongFileExtensions.contains(getFileExtension(child))) {
+				} else if (
+				        parentFolder instanceof RootFolderEntity == false 
+				    && !isHidden 
+				    && child.isFile()
+				    && this.acceptedSongFileExtensions.contains(getFileExtension(child))) {
 
 					songFilenames.add(child.getName());
 

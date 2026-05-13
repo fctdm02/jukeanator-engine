@@ -1,8 +1,8 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import java.util.List;
-import java.util.Set;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 
 /**
@@ -30,10 +30,9 @@ public interface SongLibraryService {
   
   /**
    * 
-   * @param scanPath
-   * @param acceptedSongFileExtensions
+   * @param scanRequest
    * @return number of albums scanned
    * @throws SongScanFailedException
    */
-  Integer scanFileSystemForSongs(String scanPath, Set<String> acceptedSongFileExtensions) throws SongScanFailedException;
+  Integer scanFileSystemForSongs(ScanRequest request) throws SongScanFailedException;
 }

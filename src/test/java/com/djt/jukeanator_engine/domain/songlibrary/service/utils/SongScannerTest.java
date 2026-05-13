@@ -25,6 +25,7 @@ public class SongScannerTest {
     boolean requiresMetadata = true;
     boolean useGenre = true;
     boolean useTopFolderForGenre = true;
+    Set<String> acceptedSongFileExtensions = Set.of(".mp3");
     SongScanner songScanner = new SongScanner(
         discogsClientWrapper,
         musicBrainzClientWrapper,
@@ -32,13 +33,14 @@ public class SongScannerTest {
         coverArtDownloader,
         requiresMetadata, 
         useGenre, 
-        useTopFolderForGenre);
+        useTopFolderForGenre,
+        acceptedSongFileExtensions);
     String scanPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder";
-    Set<String> acceptedSongFileExtensions = Set.of(".mp3");
+    
 
 
     // STEP 2: ACT
-    RootFolderEntity root = songScanner.scanFileSystemForSongs(scanPath, acceptedSongFileExtensions);
+    RootFolderEntity root = songScanner.scanFileSystemForSongs(scanPath);
 
 
     // STEP 3: ASSERT

@@ -1,25 +1,20 @@
 package com.djt.jukeanator_engine.domain.songlibrary.dto;
 
-import java.util.Set;
-
 public class ScanRequest {
 
-    private String scanPath;
-    private Set<String> acceptedExtensions;
+  private String scanPath;
 
-    public String getScanPath() {
-        return scanPath;
-    }
+  public ScanRequest() {}
 
-    public void setScanPath(String scanPath) {
-        this.scanPath = scanPath;
-    }
+  public ScanRequest(String scanPath) {
+    this.scanPath = scanPath;
+  }
 
-    public Set<String> getAcceptedExtensions() {
-        return acceptedExtensions;
-    }
+  public String getScanPath() {
+    return scanPath;
+  }
 
-    public void setAcceptedExtensions(Set<String> acceptedExtensions) {
-        this.acceptedExtensions = acceptedExtensions;
-    }
+  public void setScanPath(String scanPath) {
+    this.scanPath = scanPath;
+  }
 }

@@ -4,7 +4,6 @@ import static java.util.Objects.requireNonNull;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -16,6 +15,7 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
@@ -94,15 +94,13 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
   }   
   
   @Override
-  public Integer scanFileSystemForSongs(
-      String scanPath,
-      Set<String> acceptedSongFileExtensions) throws SongScanFailedException {
+  public Integer scanFileSystemForSongs(ScanRequest scanRequest) throws SongScanFailedException {
 
     try {
       
       // Scan the file system for songs
-      this.scanPath = scanPath;
-      this.root = songScanner.scanFileSystemForSongs(this.scanPath, acceptedSongFileExtensions);
+      this.scanPath = scanRequest.getScanPath();
+      this.root = songScanner.scanFileSystemForSongs(this.scanPath);
       
       // Store the song library
       if (this.songLibraryRepository instanceof SongLibraryRepositoryFileSystemImpl) {
@@ -116,7 +114,6 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
       // Publish the event
       eventPublisher.publishEvent(new ScanFileSystemForSongsEvent(
           scanPath,
-          acceptedSongFileExtensions, 
           albums.size(), 
           Instant.now()));
       
@@ -127,7 +124,7 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
       throw new SongScanFailedException("Could not scan file system for songs in: "
           + scanPath 
           + " with acceptedSongFileExtensions: " 
-          + acceptedSongFileExtensions, e);
+          + songScanner.getAcceptedSongFileExtensions(), e);
     }
   }
 
@@ -204,10 +201,17 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
     this.isInitialized = true;
   }  
   
-  public void setScanPath(String scanPath) {
+  public void setScanPath(ScanRequest scanRequest) {
+    
+    this.scanPath = scanRequest.getScanPath();
     
     if (this.songLibraryRepository instanceof SongLibraryRepositoryFileSystemImpl) {
-      ((SongLibraryRepositoryFileSystemImpl)this.songLibraryRepository).setBasePath(scanPath);
+      ((SongLibraryRepositoryFileSystemImpl)this.songLibraryRepository).setBasePath(this.scanPath);
+      
+      eventPublisher.publishEvent(new ScanFileSystemForSongsEvent(
+          this.scanPath,
+          this.albums.size(), 
+          Instant.now()));
     }
   }
 }

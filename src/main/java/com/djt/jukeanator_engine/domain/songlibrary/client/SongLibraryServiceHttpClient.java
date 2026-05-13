@@ -1,11 +1,8 @@
 package com.djt.jukeanator_engine.domain.songlibrary.client;
 
 import java.util.List;
-import java.util.Set;
-
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
-
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
@@ -43,14 +40,9 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
   }
 
   @Override
-  public Integer scanFileSystemForSongs(String scanPath, Set<String> acceptedSongFileExtensions)
-      throws SongScanFailedException {
+  public Integer scanFileSystemForSongs(ScanRequest scanRequest) throws SongScanFailedException {
 
-    ScanRequest request = new ScanRequest();
-    request.setScanPath(scanPath);
-    request.setAcceptedExtensions(acceptedSongFileExtensions);
-
-    return restClient.post().uri("/api/song-library/scan").body(request).retrieve()
+    return restClient.post().uri("/api/song-library/scan").body(scanRequest).retrieve()
         .body(Integer.class);
   }
 }
