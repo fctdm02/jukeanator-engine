@@ -2,7 +2,7 @@
 
 spring:
   application:
-    name: jukeanator-engine
+    name: JukeANator
 
 song-library:
   repository-type: filesystem   # filesystem | postgres

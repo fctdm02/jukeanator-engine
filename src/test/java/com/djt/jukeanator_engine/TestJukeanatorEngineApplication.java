@@ -5,7 +5,7 @@ import org.springframework.boot.SpringApplication;
 public class TestJukeanatorEngineApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.from(JukeanatorEngineApplication::main).with(TestcontainersConfiguration.class).run(args);
+		SpringApplication.from(JukeANatorBackendApplication::main).with(TestcontainersConfiguration.class).run(args);
 	}
 
 }

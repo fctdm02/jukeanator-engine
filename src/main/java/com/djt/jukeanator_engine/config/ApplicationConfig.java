@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.config;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
@@ -103,12 +104,14 @@ public class ApplicationConfig {
   public SongLibraryService songLibraryService(
       SongLibraryProperties songLibraryProperties,
       SongLibraryRepository repository, 
-      SongScanner songScanner) {
+      SongScanner songScanner,
+      ApplicationEventPublisher eventPublisher) {
     
     return new SongLibraryServiceImpl(
         songLibraryProperties.getRootPath(), 
         repository, 
-        songScanner);
+        songScanner,
+        eventPublisher);
   }
   
   @Bean

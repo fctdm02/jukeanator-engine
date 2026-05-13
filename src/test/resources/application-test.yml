@@ -2,7 +2,7 @@
 
 spring:
   application:
-    name: jukeanator-engine
+    name: JukeANator
 
 song-library:
   repository-type: filesystem   # filesystem | postgres
@@ -25,6 +25,6 @@ song-player:
   player-type: vlc   # vlc (all operating systems) | winamp (windows only)
 
 user-interface:
-  enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend      
+  enabled: false   # if true, a JFC/Swing UI is launched, otherwise, a headless backend      
   baseUrl: http://localhost:8080
      

@@ -6,11 +6,11 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 @SpringBootApplication
 @ConfigurationPropertiesScan
-public class JukeanatorEngineApplication {
+public class JukeANatorBackendApplication {
 
   public static void main(String[] args) {
 
-    SpringApplicationBuilder builder = new SpringApplicationBuilder(JukeanatorEngineApplication.class);
+    SpringApplicationBuilder builder = new SpringApplicationBuilder(JukeANatorBackendApplication.class);
 
     builder.initializers(context -> {
 

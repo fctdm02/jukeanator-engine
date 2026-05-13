@@ -1,11 +1,13 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import static java.util.Objects.requireNonNull;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
@@ -14,6 +16,7 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.mapper.SongLibraryMapper;
@@ -30,6 +33,8 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
 
   private static final Logger log = LoggerFactory.getLogger(SongLibraryServiceImpl.class);
   
+  private final ApplicationEventPublisher eventPublisher;
+  
   private String scanPath;
   private RootFolderEntity root;
   private SongLibraryRepository songLibraryRepository;
@@ -43,14 +48,18 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
   public SongLibraryServiceImpl(
       String scanPath,
       SongLibraryRepository songLibraryRepository,
-      SongScanner songScanner) {
+      SongScanner songScanner,
+      ApplicationEventPublisher eventPublisher) {
 
       requireNonNull(scanPath, "scanPath cannot be null");
       requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
       requireNonNull(songScanner, "songScanner cannot be null");
+      requireNonNull(eventPublisher, "eventPublisher cannot be null");
+            
       this.scanPath = scanPath;
       this.songLibraryRepository = songLibraryRepository;
       this.songScanner = songScanner;
+      this.eventPublisher = eventPublisher;
       
       // Initialize the song library
       initializeSongLibrary();
@@ -103,6 +112,13 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
       
       // Initialize the song library
       initializeSongLibrary();
+      
+      // Publish the event
+      eventPublisher.publishEvent(new ScanFileSystemForSongsEvent(
+          scanPath,
+          acceptedSongFileExtensions, 
+          albums.size(), 
+          Instant.now()));
       
       return Integer.valueOf(albums.size());
     } catch (SongLibraryException sle) {

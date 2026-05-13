@@ -23,6 +23,9 @@ import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
+import org.springframework.context.event.EventListener;
+
+import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 
 /**
  * @author tmyers
@@ -136,6 +139,24 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
 
     throw new SongLibraryException("Not implemented yet!");
   }
+  
+  @EventListener
+  public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
+
+    log.info("""
+        Received ScanFileSystemForSongsEvent:
+        scanPath={}
+        albumCount={}
+        """,
+        event.scanPath(),
+        event.albumCount()
+    );
+    
+    this.rootPath = event.scanPath();
+
+    // Refresh song library state
+    initialize();
+  }  
   
   private void initialize() {
 
