@@ -45,8 +45,9 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
   private static final Logger log = LoggerFactory.getLogger(SongPlayerServiceImpl.class);
 
   private final ApplicationEventPublisher eventPublisher;
-  private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-  private final Deque<SongQueueEntryEntity> playbackHistory = new ArrayDeque<>();  
+  private final ScheduledExecutorService executorService =
+      Executors.newSingleThreadScheduledExecutor();
+  private final Deque<SongQueueEntryEntity> playbackHistory = new ArrayDeque<>();
   private String playerType;
   private final Player player;
 
@@ -56,7 +57,7 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
   private SongQueueRepository songQueueRepository;
   private SongQueueRootEntity songQueueRoot;
-  
+
   private SongQueueEntryEntity nowPlayingSong;
   private List<String> queuedSongNames = new ArrayList<>();
 
@@ -64,11 +65,8 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
   private List<String> artists = new ArrayList<>();
   private List<AlbumFolderEntity> albums = new ArrayList<>();
 
-  public SongPlayerServiceImpl(
-      String playerType, 
-      String rootPath,
-      SongLibraryRepository songLibraryRepository, 
-      SongQueueRepository songQueueRepository,
+  public SongPlayerServiceImpl(String playerType, String rootPath,
+      SongLibraryRepository songLibraryRepository, SongQueueRepository songQueueRepository,
       ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(playerType, "playerType cannot be null");
@@ -82,7 +80,7 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
     this.songLibraryRepository = songLibraryRepository;
     this.songQueueRepository = songQueueRepository;
     this.eventPublisher = eventPublisher;
-    
+
     if (this.playerType.equals("vlc")) {
       player = new VlcMediaPlayer();
     } else {
@@ -92,9 +90,9 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
     log.info("Using song library root: " + this.songLibraryRoot);
     log.info("Using song queue root: " + this.songQueueRoot);
     log.info("Using : " + this.playerType);
-    
+
     // Initialize the song library root and song queue
-    initialize();    
+    initialize();
   }
 
   @Override
@@ -109,21 +107,18 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
   @Override
   public SongPlaybackStatusDto getPlaybackStatus() {
-    
+
     Long elapsedSeconds = 0L;
-    Long totalSeconds = 0L;    
+    Long totalSeconds = 0L;
     SongPlayerStatus songPlayerStatus = player.getStatus();
-    
+
     if (songPlayerStatus != SongPlayerStatus.STOPPED) {
 
       elapsedSeconds = player.getElapsedSeconds();
-      totalSeconds = player.getTotalLengthSeconds();      
+      totalSeconds = player.getTotalLengthSeconds();
     }
 
-    return new SongPlaybackStatusDto(
-        songPlayerStatus, 
-        elapsedSeconds,
-        totalSeconds);
+    return new SongPlaybackStatusDto(songPlayerStatus, elapsedSeconds, totalSeconds);
   }
 
   @Override
@@ -164,8 +159,8 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
   private void initialize() {
 
-    // If we cannot load the song library from disk at startup, then assume a 
-    // new install and return an empty root folder. The application will 
+    // If we cannot load the song library from disk at startup, then assume a
+    // new install and return an empty root folder. The application will
     // automatically ask the user to scan for songs at startup.
     try {
       this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(rootPath);
@@ -208,26 +203,26 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
     executorService.scheduleWithFixedDelay(this::processQueue, 0, 1, TimeUnit.SECONDS);
   }
-  
+
   @EventListener
   public void handleAddSongToQueueEvent(AddSongToQueueEvent event) {
 
     log.info("""
         Received AddSongToQueueEvent:{}
-        """,
-        event
-    );
-    
+        """, event);
+
     try {
-      this.songQueueRoot = this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
+      this.songQueueRoot =
+          this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
     } catch (EntityDoesNotExistException ednee) {
-      log.error("Could not load song queue from: " + rootPath + ", using empty song queue root for now, error: " + ednee.getMessage());
+      log.error("Could not load song queue from: " + rootPath
+          + ", using empty song queue root for now, error: " + ednee.getMessage());
       this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
-    }    
-    
+    }
+
     processQueue();
-  }  
-  
+  }
+
 
   private void processQueue() {
 
@@ -236,13 +231,15 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
       // If the queue has changed in any way, then publish
       List<String> latestQueuedSongNames = getQueuedSongNames();
       if (!latestQueuedSongNames.equals(queuedSongNames)) {
-        
-        eventPublisher.publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
+
+        eventPublisher.publishEvent(
+            new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
         this.queuedSongNames = latestQueuedSongNames;
       }
 
-      
-      // If a song is playing/paused, then do nothing (until it has finished and the player status is STOPPED)
+
+      // If a song is playing/paused, then do nothing (until it has finished and the player status
+      // is STOPPED)
       SongPlayerStatus status = player.getStatus();
       if (status != SongPlayerStatus.STOPPED) {
         return;
@@ -286,18 +283,18 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
       log.error("Queue processing failed", e);
     }
   }
-  
+
   private List<String> getQueuedSongNames() {
-    
+
     List<String> list = new ArrayList<>();
     List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
     if (!songs.isEmpty()) {
 
-      for (SongQueueEntryEntity song: songs) {
-       
-        list.add(song.getSong().getNaturalIdentity());        
-      }      
-    }    
+      for (SongQueueEntryEntity song : songs) {
+
+        list.add(song.getSong().getNaturalIdentity());
+      }
+    }
     return list;
   }
 }
