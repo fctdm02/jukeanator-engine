@@ -10,7 +10,7 @@ import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEven
 import com.djt.jukeanator_engine.domain.songplayer.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
-import com.djt.jukeanator_engine.ui.JukeANatorFrame;
+import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
 
 @Component
 public class SongPlayerUiEventListener {
