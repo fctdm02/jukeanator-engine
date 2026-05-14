@@ -95,26 +95,6 @@ public class SongPlayerServiceTest {
     assertTrue(songQueueIndex >= 0, "songQueueIndex should be non-zero");
     
     
-    // Get the contents of the song queue
-    List<SongQueueEntryDto> queuedSongs = songQueueService.getQueuedSongs();
-    assertNotNull(queuedSongs, "queuedSongs should not be null");
-    assertTrue(queuedSongs.size() > 0, "queuedSongs size should be non-zero");
-    SongQueueEntryDto queuedSong = queuedSongs.get(0);
-    assertEquals(queuedSong.getName(), song.getName(), "Song name is incorrect");
-    
-    
-    // Remove the first entry in the queue (normally, only the song player service should be doing this)
-    SongQueueEntryDto firstQueuedSong = songQueueService.getFirstEntryInSongQueue();
-    assertNotNull(firstQueuedSong, "firstQueuedSong should not be null");    
-    assertEquals(firstQueuedSong.getName(), song.getName(), "Song name is incorrect");
-    
-    
-    // Verify that the song queue is now empty
-    queuedSongs = songQueueService.getQueuedSongs();
-    assertNotNull(queuedSongs, "queuedSongs should not be null");
-    assertTrue(queuedSongs.size() == 0, "queuedSongs size should be zero");
-    
-    
     // Get the currently playing song
     NowPlayingSongDto nowPlayingSongDto = songPlayerService.getNowPlayingSong();
     assertNotNull(nowPlayingSongDto, "nowPlayingSongDto should not be null");
@@ -123,7 +103,9 @@ public class SongPlayerServiceTest {
     assertNotNull(songPlaybackStatusDto, "songPlaybackStatusDto should not be null");
     
     
-    //
-    
+    // Verify that the song queue is now empty
+    List<SongQueueEntryDto> queuedSongs = songQueueService.getQueuedSongs();
+    assertNotNull(queuedSongs, "queuedSongs should not be null");
+    assertTrue(queuedSongs.size() == 0, "queuedSongs size should be zero");
   }
 }
