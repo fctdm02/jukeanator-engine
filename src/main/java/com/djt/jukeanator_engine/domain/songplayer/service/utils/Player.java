@@ -17,4 +17,6 @@ public interface Player {
   void stop();
 
   void release();
+  
+  void setOnFinished(Runnable callback);
 }

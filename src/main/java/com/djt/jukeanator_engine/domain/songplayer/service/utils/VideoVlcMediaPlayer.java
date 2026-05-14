@@ -10,10 +10,9 @@ public class VideoVlcMediaPlayer implements Player {
 
   private final MediaPlayerFactory factory;
   private final MediaPlayer mediaPlayer;
-
-  private final AtomicReference<SongPlayerStatus> status =
-      new AtomicReference<>(SongPlayerStatus.STOPPED);
-
+  private final AtomicReference<SongPlayerStatus> status = new AtomicReference<>(SongPlayerStatus.STOPPED);
+  
+  private volatile Runnable onFinished;
   private volatile long durationMillis = 0;
 
   public VideoVlcMediaPlayer() {
@@ -40,7 +39,12 @@ public class VideoVlcMediaPlayer implements Player {
 
       @Override
       public void finished(MediaPlayer mediaPlayer) {
+
         status.set(SongPlayerStatus.STOPPED);
+        Runnable callback = onFinished;
+        if (callback != null) {          
+          callback.run();
+        }
       }
 
       // NOTE: no @Override (VLCJ version mismatch safe)
@@ -97,4 +101,9 @@ public class VideoVlcMediaPlayer implements Player {
     mediaPlayer.release();
     factory.release();
   }
+  
+  @Override
+  public void setOnFinished(Runnable callback) {
+    this.onFinished = callback;
+  }  
 }

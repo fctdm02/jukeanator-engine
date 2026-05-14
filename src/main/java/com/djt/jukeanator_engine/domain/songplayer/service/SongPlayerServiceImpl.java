@@ -1,17 +1,19 @@
 package com.djt.jukeanator_engine.domain.songplayer.service;
 
 import static java.util.Objects.requireNonNull;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
+
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
@@ -44,25 +46,41 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
   private static final Logger log = LoggerFactory.getLogger(SongPlayerServiceImpl.class);
 
+  /**
+   * ONE AND ONLY ONE queue-processing thread.
+   */
+  private final ExecutorService queueExecutor =
+      Executors.newSingleThreadExecutor(Thread.ofPlatform().name("song-queue-thread").factory());
+
   private final ApplicationEventPublisher eventPublisher;
-  private final ScheduledExecutorService executorService =
-      Executors.newSingleThreadScheduledExecutor();
+
   private final Deque<SongQueueEntryEntity> playbackHistory = new ArrayDeque<>();
-  private String playerType;
+
   private final Player player;
 
-  private String rootPath;
-  private SongLibraryRepository songLibraryRepository;
+  private final String playerType;
+
+  private final String rootPath;
+
+  private final SongLibraryRepository songLibraryRepository;
+
+  private final SongQueueRepository songQueueRepository;
+
+  /**
+   * Everything below is confined to the queueExecutor thread.
+   */
   private RootFolderEntity songLibraryRoot;
 
-  private SongQueueRepository songQueueRepository;
   private SongQueueRootEntity songQueueRoot;
 
   private SongQueueEntryEntity nowPlayingSong;
+
   private List<String> queuedSongNames = new ArrayList<>();
 
   private List<String> genres = new ArrayList<>();
+
   private List<String> artists = new ArrayList<>();
+
   private List<AlbumFolderEntity> albums = new ArrayList<>();
 
   public SongPlayerServiceImpl(String playerType, String rootPath,
@@ -82,9 +100,9 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
     this.eventPublisher = eventPublisher;
 
     if (this.playerType.equals("vlc")) {
-      player = new VlcMediaPlayer();
+      this.player = new VlcMediaPlayer();
     } else {
-      player = new VideoVlcMediaPlayer();
+      this.player = new VideoVlcMediaPlayer();
     }
 
     log.info("Using song library root: " + this.songLibraryRoot);
@@ -93,13 +111,21 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
     // Initialize the song library root and song queue
     initialize();
+
+    /*
+     * Whenever playback finishes, queue processing is re-submitted onto the SAME single executor
+     * thread.
+     */
+    this.player.setOnFinished(this::submitQueueProcessing);
   }
 
   @Override
   public NowPlayingSongDto getNowPlayingSong() {
 
-    if (nowPlayingSong != null) {
-      return SongPlayerMapper.toDto(nowPlayingSong);
+    SongQueueEntryEntity current = this.nowPlayingSong;
+
+    if (current != null) {
+      return SongPlayerMapper.toDto(current);
     }
 
     return SongPlayerMapper.EMPTY_NOW_PLAYING_SONG_DTO;
@@ -128,7 +154,7 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
     player.stop();
 
-    processQueue();
+    submitQueueProcessing();
   }
 
   @Override
@@ -152,7 +178,7 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
     log.info("Shutting down SongPlayerService");
     eventPublisher.publishEvent(new SongPlaybackShutdownEvent());
-    executorService.shutdownNow();
+    queueExecutor.shutdownNow();
     player.stop();
     player.release();
   }
@@ -196,12 +222,7 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
       }
     }
 
-    startQueueMonitor();
-  }
-
-  private void startQueueMonitor() {
-
-    executorService.scheduleWithFixedDelay(this::processQueue, 0, 1, TimeUnit.SECONDS);
+    submitQueueProcessing();
   }
 
   @EventListener
@@ -211,36 +232,43 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
         Received AddSongToQueueEvent:{}
         """, event);
 
-    try {
-      this.songQueueRoot =
-          this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
-    } catch (EntityDoesNotExistException ednee) {
-      log.error("Could not load song queue from: " + rootPath
-          + ", using empty song queue root for now, error: " + ednee.getMessage());
-      this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
-    }
-
-    processQueue();
+    submitQueueProcessing();
   }
 
+  /**
+   * THE ONLY PLACE processQueue() IS EVER INVOKED.
+   */
+  private void submitQueueProcessing() {
 
+    queueExecutor.submit(() -> {
+
+      try {
+
+        processQueue();
+
+      } catch (Exception e) {
+
+        log.error("Queue processing failed", e);
+      }
+    });
+  }
+
+  /**
+   * Runs ONLY on the single queueExecutor thread.
+   */
   private void processQueue() {
 
     try {
 
       // If the queue has changed in any way, then publish
-      List<String> latestQueuedSongNames = getQueuedSongNames();
-      if (!latestQueuedSongNames.equals(queuedSongNames)) {
+      reloadQueue();
+      publishQueueChangesIfNecessary();
 
-        eventPublisher.publishEvent(
-            new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
-        this.queuedSongNames = latestQueuedSongNames;
-      }
-
-
-      // If a song is playing/paused, then do nothing (until it has finished and the player status
-      // is STOPPED)
+      /*
+       * If something is already playing or paused, do nothing.
+       */
       SongPlayerStatus status = player.getStatus();
+
       if (status != SongPlayerStatus.STOPPED) {
         return;
       }
@@ -281,6 +309,37 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
     } catch (Exception e) {
 
       log.error("Queue processing failed", e);
+    }
+  }
+
+  private void reloadQueue() {
+
+    try {
+
+      this.songQueueRoot =
+          this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
+
+    } catch (EntityDoesNotExistException e) {
+
+      log.error("""
+          Could not load song queue from: {}
+          Using empty song queue root for now
+          Error: {}
+          """, rootPath, e.getMessage());
+
+      this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
+    }
+  }
+
+  private void publishQueueChangesIfNecessary() {
+
+    List<String> latestQueuedSongNames = getQueuedSongNames();
+    if (!latestQueuedSongNames.equals(queuedSongNames)) {
+
+      eventPublisher
+          .publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
+
+      this.queuedSongNames = latestQueuedSongNames;
     }
   }
 

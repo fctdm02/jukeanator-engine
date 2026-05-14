@@ -12,10 +12,9 @@ public class VlcMediaPlayer implements Player {
 
   private final MediaPlayerFactory factory;
   private final MediaPlayer mediaPlayer;
-
-  private final AtomicReference<SongPlayerStatus> status =
-      new AtomicReference<>(SongPlayerStatus.STOPPED);
-
+  private final AtomicReference<SongPlayerStatus> status = new AtomicReference<>(SongPlayerStatus.STOPPED);
+  
+  private volatile Runnable onFinished;
   private volatile long durationMillis = 0;
 
   public VlcMediaPlayer() {
@@ -47,9 +46,14 @@ public class VlcMediaPlayer implements Player {
 
       @Override
       public void finished(MediaPlayer mediaPlayer) {
-        status.set(SongPlayerStatus.STOPPED);
-      }
 
+        status.set(SongPlayerStatus.STOPPED);
+        Runnable callback = onFinished;
+        if (callback != null) {
+          callback.run();
+        }
+      }
+      
       @Override
       public void lengthChanged(MediaPlayer mediaPlayer, long newLength) {
         durationMillis = newLength;
@@ -111,6 +115,12 @@ public class VlcMediaPlayer implements Player {
     factory.release();
   }
 
+  @Override
+  public void setOnFinished(Runnable callback) {
+    
+    this.onFinished = callback;
+  }
+  
   private boolean isLinux() {
 
     String os = System.getProperty("os.name");
