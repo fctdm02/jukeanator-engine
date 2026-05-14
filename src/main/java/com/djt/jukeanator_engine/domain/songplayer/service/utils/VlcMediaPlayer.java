@@ -13,22 +13,19 @@ public class VlcMediaPlayer implements Player {
   private final MediaPlayerFactory factory;
   private final MediaPlayer mediaPlayer;
 
-  private final AtomicReference<SongPlayerStatus> status = new AtomicReference<>(SongPlayerStatus.STOPPED);
+  private final AtomicReference<SongPlayerStatus> status =
+      new AtomicReference<>(SongPlayerStatus.STOPPED);
 
   private volatile long durationMillis = 0;
 
   public VlcMediaPlayer() {
 
     if (isLinux()) {
-      this.factory = new MediaPlayerFactory(
-          "--no-video",
-          "--no-xlib",
-          "--quiet",
-          "--intf=dummy");
+      this.factory = new MediaPlayerFactory("--no-video", "--no-xlib", "--quiet", "--intf=dummy");
     } else {
       this.factory = new MediaPlayerFactory();
     }
-    
+
     this.mediaPlayer = factory.mediaPlayers().newMediaPlayer();
 
     this.mediaPlayer.events().addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
@@ -53,61 +50,76 @@ public class VlcMediaPlayer implements Player {
         status.set(SongPlayerStatus.STOPPED);
       }
 
-      // NOTE: no @Override (VLCJ version mismatch safe)
-      /*
-       * public void mediaReady(MediaPlayer mediaPlayer) { var info = mediaPlayer.media().info(); if
-       * (info != null) { durationMillis = info.duration(); } }
-       */
+      @Override
+      public void lengthChanged(MediaPlayer mediaPlayer, long newLength) {
+        durationMillis = newLength;
+      }
     });
   }
 
+  @Override
   public boolean playSongMedia(String songPath) {
 
     try {
+
       status.set(SongPlayerStatus.STOPPED);
       durationMillis = 0;
 
-      // ✅ FIX: no MediaRef usage needed
       return mediaPlayer.media().play(songPath);
 
     } catch (Exception e) {
+
       status.set(SongPlayerStatus.STOPPED);
+      durationMillis = 0;
+
       return false;
     }
   }
 
+  @Override
   public void pause() {
     mediaPlayer.controls().pause();
   }
 
+  @Override
   public void stop() {
+
     mediaPlayer.controls().stop();
+
+    status.set(SongPlayerStatus.STOPPED);
   }
 
+  @Override
   public SongPlayerStatus getStatus() {
     return status.get();
   }
 
+  @Override
   public long getElapsedSeconds() {
     return mediaPlayer.status().time() / 1000;
   }
 
+  @Override
   public long getTotalLengthSeconds() {
     return durationMillis / 1000;
   }
 
+  @Override
   public boolean isPlaying() {
     return status.get() == SongPlayerStatus.PLAYING;
   }
 
+  @Override
   public void release() {
+
     mediaPlayer.release();
     factory.release();
   }
-  
+
   private boolean isLinux() {
+
     String os = System.getProperty("os.name");
+
     return os != null && os.toLowerCase().contains("linux");
-  }  
-  
+  }
 }
