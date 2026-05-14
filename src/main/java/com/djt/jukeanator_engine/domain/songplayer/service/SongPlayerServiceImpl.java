@@ -25,11 +25,13 @@ import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackPausedEvent
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackShutdownEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStoppedEvent;
+import com.djt.jukeanator_engine.domain.songplayer.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.mapper.SongPlayerMapper;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.Player;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.VideoVlcMediaPlayer;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.VlcMediaPlayer;
 import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
@@ -54,7 +56,9 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
   private SongQueueRepository songQueueRepository;
   private SongQueueRootEntity songQueueRoot;
+  
   private SongQueueEntryEntity nowPlayingSong;
+  private List<String> queuedSongNames = new ArrayList<>();
 
   private List<String> genres = new ArrayList<>();
   private List<String> artists = new ArrayList<>();
@@ -229,7 +233,18 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
     try {
 
-      if (player.isPlaying()) {
+      // If the queue has changed in any way, then publish
+      List<String> latestQueuedSongNames = getQueuedSongNames();
+      if (!latestQueuedSongNames.equals(queuedSongNames)) {
+        
+        eventPublisher.publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
+        this.queuedSongNames = latestQueuedSongNames;
+      }
+
+      
+      // If a song is playing/paused, then do nothing (until it has finished and the player status is STOPPED)
+      SongPlayerStatus status = player.getStatus();
+      if (status != SongPlayerStatus.STOPPED) {
         return;
       }
 
@@ -239,11 +254,9 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
       }
 
       List<SongQueueEntryEntity> queue = songQueueRoot.getSongs();
-
       if (queue.isEmpty()) {
 
         nowPlayingSong = null;
-
         return;
       }
 
@@ -272,5 +285,19 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
       log.error("Queue processing failed", e);
     }
+  }
+  
+  private List<String> getQueuedSongNames() {
+    
+    List<String> list = new ArrayList<>();
+    List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
+    if (!songs.isEmpty()) {
+
+      for (SongQueueEntryEntity song: songs) {
+       
+        list.add(song.getSong().getNaturalIdentity());        
+      }      
+    }    
+    return list;
   }
 }

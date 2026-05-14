@@ -51,6 +51,7 @@ public class VideoVlcMediaPlayer implements Player {
     });
   }
 
+  @Override
   public boolean playSongMedia(String songPath) {
 
     try {
@@ -66,30 +67,32 @@ public class VideoVlcMediaPlayer implements Player {
     }
   }
 
+  @Override
   public void pause() {
     mediaPlayer.controls().pause();
   }
 
+  @Override
   public void stop() {
     mediaPlayer.controls().stop();
   }
 
+  @Override
   public SongPlayerStatus getStatus() {
     return status.get();
   }
 
+  @Override
   public long getElapsedSeconds() {
     return mediaPlayer.status().time() / 1000;
   }
 
+  @Override
   public long getTotalLengthSeconds() {
     return durationMillis / 1000;
   }
 
-  public boolean isPlaying() {
-    return status.get() == SongPlayerStatus.PLAYING;
-  }
-
+  @Override
   public void release() {
     mediaPlayer.release();
     factory.release();

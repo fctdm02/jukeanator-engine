@@ -77,6 +77,11 @@ public class VlcMediaPlayer implements Player {
   }
 
   @Override
+  public SongPlayerStatus getStatus() {
+    return status.get();
+  }
+  
+  @Override
   public void pause() {
     mediaPlayer.controls().pause();
   }
@@ -90,11 +95,6 @@ public class VlcMediaPlayer implements Player {
   }
 
   @Override
-  public SongPlayerStatus getStatus() {
-    return status.get();
-  }
-
-  @Override
   public long getElapsedSeconds() {
     return mediaPlayer.status().time() / 1000;
   }
@@ -102,11 +102,6 @@ public class VlcMediaPlayer implements Player {
   @Override
   public long getTotalLengthSeconds() {
     return durationMillis / 1000;
-  }
-
-  @Override
-  public boolean isPlaying() {
-    return status.get() == SongPlayerStatus.PLAYING;
   }
 
   @Override

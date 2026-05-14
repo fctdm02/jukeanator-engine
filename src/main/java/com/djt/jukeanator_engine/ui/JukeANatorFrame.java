@@ -34,16 +34,7 @@ public class JukeANatorFrame extends JFrame {
     setTitle("JukeANator");
     setUndecorated(true);
     setBackground(Color.BLACK);
-    setLayout(new BorderLayout());
-
-    //
-    // TOP
-    //
-    JLabel titleLabel = new JLabel("JukeANator", SwingConstants.CENTER);
-    titleLabel.setForeground(Color.GREEN);
-    titleLabel.setFont(new Font(Font.MONOSPACED, Font.BOLD, 48));
-
-    add(titleLabel, BorderLayout.NORTH);
+    getContentPane().setLayout(new BorderLayout());
 
     //
     // CENTER
@@ -73,7 +64,7 @@ public class JukeANatorFrame extends JFrame {
 
     centerPanel.add(songInfoPanel, BorderLayout.SOUTH);
 
-    add(centerPanel, BorderLayout.CENTER);
+    getContentPane().add(centerPanel, BorderLayout.CENTER);
 
     //
     // LEFT: GENRES
@@ -91,7 +82,7 @@ public class JukeANatorFrame extends JFrame {
     genresPanel.add(genresLabel, BorderLayout.NORTH);
     genresPanel.add(new JScrollPane(genresList), BorderLayout.CENTER);
 
-    add(genresPanel, BorderLayout.WEST);
+    getContentPane().add(genresPanel, BorderLayout.WEST);
 
     //
     // RIGHT: QUEUE
@@ -112,9 +103,9 @@ public class JukeANatorFrame extends JFrame {
 
     queuePanel.add(showQueueButton, BorderLayout.SOUTH);
 
-    queuePanel.setVisible(false);
+    queuePanel.setVisible(true);
 
-    add(queuePanel, BorderLayout.EAST);
+    getContentPane().add(queuePanel, BorderLayout.EAST);
   }
 
   private void toggleQueueVisibility(JPanel queuePanel) {

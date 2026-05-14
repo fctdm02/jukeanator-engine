@@ -6,8 +6,6 @@ public interface Player {
 
   boolean playSongMedia(String songPath);
 
-  boolean isPlaying();
-
   SongPlayerStatus getStatus();
 
   long getElapsedSeconds();
