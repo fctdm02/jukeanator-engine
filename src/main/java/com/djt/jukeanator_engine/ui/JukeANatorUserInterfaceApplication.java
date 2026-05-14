@@ -20,7 +20,7 @@ public class JukeANatorUserInterfaceApplication {
   private final SongPlayerServiceHttpClient songPlayerServiceClient;
   private final SongPlayerUiEventListener songPlayerUiEventListener;
 
-  private final JukeANatorFrame frame;
+  private JukeANatorFrame frame;
 
   public JukeANatorUserInterfaceApplication(
       SongLibraryServiceHttpClient songLibraryServiceClient,
@@ -32,14 +32,14 @@ public class JukeANatorUserInterfaceApplication {
     this.songQueueServiceClient = songQueueServiceClient;
     this.songPlayerServiceClient = songPlayerServiceClient;
     this.songPlayerUiEventListener = songPlayerUiEventListener;
-
-    this.frame = new JukeANatorFrame();
-
-    this.songPlayerUiEventListener.setFrame(frame);
   }
 
   public void launch() {
 
+    this.frame = new JukeANatorFrame();
+
+    this.songPlayerUiEventListener.setFrame(frame);
+    
     refreshUi();
 
     frame.showFullscreen();
