@@ -1,10 +1,27 @@
 package com.djt.jukeanator_engine.ui;
 
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import java.awt.Image;
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
-
-import javax.swing.*;
-
+import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
+import javax.swing.DefaultListModel;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import com.djt.jukeanator_engine.domain.songplayer.dto.NowPlayingSongDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 
@@ -172,15 +189,16 @@ public class JukeANatorFrame extends JFrame {
     albumArtLabel.setIcon(null);
   }
 
-  private void loadAlbumArt(String url) {
+  private void loadAlbumArt(String coverArtPath) {
 
     try {
-      if (url == null || url.isBlank()) {
+      if (coverArtPath == null || coverArtPath.isBlank()) {
         albumArtLabel.setIcon(null);
         return;
       }
-
-      var imageUrl = java.net.URI.create(url).toURL();
+      
+      Path path = Paths.get(coverArtPath);
+      URL imageUrl = path.toUri().toURL();      
 
       ImageIcon icon = new ImageIcon(imageUrl);
 
