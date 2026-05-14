@@ -13,14 +13,22 @@ public class VlcMediaPlayer implements Player {
   private final MediaPlayerFactory factory;
   private final MediaPlayer mediaPlayer;
 
-  private final AtomicReference<SongPlayerStatus> status =
-      new AtomicReference<>(SongPlayerStatus.STOPPED);
+  private final AtomicReference<SongPlayerStatus> status = new AtomicReference<>(SongPlayerStatus.STOPPED);
 
   private volatile long durationMillis = 0;
 
   public VlcMediaPlayer() {
 
-    this.factory = new MediaPlayerFactory();
+    if (isLinux()) {
+      this.factory = new MediaPlayerFactory(
+          "--no-video",
+          "--no-xlib",
+          "--quiet",
+          "--intf=dummy");
+    } else {
+      this.factory = new MediaPlayerFactory();
+    }
+    
     this.mediaPlayer = factory.mediaPlayers().newMediaPlayer();
 
     this.mediaPlayer.events().addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
@@ -96,73 +104,10 @@ public class VlcMediaPlayer implements Player {
     mediaPlayer.release();
     factory.release();
   }
+  
+  private boolean isLinux() {
+    String os = System.getProperty("os.name");
+    return os != null && os.toLowerCase().contains("linux");
+  }  
+  
 }
-/*
- * package com.djt.jukeanator_engine.domain.songplayer.service.utils;
- * 
- * import java.util.concurrent.atomic.AtomicReference; import
- * com.djt.jukeanator_engine.domain.songplayer.dto.SongPlayerStatus; import
- * uk.co.caprica.vlcj.player.component.EmbeddedMediaPlayerComponent;
- * 
- * public class VlcMediaPlayer implements Player {
- * 
- * private final EmbeddedMediaPlayerComponent mediaPlayerComponent;
- * 
- * private final AtomicReference<SongPlayerStatus> status = new
- * AtomicReference<>(SongPlayerStatus.STOPPED);
- * 
- * public VlcMediaPlayer() {
- * 
- * this.mediaPlayerComponent = new EmbeddedMediaPlayerComponent();
- * 
- * mediaPlayerComponent.mediaPlayer().events() .addMediaPlayerEventListener(new
- * uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter() {
- * 
- * @Override public void playing(uk.co.caprica.vlcj.player.base.MediaPlayer mediaPlayer) {
- * 
- * status.set(SongPlayerStatus.PLAYING); }
- * 
- * @Override public void paused(uk.co.caprica.vlcj.player.base.MediaPlayer mediaPlayer) {
- * 
- * status.set(SongPlayerStatus.PAUSED); }
- * 
- * @Override public void stopped(uk.co.caprica.vlcj.player.base.MediaPlayer mediaPlayer) {
- * 
- * status.set(SongPlayerStatus.STOPPED); }
- * 
- * @Override public void finished(uk.co.caprica.vlcj.player.base.MediaPlayer mediaPlayer) {
- * 
- * status.set(SongPlayerStatus.STOPPED); } }); }
- * 
- * public boolean playSongMedia(String songPath) {
- * 
- * return mediaPlayerComponent.mediaPlayer().media().play(songPath); }
- * 
- * public void pause() {
- * 
- * mediaPlayerComponent.mediaPlayer().controls().pause(); }
- * 
- * public void stop() {
- * 
- * mediaPlayerComponent.mediaPlayer().controls().stop(); }
- * 
- * public SongPlayerStatus getStatus() {
- * 
- * return status.get(); }
- * 
- * public long getElapsedSeconds() {
- * 
- * return mediaPlayerComponent.mediaPlayer().status().time() / 1000; }
- * 
- * public long getTotalLengthSeconds() {
- * 
- * return mediaPlayerComponent.mediaPlayer().media().info().duration() / 1000; }
- * 
- * public boolean isPlaying() {
- * 
- * return status.get() == SongPlayerStatus.PLAYING; }
- * 
- * public void release() {
- * 
- * mediaPlayerComponent.release(); } }
- */
