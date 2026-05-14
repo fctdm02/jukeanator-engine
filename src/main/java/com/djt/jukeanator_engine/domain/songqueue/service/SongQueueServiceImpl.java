@@ -94,6 +94,8 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
         if (song != null) {
           
           Integer songQueueIndex = songQueueRoot.addSongToQueue(song, priority);
+          
+          songQueueRepository.storeAggregateRoot(songQueueRoot);
 
           // Publish the event
           eventPublisher.publishEvent(

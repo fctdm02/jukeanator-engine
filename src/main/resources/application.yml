@@ -25,7 +25,7 @@ song-queue:
   root-path: /mnt/readyNAS/Rock_On_Third # linux
   
 song-player:  
-  player-type: vlc   # vlc (all operating systems) | winamp (windows only)
+  player-type: vlc   # vlc or detached-vlc (all operating systems) | winamp (windows only)
 
 user-interface:
   enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend      

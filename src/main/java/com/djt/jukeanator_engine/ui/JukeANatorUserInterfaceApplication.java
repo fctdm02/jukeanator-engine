@@ -1,61 +1,57 @@
 package com.djt.jukeanator_engine.ui;
 
-import javax.swing.JFrame;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import com.djt.jukeanator_engine.domain.songlibrary.client.SongLibraryServiceHttpClient;
 import com.djt.jukeanator_engine.domain.songplayer.client.SongPlayerServiceHttpClient;
 import com.djt.jukeanator_engine.domain.songqueue.client.SongQueueServiceHttpClient;
-import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
+import com.djt.jukeanator_engine.ui.event.SongPlayerUiEventListener;
 
 @Component
 public class JukeANatorUserInterfaceApplication {
 
-  private static final Logger log = LoggerFactory.getLogger(JukeANatorUserInterfaceApplication.class);
+  private static final Logger log =
+      LoggerFactory.getLogger(JukeANatorUserInterfaceApplication.class);
 
   private final SongLibraryServiceHttpClient songLibraryServiceClient;
   private final SongQueueServiceHttpClient songQueueServiceClient;
   private final SongPlayerServiceHttpClient songPlayerServiceClient;
+  private final SongPlayerUiEventListener songPlayerUiEventListener;
 
-  private final JukeANatorFrame jukeANatorFrame;
+  private final JukeANatorFrame frame;
 
   public JukeANatorUserInterfaceApplication(
       SongLibraryServiceHttpClient songLibraryServiceClient,
       SongQueueServiceHttpClient songQueueServiceClient,
-      SongPlayerServiceHttpClient songPlayerServiceClient) {
+      SongPlayerServiceHttpClient songPlayerServiceClient,
+      SongPlayerUiEventListener songPlayerUiEventListener) {
 
     this.songLibraryServiceClient = songLibraryServiceClient;
     this.songQueueServiceClient = songQueueServiceClient;
     this.songPlayerServiceClient = songPlayerServiceClient;
+    this.songPlayerUiEventListener = songPlayerUiEventListener;
 
-    this.jukeANatorFrame = new JukeANatorFrame();
+    this.frame = new JukeANatorFrame();
+
+    this.songPlayerUiEventListener.setFrame(frame);
   }
 
   public void launch() {
 
-    initialize();
+    refreshUi();
 
-    jukeANatorFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-    jukeANatorFrame.setSize(400, 300);
-    jukeANatorFrame.setVisible(true);
+    frame.showFullscreen();
+    frame.setVisible(true);
+
+    log.info("JukeANator UI launched");
   }
 
-  @EventListener
-  public void handleScanFileSystemForSongsEvent(AddSongToQueueEvent event) {
+  public void refreshUi() {
 
-    log.info("Event: {}", event);
-
-    initialize();
-  }
-
-  private void initialize() {
-
-    jukeANatorFrame.setGenres(songLibraryServiceClient.getGenres());
-
-    jukeANatorFrame.setNowPlaying(songPlayerServiceClient.getNowPlayingSong());
+    frame.setGenres(songLibraryServiceClient.getGenres());
+    frame.setNowPlaying(songPlayerServiceClient.getNowPlayingSong());
+    frame.setQueue(songQueueServiceClient.getQueuedSongs());
   }
 }

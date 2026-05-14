@@ -34,16 +34,14 @@ public class SongQueueEntryEntity extends AbstractPersistentEntity {
   @Override
   public int compareTo(AbstractEntity obj) {
 
-    if (obj instanceof SongQueueEntryEntity) {
+    SongQueueEntryEntity that = (SongQueueEntryEntity) obj;
 
-      SongQueueEntryEntity that = (SongQueueEntryEntity)obj;
-      
-      Integer thisPriority = this.getPriority();
-      Integer thatPriority = that.getPriority();
-      
-      return thisPriority.compareTo(thatPriority);
+    int priorityCompare = this.priority.compareTo(that.priority);
+    if (priorityCompare != 0) {
+      return priorityCompare;
     }
-    throw new IllegalStateException("Cannot compare this: " + this + " to an instance of: " + obj.getClassAndNaturalIdentity());
+
+    return this.song.getNaturalIdentity().compareTo(that.song.getNaturalIdentity());
   }
   
   @Override

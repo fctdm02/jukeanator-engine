@@ -1,0 +1,824 @@
+PROMPT:
+To have a thread running in an endless loop, that is unless, the application is to be shut down, that monitors songQueueRoot for any entries.  
+Naturally, we will need to get the status of the player, such as Playing/Paused/Stopped, the total length of the song in seconds, 
+the elapsed song play time in seconds, and the total song play time in seconds
+
+RESPONSE:
+A good approach in Java 21 + Spring Boot 4 is:
+
+* use a dedicated background thread (preferably a `ScheduledExecutorService`)
+* maintain player state in the service
+* make `SongMediaPlayer` long-lived (NOT recreated per song)
+* use VLCJ media callbacks/events instead of polling whenever possible
+* gracefully stop the thread with `@PreDestroy`
+
+Your current `SongMediaPlayer` creates a new `EmbeddedMediaPlayerComponent` for every song, which is incorrect for continuous playback.
+
+# Recommended Architecture
+
+Refactor into:
+
+* `SongPlayerServiceImpl`
+
+  * owns queue monitor thread
+  * owns current player state
+  * consumes queue
+* `SongMediaPlayer`
+
+  * wraps VLCJ
+  * exposes playback status
+  * exposes elapsed/total time
+  * exposes play/pause/stop
+
+---
+
+# Step 1 — Create Player Status Enum
+
+```java id="w4ec3l"
+package com.djt.jukeanator_engine.domain.songplayer.model;
+
+public enum SongPlayerStatus {
+
+    STOPPED,
+    PLAYING,
+    PAUSED
+}
+```
+
+---
+
+# Step 2 — Refactor `SongMediaPlayer`
+
+```java id="36m3go"
+package com.djt.jukeanator_engine.domain.songplayer.service.utils;
+
+import java.util.concurrent.atomic.AtomicReference;
+
+import com.djt.jukeanator_engine.domain.songplayer.model.SongPlayerStatus;
+
+import uk.co.caprica.vlcj.player.component.EmbeddedMediaPlayerComponent;
+
+public final class SongMediaPlayer {
+
+    private final EmbeddedMediaPlayerComponent mediaPlayerComponent;
+
+    private final AtomicReference<SongPlayerStatus> status =
+            new AtomicReference<>(SongPlayerStatus.STOPPED);
+
+    public SongMediaPlayer() {
+
+        this.mediaPlayerComponent =
+                new EmbeddedMediaPlayerComponent();
+
+        mediaPlayerComponent.mediaPlayer().events().addMediaPlayerEventListener(
+                new uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter() {
+
+                    @Override
+                    public void playing(
+                            uk.co.caprica.vlcj.player.base.MediaPlayer mediaPlayer) {
+
+                        status.set(SongPlayerStatus.PLAYING);
+                    }
+
+                    @Override
+                    public void paused(
+                            uk.co.caprica.vlcj.player.base.MediaPlayer mediaPlayer) {
+
+                        status.set(SongPlayerStatus.PAUSED);
+                    }
+
+                    @Override
+                    public void stopped(
+                            uk.co.caprica.vlcj.player.base.MediaPlayer mediaPlayer) {
+
+                        status.set(SongPlayerStatus.STOPPED);
+                    }
+
+                    @Override
+                    public void finished(
+                            uk.co.caprica.vlcj.player.base.MediaPlayer mediaPlayer) {
+
+                        status.set(SongPlayerStatus.STOPPED);
+                    }
+                });
+    }
+
+    public boolean playSongMedia(String songPath) {
+
+        return mediaPlayerComponent.mediaPlayer()
+                .media()
+                .play(songPath);
+    }
+
+    public void pause() {
+
+        mediaPlayerComponent.mediaPlayer().controls().pause();
+    }
+
+    public void stop() {
+
+        mediaPlayerComponent.mediaPlayer().controls().stop();
+    }
+
+    public SongPlayerStatus getStatus() {
+
+        return status.get();
+    }
+
+    public long getElapsedSeconds() {
+
+        return mediaPlayerComponent.mediaPlayer()
+                .status()
+                .time() / 1000;
+    }
+
+    public long getTotalLengthSeconds() {
+
+        return mediaPlayerComponent.mediaPlayer()
+                .media()
+                .info()
+                .duration() / 1000;
+    }
+
+    public boolean isPlaying() {
+
+        return status.get() == SongPlayerStatus.PLAYING;
+    }
+
+    public void release() {
+
+        mediaPlayerComponent.release();
+    }
+}
+```
+
+---
+
+# Step 3 — Add Playback State DTO
+
+```java id="4h8k7d"
+package com.djt.jukeanator_engine.domain.songplayer.dto;
+
+import com.djt.jukeanator_engine.domain.songplayer.model.SongPlayerStatus;
+
+public record SongPlaybackStatusDto(
+
+        SongPlayerStatus status,
+
+        Long elapsedSeconds,
+
+        Long totalSeconds
+) {
+}
+```
+
+---
+
+# Step 4 — Enhance `SongPlayerService`
+
+```java id="shn9mv"
+package com.djt.jukeanator_engine.domain.songplayer.service;
+
+import com.djt.jukeanator_engine.domain.songplayer.dto.NowPlayingSongDto;
+import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlaybackStatusDto;
+
+public interface SongPlayerService {
+
+    NowPlayingSongDto getNowPlayingSong();
+
+    SongPlaybackStatusDto getPlaybackStatus();
+
+    void pause();
+
+    void stop();
+}
+```
+
+---
+
+# Step 5 — Add Queue Monitor Thread
+
+Here is the important part.
+
+Add fields:
+
+```java id="4tizvg"
+private final ScheduledExecutorService executorService =
+        Executors.newSingleThreadScheduledExecutor();
+
+private final SongMediaPlayer mediaPlayer =
+        new SongMediaPlayer();
+```
+
+Then after `initialize();`:
+
+```java id="8ml6gx"
+startQueueMonitor();
+```
+
+---
+
+# Step 6 — Implement Queue Monitor
+
+```java id="x1mb5q"
+private void startQueueMonitor() {
+
+    executorService.scheduleWithFixedDelay(
+            this::processQueue,
+            0,
+            1,
+            TimeUnit.SECONDS);
+}
+```
+
+---
+
+# Step 7 — Process Queue
+
+```java id="8dqgto"
+private void processQueue() {
+
+    try {
+
+        if (mediaPlayer.isPlaying()) {
+            return;
+        }
+
+        List<SongQueueEntryEntity> queue =
+                songQueueRoot.getSongs();
+
+        if (queue.isEmpty()) {
+            return;
+        }
+
+        SongQueueEntryEntity nextSong =
+                queue.getFirst();
+
+        songQueueRoot.removeSongFromQueue(nextSong);
+
+        nowPlayingSong = nextSong;
+
+        String songPath =
+                nextSong.getSong().getNaturalIdentity();
+
+        log.info("Playing song: {}", songPath);
+
+        mediaPlayer.playSongMedia(songPath);
+
+    } catch (Exception e) {
+
+        log.error("Queue processing failed", e);
+    }
+}
+```
+
+---
+
+# Step 8 — Expose Playback Status
+
+```java id="tkqzjw"
+@Override
+public SongPlaybackStatusDto getPlaybackStatus() {
+
+    return new SongPlaybackStatusDto(
+            mediaPlayer.getStatus(),
+            mediaPlayer.getElapsedSeconds(),
+            mediaPlayer.getTotalLengthSeconds());
+}
+```
+
+---
+
+# Step 9 — Graceful Shutdown
+
+```java id="tzx8tz"
+@PreDestroy
+public void shutdown() {
+
+    log.info("Shutting down SongPlayerService");
+
+    executorService.shutdownNow();
+
+    mediaPlayer.stop();
+
+    mediaPlayer.release();
+}
+```
+
+---
+
+# Important Bug in Your Existing Queue Logic
+
+This is dangerous:
+
+```java id="t37m4h"
+TreeSet<SongQueueEntryEntity>
+```
+
+because your `compareTo()` only compares priority:
+
+```java id="zq4gff"
+return thisPriority.compareTo(thatPriority);
+```
+
+Meaning:
+
+* two songs with same priority are considered duplicates
+* one disappears from the queue
+
+You need:
+
+```java id="nqsk7f"
+@Override
+public int compareTo(AbstractEntity obj) {
+
+    SongQueueEntryEntity that = (SongQueueEntryEntity) obj;
+
+    int priorityCompare =
+            this.priority.compareTo(that.priority);
+
+    if (priorityCompare != 0) {
+        return priorityCompare;
+    }
+
+    return this.song.getNaturalIdentity()
+            .compareTo(that.song.getNaturalIdentity());
+}
+```
+
+Otherwise your queue loses songs silently.
+
+---
+
+# Recommended Next Enhancement
+
+You now have enough infrastructure to add:
+
+* next track
+* previous track
+* shuffle
+* repeat
+* seek
+* volume
+* WebSocket push updates
+* Swing UI auto-refresh
+* queue persistence after dequeue
+* playback events
+
+This architecture scales cleanly into a full media player.
+
+# Recommended Next Enhancements
+
+Your current architecture is now positioned well for evolving into a full-featured media player. The next logical enhancements are:
+
+---
+
+# 1. Next Track
+
+## Add to Service Interface
+
+```java id="zq2ojh"
+void playNextTrack();
+```
+
+## Implementation
+
+```java id="2r5vwf"
+@Override
+public synchronized void playNextTrack() {
+
+    mediaPlayer.stop();
+
+    processQueue();
+}
+```
+
+This:
+
+* stops current playback
+* dequeues next song
+* starts playback immediately
+
+---
+
+# 2. Previous Track
+
+Maintain playback history.
+
+## Add Field
+
+```java id="jlwm47"
+private final Deque<SongQueueEntryEntity> playbackHistory =
+        new ArrayDeque<>();
+```
+
+## Track History
+
+Before assigning `nowPlayingSong`:
+
+```java id="fx3p5i"
+if (nowPlayingSong != null) {
+    playbackHistory.push(nowPlayingSong);
+}
+```
+
+## Add Service Method
+
+```java id="6rmw7q"
+void playPreviousTrack();
+```
+
+## Implementation
+
+```java id="7on0r5"
+@Override
+public synchronized void playPreviousTrack() {
+
+    if (playbackHistory.isEmpty()) {
+        return;
+    }
+
+    SongQueueEntryEntity previousSong =
+            playbackHistory.pop();
+
+    mediaPlayer.stop();
+
+    nowPlayingSong = previousSong;
+
+    mediaPlayer.playSongMedia(
+            previousSong.getSong().getNaturalIdentity());
+}
+```
+
+---
+
+# 3. Shuffle
+
+## Add Field
+
+```java id="qiwg2r"
+private volatile boolean shuffleEnabled;
+```
+
+## Shuffle Queue Selection
+
+Replace:
+
+```java id="3ffzyi"
+SongQueueEntryEntity nextSong = queue.getFirst();
+```
+
+with:
+
+```java id="4u8y1d"
+SongQueueEntryEntity nextSong;
+
+if (shuffleEnabled) {
+
+    int randomIndex =
+            ThreadLocalRandom.current()
+                    .nextInt(queue.size());
+
+    nextSong = queue.get(randomIndex);
+
+} else {
+
+    nextSong = queue.getFirst();
+}
+```
+
+## API
+
+```java id="igzpb7"
+void setShuffleEnabled(boolean enabled);
+```
+
+---
+
+# 4. Repeat
+
+## Add Enum
+
+```java id="zzb5x8"
+public enum RepeatMode {
+
+    NONE,
+    ONE,
+    ALL
+}
+```
+
+## Add Field
+
+```java id="od7xjq"
+private volatile RepeatMode repeatMode =
+        RepeatMode.NONE;
+```
+
+## Behavior
+
+When song finishes:
+
+### Repeat One
+
+Replay current song.
+
+### Repeat All
+
+Reinsert played songs into queue tail.
+
+Example:
+
+```java id="bq7r8q"
+if (repeatMode == RepeatMode.ONE) {
+
+    mediaPlayer.playSongMedia(
+            nowPlayingSong.getSong()
+                    .getNaturalIdentity());
+
+    return;
+}
+```
+
+---
+
+# 5. Seek
+
+## Add to `SongMediaPlayer`
+
+```java id="4i6j3e"
+public void seekToSeconds(long seconds) {
+
+    mediaPlayerComponent.mediaPlayer()
+            .controls()
+            .setTime(seconds * 1000);
+}
+```
+
+## Add Service Method
+
+```java id="sk4u7h"
+void seekTo(long seconds);
+```
+
+---
+
+# 6. Volume
+
+## Add to `SongMediaPlayer`
+
+```java id="2e4y9o"
+public void setVolume(int volume) {
+
+    mediaPlayerComponent.mediaPlayer()
+            .audio()
+            .setVolume(volume);
+}
+```
+
+## Add Getter
+
+```java id="h9j8rn"
+public int getVolume() {
+
+    return mediaPlayerComponent.mediaPlayer()
+            .audio()
+            .volume();
+}
+```
+
+Typical range:
+
+```text id="3a1mp6"
+0 - 100
+```
+
+---
+
+# 7. WebSocket Push Updates
+
+Instead of polling REST endpoints constantly, push playback updates live.
+
+## Add Dependency
+
+```xml id="6jlwmq"
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-websocket</artifactId>
+</dependency>
+```
+
+---
+
+## WebSocket Configuration
+
+```java id="ry6n9l"
+@Configuration
+@EnableWebSocketMessageBroker
+public class WebSocketConfig
+        implements WebSocketMessageBrokerConfigurer {
+
+    @Override
+    public void configureMessageBroker(
+            MessageBrokerRegistry registry) {
+
+        registry.enableSimpleBroker("/topic");
+
+        registry.setApplicationDestinationPrefixes("/app");
+    }
+
+    @Override
+    public void registerStompEndpoints(
+            StompEndpointRegistry registry) {
+
+        registry.addEndpoint("/ws-player")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
+    }
+}
+```
+
+---
+
+## Push Playback Updates
+
+Inject:
+
+```java id="hdj8i0"
+private final SimpMessagingTemplate messagingTemplate;
+```
+
+Then publish:
+
+```java id="ycn0h0"
+messagingTemplate.convertAndSend(
+        "/topic/player-status",
+        getPlaybackStatus());
+```
+
+Call every second or on playback events.
+
+---
+
+# 8. Swing UI Auto-Refresh
+
+Instead of manual refresh calls:
+
+```java id="i3wym7"
+initialize();
+```
+
+use a scheduled Swing timer.
+
+## Example
+
+```java id="4f3m8x"
+new javax.swing.Timer(1000, event -> {
+
+    updateNowPlaying();
+
+}).start();
+```
+
+This keeps UI synchronized automatically.
+
+---
+
+# 9. Queue Persistence After Dequeue
+
+Right now dequeued songs disappear permanently.
+
+Persist queue changes after every mutation.
+
+## Example
+
+```java id="9f9u2i"
+songQueueRepository.saveAggregateRoot(
+        songQueueRoot);
+```
+
+Call after:
+
+* enqueue
+* dequeue
+* shuffle
+* reorder
+
+This gives crash recovery.
+
+---
+
+# 10. Playback Events
+
+Create domain events for playback lifecycle.
+
+---
+
+## Song Started Event
+
+```java id="svh4rw"
+public record SongStartedEvent(
+        SongQueueEntryEntity song) {
+}
+```
+
+## Song Finished Event
+
+```java id="7lhr4l"
+public record SongFinishedEvent(
+        SongQueueEntryEntity song) {
+}
+```
+
+---
+
+## Publish Events
+
+```java id="rj9x3m"
+eventPublisher.publishEvent(
+        new SongStartedEvent(nowPlayingSong));
+```
+
+and:
+
+```java id="8lkg7s"
+eventPublisher.publishEvent(
+        new SongFinishedEvent(nowPlayingSong));
+```
+
+---
+
+# 11. Future Enhancements
+
+Once this is in place, you can continue toward:
+
+* playlist support
+* smart playlists
+* equalizer
+* album art extraction
+* metadata extraction
+* waveform visualization
+* streaming radio
+* DLNA/AirPlay casting
+* crossfade
+* gapless playback
+* lyrics synchronization
+* remote control API
+* mobile companion app
+* browser UI
+* queue drag/drop ordering
+* multi-room playback
+
+---
+
+# Architectural Recommendation
+
+You are approaching a natural split into:
+
+## Core Domain
+
+```text id="52mz0m"
+song-library
+song-queue
+song-player
+events
+repositories
+```
+
+## Infrastructure
+
+```text id="t5by2f"
+vlcj integration
+websocket transport
+jdbc persistence
+filesystem scanning
+```
+
+## Presentation
+
+```text id="1qgz1h"
+REST controllers
+Swing UI
+future React UI
+future mobile app
+```
+
+That separation will keep the application maintainable as it grows.
+
+
+
+RANDOM PLAY:
+SongQueueEntryEntity nextSong;
+
+if (shuffleEnabled) {
+
+    int randomIndex =
+            ThreadLocalRandom.current()
+                    .nextInt(queue.size());
+
+    nextSong = queue.get(randomIndex);
+
+} else {
+
+    nextSong = queue.getFirst();
+}

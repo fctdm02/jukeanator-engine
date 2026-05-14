@@ -1,0 +1,442 @@
+Refactor the following Swing Frame accordingly. Make it take up the entire screen, including any taskbars that exist, regardless of operating system:
+
+Below is a clean refactor that:
+
+* makes the Swing UI true fullscreen
+* removes OS taskbars/docks/menu bars
+* supports live event-driven UI updates
+* keeps Swing updates on the EDT
+* wires the Spring event listener directly into the frame
+* prepares the UI for future queue/player controls
+
+# Important Fullscreen Detail
+
+To truly cover:
+
+* Windows taskbar
+* macOS dock/menu bar
+* Linux panels
+
+you should use:
+
+```java
+GraphicsDevice.setFullScreenWindow(...)
+```
+
+NOT `setExtendedState(MAXIMIZED_BOTH)`.
+
+---
+
+# Refactored `JukeANatorFrame`
+
+```java id="4wdn7m"
+package com.djt.jukeanator_engine.ui;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import java.util.List;
+
+import javax.swing.BorderFactory;
+import javax.swing.DefaultListModel;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+
+import com.djt.jukeanator_engine.domain.songplayer.dto.NowPlayingSongDto;
+
+public class JukeANatorFrame extends JFrame {
+
+    private static final long serialVersionUID =
+            -5819744874210041265L;
+
+    private final DefaultListModel<String> genresListModel =
+            new DefaultListModel<>();
+
+    private final JList<String> genresList =
+            new JList<>(genresListModel);
+
+    private final JLabel nowPlayingValueLabel =
+            new JLabel("", SwingConstants.CENTER);
+
+    public JukeANatorFrame() {
+
+        initialize();
+    }
+
+    private void initialize() {
+
+        setTitle("JukeANator");
+
+        setUndecorated(true);
+
+        setBackground(Color.BLACK);
+
+        setLayout(new BorderLayout());
+
+        //
+        // TOP PANEL
+        //
+        JPanel topPanel =
+                new JPanel(new BorderLayout());
+
+        topPanel.setBackground(Color.BLACK);
+
+        JLabel titleLabel =
+                new JLabel("JukeANator");
+
+        titleLabel.setHorizontalAlignment(
+                SwingConstants.CENTER);
+
+        titleLabel.setForeground(Color.GREEN);
+
+        titleLabel.setFont(
+                new Font(Font.MONOSPACED, Font.BOLD, 48));
+
+        topPanel.add(titleLabel, BorderLayout.CENTER);
+
+        //
+        // NOW PLAYING PANEL
+        //
+        JPanel nowPlayingPanel =
+                new JPanel(new BorderLayout());
+
+        nowPlayingPanel.setBackground(Color.BLACK);
+
+        JLabel nowPlayingLabel =
+                new JLabel("NOW PLAYING");
+
+        nowPlayingLabel.setForeground(Color.WHITE);
+
+        nowPlayingLabel.setFont(
+                new Font(Font.SANS_SERIF, Font.BOLD, 18));
+
+        nowPlayingValueLabel.setForeground(Color.CYAN);
+
+        nowPlayingValueLabel.setFont(
+                new Font(Font.SANS_SERIF, Font.BOLD, 24));
+
+        nowPlayingPanel.add(
+                nowPlayingLabel,
+                BorderLayout.NORTH);
+
+        nowPlayingPanel.add(
+                nowPlayingValueLabel,
+                BorderLayout.CENTER);
+
+        topPanel.add(nowPlayingPanel, BorderLayout.EAST);
+
+        add(topPanel, BorderLayout.NORTH);
+
+        //
+        // GENRES PANEL
+        //
+        JPanel genresPanel =
+                new JPanel(new BorderLayout());
+
+        genresPanel.setBackground(Color.DARK_GRAY);
+
+        genresPanel.setBorder(
+                BorderFactory.createEmptyBorder(
+                        20,
+                        20,
+                        20,
+                        20));
+
+        JLabel genresLabel =
+                new JLabel("GENRES");
+
+        genresLabel.setForeground(Color.WHITE);
+
+        genresLabel.setFont(
+                new Font(Font.SANS_SERIF, Font.BOLD, 28));
+
+        genresList.setFont(
+                new Font(Font.SANS_SERIF, Font.PLAIN, 24));
+
+        JScrollPane genresScrollPane =
+                new JScrollPane(genresList);
+
+        genresPanel.add(genresLabel, BorderLayout.NORTH);
+
+        genresPanel.add(
+                genresScrollPane,
+                BorderLayout.CENTER);
+
+        add(genresPanel, BorderLayout.CENTER);
+    }
+
+    public void showFullscreen() {
+
+        GraphicsDevice graphicsDevice =
+                GraphicsEnvironment
+                        .getLocalGraphicsEnvironment()
+                        .getDefaultScreenDevice();
+
+        graphicsDevice.setFullScreenWindow(this);
+    }
+
+    public void setGenres(List<String> genres) {
+
+        SwingUtilities.invokeLater(() -> {
+
+            genresListModel.clear();
+
+            if (genres != null) {
+
+                genres.forEach(
+                        genresListModel::addElement);
+            }
+        });
+    }
+
+    public void setNowPlaying(
+            NowPlayingSongDto songDto) {
+
+        SwingUtilities.invokeLater(() -> {
+
+            if (songDto == null) {
+
+                nowPlayingValueLabel.setText("");
+
+                return;
+            }
+
+            nowPlayingValueLabel.setText(
+                    songDtoDisplay(songDto));
+        });
+    }
+
+    private String songDtoDisplay(
+            NowPlayingSongDto songDto) {
+
+        return String.format(
+                "%s - %s",
+                songDto.getArtist(),
+                songDto.getSong());
+    }
+}
+```
+
+---
+
+# Refactored `JukeANatorUserInterfaceApplication`
+
+```java id="1zfqv"
+package com.djt.jukeanator_engine.ui;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import com.djt.jukeanator_engine.domain.songlibrary.client.SongLibraryServiceHttpClient;
+import com.djt.jukeanator_engine.domain.songplayer.client.SongPlayerServiceHttpClient;
+import com.djt.jukeanator_engine.domain.songqueue.client.SongQueueServiceHttpClient;
+import com.djt.jukeanator_engine.ui.event.SongPlayerUiEventListener;
+
+@Component
+public class JukeANatorUserInterfaceApplication {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(
+                    JukeANatorUserInterfaceApplication.class);
+
+    private final SongLibraryServiceHttpClient
+            songLibraryServiceClient;
+
+    private final SongQueueServiceHttpClient
+            songQueueServiceClient;
+
+    private final SongPlayerServiceHttpClient
+            songPlayerServiceClient;
+
+    private final SongPlayerUiEventListener
+            songPlayerUiEventListener;
+
+    private final JukeANatorFrame
+            jukeANatorFrame;
+
+    public JukeANatorUserInterfaceApplication(
+            SongLibraryServiceHttpClient songLibraryServiceClient,
+            SongQueueServiceHttpClient songQueueServiceClient,
+            SongPlayerServiceHttpClient songPlayerServiceClient,
+            SongPlayerUiEventListener songPlayerUiEventListener) {
+
+        this.songLibraryServiceClient =
+                songLibraryServiceClient;
+
+        this.songQueueServiceClient =
+                songQueueServiceClient;
+
+        this.songPlayerServiceClient =
+                songPlayerServiceClient;
+
+        this.songPlayerUiEventListener =
+                songPlayerUiEventListener;
+
+        this.jukeANatorFrame =
+                new JukeANatorFrame();
+
+        this.songPlayerUiEventListener
+                .setFrame(jukeANatorFrame);
+    }
+
+    public void launch() {
+
+        initialize();
+
+        jukeANatorFrame.showFullscreen();
+
+        jukeANatorFrame.setVisible(true);
+
+        log.info("JukeANator UI launched");
+    }
+
+    private void initialize() {
+
+        jukeANatorFrame.setGenres(
+                songLibraryServiceClient.getGenres());
+
+        jukeANatorFrame.setNowPlaying(
+                songPlayerServiceClient
+                        .getNowPlayingSong());
+    }
+}
+```
+
+---
+
+# Refactored `SongPlayerUiEventListener`
+
+```java id="l6qzy"
+package com.djt.jukeanator_engine.ui.event;
+
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
+
+import com.djt.jukeanator_engine.domain.songplayer.dto.NowPlayingSongDto;
+import com.djt.jukeianator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
+import com.djt.jukeianator_engine.ui.JukeANatorFrame;
+
+@Component
+public class SongPlayerUiEventListener {
+
+    private JukeANatorFrame frame;
+
+    public void setFrame(
+            JukeANatorFrame frame) {
+
+        this.frame = frame;
+    }
+
+    @EventListener
+    public void handlePlaybackStarted(
+            SongPlaybackStartedEvent event) {
+
+        if (frame == null) {
+            return;
+        }
+
+        NowPlayingSongDto dto =
+                new NowPlayingSongDto();
+
+        dto.setArtist(
+                event.song()
+                        .getSong()
+                        .getArtistName());
+
+        dto.setSong(
+                event.song()
+                        .getSong()
+                        .getSongName());
+
+        frame.setNowPlaying(dto);
+    }
+}
+```
+
+---
+
+# Key Improvements
+
+## True Fullscreen
+
+```java
+graphicsDevice.setFullScreenWindow(this);
+```
+
+removes:
+
+* taskbar
+* dock
+* window borders
+* menu bars
+
+cross-platform.
+
+---
+
+## EDT Safe
+
+All UI updates now use:
+
+```java
+SwingUtilities.invokeLater(...)
+```
+
+which is required for Swing thread safety.
+
+---
+
+## Event-Driven UI
+
+The UI updates automatically from:
+
+```java
+SongPlaybackStartedEvent
+```
+
+No polling required.
+
+---
+
+# Recommended Next UI Enhancements
+
+Now your UI architecture supports:
+
+* animated visualizer
+* queue display
+* album artwork
+* playback progress bar
+* touchscreen kiosk mode
+* keyboard shortcuts
+* drag/drop queue ordering
+* WebSocket remote display synchronization
+* multiple monitor support
+* karaoke mode
+* fullscreen video playback
+* ambient visual themes
+
+
+Recommended Next UI Enhancements
+
+Now your UI architecture supports:
+
+animated visualizer
+queue display
+album artwork
+playback progress bar
+touchscreen kiosk mode
+keyboard shortcuts
+drag/drop queue ordering
+WebSocket remote display synchronization
+multiple monitor support
+karaoke mode
+fullscreen video playback
+ambient visual themes
