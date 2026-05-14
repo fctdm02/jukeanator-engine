@@ -212,7 +212,7 @@ public class JukeANatorFrame extends JFrame {
     tabs.addTab("Home", buildPlaceholderPanel());
     tabs.addTab("Search", buildSearchPanel());
     tabs.addTab("Hot Here", buildPlaceholderPanel());
-    tabs.addTab("Popular", buildPlaceholderPanel());
+    tabs.addTab("Genres", buildPlaceholderPanel());
     tabs.addTab("Queue", buildPlaceholderPanel());
     tabs.addTab("Admin", buildPlaceholderPanel());
 
