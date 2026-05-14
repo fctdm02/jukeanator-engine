@@ -12,8 +12,7 @@ import com.djt.jukeanator_engine.ui.event.SongPlayerUiEventListener;
 @Component
 public class JukeANatorUserInterfaceApplication {
 
-  private static final Logger log =
-      LoggerFactory.getLogger(JukeANatorUserInterfaceApplication.class);
+  private static final Logger log = LoggerFactory.getLogger(JukeANatorUserInterfaceApplication.class);
 
   private final SongLibraryServiceHttpClient songLibraryServiceClient;
   private final SongQueueServiceHttpClient songQueueServiceClient;
@@ -37,21 +36,20 @@ public class JukeANatorUserInterfaceApplication {
   public void launch() {
 
     this.frame = new JukeANatorFrame();
-
     this.songPlayerUiEventListener.setFrame(frame);
     
-    refreshUi();
+    initializeUi();
 
-    frame.showFullscreen();
-    frame.setVisible(true);
+    this.frame.showFullscreen();
+    this.frame.setVisible(true);
 
     log.info("JukeANator UI launched");
   }
 
-  public void refreshUi() {
+  private void initializeUi() {
 
-    frame.setGenres(songLibraryServiceClient.getGenres());
-    frame.setNowPlaying(songPlayerServiceClient.getNowPlayingSong());
-    frame.setQueue(songQueueServiceClient.getQueuedSongs());
+    this.frame.setGenres(songLibraryServiceClient.getGenres());
+    this.frame.setNowPlaying(songPlayerServiceClient.getNowPlayingSong());
+    this.frame.setQueue(songQueueServiceClient.getQueuedSongs());
   }
 }
