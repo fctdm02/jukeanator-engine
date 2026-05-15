@@ -1,19 +1,16 @@
 package com.djt.jukeanator_engine.domain.songplayer.service;
 
 import static java.util.Objects.requireNonNull;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
-
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
@@ -27,16 +24,13 @@ import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackPausedEvent
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackShutdownEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStoppedEvent;
-import com.djt.jukeanator_engine.domain.songplayer.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.mapper.SongPlayerMapper;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.Player;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.VideoVlcMediaPlayer;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.VlcMediaPlayer;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
-import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
-import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
-import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
-import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
+import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import jakarta.annotation.PreDestroy;
 
 /**
@@ -53,50 +47,38 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
       Executors.newSingleThreadExecutor(Thread.ofPlatform().name("song-queue-thread").factory());
 
   private final ApplicationEventPublisher eventPublisher;
-
-  private final Deque<SongQueueEntryEntity> playbackHistory = new ArrayDeque<>();
-
+  private final Deque<SongQueueEntryDto> playbackHistory = new ArrayDeque<>();
   private final Player player;
-
   private final String playerType;
-
   private final String rootPath;
-
   private final SongLibraryRepository songLibraryRepository;
-
-  private final SongQueueRepository songQueueRepository;
+  private final SongQueueService songQueueService;
 
   /**
    * Everything below is confined to the queueExecutor thread.
    */
   private RootFolderEntity songLibraryRoot;
-
-  private SongQueueRootEntity songQueueRoot;
-
-  private SongQueueEntryEntity nowPlayingSong;
-
-  private List<String> queuedSongNames = new ArrayList<>();
-
+  private SongQueueEntryDto nowPlayingSong;
   private List<String> genres = new ArrayList<>();
-
   private List<String> artists = new ArrayList<>();
-
   private List<AlbumFolderEntity> albums = new ArrayList<>();
 
-  public SongPlayerServiceImpl(String playerType, String rootPath,
-      SongLibraryRepository songLibraryRepository, SongQueueRepository songQueueRepository,
+  public SongPlayerServiceImpl(
+      String playerType, String rootPath,
+      SongLibraryRepository songLibraryRepository, 
+      SongQueueService songQueueService,
       ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(playerType, "playerType cannot be null");
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
-    requireNonNull(songQueueRepository, "songQueueRepository cannot be null");
+    requireNonNull(songQueueService, "songQueueService cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
     this.playerType = playerType;
     this.rootPath = rootPath;
     this.songLibraryRepository = songLibraryRepository;
-    this.songQueueRepository = songQueueRepository;
+    this.songQueueService = songQueueService;
     this.eventPublisher = eventPublisher;
 
     if (this.playerType.equals("vlc")) {
@@ -106,7 +88,6 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
     }
 
     log.info("Using song library root: " + this.songLibraryRoot);
-    log.info("Using song queue root: " + this.songQueueRoot);
     log.info("Using : " + this.playerType);
 
     // Initialize the song library root and song queue
@@ -122,10 +103,10 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
   @Override
   public NowPlayingSongDto getNowPlayingSong() {
 
-    SongQueueEntryEntity current = this.nowPlayingSong;
-
+    SongQueueEntryDto current = this.nowPlayingSong;
     if (current != null) {
-      return SongPlayerMapper.toDto(current);
+      
+      return new NowPlayingSongDto(current.getCoverArtPath(), current.getArtistName(), current.getAlbumName(), current.getSongName());
     }
 
     return SongPlayerMapper.EMPTY_NOW_PLAYING_SONG_DTO;
@@ -191,18 +172,7 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
     try {
       this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(rootPath);
     } catch (EntityDoesNotExistException ednee) {
-      log.error("Could not load song library from: " + rootPath
-          + ", using empty song library root for now, error: " + ednee.getMessage());
-      this.songQueueRoot = new SongQueueRootEntity(rootPath);
-    }
-
-    try {
-      this.songQueueRoot =
-          this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
-    } catch (EntityDoesNotExistException ednee) {
-      log.error("Could not load song queue from: " + rootPath
-          + ", using empty song library root for now, error: " + ednee.getMessage());
-      this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
+      throw new IllegalStateException("Could not load song library from: " + rootPath, ednee);
     }
 
     this.albums = this.songLibraryRoot.getAllAlbums();
@@ -260,10 +230,6 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
     try {
 
-      // If the queue has changed in any way, then publish
-      reloadQueue();
-      publishQueueChangesIfNecessary();
-
       /*
        * If something is already playing or paused, do nothing.
        */
@@ -273,32 +239,35 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
         return;
       }
 
+      /*
+       * If a previous song had been playing, move it into playback history and publish playback
+       * finished event before advancing to the next song.
+       */
       if (nowPlayingSong != null) {
+
+        playbackHistory.push(nowPlayingSong);
 
         eventPublisher.publishEvent(new SongPlaybackFinishedEvent(nowPlayingSong));
       }
 
-      List<SongQueueEntryEntity> queue = songQueueRoot.getSongs();
-      if (queue.isEmpty()) {
+      /*
+       * Ask the queue service for the next song. The queue service owns: - queue mutation - queue
+       * persistence - queue events
+       */
+      SongQueueEntryDto nextSong = songQueueService.dequeueNextSong();
+
+      if (nextSong == null) {
 
         nowPlayingSong = null;
+
+        log.debug("No songs remaining in queue");
+
         return;
-      }
-
-      SongQueueEntryEntity nextSong = queue.getFirst();
-
-      songQueueRoot.removeSongFromQueue(nextSong);
-
-      songQueueRepository.storeAggregateRoot(songQueueRoot);
-
-      if (nowPlayingSong != null) {
-
-        playbackHistory.push(nowPlayingSong);
       }
 
       nowPlayingSong = nextSong;
 
-      String songPath = nextSong.getSong().getNaturalIdentity();
+      String songPath = nextSong.getSongPath();
 
       log.info("Playing song: {}", songPath);
 
@@ -310,50 +279,5 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
       log.error("Queue processing failed", e);
     }
-  }
-
-  private void reloadQueue() {
-
-    try {
-
-      this.songQueueRoot =
-          this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
-
-    } catch (EntityDoesNotExistException e) {
-
-      log.error("""
-          Could not load song queue from: {}
-          Using empty song queue root for now
-          Error: {}
-          """, rootPath, e.getMessage());
-
-      this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
-    }
-  }
-
-  private void publishQueueChangesIfNecessary() {
-
-    List<String> latestQueuedSongNames = getQueuedSongNames();
-    if (!latestQueuedSongNames.equals(queuedSongNames)) {
-
-      eventPublisher
-          .publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
-
-      this.queuedSongNames = latestQueuedSongNames;
-    }
-  }
-
-  private List<String> getQueuedSongNames() {
-
-    List<String> list = new ArrayList<>();
-    List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
-    if (!songs.isEmpty()) {
-
-      for (SongQueueEntryEntity song : songs) {
-
-        list.add(song.getSong().getNaturalIdentity());
-      }
-    }
-    return list;
   }
 }

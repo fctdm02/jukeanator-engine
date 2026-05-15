@@ -8,6 +8,7 @@ public class SongQueueEntryDto {
   private String songName;
   private Integer songPlays;
   private Integer priority;
+  private String songPath;
 
   public SongQueueEntryDto(
       String coverArtPath,
@@ -15,7 +16,8 @@ public class SongQueueEntryDto {
       String artistName,
       String songName,
       Integer songPlays,
-      Integer priority) {
+      Integer priority,
+      String songPath) {
     
     this.coverArtPath = coverArtPath;
     this.albumName = albumName;
@@ -23,6 +25,7 @@ public class SongQueueEntryDto {
     this.songName = songName;
     this.songPlays = songPlays;
     this.priority = priority;
+    this.songPath = songPath;
   }
 
   public String getCoverArtPath() {
@@ -48,4 +51,8 @@ public class SongQueueEntryDto {
   public Integer getPriority() {
     return priority;
   }
+  
+  public String getSongPath() {
+    return songPath;
+  }  
 }

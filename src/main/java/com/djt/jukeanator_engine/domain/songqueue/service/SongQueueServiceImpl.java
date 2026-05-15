@@ -21,6 +21,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
+import com.djt.jukeanator_engine.domain.songplayer.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
@@ -115,20 +116,25 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
   }
   
   @Override
-  public SongQueueEntryDto getFirstEntryInSongQueue() {
-    
+  public synchronized SongQueueEntryDto dequeueNextSong() {
+
     List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
-    
-    if (!songs.isEmpty()) {
-      
-      SongQueueEntryEntity songQueueEntry = songs.get(0);
-      
-      songQueueRoot.removeSongFromQueue(songQueueEntry);
-      
-      return SongQueueMapper.toDto(songQueueEntry);
+
+    if (songs.isEmpty()) {
+      return null;
     }
-    
-    return null;
+
+    SongQueueEntryEntity nextSong = songs.getFirst();
+
+    songQueueRoot.removeSongFromQueue(nextSong);
+
+    songQueueRepository.storeAggregateRoot(songQueueRoot);
+
+    eventPublisher.publishEvent(
+        new SongQueueChangedEvent(
+            SongQueueMapper.toDto(songQueueRoot.getSongs())));
+
+    return SongQueueMapper.toDto(nextSong);
   }
 
   // Repository methods

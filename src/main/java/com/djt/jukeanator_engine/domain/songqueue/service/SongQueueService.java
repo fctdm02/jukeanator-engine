@@ -25,5 +25,5 @@ public interface SongQueueService {
    * 
    * @return
    */
-  SongQueueEntryDto getFirstEntryInSongQueue();
+  SongQueueEntryDto dequeueNextSong();
 }

@@ -5,41 +5,29 @@ package com.djt.jukeanator_engine.domain.songplayer.dto;
  */
 public class NowPlayingSongDto {
 
-  private String coverArtUrl;
-  private String artist;
-  private String album;
-  private String song;
+  private String coverArtPath;
+  private String artistName;
+  private String albumName;
+  private String songName;
 
-  public NowPlayingSongDto(String coverArtUrl, String artist, String album, String song) {
+  public NowPlayingSongDto(String coverArtPath, String artistName, String albumName, String songName) {
     super();
-    this.coverArtUrl = coverArtUrl;
-    this.artist = artist;
-    this.album = album;
-    this.song = song;
+    this.coverArtPath = coverArtPath;
+    this.artistName = artistName;
+    this.albumName = albumName;
+    this.songName = songName;
   }
   
-  public String getCoverArtUrl() {
-    return coverArtUrl;
+  public String getCoverArtPath() {
+    return coverArtPath;
   }
-  public void setCoverArtUrl(String coverArtUrl) {
-    this.coverArtUrl = coverArtUrl;
+  public String getArtistName() {
+    return artistName;
   }
-  public String getArtist() {
-    return artist;
+  public String getAlbumName() {
+    return albumName;
   }
-  public void setArtist(String artist) {
-    this.artist = artist;
+  public String getSongName() {
+    return songName;
   }
-  public String getAlbum() {
-    return album;
-  }
-  public void setAlbum(String album) {
-    this.album = album;
-  }
-  public String getSong() {
-    return song;
-  }
-  public void setSong(String song) {
-    this.song = song;
-  }  
 }

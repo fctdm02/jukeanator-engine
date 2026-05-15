@@ -865,10 +865,10 @@ public class JukeANatorFrame extends JFrame {
         return;
       }
 
-      songLabel.setText(songDto.getSong());
-      artistLabel.setText(songDto.getArtist());
-      albumLabel.setText(songDto.getAlbum());
-      loadAlbumArt(songDto.getCoverArtUrl());
+      songLabel.setText(songDto.getSongName());
+      artistLabel.setText(songDto.getArtistName());
+      albumLabel.setText(songDto.getAlbumName());
+      loadAlbumArt(songDto.getCoverArtPath());
 
     });
   }

@@ -44,10 +44,10 @@ public class SongQueueServiceHttpClient implements SongQueueService {
   }
 
   @Override
-  public SongQueueEntryDto getFirstEntryInSongQueue() {
+  public SongQueueEntryDto dequeueNextSong() {
 
     return restClient.get()
-        .uri("/api/song-queue/first")
+        .uri("/api/song-queue/dequeueNextSong")
         .retrieve()
         .body(SongQueueEntryDto.class);
   }

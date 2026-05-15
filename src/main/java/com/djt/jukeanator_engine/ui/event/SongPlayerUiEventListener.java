@@ -3,13 +3,10 @@ package com.djt.jukeanator_engine.ui.event;
 import java.util.List;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songplayer.dto.NowPlayingSongDto;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
-import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
 
 @Component
@@ -36,14 +33,12 @@ public class SongPlayerUiEventListener {
 
     if (frame == null) return;
 
-    SongQueueEntryEntity songQueueEntry = event.song();
-    SongFileEntity song = songQueueEntry.getSong();
-    AlbumFolderEntity album = song.getAlbum();
+    SongQueueEntryDto song = event.song();
     
-    String coverArtUrl = album.getCoverArtPath();
-    String artistName = album.getParentArtist().getName();
-    String albumName = album.getName();
-    String songName = song.getName();
+    String coverArtUrl = song.getCoverArtPath();
+    String artistName = song.getArtistName();
+    String albumName = song.getAlbumName();
+    String songName = song.getSongName();
     
     NowPlayingSongDto dto = new NowPlayingSongDto(coverArtUrl, artistName, albumName, songName);
 

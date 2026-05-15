@@ -36,9 +36,9 @@ public class SongQueueController implements SongQueueService {
   }
 
   @Override
-  @GetMapping("/first")
-  public SongQueueEntryDto getFirstEntryInSongQueue() {
-    return songQueueService.getFirstEntryInSongQueue();
+  @GetMapping("/dequeueNextSong")
+  public SongQueueEntryDto dequeueNextSong() {
+    return songQueueService.dequeueNextSong();
   }
 
   /**

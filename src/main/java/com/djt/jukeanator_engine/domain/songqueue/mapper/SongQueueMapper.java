@@ -37,7 +37,8 @@ public final class SongQueueMapper {
         song.getArtistName(),
         song.getName(),
         song.getNumPlays(),
-        entity.getPriority());
+        entity.getPriority(),
+        song.getNaturalIdentity());
 
     return dto;
   }

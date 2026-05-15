@@ -1,6 +1,6 @@
 package com.djt.jukeanator_engine.domain.songplayer.event;
 
-import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 
-public record SongPlaybackPausedEvent(SongQueueEntryEntity song) implements SongPlayerEvent {
+public record SongPlaybackPausedEvent(SongQueueEntryDto song) implements SongPlayerEvent {
 }

@@ -97,7 +97,7 @@ public class SongQueueServiceTest {
     
     
     // Remove the first entry in the queue (normally, only the song player service should be doing this)
-    SongQueueEntryDto firstQueuedSong = songQueueService.getFirstEntryInSongQueue();
+    SongQueueEntryDto firstQueuedSong = songQueueService.dequeueNextSong();
     assertNotNull(firstQueuedSong, "firstQueuedSong should not be null");    
     assertEquals(firstQueuedSong.getSongName(), song.getName(), "Song name is incorrect");
     
