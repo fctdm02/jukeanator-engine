@@ -437,29 +437,31 @@ public class JukeANatorFrame extends JFrame {
     // LEFT : CREDITS
     //
     JPanel creditsPanel = new JPanel();
-    creditsPanel.setOpaque(false);
+    creditsPanel.setBackground(Color.BLACK);
+    creditsPanel.setOpaque(true);
+    creditsPanel.setBorder(null);
+    creditsPanel.setPreferredSize(new Dimension(240, 100));
     creditsPanel.setLayout(new BoxLayout(creditsPanel, BoxLayout.Y_AXIS));
-
-    JLabel creditsTitle = new JLabel("CREDITS:");
+    
+    JLabel creditsTitle = new JLabel("CREDITS: 12");
     creditsTitle.setForeground(Color.YELLOW);
     creditsTitle.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
 
-    JLabel creditsValue = new JLabel("12");
-    creditsValue.setForeground(TEXT_SECONDARY);
-    creditsValue.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32));
+    JLabel creditDescription = new JLabel("1$=3cr | 5$=18cr | 10$=40cr");
+    creditDescription.setForeground(Color.WHITE);
+    creditDescription.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
 
     creditsPanel.add(creditsTitle);
     creditsPanel.add(Box.createVerticalStrut(5));
-    creditsPanel.add(creditsValue);
+    creditsPanel.add(creditDescription);
 
     //
     // CENTER : BANNER
     //
     JPanel bannerPanel = new JPanel(new GridBagLayout());
-    bannerPanel.setBackground(new Color(40, 40, 50));
-    bannerPanel.setBorder(BorderFactory.createLineBorder(ACCENT_BLUE, 2));
+    bannerPanel.setBackground(Color.BLACK);
 
-    JLabel bannerLabel = new JLabel("BANNER AREA");
+    JLabel bannerLabel = new JLabel("");
     bannerLabel.setForeground(TEXT_SECONDARY);
     bannerLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
     bannerPanel.add(bannerLabel);
@@ -481,9 +483,10 @@ public class JukeANatorFrame extends JFrame {
   private JPanel buildNowPlayingPanel() {
 
     JPanel panel = new JPanel(new BorderLayout(10, 0));
-    panel.setOpaque(false);
-    panel.setBorder(new EmptyBorder(0, 20, 0, 0));
-
+    panel.setBackground(Color.BLACK);
+    panel.setOpaque(true);
+    panel.setBorder(null);
+    
     //
     // TEXT PANEL
     //
@@ -513,7 +516,7 @@ public class JukeANatorFrame extends JFrame {
     //
     albumArtLabel.setPreferredSize(new Dimension(96, 96));
     albumArtLabel.setHorizontalAlignment(SwingConstants.CENTER);
-    albumArtLabel.setBorder(BorderFactory.createLineBorder(Color.WHITE));
+    albumArtLabel.setBorder(null);
 
     panel.add(textPanel, BorderLayout.CENTER);
     panel.add(albumArtLabel, BorderLayout.EAST);
