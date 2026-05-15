@@ -128,7 +128,7 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
       return SongQueueMapper.toDto(songQueueEntry);
     }
     
-    return new SongQueueEntryDto("Nothing", 0, 0);
+    return null;
   }
 
   // Repository methods

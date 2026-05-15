@@ -50,18 +50,7 @@ public class JukeANatorFrame extends JFrame {
   private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
 
   // ============================================================
-  // DATA MODELS
-  // ============================================================
-  private final DefaultListModel<String> genresListModel = new DefaultListModel<>();
-  private final DefaultListModel<String> queueListModel = new DefaultListModel<>();
-
-  // ============================================================
-  // LISTS
-  // ============================================================
-  private final JList<String> queueList = new JList<>(queueListModel);
-
-  // ============================================================
-  // GENRES PAGINATION
+  // GENRE TAB
   // ============================================================
   private static final int GENRES_PER_PAGE = 12;
   private final JPanel genresRootPanel = new JPanel(new CardLayout());
@@ -72,10 +61,25 @@ public class JukeANatorFrame extends JFrame {
   private final JPanel genreDetailsPanel = new JPanel(new BorderLayout());
   private int currentGenresPage = 0;
   private final Map<String, ImageIcon> genreIconCache = new HashMap<>();
+  private final DefaultListModel<String> genresListModel = new DefaultListModel<>();
+
+  // ============================================================
+  // QUEUE TAB
+  // ============================================================
+  private final CardLayout queueCardLayout = new CardLayout();
+  private final JPanel queueRootPanel = new JPanel(queueCardLayout);
+  private final JPanel queueDetailsPanel = new JPanel(new BorderLayout());
+  private final JLabel queueDetailsCoverArt = new JLabel();
+  private final JLabel queueDetailsSong = new JLabel();
+  private final JLabel queueDetailsArtist = new JLabel();
+  private final JLabel queueDetailsAlbum = new JLabel();
+  private final DefaultListModel<SongQueueEntryDto> queueListModel = new DefaultListModel<>();
+  private final JList<SongQueueEntryDto> queueList = new JList<>(queueListModel);  
 
   // ============================================================
   // NOW PLAYING
   // ============================================================
+  private SongQueueEntryDto currentlyPlaying;
   private final JLabel albumArtLabel = new JLabel();
   private final JLabel songLabel = new JLabel("", SwingConstants.LEFT);
   private final JLabel artistLabel = new JLabel("", SwingConstants.LEFT);
@@ -126,7 +130,7 @@ public class JukeANatorFrame extends JFrame {
     tabs.addTab("Search", buildSearchPanel());
     tabs.addTab("Hot Here", buildPlaceholderPanel());
     tabs.addTab("Genres", buildGenresPanel());
-    tabs.addTab("Queue", buildPlaceholderPanel());
+    tabs.addTab("Queue", buildQueuePanel());
     tabs.addTab("Admin", buildPlaceholderPanel());
 
     return tabs;
@@ -425,6 +429,269 @@ public class JukeANatorFrame extends JFrame {
   }
 
   // ============================================================
+  // QUEUE PANEL
+  // ============================================================
+  private JPanel buildQueuePanel() {
+
+    //
+    // LIST PANEL
+    //
+    JPanel queueListPanel = new JPanel(new BorderLayout());
+    queueListPanel.setBackground(BG_DARK);
+    queueListPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
+
+    queueList.setBackground(Color.BLACK);
+    queueList.setForeground(Color.WHITE);
+    queueList.setSelectionBackground(ACCENT_BLUE);
+    queueList.setSelectionForeground(Color.BLACK);
+    queueList.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+    queueList.setFixedCellHeight(60);
+    queueList.setCellRenderer(new QueueListCellRenderer());
+    queueList.addListSelectionListener(e -> {
+
+      if (!e.getValueIsAdjusting()) {
+
+        SongQueueEntryDto song = queueList.getSelectedValue();
+        if (song != null) {
+          showQueueSongDetails(song);
+        }
+      }
+    });
+    queueListPanel.add(queueList, BorderLayout.CENTER);
+
+    //
+    // DETAILS PANEL
+    //
+    queueDetailsPanel.setBackground(BG_DARK);
+
+    //
+    // ROOT
+    //
+    queueRootPanel.removeAll();
+    queueRootPanel.add(queueListPanel, "LIST");
+    queueRootPanel.add(queueDetailsPanel, "DETAILS");
+
+    queueCardLayout.show(queueRootPanel, "LIST");
+
+    return queueRootPanel;
+  }
+
+  // ============================================================
+  // QUEUE SONG DETAILS
+  // ============================================================
+  private void showQueueSongDetails(SongQueueEntryDto song) {
+
+    queueDetailsPanel.removeAll();
+
+    //
+    // BACK BUTTON
+    //
+    JButton backButton = new JButton("BACK");
+    backButton.setPreferredSize(new Dimension(180, 60));
+    backButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 24));
+    backButton.setForeground(Color.WHITE);
+    backButton.setBackground(Color.BLACK);
+
+    backButton.addActionListener(e -> {
+
+      queueCardLayout.show(queueRootPanel, "LIST");
+    });
+
+    JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    topPanel.setOpaque(false);
+    topPanel.add(backButton);
+
+    //
+    // DETAILS CONTENT
+    //
+    JPanel contentPanel = new JPanel();
+    contentPanel.setBackground(BG_DARK);
+    contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+    contentPanel.setBorder(new EmptyBorder(40, 40, 40, 40));
+
+    //
+    // COVER ART
+    //
+    queueDetailsCoverArt.setAlignmentX(CENTER_ALIGNMENT);
+
+    try {
+
+      if (song.getCoverArtPath() != null) {
+
+        Path path = Paths.get(song.getCoverArtPath());
+        URL imageUrl = path.toUri().toURL();
+
+        ImageIcon icon = new ImageIcon(imageUrl);
+
+        Image scaled = icon.getImage().getScaledInstance(320, 320, Image.SCALE_SMOOTH);
+
+        queueDetailsCoverArt.setIcon(new ImageIcon(scaled));
+
+      } else {
+
+        queueDetailsCoverArt.setIcon(null);
+      }
+
+    } catch (Exception e) {
+
+      queueDetailsCoverArt.setIcon(null);
+    }
+
+    //
+    // SONG INFO
+    //
+    queueDetailsSong.setText(song.getSongName());
+    queueDetailsSong.setForeground(Color.CYAN);
+    queueDetailsSong.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 36));
+    queueDetailsSong.setAlignmentX(CENTER_ALIGNMENT);
+
+    queueDetailsArtist.setText(song.getArtistName());
+    queueDetailsArtist.setForeground(Color.WHITE);
+    queueDetailsArtist.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 28));
+    queueDetailsArtist.setAlignmentX(CENTER_ALIGNMENT);
+
+    queueDetailsAlbum.setText(song.getAlbumName());
+    queueDetailsAlbum.setForeground(TEXT_SECONDARY);
+    queueDetailsAlbum.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 24));
+    queueDetailsAlbum.setAlignmentX(CENTER_ALIGNMENT);
+
+    contentPanel.add(queueDetailsCoverArt);
+    contentPanel.add(Box.createVerticalStrut(30));
+    contentPanel.add(queueDetailsSong);
+    contentPanel.add(Box.createVerticalStrut(15));
+    contentPanel.add(queueDetailsArtist);
+    contentPanel.add(Box.createVerticalStrut(10));
+    contentPanel.add(queueDetailsAlbum);
+
+    //
+    // ASSEMBLE
+    //
+    queueDetailsPanel.add(topPanel, BorderLayout.NORTH);
+    queueDetailsPanel.add(contentPanel, BorderLayout.CENTER);
+
+    queueDetailsPanel.revalidate();
+    queueDetailsPanel.repaint();
+
+    queueCardLayout.show(queueRootPanel, "DETAILS");
+  }
+
+  private class QueueListCellRenderer extends JPanel
+      implements javax.swing.ListCellRenderer<SongQueueEntryDto> {
+
+    private static final long serialVersionUID = 1L;
+    
+    private final JLabel cover = new JLabel();
+    private final JLabel title = new JLabel();
+    private final JLabel subtitle = new JLabel();
+    private final JLabel priorityBadge = new JLabel();
+
+    public QueueListCellRenderer() {
+
+      setLayout(new BorderLayout(12, 0));
+      setBorder(new EmptyBorder(8, 10, 8, 10));
+
+      // cover art
+      cover.setPreferredSize(new Dimension(56, 56));
+      cover.setHorizontalAlignment(SwingConstants.CENTER);
+
+      // text
+      JPanel textPanel = new JPanel();
+      textPanel.setOpaque(false);
+      textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
+
+      title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
+      subtitle.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
+
+      title.setForeground(Color.WHITE);
+      subtitle.setForeground(TEXT_SECONDARY);
+
+      textPanel.add(title);
+      textPanel.add(subtitle);
+
+      // priority badge
+      priorityBadge.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+      priorityBadge.setHorizontalAlignment(SwingConstants.CENTER);
+      priorityBadge.setPreferredSize(new Dimension(40, 40));
+      priorityBadge.setOpaque(true);
+
+      add(cover, BorderLayout.WEST);
+      add(textPanel, BorderLayout.CENTER);
+      add(priorityBadge, BorderLayout.EAST);
+    }
+
+    @Override
+    public java.awt.Component getListCellRendererComponent(JList<? extends SongQueueEntryDto> list,
+        SongQueueEntryDto value, int index, boolean isSelected, boolean cellHasFocus) {
+
+      // -------------------------
+      // TEXT
+      // -------------------------
+      title.setText(value.getSongName());
+      subtitle.setText(value.getArtistName() + " • " + value.getAlbumName());
+
+      // -------------------------
+      // PRIORITY INDICATOR
+      // -------------------------
+      int p = value.getPriority() == null ? 0 : value.getPriority();
+
+      if (p >= 8) {
+        priorityBadge.setText("🔥");
+        priorityBadge.setBackground(new Color(220, 60, 60));
+        priorityBadge.setForeground(Color.WHITE);
+      } else if (p >= 4) {
+        priorityBadge.setText("⬆");
+        priorityBadge.setBackground(new Color(255, 160, 0));
+        priorityBadge.setForeground(Color.BLACK);
+      } else {
+        priorityBadge.setText("•");
+        priorityBadge.setBackground(new Color(80, 80, 80));
+        priorityBadge.setForeground(Color.WHITE);
+      }
+
+      // -------------------------
+      // COVER ART
+      // -------------------------
+      try {
+        if (value.getCoverArtPath() != null) {
+          Path path = Paths.get(value.getCoverArtPath());
+          ImageIcon icon = new ImageIcon(path.toUri().toURL());
+
+          Image scaled = icon.getImage().getScaledInstance(56, 56, Image.SCALE_SMOOTH);
+          cover.setIcon(new ImageIcon(scaled));
+        } else {
+          cover.setIcon(null);
+        }
+      } catch (Exception e) {
+        cover.setIcon(null);
+      }
+
+      // -------------------------
+      // PLAYING NOW + SELECTION HIGHLIGHT
+      // -------------------------
+      boolean isPlaying =
+          currentlyPlaying != null && currentlyPlaying.getSongName().equals(value.getSongName())
+              && currentlyPlaying.getArtistName().equals(value.getArtistName());
+
+      if (isPlaying) {
+        setBackground(new Color(0, 210, 255)); // ACCENT_BLUE
+        title.setForeground(Color.BLACK);
+        subtitle.setForeground(Color.BLACK);
+      } else if (isSelected) {
+        setBackground(new Color(40, 40, 50));
+        title.setForeground(Color.WHITE);
+        subtitle.setForeground(TEXT_SECONDARY);
+      } else {
+        setBackground(Color.BLACK);
+        title.setForeground(Color.WHITE);
+        subtitle.setForeground(TEXT_SECONDARY);
+      }
+
+      setOpaque(true);
+      return this;
+    }
+  }
+
+  // ============================================================
   // TOP PANEL
   // ============================================================
   private JPanel buildTopPanel() {
@@ -442,7 +709,7 @@ public class JukeANatorFrame extends JFrame {
     creditsPanel.setBorder(null);
     creditsPanel.setPreferredSize(new Dimension(240, 100));
     creditsPanel.setLayout(new BoxLayout(creditsPanel, BoxLayout.Y_AXIS));
-    
+
     JLabel creditsTitle = new JLabel("CREDITS: 12");
     creditsTitle.setForeground(Color.YELLOW);
     creditsTitle.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
@@ -486,7 +753,7 @@ public class JukeANatorFrame extends JFrame {
     panel.setBackground(Color.BLACK);
     panel.setOpaque(true);
     panel.setBorder(null);
-    
+
     //
     // TEXT PANEL
     //
@@ -578,13 +845,13 @@ public class JukeANatorFrame extends JFrame {
     SwingUtilities.invokeLater(() -> {
 
       queueListModel.clear();
-      if (queue != null) {
 
-        queue.forEach(q -> queueListModel.addElement(q.getName()));
+      if (queue != null) {
+        queue.forEach(queueListModel::addElement);
       }
     });
   }
-
+  
   // ============================================================
   // NOW PLAYING
   // ============================================================
@@ -606,8 +873,6 @@ public class JukeANatorFrame extends JFrame {
     });
   }
 
-  // ============================================================
-
   private void clearNowPlaying() {
 
     songLabel.setText("");
@@ -615,17 +880,13 @@ public class JukeANatorFrame extends JFrame {
     albumLabel.setText("");
     albumArtLabel.setIcon(null);
   }
-
-  // ============================================================
-
+  
   private void loadAlbumArt(String coverArtPath) {
 
     try {
 
       if (coverArtPath == null || coverArtPath.isBlank()) {
-
         albumArtLabel.setIcon(null);
-
         return;
       }
 
@@ -641,4 +902,10 @@ public class JukeANatorFrame extends JFrame {
       albumArtLabel.setIcon(null);
     }
   }
+  
+  public void setCurrentlyPlaying(SongQueueEntryDto song) {
+    this.currentlyPlaying = song;
+
+    SwingUtilities.invokeLater(() -> queueList.repaint());
+  }  
 }
