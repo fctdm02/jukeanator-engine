@@ -7,11 +7,14 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Image;
+import java.awt.Rectangle;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -123,15 +126,135 @@ public class JukeANatorFrame extends JFrame {
   private JTabbedPane buildContentPanelTabs() {
 
     JTabbedPane tabs = new JTabbedPane(JTabbedPane.BOTTOM);
-    tabs.setBackground(BG_PANEL);
-    tabs.setForeground(TEXT_PRIMARY);
-    tabs.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
-    tabs.addTab("Home", buildPlaceholderPanel());
-    tabs.addTab("Search", buildSearchPanel());
-    tabs.addTab("Hot Here", buildPlaceholderPanel());
-    tabs.addTab("Genres", buildGenresPanel());
-    tabs.addTab("Queue", buildQueuePanel());
-    tabs.addTab("Admin", buildPlaceholderPanel());
+
+    //
+    // FORCE SINGLE ROW
+    //
+    tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+
+    //
+    // CUSTOM UI
+    //
+    tabs.setUI(new javax.swing.plaf.basic.BasicTabbedPaneUI() {
+
+      @Override
+      protected int calculateTabWidth(int tabPlacement, int tabIndex, FontMetrics metrics) {
+
+        int count = Math.max(tabPane.getTabCount(), 1);
+
+        //
+        // USE AVAILABLE WIDTH
+        //
+        int availableWidth = tabPane.getWidth();
+
+        //
+        // ACCOUNT FOR INSETS
+        //
+        availableWidth -= 4;
+
+        //
+        // EVEN DISTRIBUTION
+        //
+        return availableWidth / count;
+      }
+
+      @Override
+      protected int calculateTabHeight(int tabPlacement, int tabIndex, int fontHeight) {
+
+        return 96;
+      }
+
+      @Override
+      protected void paintTabBackground(Graphics g, int tabPlacement, int tabIndex, int x, int y,
+          int w, int h, boolean isSelected) {
+
+        if (isSelected) {
+
+          //
+          // ACTIVE TAB
+          //
+          g.setColor(new Color(70, 70, 70));
+          g.fillRect(x, y, w, h);
+
+          //
+          // TOP HIGHLIGHT
+          //
+          g.setColor(Color.WHITE);
+          g.fillRect(x, y, w, 3);
+
+        } else {
+
+          //
+          // INACTIVE TAB
+          //
+          g.setColor(Color.BLACK);
+          g.fillRect(x, y, w, h);
+        }
+
+        //
+        // TAB SEPARATOR
+        //
+        g.setColor(new Color(180, 180, 180));
+        g.drawLine(x, y, x, y + h);
+      }
+
+      @Override
+      protected void paintTabBorder(Graphics g, int tabPlacement, int tabIndex, int x, int y, int w,
+          int h, boolean isSelected) {
+
+        //
+        // OUTER BORDER
+        //
+        g.setColor(new Color(180, 180, 180));
+        g.drawRect(x, y, w, h);
+      }
+
+      @Override
+      protected void paintFocusIndicator(Graphics g, int tabPlacement, Rectangle[] rects,
+          int tabIndex, Rectangle iconRect, Rectangle textRect, boolean isSelected) {
+
+        //
+        // REMOVE SWING FOCUS BORDER
+        //
+      }
+
+      @Override
+      protected void paintContentBorder(Graphics g, int tabPlacement, int selectedIndex) {
+
+        //
+        // REMOVE CONTENT BORDER
+        //
+      }
+    });
+
+    tabs.setBackground(Color.BLACK);
+    tabs.setForeground(Color.WHITE);
+    tabs.setBorder(null);
+
+    //
+    // REMOVE GAP BETWEEN TABS
+    //
+    tabs.setOpaque(true);
+
+    //
+    // CONTENT PANELS
+    //
+    tabs.addTab("HOME", buildPlaceholderPanel());
+    tabs.addTab("SEARCH", buildSearchPanel());
+    tabs.addTab("HOT HERE", buildPlaceholderPanel());
+    tabs.addTab("GENRES", buildGenresPanel());
+    tabs.addTab("QUEUE", buildQueuePanel());
+    tabs.addTab("ADMIN", buildPlaceholderPanel());
+
+    //
+    // CUSTOM TAB COMPONENTS
+    //
+    tabs.setTabComponentAt(0, new JukeboxTabComponent("HOME", "⌂", new Color(255, 120, 120)));
+    tabs.setTabComponentAt(1, new JukeboxTabComponent("SEARCH", "⌕", new Color(0, 220, 255)));
+    tabs.setTabComponentAt(2, new JukeboxTabComponent("HOT HERE", "🔥", new Color(255, 80, 120)));
+    tabs.setTabComponentAt(3, new JukeboxTabComponent("GENRES", "▣", Color.WHITE));
+    tabs.setTabComponentAt(4, new JukeboxTabComponent("QUEUE", "♫", new Color(0, 255, 180)));
+    tabs.setTabComponentAt(5, new JukeboxTabComponent("ADMIN", "⚙", new Color(255, 220, 0)));
 
     return tabs;
   }

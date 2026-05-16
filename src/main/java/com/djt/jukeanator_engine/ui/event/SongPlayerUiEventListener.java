@@ -7,6 +7,7 @@ import com.djt.jukeanator_engine.domain.songplayer.dto.NowPlayingSongDto;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
+import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
 import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
 
 @Component
@@ -17,15 +18,24 @@ public class SongPlayerUiEventListener {
   public void setFrame(JukeANatorFrame frame) {
     this.frame = frame;
   }
+  
+  @EventListener
+  public void handleAddSongToQueueEvent(AddSongToQueueEvent event) {
+    
+    updateQueue(event.queuedSongs());
+  }
 
   @EventListener
   public void handleSongQueueChangedEvent(SongQueueChangedEvent event) {
-
+    
+    updateQueue(event.queuedSongs());
+  }
+  
+  private void updateQueue(List<SongQueueEntryDto> queue) {
+    
     if (frame == null) return;
     
-    List<SongQueueEntryDto> queue = event.queue();
-    
-    frame.setQueue(queue);
+    frame.setQueue(queue);    
   }
   
   @EventListener

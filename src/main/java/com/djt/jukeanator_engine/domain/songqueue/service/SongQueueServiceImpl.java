@@ -101,6 +101,7 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
           // Publish the event
           eventPublisher.publishEvent(
               new AddSongToQueueEvent(
+                  getQueuedSongs(),
                   albumId,
                   songId,
                   priority,
