@@ -11,20 +11,20 @@ import org.springframework.context.event.EventListener;
 import com.djt.jukeanator_engine.ui.JukeANatorUserInterfaceApplication;
 
 @Configuration
-@EnableConfigurationProperties(UserInterfaceProperties.class)
+@EnableConfigurationProperties(JukeANatorUserInterfaceProperties.class)
 @ConditionalOnProperty(prefix = "user-interface", name = "enabled", havingValue = "true")
-public class SwingUiConfiguration {
+public class JukeANatorLauncherConfiguration {
 
-  private final JukeANatorUserInterfaceApplication uiApplication;
+  private final JukeANatorUserInterfaceApplication jukeANatorUserInterfaceApplication;
 
-  public SwingUiConfiguration(JukeANatorUserInterfaceApplication uiApplication) {
+  public JukeANatorLauncherConfiguration(JukeANatorUserInterfaceApplication jukeANatorUserInterfaceApplication) {
 
-    this.uiApplication = uiApplication;
+    this.jukeANatorUserInterfaceApplication = jukeANatorUserInterfaceApplication;
   }
 
   @EventListener(ApplicationReadyEvent.class)
   public void launchUi() {
 
-    SwingUtilities.invokeLater(uiApplication::launch);
+    SwingUtilities.invokeLater(jukeANatorUserInterfaceApplication::launch);
   }
 }

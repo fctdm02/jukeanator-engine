@@ -11,7 +11,7 @@ import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
 import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
 
 @Component
-public class SongPlayerUiEventListener {
+public class JukeANatorEventListener {
 
   private JukeANatorFrame frame;
 

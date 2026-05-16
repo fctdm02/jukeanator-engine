@@ -9,12 +9,14 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -37,10 +39,12 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songplayer.dto.NowPlayingSongDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
+import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 
 public class JukeANatorFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
+  private final JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties;
 
   // ============================================================
   // COLORS
@@ -87,11 +91,25 @@ public class JukeANatorFrame extends JFrame {
   private final JLabel songLabel = new JLabel("", SwingConstants.LEFT);
   private final JLabel artistLabel = new JLabel("", SwingConstants.LEFT);
   private final JLabel albumLabel = new JLabel("", SwingConstants.LEFT);
+  
+  // ============================================================
+  // SONG CREDITS
+  // ============================================================
+  private final int creditsPer;
+  private final int fiveBonusCredits;
+  private final int tenBonusCredits; 
 
   // ============================================================
   // CONSTRUCTOR
   // ============================================================
-  public JukeANatorFrame() {
+  public JukeANatorFrame(JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties) {
+
+    this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
+    
+    this.creditsPer = this.jukeANatorUserInterfaceProperties.getCreditsPer();
+    this.fiveBonusCredits = this.jukeANatorUserInterfaceProperties.getFiveBonusCredits();
+    this.tenBonusCredits = this.jukeANatorUserInterfaceProperties.getTenBonusCredits();
+
     initialize();
   }
 
@@ -259,6 +277,82 @@ public class JukeANatorFrame extends JFrame {
     return tabs;
   }
 
+  private class JukeboxTabComponent extends JPanel {
+
+    private static final long serialVersionUID = 1L;
+
+    private final Color accentColor;
+
+    public JukeboxTabComponent(String title, String iconText, Color accentColor) {
+
+      this.accentColor = accentColor;
+      setOpaque(false);
+      setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+      setBorder(new EmptyBorder(8, 20, 8, 20));
+
+      //
+      // ICON
+      //
+      JLabel iconLabel = new JLabel(iconText);
+      iconLabel.setAlignmentX(CENTER_ALIGNMENT);
+      iconLabel.setForeground(accentColor);
+      iconLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 34));
+
+      //
+      // TEXT
+      //
+      JLabel textLabel = new JLabel(title);
+      textLabel.setAlignmentX(CENTER_ALIGNMENT);
+      textLabel.setForeground(accentColor);
+      textLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
+
+      add(iconLabel);
+      add(Box.createVerticalStrut(4));
+      add(textLabel);
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+
+      Graphics2D g2 = (Graphics2D) g.create();
+      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+      JTabbedPane pane = (JTabbedPane) SwingUtilities.getAncestorOfClass(JTabbedPane.class, this);
+      if (pane != null) {
+
+        int index = pane.indexOfTabComponent(this);
+        boolean selected = pane.getSelectedIndex() == index;
+        if (selected) {
+
+          //
+          // GLOW EFFECT
+          //
+          g2.setColor(
+              new Color(accentColor.getRed(), accentColor.getGreen(), accentColor.getBlue(), 60));
+
+          g2.fillRoundRect(6, 6, getWidth() - 12, getHeight() - 12, 18, 18);
+
+          //
+          // BORDER
+          //
+          g2.setColor(new Color(220, 220, 220));
+
+          g2.drawRoundRect(6, 6, getWidth() - 13, getHeight() - 13, 18, 18);
+        }
+      }
+
+      g2.dispose();
+
+      super.paintComponent(g);
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+
+      return new Dimension(200, 92);
+    }
+  }
+  
   // ============================================================
   // SEARCH PANEL
   // ============================================================
@@ -837,7 +931,7 @@ public class JukeANatorFrame extends JFrame {
     creditsTitle.setForeground(Color.YELLOW);
     creditsTitle.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
 
-    JLabel creditDescription = new JLabel("1$=3cr | 5$=18cr | 10$=40cr");
+    JLabel creditDescription = new JLabel(buildCreditsDescription());
     creditDescription.setForeground(Color.WHITE);
     creditDescription.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
 
@@ -867,6 +961,19 @@ public class JukeANatorFrame extends JFrame {
     return panel;
   }
 
+  private String buildCreditsDescription() {
+
+    int oneDollarCredits = creditsPer;
+    int fiveDollarCredits = (5 * creditsPer) + fiveBonusCredits;
+    int tenDollarCredits = (10 * creditsPer) + tenBonusCredits;
+
+    return String.format(
+        "1$=%dcr | 5$=%dcr | 10$=%dcr",
+        oneDollarCredits,
+        fiveDollarCredits,
+        tenDollarCredits);
+  }
+  
   // ============================================================
   // NOW PLAYING PANEL
   // ============================================================

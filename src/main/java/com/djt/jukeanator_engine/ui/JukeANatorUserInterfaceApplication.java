@@ -7,36 +7,40 @@ import com.djt.jukeanator_engine.domain.songlibrary.client.SongLibraryServiceHtt
 import com.djt.jukeanator_engine.domain.songplayer.client.SongPlayerServiceHttpClient;
 import com.djt.jukeanator_engine.domain.songqueue.client.SongQueueServiceHttpClient;
 import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
-import com.djt.jukeanator_engine.ui.event.SongPlayerUiEventListener;
+import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
+import com.djt.jukeanator_engine.ui.event.JukeANatorEventListener;
 
 @Component
 public class JukeANatorUserInterfaceApplication {
 
   private static final Logger log = LoggerFactory.getLogger(JukeANatorUserInterfaceApplication.class);
 
+  private final JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties;
   private final SongLibraryServiceHttpClient songLibraryServiceClient;
   private final SongQueueServiceHttpClient songQueueServiceClient;
   private final SongPlayerServiceHttpClient songPlayerServiceClient;
-  private final SongPlayerUiEventListener songPlayerUiEventListener;
+  private final JukeANatorEventListener jukeANatorEventListener;
 
   private JukeANatorFrame frame;
 
   public JukeANatorUserInterfaceApplication(
+      JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
       SongLibraryServiceHttpClient songLibraryServiceClient,
       SongQueueServiceHttpClient songQueueServiceClient,
       SongPlayerServiceHttpClient songPlayerServiceClient,
-      SongPlayerUiEventListener songPlayerUiEventListener) {
+      JukeANatorEventListener jukeANatorEventListener) {
 
+    this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
     this.songLibraryServiceClient = songLibraryServiceClient;
     this.songQueueServiceClient = songQueueServiceClient;
     this.songPlayerServiceClient = songPlayerServiceClient;
-    this.songPlayerUiEventListener = songPlayerUiEventListener;
+    this.jukeANatorEventListener = jukeANatorEventListener;
   }
 
   public void launch() {
 
-    this.frame = new JukeANatorFrame();
-    this.songPlayerUiEventListener.setFrame(frame);
+    this.frame = new JukeANatorFrame(jukeANatorUserInterfaceProperties);
+    this.jukeANatorEventListener.setFrame(frame);
     
     initializeUi();
 

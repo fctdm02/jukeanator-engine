@@ -8,22 +8,22 @@ import com.djt.jukeanator_engine.domain.songplayer.client.SongPlayerServiceHttpC
 import com.djt.jukeanator_engine.domain.songqueue.client.SongQueueServiceHttpClient;
 
 @Configuration
-public class ClientConfiguration {
+public class JukeANatorClientConfiguration {
 
   @Bean
-  SongLibraryServiceHttpClient songLibraryServiceHttpClient(UserInterfaceProperties properties) {
+  SongLibraryServiceHttpClient songLibraryServiceHttpClient(JukeANatorUserInterfaceProperties properties) {
 
     return new SongLibraryServiceHttpClient(properties.getBaseUrl());
   }
 
   @Bean
-  SongQueueServiceHttpClient songQueueServiceHttpClient(UserInterfaceProperties properties) {
+  SongQueueServiceHttpClient songQueueServiceHttpClient(JukeANatorUserInterfaceProperties properties) {
 
     return new SongQueueServiceHttpClient(properties.getBaseUrl());
   }
 
   @Bean
-  SongPlayerServiceHttpClient songPlayerServiceHttpClient(UserInterfaceProperties properties) {
+  SongPlayerServiceHttpClient songPlayerServiceHttpClient(JukeANatorUserInterfaceProperties properties) {
 
     return new SongPlayerServiceHttpClient(properties.getBaseUrl());
   }
