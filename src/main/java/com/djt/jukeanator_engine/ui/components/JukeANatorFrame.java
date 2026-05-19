@@ -392,53 +392,83 @@ public class JukeANatorFrame extends JFrame {
     JPanel panel = new JPanel();
     panel.setOpaque(false);
     panel.setBorder(new EmptyBorder(30, 50, 30, 50));
-    panel.setLayout(new GridLayout(4, 1, 8, 8));
-    panel.add(buildKeyboardRow("QWERTYUIOP"));
-    panel.add(buildKeyboardRow("ASDFGHJKL"));
-    panel.add(buildKeyboardRow("ZXCVBNM"));
-    panel.add(buildBottomKeyboardRow());
+    panel.setLayout(new GridLayout(3, 1, 10, 10));
+
+    panel.add(buildKeyboardRow1());
+    panel.add(buildKeyboardRow2());
+    panel.add(buildKeyboardRow3());
 
     return panel;
   }
 
-  private JPanel buildKeyboardRow(String chars) {
+  private JPanel buildKeyboardRow1() {
 
-    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
     row.setOpaque(false);
 
-    for (char c : chars.toCharArray()) {
+    String keys = "QWERTYUIOP";
 
-      JButton button = createKeyboardButton(String.valueOf(c));
-      row.add(button);
+    for (char c : keys.toCharArray()) {
+      row.add(createKeyboardButton(String.valueOf(c)));
     }
 
+    row.add(createKeyboardButton("'"));
+
+    JButton clear = createKeyboardButton("CLEAR");
+    clear.setPreferredSize(new Dimension(140, 60));
+    row.add(clear);
+
+    JButton backspace = createKeyboardButton("⌫");
+    backspace.setPreferredSize(new Dimension(100, 60));
+    row.add(backspace);
+
     return row;
   }
+  
+  private JPanel buildKeyboardRow2() {
 
-  private JPanel buildBottomKeyboardRow() {
-
-    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
     row.setOpaque(false);
-    row.add(createWideButton("CLEAR", 180));
-    row.add(createWideButton("SPACE", 320));
-    row.add(createWideButton("⌫", 100));
+
+    JButton numeric = createKeyboardButton("123@");
+    numeric.setPreferredSize(new Dimension(140, 60));
+    row.add(numeric);
+
+    String keys = "ASDFGHJKL";
+
+    for (char c : keys.toCharArray()) {
+      row.add(createKeyboardButton(String.valueOf(c)));
+    }
+
+    JButton alpha = createKeyboardButton("ABC");
+    alpha.setPreferredSize(new Dimension(140, 60));
+    row.add(alpha);
+
+    return row;
+  }  
+  
+  private JPanel buildKeyboardRow3() {
+
+    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+    row.setOpaque(false);
+
+    String keys = "ZXCVBNM";
+
+    for (char c : keys.toCharArray()) {
+      row.add(createKeyboardButton(String.valueOf(c)));
+    }
+
+    JButton space = createKeyboardButton("SPACE");
+    space.setPreferredSize(new Dimension(420, 60));
+    row.add(space);
 
     return row;
   }
-
+  
   private JButton createKeyboardButton(String text) {
 
     JButton button = new JButton(text);
     button.setPreferredSize(new Dimension(70, 60));
-    styleKeyboardButton(button);
-
-    return button;
-  }
-
-  private JButton createWideButton(String text, int width) {
-
-    JButton button = new JButton(text);
-    button.setPreferredSize(new Dimension(width, 60));
     styleKeyboardButton(button);
 
     return button;
