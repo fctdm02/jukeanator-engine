@@ -2,8 +2,10 @@ package com.djt.jukeanator_engine.ui;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import com.djt.jukeanator_engine.domain.songlibrary.client.SongLibraryServiceHttpClient;
+import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songplayer.client.SongPlayerServiceHttpClient;
 import com.djt.jukeanator_engine.domain.songqueue.client.SongQueueServiceHttpClient;
 import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
@@ -56,4 +58,10 @@ public class JukeANatorUserInterfaceApplication {
     this.frame.setNowPlaying(songPlayerServiceClient.getNowPlayingSong());
     this.frame.setQueue(songQueueServiceClient.getQueuedSongs());
   }
+  
+  @EventListener
+  public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
+
+    initializeUi();
+  }   
 }
