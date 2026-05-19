@@ -1062,8 +1062,6 @@ public class JukeANatorFrame extends JFrame {
 
     stylePageNavButton(previousButton);
 
-    previousButton.setEnabled(currentGenresPage > 0);
-
     previousButton.addActionListener(e -> {
 
       if (currentGenresPage > 0) {
@@ -1081,8 +1079,6 @@ public class JukeANatorFrame extends JFrame {
 
     stylePageNavButton(nextButton);
 
-    nextButton.setEnabled(currentGenresPage < pageCount - 1);
-
     nextButton.addActionListener(e -> {
 
       if (currentGenresPage < pageCount - 1) {
@@ -1092,6 +1088,12 @@ public class JukeANatorFrame extends JFrame {
       }
     });
 
+    boolean hasPrevious = currentGenresPage > 0;
+    boolean hasNext = currentGenresPage < pageCount - 1;
+
+    previousButton.setVisible(hasPrevious);
+    nextButton.setVisible(hasNext);
+    
     //
     // DOT BUTTONS
     //
@@ -1127,6 +1129,7 @@ public class JukeANatorFrame extends JFrame {
     JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
     leftPanel.setOpaque(false);
     leftPanel.add(previousButton);
+    leftPanel.setPreferredSize(new Dimension(140, 80));
 
     //
     // RIGHT WRAPPER
@@ -1134,6 +1137,7 @@ public class JukeANatorFrame extends JFrame {
     JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
     rightPanel.setOpaque(false);
     rightPanel.add(nextButton);
+    rightPanel.setPreferredSize(new Dimension(140, 80));
 
     //
     // ASSEMBLE
