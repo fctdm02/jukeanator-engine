@@ -25,290 +25,283 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
  */
 public final class SongScanner {
 
-	private RootFolderEntity rootFolder;	
-	private boolean requiresMetadata;
-	private boolean useGenre;
-	private boolean useTopFolderForGenre;
-	private Set<String> acceptedSongFileExtensions;
+  private RootFolderEntity rootFolder;
+  private boolean requiresMetadata;
+  private boolean useGenre;
+  private boolean useTopFolderForGenre;
+  private Set<String> acceptedSongFileExtensions;
 
-	private DiscogsClientWrapper discogsClientWrapper;
-	private MusicBrainzClientWrapper musicBrainzClientWrapper;
-	private JAudioTaggerClient jAudioTaggerClient;
-	private CoverArtDownloader coverArtDownloader;
+  private DiscogsClientWrapper discogsClientWrapper;
+  private MusicBrainzClientWrapper musicBrainzClientWrapper;
+  private JAudioTaggerClient jAudioTaggerClient;
+  private CoverArtDownloader coverArtDownloader;
 
-	public SongScanner(
-			DiscogsClientWrapper discogsClientWrapper, 
-			MusicBrainzClientWrapper musicBrainzClientWrapper,
-			JAudioTaggerClient jAudioTaggerClient,
-			CoverArtDownloader coverArtDownloader, 
-			boolean requiresMetadata, 
-			boolean useGenre,
-			boolean useTopFolderForGenre,
-			Set<String> acceptedSongFileExtensions) {
-		requireNonNull(discogsClientWrapper, "discogsClientWrapper cannot be null");
-		requireNonNull(musicBrainzClientWrapper, "musicBrainzClientWrapper cannot be null");
-		requireNonNull(jAudioTaggerClient, "jAudioTaggerClient cannot be null");
-		requireNonNull(coverArtDownloader, "coverArtDownloader cannot be null");
-		requireNonNull(acceptedSongFileExtensions, "acceptedSongFileExtensions cannot be null");		
-		this.discogsClientWrapper = discogsClientWrapper;
-		this.musicBrainzClientWrapper = musicBrainzClientWrapper;
-		this.jAudioTaggerClient = jAudioTaggerClient;
-		this.coverArtDownloader = coverArtDownloader;
-		this.requiresMetadata = requiresMetadata;
-		this.useGenre = useGenre;
-		this.useTopFolderForGenre = useTopFolderForGenre;
-		this.acceptedSongFileExtensions = acceptedSongFileExtensions;
-		if (this.acceptedSongFileExtensions.isEmpty()) {
-		  throw new IllegalStateException("Accepted File Extensions cannot be empty.");
-		}
-	}
-	
-	public Set<String> getAcceptedSongFileExtensions() {
-	  return this.acceptedSongFileExtensions;
-	}
+  public SongScanner(DiscogsClientWrapper discogsClientWrapper,
+      MusicBrainzClientWrapper musicBrainzClientWrapper, JAudioTaggerClient jAudioTaggerClient,
+      CoverArtDownloader coverArtDownloader, boolean requiresMetadata, boolean useGenre,
+      boolean useTopFolderForGenre, Set<String> acceptedSongFileExtensions) {
+    requireNonNull(discogsClientWrapper, "discogsClientWrapper cannot be null");
+    requireNonNull(musicBrainzClientWrapper, "musicBrainzClientWrapper cannot be null");
+    requireNonNull(jAudioTaggerClient, "jAudioTaggerClient cannot be null");
+    requireNonNull(coverArtDownloader, "coverArtDownloader cannot be null");
+    requireNonNull(acceptedSongFileExtensions, "acceptedSongFileExtensions cannot be null");
+    this.discogsClientWrapper = discogsClientWrapper;
+    this.musicBrainzClientWrapper = musicBrainzClientWrapper;
+    this.jAudioTaggerClient = jAudioTaggerClient;
+    this.coverArtDownloader = coverArtDownloader;
+    this.requiresMetadata = requiresMetadata;
+    this.useGenre = useGenre;
+    this.useTopFolderForGenre = useTopFolderForGenre;
+    this.acceptedSongFileExtensions = acceptedSongFileExtensions;
+    if (this.acceptedSongFileExtensions.isEmpty()) {
+      throw new IllegalStateException("Accepted File Extensions cannot be empty.");
+    }
+  }
 
-	/**
-	 * 
-	 * @param scanPath
-	 * @return
-	 * @throws IOException
-	 */
-	public RootFolderEntity scanFileSystemForSongs(String scanPath) throws IOException {
+  public Set<String> getAcceptedSongFileExtensions() {
+    return this.acceptedSongFileExtensions;
+  }
 
-		File file = new File(scanPath);
+  /**
+   * 
+   * @param scanPath
+   * @return
+   * @throws IOException
+   */
+  public RootFolderEntity scanFileSystemForSongs(String scanPath) throws IOException {
 
-		String rootPrefix = "";
-		String filePath = file.getAbsolutePath();
-		String name = null;
-		if (filePath.contains(":")) {
-			rootPrefix = filePath.substring(0, 2);
-			name = filePath.substring(2);
-		} else {
-			name = filePath;
-		}
+    File file = new File(scanPath);
 
-		rootFolder = new RootFolderEntity(rootPrefix, name);
+    String rootPrefix = "";
+    String filePath = file.getAbsolutePath();
+    String name = null;
+    if (filePath.contains(":")) {
+      rootPrefix = filePath.substring(0, 2);
+      name = filePath.substring(2);
+    } else {
+      name = filePath;
+    }
 
-		process(rootFolder);
+    rootFolder = new RootFolderEntity(rootPrefix, name);
 
-		// Prune all children that do not contain AlbumFolders
-		rootFolder.pruneNonAlbumContainingChildFolders();
+    process(rootFolder);
 
-		List<AlbumFolderEntity> albums = rootFolder.getAllAlbums();
-		for (AlbumFolderEntity album : albums) {
+    // Prune all children that do not contain AlbumFolders
+    rootFolder.pruneNonAlbumContainingChildFolders();
 
-			// A historical quirk is that for "Soundtracks", there is no Artist level, as it
-			// was originally assumed all albums would be compilations
-			FolderEntity parentFolder = album.getParentFolder();
-			if (!parentFolder.getName().equalsIgnoreCase("Soundtracks")
-					&& parentFolder instanceof ArtistFolderEntity == false) {
+    List<AlbumFolderEntity> albums = rootFolder.getAllAlbums();
+    for (AlbumFolderEntity album : albums) {
 
-				parentFolder.getParentFolder().convertChildFolderToArtistFolder(parentFolder);
-			}
+      // A historical quirk is that for "Soundtracks", there is no Artist level, as it
+      // was originally assumed all albums would be compilations
+      FolderEntity parentFolder = album.getParentFolder();
+      if (!parentFolder.getName().equalsIgnoreCase("Soundtracks")
+          && parentFolder instanceof ArtistFolderEntity == false) {
 
-			if (useGenre) {
+        parentFolder.getParentFolder().convertChildFolderToArtistFolder(parentFolder);
+      }
 
-				RootFolderEntity rootFolder = null;
-				FolderEntity folderToConvertToGenreFolder = null;
+      if (useGenre) {
 
-				if (useTopFolderForGenre) {
+        RootFolderEntity rootFolder = null;
+        FolderEntity folderToConvertToGenreFolder = null;
 
-					while (parentFolder instanceof RootFolderEntity == false) {
+        if (useTopFolderForGenre) {
 
-						folderToConvertToGenreFolder = parentFolder;
-						parentFolder = parentFolder.getParentFolder();
+          while (parentFolder instanceof RootFolderEntity == false) {
 
-						if (parentFolder instanceof RootFolderEntity) {
-							rootFolder = (RootFolderEntity) parentFolder;
-						}
-					}
+            folderToConvertToGenreFolder = parentFolder;
+            parentFolder = parentFolder.getParentFolder();
 
-					if (folderToConvertToGenreFolder instanceof GenreFolderEntity == false) {
-						rootFolder.convertChildFolderToGenreFolder(folderToConvertToGenreFolder);
-					}
+            if (parentFolder instanceof RootFolderEntity) {
+              rootFolder = (RootFolderEntity) parentFolder;
+            }
+          }
 
-				} else {
+          if (folderToConvertToGenreFolder instanceof GenreFolderEntity == false) {
+            rootFolder.convertChildFolderToGenreFolder(folderToConvertToGenreFolder);
+          }
 
-					throw new SongLibraryException("useTopFolderForGenre=false not implemented yet!");
+        } else {
 
-				}
-			}
-		}
+          throw new SongLibraryException("useTopFolderForGenre=false not implemented yet!");
 
-		// See if any album needs to have cover art, record label, release
-		// date or explicit lyrics metadata retrieved from Discogs
-		for (int i=0; i < albums.size(); i++) {
-			
-			AlbumFolderEntity album = albums.get(i);
-			album.setPersistentIdentity(i);
+        }
+      }
+    }
 
-			String albumPath = album.getNaturalIdentity();
-			String coverArtPath = albumPath + File.separator + AlbumFolderEntity.COVER_ART_FILENAME;
-			
-			boolean hasValidCoverArt = album.hasValidCoverArt();
-			boolean hasValidMetadata = album.hasValidMetadata();
+    // See if any album needs to have cover art, record label, release
+    // date or explicit lyrics metadata retrieved from Discogs
+    for (int i = 0; i < albums.size(); i++) {
 
-			// First, see if we can retrieve any of this information from tags embedded in the song file
-			Map<String, String> albumMetadataResults = new HashMap<>();
-			Set<SongFileEntity> songs = album.getChildSongs();
-			List<SongFileEntity> songList = new ArrayList<>();
-			songList.addAll(songs);
-			for (int j=0; j < songList.size(); j++) {
-				
-				SongFileEntity song = songList.get(j);
-				song.setPersistentIdentity(j);
-				
-				String songFile = song.getNaturalIdentity();
-				if (!hasValidCoverArt) {
-					
-					this.jAudioTaggerClient.extractCoverArt(coverArtPath, songFile);					
-					hasValidCoverArt = album.hasValidCoverArt();						
-				}
-				
-				if (requiresMetadata && !hasValidMetadata) {
-					
-					Map<String, String> tags = this.jAudioTaggerClient.getTags(songFile);
-					if (tags != null && !tags.isEmpty()) {
-						
-						String recordLabel = tags.get(JAudioTaggerClient.RECORD_LABEL);						
-						if (recordLabel != null && !recordLabel.trim().isBlank()) {
-							
-							albumMetadataResults.put(AlbumMetaDataFileEntity.RecordLabel, recordLabel);	
-						}
-						
-						String releaseDate = tags.get(JAudioTaggerClient.RELEASE_DATE);
-						if (releaseDate != null && releaseDate.trim().length() == 4) {
-							
-							albumMetadataResults.put(AlbumMetaDataFileEntity.ReleaseDate, releaseDate);
-					    }
-						
-						if (!albumMetadataResults.isEmpty()) {
+      AlbumFolderEntity album = albums.get(i);
+      album.setPersistentIdentity(i);
 
-							album.getMetaData().writeMetadataToFileSystem(albumMetadataResults);						
-							hasValidMetadata = album.hasValidMetadata();
-						}
-						
-						String artistName = tags.get(JAudioTaggerClient.ARTIST_NAME);
-						if (artistName != null && !artistName.trim().isBlank()) {
-							song.setArtistName(artistName);
-						} else {
-							artistName = SongFileEntity.extractArtistName(songFile);
-							if (artistName != null && !artistName.trim().isBlank()) {
-								song.setArtistName(artistName);	
-							}
-						}
-						
-						String songName = tags.get(JAudioTaggerClient.SONG_NAME);
-						if (songName != null && !songName.trim().isBlank()) {
-							song.setSongName(songName);
-						} else {
-							songName = SongFileEntity.extractSongName(songFile);
-							if (songName != null && !songName.trim().isBlank()) {
-								song.setSongName(songName);
-							}
-						}
+      String albumPath = album.getNaturalIdentity();
+      String coverArtPath = albumPath + File.separator + AlbumFolderEntity.COVER_ART_FILENAME;
 
-						Integer trackNumber = null;
-						try {
-							
-							String strTrackNumber = tags.get(JAudioTaggerClient.TRACK_NUMBER);
-							if (strTrackNumber != null && !strTrackNumber.trim().isBlank()) {
-								
-								trackNumber = Integer.parseInt(strTrackNumber);
-								if (trackNumber.intValue() > 0) {
-									song.setTrackNumber(trackNumber);	
-								}					
-							}
-							
-						} catch (NumberFormatException nfe) {
-							
-							trackNumber = SongFileEntity.extractTrackNumber(songFile);
-							if (trackNumber != null && trackNumber.intValue() > 0) {
-								song.setTrackNumber(trackNumber);
-							} else {
-								song.setTrackNumber(Integer.valueOf(j));
-							}							
-						}					
-					}					
-				}
-			}
-			
-			if (!hasValidCoverArt || (requiresMetadata && !hasValidMetadata)) {
+      boolean hasValidCoverArt = album.hasValidCoverArt();
+      boolean hasValidMetadata = album.hasValidMetadata();
 
-				albumMetadataResults = this.musicBrainzClientWrapper
-						.searchForAlbumMetadata(album.getParentFolder().getName(), album.getName(), this.useGenre);
-				
-				if ((albumMetadataResults == null || albumMetadataResults.isEmpty()) && this.discogsClientWrapper.hasValidApiKey()) {
+      // First, see if we can retrieve any of this information from tags embedded in the song file
+      Map<String, String> albumMetadataResults = new HashMap<>();
+      Set<SongFileEntity> songs = album.getChildSongs();
+      List<SongFileEntity> songList = new ArrayList<>();
+      songList.addAll(songs);
+      for (int j = 0; j < songList.size(); j++) {
 
-					albumMetadataResults = this.discogsClientWrapper
-							.searchForAlbumMetadata(album.getParentFolder().getName(), album.getName());
-				}
+        SongFileEntity song = songList.get(j);
+        song.setPersistentIdentity(j);
 
-				if (!hasValidCoverArt) {
-					
-					String coverArtUrl = albumMetadataResults.get(AlbumMetaDataFileEntity.CoverArtURL);
-					this.coverArtDownloader.downloadCoverArt(coverArtPath, coverArtUrl);
-				}
+        String songFile = song.getNaturalIdentity();
+        if (!hasValidCoverArt) {
 
-				if (!hasValidMetadata) {
+          this.jAudioTaggerClient.extractCoverArt(coverArtPath, songFile);
+          hasValidCoverArt = album.hasValidCoverArt();
+        }
 
-					album.getMetaData().writeMetadataToFileSystem(albumMetadataResults);
-				}
-			}
-		}
+        if (requiresMetadata && !hasValidMetadata) {
 
-		return rootFolder;
-	}
+          Map<String, String> tags = this.jAudioTaggerClient.getTags(songFile);
+          if (tags != null && !tags.isEmpty()) {
 
-	private void process(FolderEntity parentFolder) {
+            String recordLabel = tags.get(JAudioTaggerClient.RECORD_LABEL);
+            if (recordLabel != null && !recordLabel.trim().isBlank()) {
 
-		List<String> songFilenames = new ArrayList<>();
+              albumMetadataResults.put(AlbumMetaDataFileEntity.RecordLabel, recordLabel);
+            }
 
-		File parentFile = new File(parentFolder.getNaturalIdentity());
-		File[] children = parentFile.listFiles();
-		if (children != null) {
+            String releaseDate = tags.get(JAudioTaggerClient.RELEASE_DATE);
+            if (releaseDate != null && releaseDate.trim().length() == 4) {
 
-			for (File child : children) {
+              albumMetadataResults.put(AlbumMetaDataFileEntity.ReleaseDate, releaseDate);
+            }
 
-				boolean isHidden = child.isHidden();
-				if (!isHidden && child.isDirectory()) {
-					try {
+            if (!albumMetadataResults.isEmpty()) {
 
-						FolderEntity childFolder = new FolderEntity(parentFolder, child.getName());
-						parentFolder.addChildFolder(childFolder);
-						process(childFolder);
+              album.getMetaData().writeMetadataToFileSystem(albumMetadataResults);
+              hasValidMetadata = album.hasValidMetadata();
+            }
 
-					} catch (EntityAlreadyExistsException eaee) {
-						throw new SongLibraryException(eaee.getMessage(), eaee);
-					}
-				} else if (
-				        parentFolder instanceof RootFolderEntity == false 
-				    && !isHidden 
-				    && child.isFile()
-				    && this.acceptedSongFileExtensions.contains(getFileExtension(child))) {
+            String artistName = tags.get(JAudioTaggerClient.ARTIST_NAME);
+            if (artistName != null && !artistName.trim().isBlank()) {
+              song.setArtistName(artistName);
+            } else {
+              artistName = SongFileEntity.extractArtistName(songFile);
+              if (artistName != null && !artistName.trim().isBlank()) {
+                song.setArtistName(artistName);
+              }
+            }
 
-					songFilenames.add(child.getName());
+            String songName = tags.get(JAudioTaggerClient.SONG_NAME);
+            if (songName != null && !songName.trim().isBlank()) {
+              song.setSongName(songName);
+            } else {
+              songName = SongFileEntity.extractSongName(songFile);
+              if (songName != null && !songName.trim().isBlank()) {
+                song.setSongName(songName);
+              }
+            }
 
-				}
-			}
-		} else {
-			System.err.println("parentFile.listFiles() was null for: " + parentFile.getAbsolutePath());
-		}
+            Integer trackNumber = null;
+            try {
 
-		if (!songFilenames.isEmpty()) {
+              String strTrackNumber = tags.get(JAudioTaggerClient.TRACK_NUMBER);
+              if (strTrackNumber != null && !strTrackNumber.trim().isBlank()) {
 
-			parentFolder.getParentFolder().convertChildFolderToAlbumFolder(parentFolder, songFilenames);
-		}
-	}
+                trackNumber = Integer.parseInt(strTrackNumber);
+                if (trackNumber.intValue() > 0) {
+                  song.setTrackNumber(trackNumber);
+                }
+              }
 
-	private String getFileExtension(File file) {
+            } catch (NumberFormatException nfe) {
 
-		String extension = "";
-		String filename = file.getName().toLowerCase();
-		int index = filename.indexOf('.');
-		if (index > 0) {
-			extension = filename.substring(index);
-		}
-		return extension;
-	}
+              trackNumber = SongFileEntity.extractTrackNumber(songFile);
+              if (trackNumber != null && trackNumber.intValue() > 0) {
+                song.setTrackNumber(trackNumber);
+              } else {
+                song.setTrackNumber(Integer.valueOf(j));
+              }
+            }
+          }
+        }
+      }
+
+      if (!hasValidCoverArt || (requiresMetadata && !hasValidMetadata)) {
+
+        albumMetadataResults = this.musicBrainzClientWrapper.searchForAlbumMetadata(
+            album.getParentFolder().getName(), album.getName(), this.useGenre);
+
+        if ((albumMetadataResults == null || albumMetadataResults.isEmpty())
+            && this.discogsClientWrapper.hasValidApiKey()) {
+
+          albumMetadataResults = this.discogsClientWrapper
+              .searchForAlbumMetadata(album.getParentFolder().getName(), album.getName());
+        }
+
+        if (!hasValidCoverArt) {
+
+          String coverArtUrl = albumMetadataResults.get(AlbumMetaDataFileEntity.CoverArtURL);
+          this.coverArtDownloader.downloadCoverArt(coverArtPath, coverArtUrl);
+        }
+
+        if (!hasValidMetadata) {
+
+          album.getMetaData().writeMetadataToFileSystem(albumMetadataResults);
+        }
+      }
+    }
+
+    return rootFolder;
+  }
+
+  private void process(FolderEntity parentFolder) {
+
+    List<String> songFilenames = new ArrayList<>();
+
+    File parentFile = new File(parentFolder.getNaturalIdentity());
+    File[] children = parentFile.listFiles();
+    if (children != null) {
+
+      for (File child : children) {
+
+        boolean isHidden = child.isHidden();
+        if (!isHidden && child.isDirectory()) {
+          try {
+
+            FolderEntity childFolder = new FolderEntity(parentFolder, child.getName());
+            parentFolder.addChildFolder(childFolder);
+            process(childFolder);
+
+          } catch (EntityAlreadyExistsException eaee) {
+            throw new SongLibraryException(eaee.getMessage(), eaee);
+          }
+        } else if (parentFolder instanceof RootFolderEntity == false && !isHidden && child.isFile()
+            && this.acceptedSongFileExtensions.contains(getFileExtension(child))) {
+
+          songFilenames.add(child.getName());
+
+        }
+      }
+    } else {
+      System.err.println("parentFile.listFiles() was null for: " + parentFile.getAbsolutePath());
+    }
+
+    if (!songFilenames.isEmpty()) {
+
+      parentFolder.getParentFolder().convertChildFolderToAlbumFolder(parentFolder, songFilenames);
+    }
+  }
+
+  private String getFileExtension(File file) {
+
+    String extension = "";
+    String filename = file.getName().toLowerCase();
+    int index = filename.indexOf('.');
+    if (index > 0) {
+      extension = filename.substring(index);
+    }
+    return extension;
+  }
 }
