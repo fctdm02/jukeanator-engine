@@ -1,13 +1,14 @@
 package com.djt.jukeanator_engine.domain.songlibrary.dto;
 
 public class SongDto {
+  
   private Integer songId;
-  private String name;
+  private String songName;
   private Integer songPlays;
 
-  public SongDto(Integer songId, String name, Integer songPlays) {
+  public SongDto(Integer songId, String songName, Integer songPlays) {
     this.songId = songId;
-    this.name = name;
+    this.songName = songName;
     this.songPlays = songPlays;
   }
   
@@ -15,8 +16,8 @@ public class SongDto {
     return songId;
   }
 
-  public String getName() {
-    return name;
+  public String getSongName() {
+    return songName;
   }
 
   public Integer getSongPlays() {

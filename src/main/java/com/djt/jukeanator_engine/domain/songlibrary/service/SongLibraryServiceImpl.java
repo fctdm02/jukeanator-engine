@@ -200,18 +200,4 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
     
     this.isInitialized = true;
   }  
-  
-  public void setScanPath(ScanRequest scanRequest) {
-    
-    this.scanPath = scanRequest.getScanPath();
-    
-    if (this.songLibraryRepository instanceof SongLibraryRepositoryFileSystemImpl) {
-      ((SongLibraryRepositoryFileSystemImpl)this.songLibraryRepository).setBasePath(this.scanPath);
-      
-      eventPublisher.publishEvent(new ScanFileSystemForSongsEvent(
-          this.scanPath,
-          this.albums.size(), 
-          Instant.now()));
-    }
-  }
 }

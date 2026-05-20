@@ -54,7 +54,6 @@ public class SongLibraryServiceTest {
     
     // STEP 1: ARRANGE
     ScanRequest scanRequest = new ScanRequest("src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
-    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanRequest);
     
     
     // STEP 2: ACT
@@ -73,8 +72,8 @@ public class SongLibraryServiceTest {
     
     // STEP 1: ARRANGE
     ScanRequest scanRequest = new ScanRequest("src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
-    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanRequest);
-    ((SongLibraryServiceImpl)songLibraryService).initializeSongLibrary();
+    Integer numAlbums = songLibraryService.scanFileSystemForSongs(scanRequest);
+    assertNotNull(numAlbums, "numAlbums should not be null");
 
     
     // STEP 2: ACT

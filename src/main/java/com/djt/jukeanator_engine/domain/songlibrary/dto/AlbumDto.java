@@ -5,9 +5,9 @@ import java.util.List;
 public class AlbumDto {
   
   private Integer albumId;
-  private String title;
-  private String genre;
-  private String artist;
+  private String albumName;
+  private String genreName;
+  private String artistName;
   private Boolean hasExplicit;
   private String recordLabel;
   private String releaseDate;
@@ -16,9 +16,9 @@ public class AlbumDto {
 
   public AlbumDto(
       Integer albumId, 
-      String title,
-      String genre,
-      String artist, 
+      String albumName,
+      String genreName,
+      String artistName, 
       Boolean hasExplicit, 
       String recordLabel,
       String releaseDate, 
@@ -26,9 +26,9 @@ public class AlbumDto {
       List<SongDto> songs) {
     super();
     this.albumId = albumId;
-    this.title = title;
-    this.genre = genre;
-    this.artist = artist;
+    this.albumName = albumName;
+    this.genreName = genreName;
+    this.artistName = artistName;
     this.hasExplicit = hasExplicit;
     this.recordLabel = recordLabel;
     this.releaseDate = releaseDate;
@@ -40,16 +40,16 @@ public class AlbumDto {
     return albumId;
   }
 
-  public String getTitle() {
-    return title;
+  public String getAlbumName() {
+    return albumName;
   }
 
-  public String getGenre() {
-    return genre;
+  public String getGenreName() {
+    return genreName;
   }
   
-  public String getArtist() {
-    return artist;
+  public String getArtistName() {
+    return artistName;
   }
 
   public Boolean getHasExplicit() {

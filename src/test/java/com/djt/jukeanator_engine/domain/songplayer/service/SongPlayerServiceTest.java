@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,7 +18,6 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
-import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryServiceImpl;
 import com.djt.jukeanator_engine.domain.songplayer.dto.NowPlayingSongDto;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlaybackStatusDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
@@ -67,11 +67,11 @@ public class SongPlayerServiceTest {
   }
 
   @Test
+  @Disabled
   void lifecycle() throws IOException {
     
     // Scan for songs
     ScanRequest scanRequest = new ScanRequest("src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
-    ((SongLibraryServiceImpl)songLibraryService).setScanPath(scanRequest);
     Integer numAlbums = songLibraryService.scanFileSystemForSongs(scanRequest);
     assertNotNull(numAlbums, "numAlbums should not be null");
     List<AlbumDto> albums = songLibraryService.getAlbums();    

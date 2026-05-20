@@ -4,6 +4,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
@@ -122,6 +123,7 @@ public class ApplicationConfig {
   }
 
   @Bean
+  @Primary
   public SongLibraryService songLibraryService(
       SongLibraryProperties songLibraryProperties,
       SongLibraryRepository repository, 
@@ -136,6 +138,7 @@ public class ApplicationConfig {
   }
   
   @Bean
+  @Primary
   public SongQueueService songQueueService(
       SongQueueProperties songQueueProperties,
       SongLibraryRepository songLibraryRepository,
@@ -150,6 +153,7 @@ public class ApplicationConfig {
   }
   
   @Bean
+  @Primary
   public SongPlayerService songPlayerService(
       SongPlayerProperties songPlayerProperties,
       SongLibraryProperties songLibraryProperties,
