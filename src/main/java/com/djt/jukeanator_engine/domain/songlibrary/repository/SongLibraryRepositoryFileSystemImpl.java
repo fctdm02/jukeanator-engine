@@ -61,5 +61,16 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
   public RootFolderEntity loadAggregateRoot(int persistentIdentity) throws EntityDoesNotExistException {
 
     throw new SongLibraryException("This method is unsupported for the file system implementation");
-  }  
+  }
+  
+  @Override
+  public Integer incrementNumPlaysForSong(Integer albumId, Integer songId) throws EntityDoesNotExistException {
+    
+    // TODO: TDM: Move data structures for song library entities into the root entity and refactor to all be maps 
+    // keyed by persistent identity.
+    //
+    // Assign all entities a persistent identity
+    //throw new SongLibraryException("Not implemented yet!");
+    return Integer.valueOf(1);
+  }
 }

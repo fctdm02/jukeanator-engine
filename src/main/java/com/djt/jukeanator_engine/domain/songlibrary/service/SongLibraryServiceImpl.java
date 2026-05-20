@@ -8,6 +8,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
@@ -19,6 +20,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
@@ -31,6 +33,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
+import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
 
 /**
  * @author tmyers
@@ -361,5 +364,23 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
     }
     
     this.isInitialized = true;
-  }  
+  }
+  
+  // Event handlers
+  @EventListener
+  public void handleSongPlaybackStartedEvent(SongPlaybackStartedEvent event) {
+
+    SongDto song = event.songQueueEntry().getSong();
+    
+    Integer albumId = song.getAlbumId();
+    Integer songId = song.getSongId();
+    
+    try {
+      
+      this.songLibraryRepository.incrementNumPlaysForSong(albumId, songId);
+      
+    } catch (EntityDoesNotExistException ednee) {
+      throw new SongLibraryException("Could not increment num plays for song with albumId: " + albumId + ", songId: " + songId,  ednee);
+    }
+  }   
 }

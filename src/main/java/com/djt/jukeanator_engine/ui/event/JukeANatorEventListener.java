@@ -65,7 +65,7 @@ public class JukeANatorEventListener {
 
     if (frame == null) return;
 
-    frame.setNowPlaying(event.song().getSong());
+    frame.setNowPlaying(event.songQueueEntry().getSong());
   }
   
   @EventListener

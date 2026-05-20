@@ -16,9 +16,7 @@ public final class SongLibraryRepositoryPostgresImpl implements SongLibraryRepos
   public RootFolderEntity loadAggregateRoot(String naturalIdentity)
       throws EntityDoesNotExistException {
 
-    // TODO: TDM:
-    return new RootFolderEntity();
-    //throw new SongLibraryException("Not implemented yet!");
+    throw new SongLibraryException("Not implemented yet!");
   }
   
   @Override
@@ -31,6 +29,12 @@ public final class SongLibraryRepositoryPostgresImpl implements SongLibraryRepos
   @Override
   public void storeAggregateRoot(RootFolderEntity rootFolder) {
 
+    throw new SongLibraryException("Not implemented yet!");
+  }
+  
+  @Override
+  public Integer incrementNumPlaysForSong(Integer albumId, Integer songId) throws EntityDoesNotExistException {
+    
     throw new SongLibraryException("Not implemented yet!");
   }
 }
