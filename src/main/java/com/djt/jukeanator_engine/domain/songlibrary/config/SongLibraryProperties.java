@@ -14,6 +14,7 @@ public class SongLibraryProperties {
   private boolean useGenre;
   private boolean useTopFolderForGenre;
   private Set<String> acceptedSongFileExtensions;
+  private Integer searchResultSize = Integer.valueOf(50);
 
   private Discogs discogs = new Discogs();
 
@@ -93,5 +94,13 @@ public class SongLibraryProperties {
   
   public void setAcceptedSongFileExtensions(Set<String> acceptedSongFileExtensions) {
     this.acceptedSongFileExtensions = acceptedSongFileExtensions;
+  }
+
+  public Integer getSearchResultSize() {
+    return searchResultSize;
+  }
+
+  public void setSearchResultSize(Integer searchResultSize) {
+    this.searchResultSize = searchResultSize;
   }
 }

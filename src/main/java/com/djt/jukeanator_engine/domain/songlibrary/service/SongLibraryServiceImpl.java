@@ -16,6 +16,7 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
@@ -39,6 +40,7 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
   private RootFolderEntity root;
   private SongLibraryRepository songLibraryRepository;
   private SongScanner songScanner;
+  private Integer searchResultSize = Integer.valueOf(50);
   private boolean isInitialized;
   
   private List<String> genres = new ArrayList<>();
@@ -49,16 +51,19 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
       String scanPath,
       SongLibraryRepository songLibraryRepository,
       SongScanner songScanner,
+      Integer searchResultSize,
       ApplicationEventPublisher eventPublisher) {
 
       requireNonNull(scanPath, "scanPath cannot be null");
       requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
       requireNonNull(songScanner, "songScanner cannot be null");
+      requireNonNull(searchResultSize, "searchResultSize cannot be null");
       requireNonNull(eventPublisher, "eventPublisher cannot be null");
             
       this.scanPath = scanPath;
       this.songLibraryRepository = songLibraryRepository;
       this.songScanner = songScanner;
+      this.searchResultSize = searchResultSize;
       this.eventPublisher = eventPublisher;
       
       // Initialize the song library
@@ -66,6 +71,28 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
   }
   
   // Service methods
+  @Override
+  public SearchResultDto getMusicByPopularity() {
+    
+    if (!isInitialized) {
+      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
+    }
+    
+    // TODO: TDM: Implement
+    return null;
+  }
+
+  @Override
+  public SearchResultDto getMusicBySearch(String searchFor) {
+    
+    if (!isInitialized) {
+      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
+    }
+    
+    // TODO: TDM: Implement
+    return null;
+  }
+  
   @Override  
   public List<String> getGenres() {
     

@@ -3,13 +3,26 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 
 /**
  * @author tmyers
  */
 public interface SongLibraryService {
+  
+  /**
+   * 
+   * @return
+   */
+  SearchResultDto getMusicByPopularity();
 
+  /**
+   * @param searchFor
+   * @return
+   */
+  SearchResultDto getMusicBySearch(String searchFor);
+  
   /**
    * 
    * @return

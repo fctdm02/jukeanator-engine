@@ -134,6 +134,7 @@ public class ApplicationConfig {
         songLibraryProperties.getRootPath(), 
         repository, 
         songScanner,
+        songLibraryProperties.getSearchResultSize(),
         eventPublisher);
   }
   

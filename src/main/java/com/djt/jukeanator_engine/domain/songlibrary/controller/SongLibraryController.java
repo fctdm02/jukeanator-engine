@@ -7,9 +7,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
@@ -28,6 +30,18 @@ public class SongLibraryController implements SongLibraryService {
     this.songLibraryService = songLibraryService;
   }
 
+  @Override
+  @GetMapping("/popular")
+  public SearchResultDto getMusicByPopularity() {
+    return songLibraryService.getMusicByPopularity();
+  }
+
+  @Override
+  @GetMapping("/search")
+  public SearchResultDto getMusicBySearch(@RequestParam String searchFor) {
+    return songLibraryService.getMusicBySearch(searchFor);
+  }
+  
   @Override
   @GetMapping("/genres")
   public List<String> getGenres() {

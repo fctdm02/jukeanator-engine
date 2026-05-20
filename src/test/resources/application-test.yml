@@ -15,9 +15,10 @@ song-library:
     consumer-key: vBSFEvNtGflHQnULBNnL
     consumer-secret: AOOYhlvSshYkJieLRrdTCUoLcsWACfWW
   accepted-song-file-extensions:
-  - .mp3
-  - .flac
-  - .wav
+    - .mp3
+    - .flac
+    - .wav
+  search-result-size: 50  
 
 song-queue:
   repository-type: filesystem   # filesystem | postgres

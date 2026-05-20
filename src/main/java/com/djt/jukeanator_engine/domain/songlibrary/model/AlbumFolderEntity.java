@@ -31,6 +31,16 @@ public class AlbumFolderEntity extends FolderEntity {
     return this.metaData;
   }
 
+  public Integer getNumPlays() {
+    
+    int numPlays = 0;
+    for (SongFileEntity childSong : childSongs) {
+
+      numPlays = numPlays + childSong.getNumPlays();
+    }
+    return Integer.valueOf(numPlays);
+  }
+  
   public boolean addChildSong(SongFileEntity childSong) throws EntityAlreadyExistsException {
     return addChild(childSongs, childSong, this);
   }

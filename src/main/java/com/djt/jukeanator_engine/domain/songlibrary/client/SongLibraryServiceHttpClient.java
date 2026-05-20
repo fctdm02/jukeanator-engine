@@ -5,6 +5,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
@@ -22,27 +23,55 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
   }
 
   @Override
+  public SearchResultDto getMusicByPopularity() {
+
+    return restClient.get()
+        .uri("/api/song-library/popular")
+        .retrieve()
+        .body(SearchResultDto.class);
+  }
+
+  @Override
+  public SearchResultDto getMusicBySearch(String searchFor) {
+
+    return restClient.get()
+        .uri(uriBuilder -> uriBuilder
+            .path("/api/song-library/search")
+            .queryParam("searchFor", searchFor)
+            .build())
+        .retrieve()
+        .body(SearchResultDto.class);
+  }
+  
+  @Override
   public List<String> getGenres() {
-    return restClient.get().uri("/api/song-library/genres").retrieve()
+    
+    return restClient.get()
+        .uri("/api/song-library/genres").retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
   public List<String> getArtists() {
-    return restClient.get().uri("/api/song-library/artists").retrieve()
+    
+    return restClient.get(
+        ).uri("/api/song-library/artists").retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
   public List<AlbumDto> getAlbums() {
-    return restClient.get().uri("/api/song-library/albums").retrieve()
+    
+    return restClient.get()
+        .uri("/api/song-library/albums").retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
   public Integer scanFileSystemForSongs(ScanRequest scanRequest) throws SongScanFailedException {
 
-    return restClient.post().uri("/api/song-library/scan").body(scanRequest).retrieve()
+    return restClient.post()
+        .uri("/api/song-library/scan").body(scanRequest).retrieve()
         .body(Integer.class);
   }
 }

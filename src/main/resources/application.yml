@@ -18,6 +18,7 @@ song-library:
     - .mp3
     - .flac
     - .wav
+  search-result-size: 50    
 
 song-queue:
   repository-type: filesystem   # filesystem | postgres
