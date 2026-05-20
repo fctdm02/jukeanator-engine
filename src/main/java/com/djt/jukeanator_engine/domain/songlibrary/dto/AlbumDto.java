@@ -3,11 +3,11 @@ package com.djt.jukeanator_engine.domain.songlibrary.dto;
 import java.util.List;
 
 public class AlbumDto {
-  
+
+  private Integer artistId;
+  private String artistName;  
   private Integer albumId;
   private String albumName;
-  private String genreName;
-  private String artistName;
   private Boolean hasExplicit;
   private String recordLabel;
   private String releaseDate;
@@ -15,19 +15,19 @@ public class AlbumDto {
   private List<SongDto> songs;
 
   public AlbumDto(
+      Integer artistId,
+      String artistName,
       Integer albumId, 
-      String albumName,
-      String genreName,
-      String artistName, 
+      String albumName,       
       Boolean hasExplicit, 
       String recordLabel,
       String releaseDate, 
       String coverArtPath, 
       List<SongDto> songs) {
     super();
+    this.artistId = artistId;
     this.albumId = albumId;
-    this.albumName = albumName;
-    this.genreName = genreName;
+    this.albumName = albumName;    
     this.artistName = artistName;
     this.hasExplicit = hasExplicit;
     this.recordLabel = recordLabel;
@@ -36,20 +36,20 @@ public class AlbumDto {
     this.songs = songs;
   }
 
+  public Integer getArtistId() {
+    return artistId;
+  }
+  
+  public String getArtistName() {
+    return artistName;
+  }
+  
   public Integer getAlbumId() {
     return albumId;
   }
 
   public String getAlbumName() {
     return albumName;
-  }
-
-  public String getGenreName() {
-    return genreName;
-  }
-  
-  public String getArtistName() {
-    return artistName;
   }
 
   public Boolean getHasExplicit() {
