@@ -164,8 +164,6 @@ public class ApplicationConfig {
     
     return new SongPlayerServiceImpl(
         songPlayerProperties.getPlayerType(),
-        songLibraryProperties.getRootPath(), 
-        songLibraryRepository, 
         songQueueService,
         eventPublisher);
   }  

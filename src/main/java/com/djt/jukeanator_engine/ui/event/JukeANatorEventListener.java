@@ -7,6 +7,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.client.SongLibraryServiceHtt
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songplayer.client.SongPlayerServiceHttpClient;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
+import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStoppedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.client.SongQueueServiceHttpClient;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
@@ -66,6 +67,14 @@ public class JukeANatorEventListener {
     if (frame == null) return;
 
     frame.setNowPlaying(event.songQueueEntry().getSong());
+  }
+
+  @EventListener
+  public void handleSongPlaybackStoppedEvent(SongPlaybackStoppedEvent event) {
+
+    if (frame == null) return;
+
+    frame.setNowPlaying(null);
   }
   
   @EventListener

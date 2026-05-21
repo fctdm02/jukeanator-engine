@@ -86,7 +86,7 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   // NOW PLAYING
   // ============================================================
-  private SongQueueEntryDto currentlyPlaying;
+  private SongQueueEntryDto nowPlayingSong;
   private final JLabel albumArtLabel = new JLabel();
   private final JLabel songLabel = new JLabel("", SwingConstants.LEFT);
   private final JLabel artistLabel = new JLabel("", SwingConstants.LEFT);
@@ -884,9 +884,7 @@ public class JukeANatorFrame extends JFrame {
       // -------------------------
       // PLAYING NOW + SELECTION HIGHLIGHT
       // -------------------------
-      boolean isPlaying =
-          currentlyPlaying != null && currentlyPlaying.getSong().getSongName().equals(value.getSong().getSongName())
-              && currentlyPlaying.getSong().getArtistName().equals(value.getSong().getArtistName());
+      boolean isPlaying = nowPlayingSong != null && nowPlayingSong.equals(value);
 
       if (isPlaying) {
         setBackground(new Color(0, 210, 255)); // ACCENT_BLUE
@@ -1254,10 +1252,4 @@ public class JukeANatorFrame extends JFrame {
       albumArtLabel.setIcon(null);
     }
   }
-  
-  public void setCurrentlyPlaying(SongQueueEntryDto song) {
-    this.currentlyPlaying = song;
-
-    SwingUtilities.invokeLater(() -> queueList.repaint());
-  }  
 }
