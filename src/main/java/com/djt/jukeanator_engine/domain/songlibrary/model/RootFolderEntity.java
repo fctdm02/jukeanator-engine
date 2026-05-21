@@ -19,7 +19,7 @@ public class RootFolderEntity extends FolderEntity {
   private transient Map<Integer, GenreFolderEntity> genres;
   private transient Map<Integer, ArtistFolderEntity> artists;
   private transient Map<Integer, AlbumFolderEntity> albums;
-  private transient Map<Integer, SongFileEntity> songs;
+  private transient Map<String, SongFileEntity> songs;
   
   public RootFolderEntity() {}
 
@@ -169,20 +169,48 @@ public class RootFolderEntity extends FolderEntity {
       }
       
       for (SongFileEntity song: album.getChildSongs()) {
-        Integer songId = song.getPersistentIdentity();
-        if (!this.songs.containsKey(songId)) {
-          this.songs.put(songId, song);
+        String songKey = albumId.toString() + song.getPersistentIdentity().toString();
+        if (!this.songs.containsKey(songKey)) {
+          this.songs.put(songKey, song);
         }        
       }
     }    
   }
-  
-  public AlbumFolderEntity getAlbumById(Integer albumId) throws EntityDoesNotExistException {
+
+  public GenreFolderEntity getGenreById(Integer id) throws EntityDoesNotExistException {
     
-    AlbumFolderEntity album = albums.get(albumId);
-    if (album != null) {
-      return album;
+    GenreFolderEntity entity = genres.get(id);
+    if (entity != null) {
+      return entity;
     }   
-    throw new EntityDoesNotExistException("Album with id: [" + albumId + "] not found.");
+    throw new EntityDoesNotExistException("Genre with id: [" + id + "] not found.");
   }  
+
+  public ArtistFolderEntity getArtistById(Integer id) throws EntityDoesNotExistException {
+    
+    ArtistFolderEntity entity = artists.get(id);
+    if (entity != null) {
+      return entity;
+    }   
+    throw new EntityDoesNotExistException("Artist with id: [" + id + "] not found.");
+  }  
+  
+  public AlbumFolderEntity getAlbumById(Integer id) throws EntityDoesNotExistException {
+    
+    AlbumFolderEntity entity = albums.get(id);
+    if (entity != null) {
+      return entity;
+    }   
+    throw new EntityDoesNotExistException("Album with id: [" + id + "] not found.");
+  }
+  
+  public SongFileEntity getSongById(Integer albumId, Integer songId) throws EntityDoesNotExistException {
+    
+    String songKey = albumId.toString() + songId.toString();
+    SongFileEntity entity = songs.get(songKey);
+    if (entity != null) {
+      return entity;
+    }   
+    throw new EntityDoesNotExistException("Song with songId: [" + songId + "] and albumId: [" + albumId + "] not found.");
+  } 
 }
