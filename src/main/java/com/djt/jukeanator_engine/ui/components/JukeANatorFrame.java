@@ -37,6 +37,7 @@ import javax.swing.JTabbedPane;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
@@ -68,7 +69,7 @@ public class JukeANatorFrame extends JFrame {
   private final JPanel genreDetailsPanel = new JPanel(new BorderLayout());
   private int currentGenresPage = 0;
   private final Map<String, ImageIcon> genreIconCache = new HashMap<>();
-  private final DefaultListModel<String> genresListModel = new DefaultListModel<>();
+  private final DefaultListModel<GenreDto> genresListModel = new DefaultListModel<>();
 
   // ============================================================
   // QUEUE TAB
@@ -532,13 +533,19 @@ public class JukeANatorFrame extends JFrame {
   private void refreshGenresPage() {
 
     genresGridPanel.removeAll();
+
     int start = currentGenresPage * GENRES_PER_PAGE;
-    int end = Math.min(start + GENRES_PER_PAGE, genresListModel.size());
+    int end = Math.min(
+        start + GENRES_PER_PAGE,
+        genresListModel.size());
+
     for (int i = start; i < end; i++) {
 
-      String genre = genresListModel.get(i);
+      GenreDto genre = genresListModel.get(i);
+
       genresGridPanel.add(buildGenreTile(genre));
     }
+
     genresGridPanel.revalidate();
     genresGridPanel.repaint();
   }
@@ -546,44 +553,62 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   // GENRE TILE
   // ============================================================
-  private JPanel buildGenreTile(String genre) {
+  private JPanel buildGenreTile(GenreDto genreDto) {
 
     JPanel panel = new JPanel(new BorderLayout());
+
     panel.setBackground(Color.BLACK);
     panel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     JLabel imageLabel = new JLabel();
+
     imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+    String genreName = genreDto.getGenreName();
 
     try {
 
-      ImageIcon cached = genreIconCache.get(genre);
+      ImageIcon cached = genreIconCache.get(genreName);
+
       if (cached != null) {
 
         imageLabel.setIcon(cached);
 
       } else {
 
-        String resourceName = genre + ".png";
+        String resourceName = genreName + ".png";
+
         URL resource = getClass().getResource(resourceName);
+
         if (resource != null) {
 
           ImageIcon icon = new ImageIcon(resource);
-          Image scaled = icon.getImage().getScaledInstance(240, 240, Image.SCALE_SMOOTH);
+
+          Image scaled = icon.getImage().getScaledInstance(
+              240,
+              240,
+              Image.SCALE_SMOOTH);
+
           ImageIcon scaledIcon = new ImageIcon(scaled);
 
-          genreIconCache.put(genre, scaledIcon);
+          genreIconCache.put(genreName, scaledIcon);
+
           imageLabel.setIcon(scaledIcon);
 
         } else {
-          imageLabel.setText(genre);
+
+          imageLabel.setText(genreName);
         }
       }
+
     } catch (Exception e) {
-      imageLabel.setText(genre);
+
+      imageLabel.setText(genreName);
     }
 
-    JLabel textLabel = new JLabel(genre.toUpperCase(), SwingConstants.CENTER);
+    JLabel textLabel = new JLabel(
+        genreName.toUpperCase(),
+        SwingConstants.CENTER);
 
     textLabel.setForeground(Color.WHITE);
     textLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 24));
@@ -597,45 +622,53 @@ public class JukeANatorFrame extends JFrame {
       @Override
       public void mouseClicked(java.awt.event.MouseEvent e) {
 
-        showGenreDetails(genre);
+        showGenreDetails(genreDto);
       }
     });
 
     return panel;
   }
+  
 
   // ============================================================
   // GENRE DETAILS
   // ============================================================
-  private void showGenreDetails(String genre) {
+  private void showGenreDetails(GenreDto genreDto) {
 
     genreDetailsPanel.removeAll();
 
     JPanel detailsPanel = new JPanel(new GridBagLayout());
+
     detailsPanel.setBackground(BG_DARK);
 
-    JLabel label = new JLabel("Genre Details: " + genre);
+    JLabel label = new JLabel(
+        "Genre Details: " + genreDto.getGenreName());
+
     label.setForeground(Color.WHITE);
     label.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 42));
 
     detailsPanel.add(label);
 
     JButton backButton = new JButton("BACK");
+
     backButton.setPreferredSize(new Dimension(180, 60));
     backButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 24));
     backButton.setForeground(Color.WHITE);
     backButton.setBackground(Color.BLACK);
+
     backButton.addActionListener(e -> {
 
       genresCardLayout.show(genresContentPanel, "GRID");
     });
 
     JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
     topPanel.setOpaque(false);
     topPanel.add(backButton);
 
     genreDetailsPanel.add(topPanel, BorderLayout.NORTH);
     genreDetailsPanel.add(detailsPanel, BorderLayout.CENTER);
+
     genreDetailsPanel.revalidate();
     genreDetailsPanel.repaint();
 
@@ -1049,7 +1082,7 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   // GENRE LIST
   // ============================================================
-  public void setGenres(List<String> genres) {
+  public void setGenres(List<GenreDto> genres) {
 
     SwingUtilities.invokeLater(() -> {
 
@@ -1059,15 +1092,17 @@ public class JukeANatorFrame extends JFrame {
         genres.forEach(genresListModel::addElement);
       }
 
-      // 🔥 clamp current page
-      int maxPage = Math.max(0,
-          (int) Math.ceil(genresListModel.size() / (double) GENRES_PER_PAGE) - 1);
+      // clamp current page
+      int maxPage = Math.max(
+          0,
+          (int) Math.ceil(
+              genresListModel.size() / (double) GENRES_PER_PAGE) - 1);
 
       if (currentGenresPage > maxPage) {
         currentGenresPage = maxPage;
       }
 
-      refreshGenresUI(); // 👈 NEW unified refresh
+      refreshGenresUI();
     });
   }
   

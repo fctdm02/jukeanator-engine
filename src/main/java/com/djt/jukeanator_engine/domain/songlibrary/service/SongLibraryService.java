@@ -3,6 +3,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
@@ -28,7 +29,7 @@ public interface SongLibraryService {
    * 
    * @return
    */
-  List<String> getGenres();
+  List<GenreDto> getGenres();
 
   /**
    * 

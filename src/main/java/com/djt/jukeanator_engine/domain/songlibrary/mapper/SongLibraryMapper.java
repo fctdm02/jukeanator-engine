@@ -5,9 +5,11 @@ import java.util.Collection;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 
 /**
@@ -15,6 +17,18 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
  */
 public final class SongLibraryMapper {
 
+  public static List<GenreDto> toGenreDtoList(Collection<GenreFolderEntity> genreEntities) {
+
+    List<GenreDto> genreDtos = new ArrayList<>();
+    for (GenreFolderEntity genreEntity : genreEntities) {
+
+      genreDtos.add(new GenreDto(
+          genreEntity.getPersistentIdentity(),
+          genreEntity.getName()));
+    }
+    return genreDtos;
+  }
+  
   public static List<ArtistDto> toArtistDtoList(Collection<ArtistFolderEntity> artistEntities) {
 
     List<ArtistDto> artistDtos = new ArrayList<>();

@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.domain.songqueue.service;
 
 import static java.util.Objects.requireNonNull;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,10 +46,6 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
   private SongQueueRepository songQueueRepository;
   private SongQueueRootEntity songQueueRoot;
   
-  private List<String> genres = new ArrayList<>();
-  private List<String> artists = new ArrayList<>();
-  private List<AlbumFolderEntity> albums = new ArrayList<>(); 
-  
   public SongQueueServiceImpl(
       String rootPath,
       SongLibraryRepository songLibraryRepository, 
@@ -88,7 +83,7 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
     Integer priority = addSongToQueueRequest.getPriority();
     
     try {
-      AlbumFolderEntity album = albums.get(albumId);
+      AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
       if (album != null) {
         
         SongFileEntity song = album.getChildSong(songId);
@@ -207,23 +202,6 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
     } catch (EntityDoesNotExistException ednee) {
       log.error("Could not load song queue from: " + rootPath + ", using empty song library root for now, error: " + ednee.getMessage());
       this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
-    }
-        
-    this.albums = this.songLibraryRoot.getAllAlbums();
-    this.artists.clear();    
-    this.genres.clear();
-    
-    for (AlbumFolderEntity album : this.albums) {
-        
-      String artist = album.getParentArtist().getName();
-      if (!this.artists.contains(artist)) {
-          this.artists.add(artist);
-      }     
-        
-      String genre = album.getParentGenre().getName();
-      if (!this.genres.contains(genre)) {
-        this.genres.add(genre);
-      }
     }
   }
 }

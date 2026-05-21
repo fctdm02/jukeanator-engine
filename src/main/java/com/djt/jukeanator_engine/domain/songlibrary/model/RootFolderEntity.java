@@ -3,19 +3,23 @@ package com.djt.jukeanator_engine.domain.songlibrary.model;
 import static java.util.Objects.requireNonNull;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 
 public class RootFolderEntity extends FolderEntity {
   private static final long serialVersionUID = 1L;
   
   private String rootPrefix;
 
-  private transient List<String> genres;
-  private transient List<ArtistFolderEntity> artists;
-  private transient List<AlbumFolderEntity> albums;
-  private transient List<SongFileEntity> songs;
+  private transient Map<Integer, GenreFolderEntity> genres;
+  private transient Map<Integer, ArtistFolderEntity> artists;
+  private transient Map<Integer, AlbumFolderEntity> albums;
+  private transient Map<Integer, SongFileEntity> songs;
   
   public RootFolderEntity() {}
 
@@ -122,42 +126,63 @@ public class RootFolderEntity extends FolderEntity {
     return sb.toString();
   }
 
-  public List<String> getGenres() {
-    return genres;
+  public Collection<GenreFolderEntity> getGenres() {
+    return genres.values();
   }
 
-  public List<ArtistFolderEntity> getArtists() {
-    return artists;
+  public Collection<ArtistFolderEntity> getArtists() {
+    return artists.values();
   }
 
-  public List<AlbumFolderEntity> getAlbums() {
-    return albums;
+  public Collection<AlbumFolderEntity> getAlbums() {
+    return albums.values();
   }
-
-  public List<SongFileEntity> getSongs() {
-    return songs;
+  
+  public Collection<SongFileEntity> getSongs() {
+    return songs.values();
   }
   
   public void initialize() {
     
-    this.genres = new ArrayList<>();
-    this.artists = new ArrayList<>();
-    this.albums = getAllAlbums();
-    this.songs = new ArrayList<>();
+    this.genres = new HashMap<>();
+    this.artists = new HashMap<>();
+    this.albums = new HashMap<>();
+    this.songs = new HashMap<>();
     
-    for (AlbumFolderEntity album : this.albums) {
+    for (AlbumFolderEntity album : getAllAlbums()) {
                 
-      String genre = album.getParentGenre().getName();
-      if (!this.genres.contains(genre)) {
-        this.genres.add(genre);
+      GenreFolderEntity genre = album.getParentGenre();
+      Integer genreId = genre.getPersistentIdentity();      
+      if (!this.genres.containsKey(genreId)) {
+        this.genres.put(genreId, genre);
       }
       
       ArtistFolderEntity artist = album.getParentArtist();
-      if (!this.artists.contains(artist)) {
-          this.artists.add(artist);
+      Integer artistId = artist.getPersistentIdentity();
+      if (!this.artists.containsKey(artistId)) {
+          this.artists.put(artistId, artist);
       }
       
-      this.songs.addAll(album.getChildSongs());
+      Integer albumId = album.getPersistentIdentity();
+      if (!this.albums.containsKey(albumId)) {
+        this.albums.put(albumId, album);
+      }
+      
+      for (SongFileEntity song: album.getChildSongs()) {
+        Integer songId = song.getPersistentIdentity();
+        if (!this.songs.containsKey(songId)) {
+          this.songs.put(songId, song);
+        }        
+      }
     }    
   }
+  
+  public AlbumFolderEntity getAlbumById(Integer albumId) throws EntityDoesNotExistException {
+    
+    AlbumFolderEntity album = albums.get(albumId);
+    if (album != null) {
+      return album;
+    }   
+    throw new EntityDoesNotExistException("Album with id: [" + albumId + "] not found.");
+  }  
 }

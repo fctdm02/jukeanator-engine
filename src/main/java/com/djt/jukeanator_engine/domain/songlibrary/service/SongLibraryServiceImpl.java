@@ -17,6 +17,7 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
@@ -220,12 +221,12 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
   }
   
   @Override  
-  public List<String> getGenres() {
+  public List<GenreDto> getGenres() {
     
     if (!isInitialized) {
       throw new SongLibraryException("SongLibraryService has not been initialized yet!");
     }
-    return root.getGenres();
+    return SongLibraryMapper.toGenreDtoList(root.getGenres());
   }
 
   @Override

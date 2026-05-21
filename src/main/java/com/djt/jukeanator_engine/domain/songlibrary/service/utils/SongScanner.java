@@ -134,15 +134,21 @@ public final class SongScanner {
 
     // See if any album needs to have cover art, record label, release
     // date or explicit lyrics metadata retrieved from Discogs
-    int k = 0;
+    int genreIndex = 0;
+    int artistIndex = 0;
     for (int i = 0; i < albums.size(); i++) {
 
       AlbumFolderEntity album = albums.get(i);
       album.setPersistentIdentity(i);
+
+      GenreFolderEntity genre = album.getParentGenre();
+      if (genre != null && genre.getPersistentIdentity() == null) {
+        genre.setPersistentIdentity(genreIndex++);
+      }
       
       ArtistFolderEntity artist = album.getParentArtist();
       if (artist != null && artist.getPersistentIdentity() == null) {
-        artist.setPersistentIdentity(k++);
+        artist.setPersistentIdentity(artistIndex++);
       }
 
       String albumPath = album.getNaturalIdentity();

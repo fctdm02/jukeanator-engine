@@ -4,7 +4,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 
 public class AlbumFolderEntity extends FolderEntity implements NumPlaysComparable {
   private static final long serialVersionUID = 1L;
@@ -83,7 +82,9 @@ public class AlbumFolderEntity extends FolderEntity implements NumPlaysComparabl
         parentFolder = parentFolder.getParentFolder();
       }
     }
-    return new ArtistFolderEntity(parentFolder, "Compilations");
+    ArtistFolderEntity dummyArtist = new ArtistFolderEntity(parentFolder, "Compilations");
+    dummyArtist.setPersistentIdentity(999999);
+    return dummyArtist;
   }
   
   public GenreFolderEntity getParentGenre() {
@@ -96,8 +97,10 @@ public class AlbumFolderEntity extends FolderEntity implements NumPlaysComparabl
       } else {
         parentFolder = parentFolder.getParentFolder();
       }
-    }    
-    throw new SongLibraryException("Album: " + this.getNaturalIdentity() + " does not have a parent genre");
+    }
+    GenreFolderEntity dummyGenre = new GenreFolderEntity(parentFolder, "None");
+    dummyGenre.setPersistentIdentity(999999);
+    return dummyGenre;
   }
   
   public boolean hasValidCoverArt() {
