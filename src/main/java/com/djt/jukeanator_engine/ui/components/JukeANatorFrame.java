@@ -182,8 +182,6 @@ public class JukeANatorFrame extends JFrame {
         if (isSelected) {
           g.setColor(new Color(70, 70, 70));
           g.fillRect(x, y, w, h);
-          g.setColor(Color.WHITE);
-          g.fillRect(x, y, w, 3);
         } else {
           g.setColor(Color.BLACK);
           g.fillRect(x, y, w, h);
@@ -297,13 +295,6 @@ public class JukeANatorFrame extends JFrame {
               new Color(accentColor.getRed(), accentColor.getGreen(), accentColor.getBlue(), 60));
 
           g2.fillRoundRect(6, 6, getWidth() - 12, getHeight() - 12, 18, 18);
-
-          //
-          // BORDER
-          //
-          g2.setColor(new Color(220, 220, 220));
-
-          g2.drawRoundRect(6, 6, getWidth() - 13, getHeight() - 13, 18, 18);
         }
       }
 

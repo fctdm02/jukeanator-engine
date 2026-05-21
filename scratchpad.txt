@@ -1,7 +1,0 @@
-  @EventListener
-  public void handleSongPlaybackStartedEvent(SongPlaybackStartedEvent event) {
-
-  } 
-  
-  
-  this.songLibraryRepository.storeAggregateRoot(this.root);
