@@ -3,41 +3,41 @@ package com.djt.jukeanator_engine.ui.event;
 import java.util.List;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import com.djt.jukeanator_engine.domain.songlibrary.client.SongLibraryServiceHttpClient;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
-import com.djt.jukeanator_engine.domain.songplayer.client.SongPlayerServiceHttpClient;
+import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.event.AllSongsDonePlayingEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackPausedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStoppedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongQueueChangedEvent;
-import com.djt.jukeanator_engine.domain.songqueue.client.SongQueueServiceHttpClient;
+import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
 
 @Component
 public class JukeANatorEventListener {
 
-  private SongLibraryServiceHttpClient songLibraryServiceClient;
-  private SongQueueServiceHttpClient songQueueServiceClient;
-  private SongPlayerServiceHttpClient songPlayerServiceClient;
+  private SongLibraryService songLibraryService;
+  private SongQueueService songQueueService;
+  private SongPlayerService songPlayerService;
   private JukeANatorFrame frame;
 
   public void setFrame(JukeANatorFrame frame) {
     this.frame = frame;
   }
   
-  public void setSongLibraryServiceHttpClient(SongLibraryServiceHttpClient songLibraryServiceClient) {
-    this.songLibraryServiceClient = songLibraryServiceClient;
+  public void setSongLibraryService(SongLibraryService songLibraryService) {
+    this.songLibraryService = songLibraryService;
   }
   
-  public void setSongQueueServiceHttpClient(SongQueueServiceHttpClient songQueueServiceClient) {
-    this.songQueueServiceClient = songQueueServiceClient;
+  public void setSongQueueService(SongQueueService songQueueService) {
+    this.songQueueService = songQueueService;
   }
   
-  public void setSongPlayerServiceHttpClient(SongPlayerServiceHttpClient songPlayerServiceClient) {
-    this.songPlayerServiceClient = songPlayerServiceClient;
+  public void setSongPlayerService(SongPlayerService songPlayerService) {
+    this.songPlayerService = songPlayerService;
   }
   
   @EventListener
@@ -105,8 +105,8 @@ public class JukeANatorEventListener {
   
   private void initializeUi() {
 
-    this.frame.setGenres(songLibraryServiceClient.getGenres());
-    this.frame.setNowPlaying(songPlayerServiceClient.getNowPlayingSong());
-    this.frame.setQueue(songQueueServiceClient.getQueuedSongs());
+    this.frame.setGenres(songLibraryService.getGenres());
+    this.frame.setNowPlaying(songPlayerService.getNowPlayingSong());
+    this.frame.setQueue(songQueueService.getQueuedSongs());
   }  
 }

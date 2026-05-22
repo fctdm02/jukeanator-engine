@@ -38,13 +38,13 @@ import javax.swing.JTabbedPane;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
-import com.djt.jukeanator_engine.domain.songlibrary.client.SongLibraryServiceHttpClient;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
-import com.djt.jukeanator_engine.domain.songplayer.client.SongPlayerServiceHttpClient;
-import com.djt.jukeanator_engine.domain.songqueue.client.SongQueueServiceHttpClient;
+import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
+import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
+import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 
 public class JukeANatorFrame extends JFrame {
@@ -52,9 +52,9 @@ public class JukeANatorFrame extends JFrame {
   private static final long serialVersionUID = 1L;
   
   private final JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties;
-  private final SongLibraryServiceHttpClient songLibraryServiceClient;
-  private final SongQueueServiceHttpClient songQueueServiceClient;
-  private final SongPlayerServiceHttpClient songPlayerServiceClient;
+  private final SongLibraryService songLibraryService;
+  private final SongQueueService songQueueService;
+  private final SongPlayerService songPlayerService;
 
   // ============================================================
   // COLORS
@@ -146,14 +146,14 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   public JukeANatorFrame(
       JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
-      SongLibraryServiceHttpClient songLibraryServiceClient,
-      SongQueueServiceHttpClient songQueueServiceClient,
-      SongPlayerServiceHttpClient songPlayerServiceClient) {
+      SongLibraryService songLibraryService,
+      SongQueueService songQueueService,
+      SongPlayerService songPlayerService) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
-    this.songLibraryServiceClient = songLibraryServiceClient;
-    this.songQueueServiceClient = songQueueServiceClient;
-    this.songPlayerServiceClient = songPlayerServiceClient;
+    this.songLibraryService = songLibraryService;
+    this.songQueueService = songQueueService;
+    this.songPlayerService = songPlayerService;
     
     this.creditsPer = this.jukeANatorUserInterfaceProperties.getCreditsPer();
     this.fiveBonusCredits = this.jukeANatorUserInterfaceProperties.getFiveBonusCredits();
@@ -717,7 +717,7 @@ public class JukeANatorFrame extends JFrame {
     //
     try {
 
-      lastSearchResult = songLibraryServiceClient.getMusicBySearch(query);
+      lastSearchResult = songLibraryService.getMusicBySearch(query);
       artistsOffset = 0;
       albumsOffset = 0;
       songsOffset = 0;
