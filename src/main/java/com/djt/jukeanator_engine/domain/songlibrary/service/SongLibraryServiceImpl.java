@@ -140,7 +140,7 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
             .reversed();
 
     List<SongFileEntity> matchingSongs = root.getSongs().stream()
-        .filter(song -> calculateSearchResultWeight(song.getName(), normalizedSearch) > 0)
+        .filter(song -> calculateSearchResultWeight(song.getSongName(), normalizedSearch) > 0)
         .sorted(bySearchWeightThenPopularityDescending).limit(searchResultSize).toList();
 
     List<ArtistFolderEntity> matchingArtists = root.getArtists().stream()

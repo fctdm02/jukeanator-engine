@@ -83,7 +83,7 @@ public class JukeANatorFrame extends JFrame {
   private int artistsOffset = 0;
   private int albumsOffset = 0;
   private int songsOffset = 0;
-  private static final int SEARCH_PREVIEW_COUNT = 4;
+  private static final int SEARCH_PREVIEW_COUNT = 6;
 
   // Results panels (rebuilt on each search)
   private final JPanel searchResultsPanel = new JPanel(new BorderLayout());
@@ -802,13 +802,19 @@ public class JukeANatorFrame extends JFrame {
     rowsPanel.setLayout(new BoxLayout(rowsPanel, BoxLayout.Y_AXIS));
 
     int start = offset;
-    int end = Math.min(offset + SEARCH_PREVIEW_COUNT, total);
+    for (int slot = 0; slot < SEARCH_PREVIEW_COUNT; slot++) {
 
-    for (int i = start; i < end; i++) {
-      T item = items.get(i);
-      JPanel row = buildSearchResultRow(i + 1, item, category);
+      int itemIndex = start + slot;
+      JPanel row;
+      if (itemIndex < total) {
+        T item = items.get(itemIndex);
+        row = buildSearchResultRow(itemIndex + 1, item, category);
+      } else {
+        // EMPTY PLACEHOLDER ROW (keeps height consistent)
+        row = buildEmptySearchResultRow();
+      }
       rowsPanel.add(row);
-      if (i < end - 1) {
+      if (slot < SEARCH_PREVIEW_COUNT - 1) {
         JSeparator sep = new JSeparator();
         sep.setForeground(new Color(50, 50, 65));
         sep.setBackground(new Color(50, 50, 65));
@@ -833,7 +839,7 @@ public class JukeANatorFrame extends JFrame {
 
     JButton downButton = new JButton("∨");
     styleNavButton(downButton);
-    downButton.setEnabled(end < total);
+    downButton.setEnabled(offset + SEARCH_PREVIEW_COUNT < total);
     downButton.addActionListener(e -> {
       adjustOffset(category, 1);
       rebuildSearchResultsPanel();
@@ -859,6 +865,31 @@ public class JukeANatorFrame extends JFrame {
     return column;
   }
 
+  private JPanel buildEmptySearchResultRow() {
+
+    JPanel row = new JPanel(new BorderLayout());
+    row.setBackground(new Color(15, 15, 20));
+    row.setBorder(new EmptyBorder(8, 10, 8, 10));
+    row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
+
+    // Keep structure identical to real rows so height is consistent
+    JLabel numLabel = new JLabel("");
+    numLabel.setPreferredSize(new Dimension(36, 56));
+
+    JLabel thumb = new JLabel();
+    thumb.setPreferredSize(new Dimension(56, 56));
+
+    JPanel textPanel = new JPanel();
+    textPanel.setOpaque(false);
+
+    row.add(numLabel, BorderLayout.WEST);
+    row.add(thumb, BorderLayout.CENTER);
+    row.add(textPanel, BorderLayout.CENTER);
+
+    row.setOpaque(true);
+    return row;
+  }
+  
   private void adjustOffset(String category, int delta) {
 
     switch (category) {
