@@ -131,6 +131,8 @@ public class JukeANatorFrame extends JFrame {
   private final JLabel songLabel = new JLabel("", SwingConstants.LEFT);
   private final JLabel artistLabel = new JLabel("", SwingConstants.LEFT);
   private final JLabel albumLabel = new JLabel("", SwingConstants.LEFT);
+  private final JLabel playStatus = new JLabel();
+  private boolean musicPaused = false;
   
   // ============================================================
   // SONG CREDITS
@@ -565,14 +567,14 @@ public class JukeANatorFrame extends JFrame {
     JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
     row.setOpaque(false);
 
-    JButton numeric = createKeyboardButton("123@");
-    numeric.setPreferredSize(new Dimension(140, 60));
-    row.add(numeric);
-
     for (char c : "ASDFGHJKL".toCharArray()) {
       row.add(createKeyboardButton(String.valueOf(c)));
     }
 
+    JButton numeric = createKeyboardButton("123@");
+    numeric.setPreferredSize(new Dimension(140, 60));
+    row.add(numeric);
+    
     JButton alpha = createKeyboardButton("ABC");
     alpha.setPreferredSize(new Dimension(140, 60));
     row.add(alpha);
@@ -1734,25 +1736,37 @@ public class JukeANatorFrame extends JFrame {
   private JPanel buildNowPlayingPanel() {
 
     JPanel panel = new JPanel(new BorderLayout(10, 0));
+
     panel.setBackground(Color.BLACK);
     panel.setOpaque(true);
     panel.setBorder(null);
 
     //
-    // TEXT PANEL
+    // LEFT : PLAY STATUS
+    //
+    playStatus.setPreferredSize(new Dimension(96, 96));
+    playStatus.setHorizontalAlignment(SwingConstants.CENTER);
+    playStatus.setBorder(null);
+
+    //
+    // CENTER : TEXT PANEL
     //
     JPanel textPanel = new JPanel();
+
     textPanel.setOpaque(false);
     textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
 
     JLabel nowPlayingTitle = new JLabel("NOW PLAYING:");
+
     nowPlayingTitle.setForeground(Color.YELLOW);
     nowPlayingTitle.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
 
     songLabel.setForeground(Color.CYAN);
     songLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+
     artistLabel.setForeground(TEXT_PRIMARY);
     artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
+
     albumLabel.setForeground(TEXT_SECONDARY);
     albumLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
 
@@ -1763,12 +1777,13 @@ public class JukeANatorFrame extends JFrame {
     textPanel.add(albumLabel);
 
     //
-    // COVER ART
+    // RIGHT : COVER ART
     //
     albumArtLabel.setPreferredSize(new Dimension(96, 96));
     albumArtLabel.setHorizontalAlignment(SwingConstants.CENTER);
     albumArtLabel.setBorder(null);
 
+    panel.add(playStatus, BorderLayout.WEST);
     panel.add(textPanel, BorderLayout.CENTER);
     panel.add(albumArtLabel, BorderLayout.EAST);
 
@@ -1979,6 +1994,9 @@ public class JukeANatorFrame extends JFrame {
       albumLabel.setText(songDto.getAlbumName());
       loadAlbumArt(songDto.getCoverArtPath());
 
+      musicPaused = false;
+      loadPlayStatusIcon("music_playing.gif");
+      
     });
   }
 
@@ -1988,6 +2006,70 @@ public class JukeANatorFrame extends JFrame {
     artistLabel.setText("");
     albumLabel.setText("");
     albumArtLabel.setIcon(null);
+    playStatus.setIcon(null);
+    musicPaused = false;    
+  }
+
+  // ============================================================
+  // TOGGLE MUSIC PLAY STATE ICON
+  // ============================================================
+  public void toggleMusicPlayStateIcon() {
+
+    SwingUtilities.invokeLater(() -> {
+
+      //
+      // If nothing is playing, remain blank
+      //
+      if (songLabel.getText() == null || songLabel.getText().isBlank()) {
+
+        playStatus.setIcon(null);
+        return;
+      }
+
+      musicPaused = !musicPaused;
+
+      if (musicPaused) {
+
+        loadPlayStatusIcon("music_paused.png");
+
+      } else {
+
+        loadPlayStatusIcon("music_playing.gif");
+      }
+    });
+  }
+
+  private void loadPlayStatusIcon(String resourceName) {
+
+    try {
+
+      if (resourceName == null || resourceName.isBlank()) {
+
+        playStatus.setIcon(null);
+        return;
+      }
+
+      URL resource = getClass().getResource(resourceName);
+
+      if (resource == null) {
+
+        playStatus.setIcon(null);
+        return;
+      }
+
+      ImageIcon icon = new ImageIcon(resource);
+
+      Image scaled = icon.getImage().getScaledInstance(
+          96,
+          96,
+          Image.SCALE_DEFAULT);
+
+      playStatus.setIcon(new ImageIcon(scaled));
+
+    } catch (Exception e) {
+
+      playStatus.setIcon(null);
+    }
   }
   
   private void loadAlbumArt(String coverArtPath) {
