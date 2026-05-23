@@ -56,9 +56,7 @@ public class JukeANatorFrame extends JFrame {
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
 
-  // ============================================================
   // COLORS
-  // ============================================================
   private static final Color BG_DARK = new Color(10, 10, 10);
   private static final Color BG_PANEL = new Color(22, 22, 28);
   private static final Color BG_SEARCH = new Color(32, 32, 40);
@@ -66,9 +64,7 @@ public class JukeANatorFrame extends JFrame {
   private static final Color TEXT_PRIMARY = Color.WHITE;
   private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
 
-  // ============================================================
   // SEARCH TAB
-  // ============================================================
   private static final int KEYBOARD_HEIGHT = 260;
   private static final int SEARCH_BAR_HEIGHT = 90;  
   private final boolean enableTypeAheadSearch;
@@ -96,9 +92,7 @@ public class JukeANatorFrame extends JFrame {
   private int viewAllPage = 0;
   private static final int VIEW_ALL_PAGE_SIZE = 15;
 
-  // ============================================================
   // HOT HERE TAB
-  // ============================================================
   private static final int HOT_HERE_PAGE_SIZE = 15;
   private final CardLayout hotHereCardLayout = new CardLayout();
   private final JPanel hotHereRootPanel = new JPanel(hotHereCardLayout);
@@ -107,9 +101,7 @@ public class JukeANatorFrame extends JFrame {
   private String hotHereCategory = "SONGS";
   private int hotHerePage = 0;
 
-  // ============================================================
   // GENRE TAB
-  // ============================================================
   private static final int GENRES_PER_PAGE = 12;
   private final JPanel genresRootPanel = new JPanel(new CardLayout());
   private final JPanel genresGridPanel = new JPanel(new GridLayout(2, 6, 20, 20));
@@ -121,9 +113,7 @@ public class JukeANatorFrame extends JFrame {
   private final Map<String, ImageIcon> genreIconCache = new HashMap<>();
   private final DefaultListModel<GenreDto> genresListModel = new DefaultListModel<>();
 
-  // ============================================================
   // QUEUE TAB
-  // ============================================================
   private final CardLayout queueCardLayout = new CardLayout();
   private final JPanel queueRootPanel = new JPanel(queueCardLayout);
   private final JPanel queueDetailsPanel = new JPanel(new BorderLayout());
@@ -134,9 +124,7 @@ public class JukeANatorFrame extends JFrame {
   private final DefaultListModel<SongQueueEntryDto> queueListModel = new DefaultListModel<>();
   private final JList<SongQueueEntryDto> queueList = new JList<>(queueListModel);  
 
-  // ============================================================
   // NOW PLAYING
-  // ============================================================
   private SongQueueEntryDto nowPlayingSong;
   private final JLabel albumArtLabel = new JLabel();
   private final JLabel songLabel = new JLabel("", SwingConstants.LEFT);
@@ -145,16 +133,12 @@ public class JukeANatorFrame extends JFrame {
   private final JLabel playStatus = new JLabel();
   private boolean musicPaused = false;
   
-  // ============================================================
   // SONG CREDITS
-  // ============================================================
   private final int creditsPer;
   private final int fiveBonusCredits;
   private final int tenBonusCredits; 
 
-  // ============================================================
   // CONSTRUCTOR
-  // ============================================================
   public JukeANatorFrame(
       JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
       SongLibraryService songLibraryService,
@@ -175,9 +159,7 @@ public class JukeANatorFrame extends JFrame {
     initialize();
   }
 
-  // ============================================================
   // INITIALIZE
-  // ============================================================
   private void initialize() {
 
     setTitle("JukeANator");
@@ -200,8 +182,17 @@ public class JukeANatorFrame extends JFrame {
     getContentPane().add(contentPanelTabs, BorderLayout.CENTER);
   }
 
+  
+  
+  
+  
+  
+  
+  
+  
+  
   // ============================================================
-  // TABS
+  // TABS PANEL
   // ============================================================
   private JTabbedPane buildContentPanelTabs() {
 
@@ -365,6 +356,15 @@ public class JukeANatorFrame extends JFrame {
     }
   }
   
+  
+  
+  
+  
+
+  
+  
+  
+  
   // ============================================================
   // SEARCH PANEL
   // ============================================================
@@ -398,9 +398,7 @@ public class JukeANatorFrame extends JFrame {
     return searchRootPanel;
   }
 
-  // ============================================================
   // SEARCH ENTRY CARD
-  // ============================================================
   private JPanel buildSearchEntryCard() {
 
     JPanel root = new JPanel(new BorderLayout());
@@ -442,10 +440,8 @@ public class JukeANatorFrame extends JFrame {
     return root;
   }
 
-  // ============================================================
   // SEARCH BAR PANEL
   // Shared between entry card and results card
-  // ============================================================
   private JPanel buildSearchBarPanel(boolean forResults) {
 
     JPanel bar = new JPanel(new BorderLayout(10, 0));
@@ -506,9 +502,7 @@ public class JukeANatorFrame extends JFrame {
     return bar;
   }
 
-  // ============================================================
   // KEYBOARD PANEL
-  // ============================================================
   private JPanel buildFixedKeyboardPanel() {
     JPanel wrapper = new JPanel(new GridBagLayout());
     wrapper.setBackground(BG_SEARCH);
@@ -664,9 +658,7 @@ public class JukeANatorFrame extends JFrame {
     }
   }
 
-  // ============================================================
   // RESET SEARCH STATE
-  // ============================================================
   private void resetSearchState() {
 
     if (entrySearchLabel != null) {
@@ -711,9 +703,7 @@ public class JukeANatorFrame extends JFrame {
     searchCardLayout.show(searchRootPanel, "ENTRY");
   }
 
-  // ============================================================
   // EXECUTE SEARCH
-  // ============================================================
   private void executeSearch() {
 
     String query = searchBuffer.toString().trim();
@@ -742,9 +732,7 @@ public class JukeANatorFrame extends JFrame {
     }
   }
 
-  // ============================================================
   // RESULTS PANEL
-  // ============================================================
   private void rebuildSearchResultsPanel() {
 
     searchResultsPanel.removeAll();
@@ -786,9 +774,7 @@ public class JukeANatorFrame extends JFrame {
     searchResultsPanel.repaint();
   }
 
-  // ============================================================
   // SEARCH RESULT COLUMN (Artists / Albums / Songs)
-  // ============================================================
   private <T> JPanel buildSearchResultColumn(String header, List<T> items, int offset,
       String category) {
 
@@ -923,9 +909,7 @@ public class JukeANatorFrame extends JFrame {
     b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
   }
 
-  // ============================================================
   // SEARCH RESULT ROW
-  // ============================================================
   private <T> JPanel buildSearchResultRow(int rowNum, T item, String category) {
 
     JPanel row = new JPanel(new BorderLayout(10, 0));
@@ -1040,9 +1024,7 @@ public class JukeANatorFrame extends JFrame {
     }
   }
 
-  // ============================================================
   // VIEW ALL
-  // ============================================================
   private void showViewAll(String category) {
 
     viewAllCategory = category;
@@ -1221,42 +1203,40 @@ public class JukeANatorFrame extends JFrame {
     };
   }
   
+  
+  
+  
+  
+  
+  
+
+  
+  
   // ============================================================
   // HOT HERE PANEL
   // ============================================================
   private JPanel buildHotHerePanel() {
 
     hotHereRootPanel.setBackground(BG_DARK);
-
     refreshHotHere();
-
     hotHereRootPanel.add(hotHereContentPanel, "CONTENT");
-
     hotHereCardLayout.show(hotHereRootPanel, "CONTENT");
 
     return hotHereRootPanel;
   }
 
-  // ============================================================
   // REFRESH HOT HERE
-  // ============================================================
   private void refreshHotHere() {
 
     try {
-
       hotHereResults = songLibraryService.getMusicByPopularity();
-
     } catch (Exception e) {
-
       hotHereResults = new SearchResultDto();
     }
-
     rebuildHotHerePanel();
   }
 
-  // ============================================================
   // REBUILD HOT HERE PANEL
-  // ============================================================
   private void rebuildHotHerePanel() {
 
     hotHereContentPanel.removeAll();
@@ -1278,34 +1258,23 @@ public class JukeANatorFrame extends JFrame {
     hotHereContentPanel.repaint();
   }
 
-  // ============================================================
   // HOT HERE SIDEBAR
-  // ============================================================
   private JPanel buildHotHereSidebar() {
 
     JPanel panel = new JPanel();
-
     panel.setBackground(new Color(18, 18, 24));
-
     panel.setPreferredSize(new Dimension(260, 1));
-
     panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-
     panel.setBorder(new EmptyBorder(24, 20, 24, 20));
 
     //
     // TITLE
     //
     JLabel title = new JLabel("HOT HERE");
-
     title.setAlignmentX(CENTER_ALIGNMENT);
-
     title.setForeground(Color.WHITE);
-
     title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32));
-
     panel.add(title);
-
     panel.add(Box.createVerticalStrut(30));
 
     //
@@ -1313,34 +1282,23 @@ public class JukeANatorFrame extends JFrame {
     //
     panel.add(buildHotHereCategoryButton("SONGS"));
     panel.add(Box.createVerticalStrut(14));
-
+    panel.add(buildHotHereCategoryButton("ALBUMS"));
     panel.add(buildHotHereCategoryButton("ARTISTS"));
     panel.add(Box.createVerticalStrut(14));
-
-    panel.add(buildHotHereCategoryButton("ALBUMS"));
-
     panel.add(Box.createVerticalGlue());
 
     return panel;
   }
 
-  // ============================================================
   // HOT HERE CATEGORY BUTTON
-  // ============================================================
   private JButton buildHotHereCategoryButton(String category) {
 
     boolean selected = hotHereCategory.equals(category);
-
     JButton button = new JButton(category);
-
     button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
-
     button.setPreferredSize(new Dimension(200, 64));
-
     button.setFocusPainted(false);
-
     button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 24));
-
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     if (selected) {
@@ -1357,24 +1315,18 @@ public class JukeANatorFrame extends JFrame {
     button.addActionListener(e -> {
 
       hotHereCategory = category;
-
       hotHerePage = 0;
-
       rebuildHotHerePanel();
     });
 
     return button;
   }
 
-  // ============================================================
   // HOT HERE GRID PANEL
-  // ============================================================
   private JPanel buildHotHereGridPanel() {
 
     JPanel root = new JPanel(new BorderLayout());
-
     root.setBackground(BG_DARK);
-
     List<?> items = switch (hotHereCategory) {
 
       case "ARTISTS" -> hotHereResults.getArtists() != null ? hotHereResults.getArtists()
@@ -1389,39 +1341,28 @@ public class JukeANatorFrame extends JFrame {
     // PAGING
     //
     int total = items.size();
-
     int totalPages = Math.max(1, (int) Math.ceil(total / (double) HOT_HERE_PAGE_SIZE));
-
     hotHerePage = Math.max(0, Math.min(hotHerePage, totalPages - 1));
-
     int start = hotHerePage * HOT_HERE_PAGE_SIZE;
-
     int end = Math.min(start + HOT_HERE_PAGE_SIZE, total);
 
     //
     // HEADER
     //
     JLabel header = new JLabel(hotHereCategory + " (" + total + ")");
-
     header.setBorder(new EmptyBorder(18, 24, 18, 24));
-
     header.setForeground(ACCENT_BLUE);
-
     header.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
 
     //
     // GRID
     //
     JPanel grid = new JPanel(new GridLayout(5, 3, 1, 1));
-
     grid.setBackground(Color.BLACK);
-
     for (int i = start; i < end; i++) {
 
       JPanel row = buildSearchResultRow(i + 1, items.get(i), hotHereCategory);
-
       row.setMaximumSize(null);
-
       grid.add(row);
     }
 
@@ -1429,13 +1370,10 @@ public class JukeANatorFrame extends JFrame {
     // Fill remaining cells
     //
     int visible = end - start;
-
     for (int i = visible; i < HOT_HERE_PAGE_SIZE; i++) {
 
       JPanel filler = new JPanel();
-
       filler.setBackground(BG_DARK);
-
       grid.add(filler);
     }
 
@@ -1443,39 +1381,27 @@ public class JukeANatorFrame extends JFrame {
     // PAGINATION
     //
     JPanel pagination = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
-
     pagination.setBackground(new Color(20, 20, 30));
-
     JButton previous = new JButton("❮");
-
     styleNavButton(previous);
-
     previous.setEnabled(hotHerePage > 0);
-
     previous.addActionListener(e -> {
 
       hotHerePage--;
-
       rebuildHotHerePanel();
     });
 
     JButton next = new JButton("❯");
-
     styleNavButton(next);
-
     next.setEnabled(hotHerePage < totalPages - 1);
-
     next.addActionListener(e -> {
 
       hotHerePage++;
-
       rebuildHotHerePanel();
     });
 
     JLabel pageLabel = new JLabel((hotHerePage + 1) + " / " + totalPages);
-
     pageLabel.setForeground(TEXT_SECONDARY);
-
     pageLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 18));
 
     pagination.add(previous);
@@ -1489,6 +1415,15 @@ public class JukeANatorFrame extends JFrame {
     return root;
   }
 
+  
+  
+  
+  
+  
+  
+  
+  
+  
   // ============================================================
   // GENRES PANEL
   // ============================================================
@@ -1532,9 +1467,7 @@ public class JukeANatorFrame extends JFrame {
     return genresRootPanel;
   }
 
-  // ============================================================
   // REFRESH GENRES PAGE
-  // ============================================================
   private void refreshGenresPage() {
 
     genresGridPanel.removeAll();
@@ -1555,9 +1488,7 @@ public class JukeANatorFrame extends JFrame {
     genresGridPanel.repaint();
   }
 
-  // ============================================================
   // GENRE TILE
-  // ============================================================
   private JPanel buildGenreTile(GenreDto genreDto) {
 
     JPanel panel = new JPanel(new BorderLayout());
@@ -1635,10 +1566,7 @@ public class JukeANatorFrame extends JFrame {
     return panel;
   }
   
-
-  // ============================================================
   // GENRE DETAILS
-  // ============================================================
   private void showGenreDetails(GenreDto genreDto) {
 
     genreDetailsPanel.removeAll();
@@ -1681,6 +1609,15 @@ public class JukeANatorFrame extends JFrame {
     genresCardLayout.show(genresContentPanel, "DETAILS");
   }
 
+  
+  
+  
+  
+  
+  
+  
+  
+  
   // ============================================================
   // QUEUE PANEL
   // ============================================================
@@ -1729,9 +1666,7 @@ public class JukeANatorFrame extends JFrame {
     return queueRootPanel;
   }
 
-  // ============================================================
   // QUEUE SONG DETAILS
-  // ============================================================
   private void showQueueSongDetails(SongQueueEntryDto songQueueEntryDto) {
     
     SongDto song = songQueueEntryDto.getSong();
@@ -1944,6 +1879,15 @@ public class JukeANatorFrame extends JFrame {
     }
   }
 
+  
+  
+  
+  
+  
+  
+  
+  
+  
   // ============================================================
   // TOP PANEL
   // ============================================================
@@ -2010,9 +1954,7 @@ public class JukeANatorFrame extends JFrame {
         tenDollarCredits);
   }
   
-  // ============================================================
   // NOW PLAYING PANEL
-  // ============================================================
   private JPanel buildNowPlayingPanel() {
 
     JPanel panel = new JPanel(new BorderLayout(10, 0));
@@ -2070,6 +2012,15 @@ public class JukeANatorFrame extends JFrame {
     return panel;
   }
 
+  
+  
+  
+  
+  
+  
+  
+
+  
   // ============================================================
   // PLACEHOLDER
   // ============================================================
@@ -2088,9 +2039,16 @@ public class JukeANatorFrame extends JFrame {
     return panel;
   }
 
-  // ============================================================
+  
+  
+  
+  
+  
+  
+    
+ 
+  
   // FULLSCREEN
-  // ============================================================
   public void showFullscreen() {
 
     GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
@@ -2098,9 +2056,7 @@ public class JukeANatorFrame extends JFrame {
     gd.setFullScreenWindow(this);
   }
 
-  // ============================================================
   // GENRE LIST
-  // ============================================================
   public void setGenres(List<GenreDto> genres) {
 
     SwingUtilities.invokeLater(() -> {
@@ -2241,9 +2197,7 @@ public class JukeANatorFrame extends JFrame {
     b.setFocusPainted(false);
   }
   
-  // ============================================================
   // SONG QUEUE LIST
-  // ============================================================
   public void setQueue(List<SongQueueEntryDto> queue) {
 
     SwingUtilities.invokeLater(() -> {
@@ -2256,9 +2210,7 @@ public class JukeANatorFrame extends JFrame {
     });
   }
   
-  // ============================================================
   // NOW PLAYING
-  // ============================================================
   public void setNowPlaying(SongDto songDto) {
 
     SwingUtilities.invokeLater(() -> {
@@ -2290,9 +2242,7 @@ public class JukeANatorFrame extends JFrame {
     musicPaused = false;    
   }
 
-  // ============================================================
   // TOGGLE MUSIC PLAY STATE ICON
-  // ============================================================
   public void toggleMusicPlayStateIcon() {
 
     SwingUtilities.invokeLater(() -> {
