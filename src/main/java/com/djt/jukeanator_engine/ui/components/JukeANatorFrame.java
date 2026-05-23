@@ -47,6 +47,7 @@ import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
+import com.djt.jukeanator_engine.ui.utils.ImageLoader;
 
 public class JukeANatorFrame extends JFrame {
 
@@ -56,6 +57,7 @@ public class JukeANatorFrame extends JFrame {
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
+  private final ImageLoader imageLoader = new ImageLoader();
 
   // COLORS
   private static final Color BG_DARK = new Color(10, 10, 10);
@@ -2443,19 +2445,6 @@ public class JukeANatorFrame extends JFrame {
   
   private ImageIcon loadImage(URL imageUrl, int width, int height) {
     
-    try {
-      if (imageUrl == null) {
-        return null;
-      }
-      
-      ImageIcon icon = new ImageIcon(imageUrl);
-      Image image = icon.getImage();
-      Image scaled = image.getScaledInstance(width, height, Image.SCALE_SMOOTH);
-      return new ImageIcon(scaled);
-
-    } catch (Exception e) {
-
-      return null;
-    } 
+    return imageLoader.loadImage(imageUrl, width, height);
   }
 }
