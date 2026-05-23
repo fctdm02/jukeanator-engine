@@ -15,12 +15,10 @@ import java.awt.GraphicsEnvironment;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Image;
+//import java.awt.Image;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +45,6 @@ import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
-import com.djt.jukeanator_engine.ui.utils.ImageLoader;
 
 public class JukeANatorFrame extends JFrame {
 
@@ -977,10 +974,7 @@ public class JukeANatorFrame extends JFrame {
     final String finalCoverPath = coverPath;
     if (finalCoverPath != null) {
       try {
-        Path path = Paths.get(finalCoverPath);
-        ImageIcon icon = new ImageIcon(path.toUri().toURL());
-        Image scaled = icon.getImage().getScaledInstance(56, 56, Image.SCALE_SMOOTH);
-        thumb.setIcon(new ImageIcon(scaled));
+        thumb.setIcon(imageLoader.loadFilesystemImage(finalCoverPath, 56, 56));
       } catch (Exception ignored) {
       }
     }
@@ -1294,7 +1288,7 @@ public class JukeANatorFrame extends JFrame {
     //
     // Try JPG first
     //
-    ImageIcon logoIcon = loadImage(
+    ImageIcon logoIcon = imageLoader.loadImage(
         "locationLogo.jpg",
         220,
         220);
@@ -1304,7 +1298,7 @@ public class JukeANatorFrame extends JFrame {
     //
     if (logoIcon == null) {
 
-      logoIcon = loadImage(
+      logoIcon = imageLoader.loadImage(
           "locationLogo.png",
           220,
           220);
@@ -1618,23 +1612,12 @@ public class JukeANatorFrame extends JFrame {
       } else {
 
         String resourceName = genreName + ".png";
-
         URL resource = getClass().getResource(resourceName);
-
         if (resource != null) {
 
-          ImageIcon icon = new ImageIcon(resource);
-
-          Image scaled = icon.getImage().getScaledInstance(
-              240,
-              240,
-              Image.SCALE_SMOOTH);
-
-          ImageIcon scaledIcon = new ImageIcon(scaled);
-
-          genreIconCache.put(genreName, scaledIcon);
-
-          imageLabel.setIcon(scaledIcon);
+          ImageIcon imageIcon = imageLoader.loadImage(resourceName, 240, 240);
+          genreIconCache.put(genreName, imageIcon);
+          imageLabel.setIcon(imageIcon);
 
         } else {
 
@@ -1807,27 +1790,13 @@ public class JukeANatorFrame extends JFrame {
     // COVER ART
     //
     queueDetailsCoverArt.setAlignmentX(CENTER_ALIGNMENT);
-
     try {
-
       if (song.getCoverArtPath() != null) {
-
-        Path path = Paths.get(song.getCoverArtPath());
-        URL imageUrl = path.toUri().toURL();
-
-        ImageIcon icon = new ImageIcon(imageUrl);
-
-        Image scaled = icon.getImage().getScaledInstance(320, 320, Image.SCALE_SMOOTH);
-
-        queueDetailsCoverArt.setIcon(new ImageIcon(scaled));
-
+        queueDetailsCoverArt.setIcon(imageLoader.loadImage(song.getCoverArtPath(), 320, 320));
       } else {
-
         queueDetailsCoverArt.setIcon(null);
       }
-
     } catch (Exception e) {
-
       queueDetailsCoverArt.setIcon(null);
     }
 
@@ -1947,11 +1916,7 @@ public class JukeANatorFrame extends JFrame {
       // -------------------------
       try {
         if (value.getSong().getCoverArtPath() != null) {
-          Path path = Paths.get(value.getSong().getCoverArtPath());
-          ImageIcon icon = new ImageIcon(path.toUri().toURL());
-
-          Image scaled = icon.getImage().getScaledInstance(56, 56, Image.SCALE_SMOOTH);
-          cover.setIcon(new ImageIcon(scaled));
+          cover.setIcon(imageLoader.loadFilesystemImage(value.getSong().getCoverArtPath(), 56, 56));
         } else {
           cover.setIcon(null);
         }
@@ -2328,11 +2293,10 @@ public class JukeANatorFrame extends JFrame {
       songLabel.setText(songDto.getSongName());
       artistLabel.setText(songDto.getArtistName());
       albumLabel.setText(songDto.getAlbumName());
-      albumArtLabel.setIcon(loadFilesystemImage(songDto.getCoverArtPath(), 96, 96));
+      albumArtLabel.setIcon(imageLoader.loadFilesystemImage(songDto.getCoverArtPath(), 96, 96));
 
       musicPaused = false;
-      loadPlayStatusIcon("music_playing.gif");
-      
+      playStatus.setIcon(imageLoader.loadClasspathImage("music_playing.gif", 96, 96, Image.SCALE_DEFAULT));
     });
   }
 
@@ -2363,88 +2327,10 @@ public class JukeANatorFrame extends JFrame {
       musicPaused = !musicPaused;
 
       if (musicPaused) {
-
-        loadPlayStatusIcon("music_paused.png");
-
+        playStatus.setIcon(imageLoader.loadClasspathImage("music_paused.png", 96, 96, Image.SCALE_DEFAULT));
       } else {
-
-        loadPlayStatusIcon("music_playing.gif");
+        playStatus.setIcon(imageLoader.loadClasspathImage("music_playing.gif", 96, 96, Image.SCALE_DEFAULT));
       }
     });
-  }
-
-  private void loadPlayStatusIcon(String resourceName) {
-
-    try {
-
-      if (resourceName == null || resourceName.isBlank()) {
-
-        playStatus.setIcon(null);
-        return;
-      }
-
-      URL resource = getClass().getResource(resourceName);
-
-      if (resource == null) {
-
-        playStatus.setIcon(null);
-        return;
-      }
-
-      ImageIcon icon = new ImageIcon(resource);
-
-      Image scaled = icon.getImage().getScaledInstance(
-          96,
-          96,
-          Image.SCALE_DEFAULT);
-
-      playStatus.setIcon(new ImageIcon(scaled));
-
-    } catch (Exception e) {
-
-      playStatus.setIcon(null);
-    }
-  }
-  
-  private ImageIcon loadImage(String resourceName, int width, int height) {
-    
-    ImageIcon imageIcon = loadFilesystemImage(resourceName, width, height);
-    if (imageIcon == null) {
-      imageIcon = loadClasspathImage(resourceName, width, height);
-    }
-    return imageIcon;
-  }
-  
-  private ImageIcon loadFilesystemImage(String resourceName, int width, int height) {
-    
-    if (resourceName == null || resourceName.isBlank()) {
-      return null;
-    }    
-    Path path = Paths.get(resourceName);
-    if (!path.toFile().exists()) {
-      return null;
-    }
-    URL imageUrl;
-    try {
-      imageUrl = path.toUri().toURL();
-    } catch (MalformedURLException e) {
-      e.printStackTrace();
-      return null;
-    }
-    return loadImage(imageUrl, width, height);
-  }
-  
-  private ImageIcon loadClasspathImage(String resourceName, int width, int height) {
-   
-    if (resourceName == null || resourceName.isBlank()) {
-      return null;
-    }
-    URL imageUrl = getClass().getResource(resourceName);
-    return loadImage(imageUrl, width, height);
-  }
-  
-  private ImageIcon loadImage(URL imageUrl, int width, int height) {
-    
-    return imageLoader.loadImage(imageUrl, width, height);
   }
 }
