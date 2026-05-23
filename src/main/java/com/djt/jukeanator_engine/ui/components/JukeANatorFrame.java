@@ -1203,324 +1203,159 @@ public class JukeANatorFrame extends JFrame {
   
   
   
-  
-  
-  
-
-  
-  
   // ============================================================
   // HOT HERE PANEL
   // ============================================================
+  // Field declarations — move these up to the instance field section of the class,
+  // replacing the existing HOT HERE block:
+  //
+  // private static final int HOT_HERE_PREVIEW_COUNT = 10;
+  // private SearchResultDto hotHereResults;
+  // private int hotHereArtistsOffset = 0;
+  // private int hotHereAlbumsOffset = 0;
+  // private int hotHereSongsOffset = 0;
+  // private final JPanel hotHereContentPanel = new JPanel(new BorderLayout());
+  //
+  // Remove these old fields (no longer needed):
+  // HOT_HERE_PAGE_SIZE, hotHereCardLayout, hotHereRootPanel,
+  // hotHereCategory, hotHerePage
+
+  private static final int HOT_HERE_PREVIEW_COUNT = 10;
+
+  // Per-column scroll offsets (replace the old hotHerePage / hotHereCategory fields)
+  private int hotHereArtistsOffset = 0;
+  private int hotHereAlbumsOffset = 0;
+  private int hotHereSongsOffset = 0;
+
   private JPanel buildHotHerePanel() {
 
-    hotHereRootPanel.setBackground(BG_DARK);
-    refreshHotHere();
-    hotHereRootPanel.add(hotHereContentPanel, "CONTENT");
-    hotHereCardLayout.show(hotHereRootPanel, "CONTENT");
+    hotHereContentPanel.setBackground(BG_DARK);
 
-    return hotHereRootPanel;
-  }
-
-  // REFRESH HOT HERE
-  private void refreshHotHere() {
-
+    // Load data once
     try {
       hotHereResults = songLibraryService.getMusicByPopularity();
     } catch (Exception e) {
       hotHereResults = new SearchResultDto();
     }
-    rebuildHotHerePanel();
+
+    rebuildHotHereColumnsPanel();
+
+    return hotHereContentPanel;
   }
 
-  // REBUILD HOT HERE PANEL
-  private void rebuildHotHerePanel() {
+  // REBUILD HOT HERE COLUMNS
+  private void rebuildHotHereColumnsPanel() {
 
     hotHereContentPanel.removeAll();
 
-    //
-    // LEFT SIDEBAR
-    //
-    JPanel leftPanel = buildHotHereSidebar();
+    List<?> artists = hotHereResults.getArtists() != null ? hotHereResults.getArtists() : List.of();
+    List<?> albums = hotHereResults.getAlbums() != null ? hotHereResults.getAlbums() : List.of();
+    List<?> songs = hotHereResults.getSongs() != null ? hotHereResults.getSongs() : List.of();
 
-    //
-    // MAIN GRID
-    //
-    JPanel mainPanel = buildHotHereGridPanel();
+    JPanel columnsPanel = new JPanel(new GridLayout(1, 3, 2, 0));
+    columnsPanel.setBackground(Color.BLACK);
+    columnsPanel.setBorder(new EmptyBorder(0, 0, 0, 0));
 
-    hotHereContentPanel.add(leftPanel, BorderLayout.WEST);
-    hotHereContentPanel.add(mainPanel, BorderLayout.CENTER);
+    columnsPanel.add(buildHotHereColumn("ARTISTS", artists, hotHereArtistsOffset));
+    columnsPanel.add(buildHotHereColumn("ALBUMS", albums, hotHereAlbumsOffset));
+    columnsPanel.add(buildHotHereColumn("SONGS", songs, hotHereSongsOffset));
+
+    hotHereContentPanel.add(columnsPanel, BorderLayout.CENTER);
 
     hotHereContentPanel.revalidate();
     hotHereContentPanel.repaint();
   }
 
-  // HOT HERE SIDEBAR
-  private JPanel buildHotHereSidebar() {
+  // HOT HERE COLUMN (mirrors buildSearchResultColumn, but no VIEW ALL button,
+  // uses HOT_HERE_PREVIEW_COUNT rows instead of SEARCH_PREVIEW_COUNT)
+  private <T> JPanel buildHotHereColumn(String header, List<T> items, int offset) {
 
-    JPanel panel = new JPanel();
-    panel.setBackground(new Color(18, 18, 24));
-    panel.setPreferredSize(new Dimension(260, 1));
-    panel.setLayout(new BorderLayout());
-
-    //
-    // ==========================================================
-    // TOP BRAND PANEL
-    // ==========================================================
-    //
-    JPanel topPanel = new JPanel(new BorderLayout());
-    topPanel.setBackground(new Color(12, 12, 18));
-    topPanel.setBorder(new EmptyBorder(12, 12, 12, 12));
-
-    //
-    // LOCATION IMAGE
-    //
-    JLabel locationLogo = new JLabel();
-    locationLogo.setHorizontalAlignment(SwingConstants.CENTER);
-    locationLogo.setVerticalAlignment(SwingConstants.CENTER);
-    locationLogo.setOpaque(true);
-    locationLogo.setBackground(new Color(20, 20, 28));
-    locationLogo.setBorder(
-        BorderFactory.createLineBorder(
-            new Color(80, 80, 90),
-            1));
-
-    //
-    // Try JPG first
-    //
-    ImageIcon logoIcon = imageLoader.loadImage(
-        "locationLogo.jpg",
-        220,
-        220);
-
-    //
-    // Fallback PNG
-    //
-    if (logoIcon == null) {
-
-      logoIcon = imageLoader.loadImage(
-          "locationLogo.png",
-          220,
-          220);
-    }
-
-    if (logoIcon != null) {
-
-      locationLogo.setIcon(logoIcon);
-
-    } else {
-
-      //
-      // Fallback text
-      //
-      locationLogo.setText("HOT HERE");
-      locationLogo.setForeground(Color.WHITE);
-      locationLogo.setFont(
-          new Font(
-              Font.SANS_SERIF,
-              Font.BOLD,
-              28));
-    }
-
-    topPanel.add(locationLogo, BorderLayout.CENTER);
-
-    //
-    // ==========================================================
-    // BUTTON PANEL
-    // ==========================================================
-    //
-    JPanel buttonPanel = new JPanel();
-    buttonPanel.setOpaque(false);
-    buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
-    buttonPanel.setBorder(new EmptyBorder(8, 12, 12, 12));
-
-    buttonPanel.add(buildHotHereCategoryButton("SONGS"));
-    buttonPanel.add(Box.createVerticalStrut(12));
-
-    buttonPanel.add(buildHotHereCategoryButton("ALBUMS"));
-    buttonPanel.add(Box.createVerticalStrut(12));
-
-    buttonPanel.add(buildHotHereCategoryButton("ARTISTS"));
-    buttonPanel.add(Box.createVerticalGlue());
-
-    //
-    // ==========================================================
-    // ASSEMBLE
-    // ==========================================================
-    //
-    panel.add(topPanel, BorderLayout.NORTH);
-    panel.add(buttonPanel, BorderLayout.CENTER);
-
-    return panel;
-  }
-  
-  // HOT HERE CATEGORY BUTTON
-  private JButton buildHotHereCategoryButton(String category) {
-
-    boolean selected = hotHereCategory.equals(category);
-    JButton button = new JButton(category);
-    button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
-    button.setPreferredSize(new Dimension(200, 64));
-    button.setFocusPainted(false);
-    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 24));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-    if (selected) {
-
-      button.setBackground(ACCENT_BLUE);
-      button.setForeground(Color.BLACK);
-
-    } else {
-
-      button.setBackground(new Color(50, 50, 70));
-      button.setForeground(Color.WHITE);
-    }
-
-    button.addActionListener(e -> {
-
-      hotHereCategory = category;
-      hotHerePage = 0;
-      rebuildHotHerePanel();
-    });
-
-    return button;
-  }
-
-  // HOT HERE GRID PANEL
-  private JPanel buildHotHereGridPanel() {
-
-    JPanel root = new JPanel(new BorderLayout());
-    root.setBorder(new EmptyBorder(6, 6, 6, 6));
-    root.setBackground(BG_DARK);
-    List<?> items = switch (hotHereCategory) {
-
-      case "ARTISTS" -> hotHereResults.getArtists() != null ? hotHereResults.getArtists()
-          : List.of();
-
-      case "ALBUMS" -> hotHereResults.getAlbums() != null ? hotHereResults.getAlbums() : List.of();
-
-      default -> hotHereResults.getSongs() != null ? hotHereResults.getSongs() : List.of();
-    };
-
-    //
-    // PAGING
-    //
-    int total = items.size();
-    int totalPages = Math.max(1, (int) Math.ceil(total / (double) HOT_HERE_PAGE_SIZE));
-    hotHerePage = Math.max(0, Math.min(hotHerePage, totalPages - 1));
-    int start = hotHerePage * HOT_HERE_PAGE_SIZE;
-    int end = Math.min(start + HOT_HERE_PAGE_SIZE, total);
+    JPanel column = new JPanel(new BorderLayout());
+    column.setBackground(new Color(15, 15, 20));
+    column.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, new Color(60, 60, 80)));
 
     //
     // HEADER
     //
-    JLabel header = new JLabel(hotHereCategory + " (" + total + ")");
-    header.setBorder(new EmptyBorder(18, 24, 18, 24));
-    header.setForeground(ACCENT_BLUE);
-    header.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
+    int total = items.size();
+    JLabel headerLabel = new JLabel(header + " (" + total + ")", SwingConstants.CENTER);
+    headerLabel.setForeground(ACCENT_BLUE);
+    headerLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+    headerLabel.setBorder(new EmptyBorder(10, 0, 8, 0));
+    headerLabel.setOpaque(true);
+    headerLabel.setBackground(new Color(20, 20, 30));
 
     //
-    // GRID
+    // ROWS (up to HOT_HERE_PREVIEW_COUNT)
     //
-    JPanel grid = new JPanel(new GridLayout(5, 3, 2, 2));
-    grid.setBackground(Color.BLACK);
-    grid.setBorder(new EmptyBorder(2, 2, 2, 2));
+    JPanel rowsPanel = new JPanel();
+    rowsPanel.setBackground(new Color(15, 15, 20));
+    rowsPanel.setLayout(new BoxLayout(rowsPanel, BoxLayout.Y_AXIS));
 
-    //
-    // Render in COLUMN-MAJOR order:
-    //
-    // 1 6 11
-    // 2 7 12
-    // 3 8 13
-    // 4 9 14
-    // 5 10 15
-    //
-    for (int row = 0; row < 5; row++) {
+    for (int slot = 0; slot < HOT_HERE_PREVIEW_COUNT; slot++) {
 
-      for (int col = 0; col < 3; col++) {
+      int itemIndex = offset + slot;
+      JPanel row =
+          (itemIndex < total) ? buildSearchResultRow(itemIndex + 1, items.get(itemIndex), header)
+              : buildEmptySearchResultRow();
 
-        int relativeIndex = (col * 5) + row;
-        int actualIndex = start + relativeIndex;
+      rowsPanel.add(row);
 
-        JPanel cell;
-
-        if (actualIndex < end) {
-
-          //
-          // Build actual result row
-          //
-          cell = buildSearchResultRow(actualIndex + 1, items.get(actualIndex), hotHereCategory);
-
-          //
-          // Border styling
-          //
-          cell.setBorder(BorderFactory.createCompoundBorder(
-              BorderFactory.createLineBorder(new Color(80, 80, 90), 1),
-              new EmptyBorder(4, 4, 4, 4)));
-
-          cell.setBackground(new Color(28, 28, 36));
-
-        } else {
-
-          //
-          // Empty filler cell
-          //
-          cell = new JPanel();
-          cell.setBackground(BG_DARK);
-
-          cell.setBorder(BorderFactory.createLineBorder(new Color(45, 45, 55), 1));
-        }
-
-        grid.add(cell);
+      if (slot < HOT_HERE_PREVIEW_COUNT - 1) {
+        JSeparator sep = new JSeparator();
+        sep.setForeground(new Color(50, 50, 65));
+        sep.setBackground(new Color(50, 50, 65));
+        rowsPanel.add(sep);
       }
     }
- 
-    //
-    // PAGINATION
-    //
-    JPanel pagination = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
-    pagination.setBackground(new Color(20, 20, 30));
-    JButton previous = new JButton("❮");
-    styleNavButton(previous);
-    previous.setEnabled(hotHerePage > 0);
-    previous.addActionListener(e -> {
 
-      hotHerePage--;
-      rebuildHotHerePanel();
+    //
+    // NAVIGATION (up / down only — no VIEW ALL)
+    //
+    JPanel navPanel = new JPanel(new BorderLayout(4, 0));
+    navPanel.setBackground(new Color(20, 20, 30));
+    navPanel.setBorder(new EmptyBorder(6, 8, 6, 8));
+
+    JButton upButton = new JButton("∧");
+    styleNavButton(upButton);
+    upButton.setEnabled(offset > 0);
+    upButton.addActionListener(e -> {
+      adjustHotHereOffset(header, -1);
+      rebuildHotHereColumnsPanel();
     });
 
-    JButton next = new JButton("❯");
-    styleNavButton(next);
-    next.setEnabled(hotHerePage < totalPages - 1);
-    next.addActionListener(e -> {
-
-      hotHerePage++;
-      rebuildHotHerePanel();
+    JButton downButton = new JButton("∨");
+    styleNavButton(downButton);
+    downButton.setEnabled(offset + HOT_HERE_PREVIEW_COUNT < total);
+    downButton.addActionListener(e -> {
+      adjustHotHereOffset(header, 1);
+      rebuildHotHereColumnsPanel();
     });
 
-    JLabel pageLabel = new JLabel((hotHerePage + 1) + " / " + totalPages);
-    pageLabel.setForeground(TEXT_SECONDARY);
-    pageLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 18));
+    navPanel.add(upButton, BorderLayout.WEST);
+    navPanel.add(downButton, BorderLayout.EAST);
 
-    pagination.add(previous);
-    pagination.add(pageLabel);
-    pagination.add(next);
+    column.add(headerLabel, BorderLayout.NORTH);
+    column.add(rowsPanel, BorderLayout.CENTER);
+    column.add(navPanel, BorderLayout.SOUTH);
 
-    root.add(header, BorderLayout.NORTH);
-    root.add(grid, BorderLayout.CENTER);
-    root.add(pagination, BorderLayout.SOUTH);
-
-    return root;
+    return column;
   }
 
+  // Adjust the correct per-column offset
+  private void adjustHotHereOffset(String category, int delta) {
+
+    switch (category) {
+      case "ARTISTS" -> hotHereArtistsOffset = Math.max(0, hotHereArtistsOffset + delta);
+      case "ALBUMS" -> hotHereAlbumsOffset = Math.max(0, hotHereAlbumsOffset + delta);
+      case "SONGS" -> hotHereSongsOffset = Math.max(0, hotHereSongsOffset + delta);
+    }
+  }
   
   
   
   
-  
-  
-  
-  
+
   
   // ============================================================
   // GENRES PANEL
