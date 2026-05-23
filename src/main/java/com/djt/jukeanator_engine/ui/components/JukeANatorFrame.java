@@ -17,6 +17,7 @@ import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1264,32 +1265,99 @@ public class JukeANatorFrame extends JFrame {
     JPanel panel = new JPanel();
     panel.setBackground(new Color(18, 18, 24));
     panel.setPreferredSize(new Dimension(260, 1));
-    panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-    panel.setBorder(new EmptyBorder(24, 20, 24, 20));
+    panel.setLayout(new BorderLayout());
 
     //
-    // TITLE
+    // ==========================================================
+    // TOP BRAND PANEL
+    // ==========================================================
     //
-    JLabel title = new JLabel("HOT HERE");
-    title.setAlignmentX(CENTER_ALIGNMENT);
-    title.setForeground(Color.WHITE);
-    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32));
-    panel.add(title);
-    panel.add(Box.createVerticalStrut(30));
+    JPanel topPanel = new JPanel(new BorderLayout());
+    topPanel.setBackground(new Color(12, 12, 18));
+    topPanel.setBorder(new EmptyBorder(12, 12, 12, 12));
 
     //
-    // CATEGORY BUTTONS
+    // LOCATION IMAGE
     //
-    panel.add(buildHotHereCategoryButton("SONGS"));
-    panel.add(Box.createVerticalStrut(14));
-    panel.add(buildHotHereCategoryButton("ALBUMS"));
-    panel.add(buildHotHereCategoryButton("ARTISTS"));
-    panel.add(Box.createVerticalStrut(14));
-    panel.add(Box.createVerticalGlue());
+    JLabel locationLogo = new JLabel();
+    locationLogo.setHorizontalAlignment(SwingConstants.CENTER);
+    locationLogo.setVerticalAlignment(SwingConstants.CENTER);
+    locationLogo.setOpaque(true);
+    locationLogo.setBackground(new Color(20, 20, 28));
+    locationLogo.setBorder(
+        BorderFactory.createLineBorder(
+            new Color(80, 80, 90),
+            1));
+
+    //
+    // Try JPG first
+    //
+    ImageIcon logoIcon = loadClasspathImage(
+        "locationLogo.jpg",
+        220,
+        220);
+
+    //
+    // Fallback PNG
+    //
+    if (logoIcon == null) {
+
+      logoIcon = loadClasspathImage(
+          "locationLogo.png",
+          220,
+          220);
+    }
+
+    if (logoIcon != null) {
+
+      locationLogo.setIcon(logoIcon);
+
+    } else {
+
+      //
+      // Fallback text
+      //
+      locationLogo.setText("HOT HERE");
+      locationLogo.setForeground(Color.WHITE);
+      locationLogo.setFont(
+          new Font(
+              Font.SANS_SERIF,
+              Font.BOLD,
+              28));
+    }
+
+    topPanel.add(locationLogo, BorderLayout.CENTER);
+
+    //
+    // ==========================================================
+    // BUTTON PANEL
+    // ==========================================================
+    //
+    JPanel buttonPanel = new JPanel();
+    buttonPanel.setOpaque(false);
+    buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
+    buttonPanel.setBorder(new EmptyBorder(8, 12, 12, 12));
+
+    buttonPanel.add(buildHotHereCategoryButton("SONGS"));
+    buttonPanel.add(Box.createVerticalStrut(12));
+
+    buttonPanel.add(buildHotHereCategoryButton("ALBUMS"));
+    buttonPanel.add(Box.createVerticalStrut(12));
+
+    buttonPanel.add(buildHotHereCategoryButton("ARTISTS"));
+    buttonPanel.add(Box.createVerticalGlue());
+
+    //
+    // ==========================================================
+    // ASSEMBLE
+    // ==========================================================
+    //
+    panel.add(topPanel, BorderLayout.NORTH);
+    panel.add(buttonPanel, BorderLayout.CENTER);
 
     return panel;
   }
-
+  
   // HOT HERE CATEGORY BUTTON
   private JButton buildHotHereCategoryButton(String category) {
 
@@ -2258,7 +2326,7 @@ public class JukeANatorFrame extends JFrame {
       songLabel.setText(songDto.getSongName());
       artistLabel.setText(songDto.getArtistName());
       albumLabel.setText(songDto.getAlbumName());
-      loadAlbumArt(songDto.getCoverArtPath());
+      albumArtLabel.setIcon(loadFilesystemImage(songDto.getCoverArtPath(), 96, 96));
 
       musicPaused = false;
       loadPlayStatusIcon("music_playing.gif");
@@ -2336,25 +2404,51 @@ public class JukeANatorFrame extends JFrame {
     }
   }
   
-  private void loadAlbumArt(String coverArtPath) {
-
+  private ImageIcon loadFilesystemImage(String resourceName, int width, int height) {
+    
+    if (resourceName == null || resourceName.isBlank()) {
+      return null;
+    }
+    
+    Path path = Paths.get(resourceName);
+    URL imageUrl;
+    try {
+      imageUrl = path.toUri().toURL();
+    } catch (MalformedURLException e) {
+      e.printStackTrace();
+      return null;
+    }
+    
+    return loadImage(imageUrl, width, height);
+  }
+  
+  private ImageIcon loadClasspathImage(String resourceName, int width, int height) {
+   
+    if (resourceName == null || resourceName.isBlank()) {
+      return null;
+    }
+    
+    URL imageUrl = getClass().getResource(resourceName);
+    
+    return loadImage(imageUrl, width, height);
+  }
+  
+  private ImageIcon loadImage(URL imageUrl, int width, int height) {
+    
     try {
 
-      if (coverArtPath == null || coverArtPath.isBlank()) {
-        albumArtLabel.setIcon(null);
-        return;
+      if (imageUrl == null) {
+        return null;
       }
-
-      Path path = Paths.get(coverArtPath);
-      URL imageUrl = path.toUri().toURL();
+      
       ImageIcon icon = new ImageIcon(imageUrl);
       Image image = icon.getImage();
-      Image scaled = image.getScaledInstance(96, 96, Image.SCALE_SMOOTH);
-      albumArtLabel.setIcon(new ImageIcon(scaled));
+      Image scaled = image.getScaledInstance(width, height, Image.SCALE_SMOOTH);
+      return new ImageIcon(scaled);
 
     } catch (Exception e) {
 
-      albumArtLabel.setIcon(null);
-    }
+      return null;
+    } 
   }
 }
