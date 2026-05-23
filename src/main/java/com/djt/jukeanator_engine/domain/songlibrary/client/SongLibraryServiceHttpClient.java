@@ -8,6 +8,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
@@ -69,6 +70,30 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
         .body(new ParameterizedTypeReference<>() {});
   }
 
+  @Override
+  public ArtistDto getArtistById(Integer artistId) {
+    
+    return restClient.get()
+        .uri("/api/song-library/artists/" + artistId).retrieve()
+        .body(new ParameterizedTypeReference<>() {});
+  }
+
+  @Override
+  public AlbumDto getAlbumById(Integer albumId) {
+    
+    return restClient.get()
+        .uri("/api/song-library/albums/" + albumId).retrieve()
+        .body(new ParameterizedTypeReference<>() {});
+  }
+
+  @Override
+  public SongDto getSongById(Integer albumId, Integer songId) {
+    
+    return restClient.get()
+        .uri("/api/song-library/songs/" + albumId + "/" + songId).retrieve()
+        .body(new ParameterizedTypeReference<>() {});
+  }
+  
   @Override
   public Integer scanFileSystemForSongs(ScanRequest scanRequest) throws SongScanFailedException {
 

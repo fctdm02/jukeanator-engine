@@ -22,11 +22,14 @@ public final class SongLibraryMapper {
     List<GenreDto> genreDtos = new ArrayList<>();
     for (GenreFolderEntity genreEntity : genreEntities) {
 
-      genreDtos.add(new GenreDto(
-          genreEntity.getPersistentIdentity(),
-          genreEntity.getName()));
+      genreDtos.add(toGenreDto(genreEntity));
     }
     return genreDtos;
+  }
+
+  public static GenreDto toGenreDto(GenreFolderEntity genreEntity) {
+
+    return new GenreDto(genreEntity.getPersistentIdentity(), genreEntity.getName());
   }
   
   public static List<ArtistDto> toArtistDtoList(Collection<ArtistFolderEntity> artistEntities) {
@@ -34,16 +37,17 @@ public final class SongLibraryMapper {
     List<ArtistDto> artistDtos = new ArrayList<>();
     for (ArtistFolderEntity artistEntity : artistEntities) {
 
-      artistDtos.add(new ArtistDto(
-          artistEntity.getPersistentIdentity(),
-          artistEntity.getName(),
-          SongLibraryMapper.toAlbumDtoList(
-              artistEntity,
-              artistEntity.getAlbums())));
+      artistDtos.add(toArtistDto(artistEntity));
     }
     return artistDtos;
   }
 
+  public static ArtistDto toArtistDto(ArtistFolderEntity artistEntity) {
+
+    return new ArtistDto(artistEntity.getPersistentIdentity(), artistEntity.getName(),
+        SongLibraryMapper.toAlbumDtoList(artistEntity, artistEntity.getAlbums()));
+  }
+  
   public static List<AlbumDto> toAlbumDtoList(Collection<AlbumFolderEntity> albumEntities) {
 
     List<AlbumDto> albumDtos = new ArrayList<>();
@@ -51,19 +55,7 @@ public final class SongLibraryMapper {
 
       ArtistFolderEntity artist = albumEntity.getParentArtist();
 
-      albumDtos.add(new AlbumDto(
-          artist.getPersistentIdentity(),
-          artist.getName(),
-          albumEntity.getPersistentIdentity(),
-          albumEntity.getName(),
-          albumEntity.hasExplicit(),
-          albumEntity.getRecordLabel(),
-          albumEntity.getReleaseDate(),
-          albumEntity.getCoverArtPath(),
-          SongLibraryMapper.toSongDtoList(
-              artist,
-              albumEntity,
-              albumEntity.getChildSongs())));
+      albumDtos.add(toAlbumDto(artist, albumEntity));
     }
     return albumDtos;
   }
@@ -73,23 +65,34 @@ public final class SongLibraryMapper {
     List<AlbumDto> albumDtos = new ArrayList<>();
     for (AlbumFolderEntity albumEntity : albumEntities) {
 
-      albumDtos.add(new AlbumDto(
-          artist.getPersistentIdentity(),
-          artist.getName(),
-          albumEntity.getPersistentIdentity(),
-          albumEntity.getName(),
-          albumEntity.hasExplicit(),
-          albumEntity.getRecordLabel(),
-          albumEntity.getReleaseDate(),
-          albumEntity.getCoverArtPath(),
-          SongLibraryMapper.toSongDtoList(
-              artist,
-              albumEntity,
-              albumEntity.getChildSongs())));
+      albumDtos.add(toAlbumDto(artist, albumEntity));
     }
     return albumDtos;
   }
 
+  public static AlbumDto toAlbumDto(AlbumFolderEntity albumEntity) {
+
+    ArtistFolderEntity artist = albumEntity.getParentArtist();
+    return toAlbumDto(artist, albumEntity);
+  }
+  
+  public static AlbumDto toAlbumDto(ArtistFolderEntity artist, AlbumFolderEntity albumEntity) {
+
+    return new AlbumDto(
+        artist.getPersistentIdentity(), 
+        artist.getName(),
+        albumEntity.getPersistentIdentity(), 
+        albumEntity.getName(), 
+        albumEntity.hasExplicit(),
+        albumEntity.getRecordLabel(), 
+        albumEntity.getReleaseDate(), 
+        albumEntity.getCoverArtPath(),
+        SongLibraryMapper.toSongDtoList(
+            artist, 
+            albumEntity, 
+            albumEntity.getChildSongs()));
+  }
+  
   public static List<SongDto> toSongDtoList(Collection<SongFileEntity> songEntities) {
 
     List<SongDto> songDtos = new ArrayList<>();

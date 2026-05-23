@@ -6,6 +6,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 
 /**
@@ -42,6 +43,28 @@ public interface SongLibraryService {
    * @return
    */
   List<AlbumDto> getAlbums();
+
+  /**
+   * 
+   * @param artistId
+   * @return
+   */
+  ArtistDto getArtistById(Integer artistId);
+  
+  /**
+   * 
+   * @param albumId
+   * @return
+   */
+  AlbumDto getAlbumById(Integer albumId);
+  
+  /**
+   * 
+   * @param albumId
+   * @param songId
+   * @return
+   */
+  SongDto getSongById(Integer albumId, Integer songId);
   
   /**
    * 

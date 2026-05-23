@@ -217,6 +217,36 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
   }   
   
   @Override
+  public ArtistDto getArtistById(Integer artistId) {
+    
+    try {
+      return SongLibraryMapper.toArtistDto(root.getArtistById(artistId));
+    } catch (EntityDoesNotExistException e) {
+      return null;
+    }
+  }
+  
+  @Override
+  public AlbumDto getAlbumById(Integer albumId) {
+
+    try {
+      return SongLibraryMapper.toAlbumDto(root.getAlbumById(albumId));
+    } catch (EntityDoesNotExistException e) {
+      return null;
+    }
+  }
+  
+  @Override
+  public SongDto getSongById(Integer albumId, Integer songId) {
+
+    try {
+      return SongLibraryMapper.toSongDto(root.getSongById(albumId, songId));
+    } catch (EntityDoesNotExistException e) {
+      return null;
+    }
+  }
+  
+  @Override
   public Integer scanFileSystemForSongs(ScanRequest scanRequest) throws SongScanFailedException {
 
     try {
