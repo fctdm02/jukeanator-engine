@@ -3,20 +3,23 @@ package com.djt.jukeanator_engine.domain.songlibrary.dto;
 import java.util.List;
 import java.util.Objects;
 
-public class GenreDto {
+public class GenreDto implements Comparable<GenreDto> {
   
   private Integer genreId;
   private String genreName;
   private List<Integer> albumIds;
+  private Integer numPlays;
   
   public GenreDto(
       Integer genreId,
       String genreName,
-      List<Integer> albumIds) {
+      List<Integer> albumIds,
+      Integer numPlays) {
     super();
     this.genreId = genreId;
     this.genreName = genreName;
     this.albumIds = albumIds;
+    this.numPlays = numPlays;
   }
   
   public Integer getGenreId() {
@@ -29,6 +32,10 @@ public class GenreDto {
   
   public List<Integer> getAlbumIds() {
     return albumIds;
+  }
+  
+  public Integer getNumPlays() {
+    return numPlays;
   }
 
   @Override
@@ -51,5 +58,10 @@ public class GenreDto {
   @Override
   public String toString() {
     return "GenreDto [genreName=" + genreName + "]";
+  }
+
+  @Override
+  public int compareTo(GenreDto that) {
+    return this.numPlays.compareTo(that.numPlays);
   }  
 }

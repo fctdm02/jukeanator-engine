@@ -17,9 +17,9 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
  */
 public final class SongLibraryMapper {
 
-  public static GenreDto toGenreDto(GenreFolderEntity genreEntity, List<Integer> albumIds) {
+  public static GenreDto toGenreDto(GenreFolderEntity genreEntity, List<Integer> albumIds, Integer numPlays) {
 
-    return new GenreDto(genreEntity.getPersistentIdentity(), genreEntity.getName(), albumIds);
+    return new GenreDto(genreEntity.getPersistentIdentity(), genreEntity.getName(), albumIds, numPlays);
   }
   
   public static List<ArtistDto> toArtistDtoList(Collection<ArtistFolderEntity> artistEntities) {

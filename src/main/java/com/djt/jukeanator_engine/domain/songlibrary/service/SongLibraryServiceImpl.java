@@ -201,14 +201,17 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
     List<GenreDto> dtos = new ArrayList<>();
     for (GenreFolderEntity genre: root.getGenres()) {
       
+      int numPlays = 0;
       List<Integer> albumIds = new ArrayList<>();
       for (AlbumFolderEntity album: root.getAlbumsForGenre(genre.getPersistentIdentity())) {
        
         albumIds.add(album.getPersistentIdentity());
+        numPlays = numPlays + album.getNumPlays().intValue();
       }
       Collections.sort(albumIds);
-      dtos.add(SongLibraryMapper.toGenreDto(genre, albumIds));
-    }    
+      dtos.add(SongLibraryMapper.toGenreDto(genre, albumIds, Integer.valueOf(numPlays)));
+    }
+    dtos.sort(Comparator.reverseOrder());
     return dtos;
   }
 
