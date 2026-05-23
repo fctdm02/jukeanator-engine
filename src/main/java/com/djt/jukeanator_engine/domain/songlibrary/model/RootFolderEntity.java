@@ -1,7 +1,12 @@
 package com.djt.jukeanator_engine.domain.songlibrary.model;
 
 import static java.util.Objects.requireNonNull;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -13,6 +18,8 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 
 public class RootFolderEntity extends FolderEntity {
   private static final long serialVersionUID = 1L;
+
+  private static final String CD_STATS_FILE = "/mnt/readyNAS/Rock_On_Third/CDStats_linux.txt";
 
   private String rootPrefix;
 
@@ -175,6 +182,86 @@ public class RootFolderEntity extends FolderEntity {
         }
       }
     }
+  }
+
+  public void restoreSongNumPlays() {
+    
+    if (this.songs == null) {
+      initialize();
+    }
+
+    Path statsFile = Path.of(CD_STATS_FILE);
+
+    if (!Files.exists(statsFile)) {
+      System.err.println("CD stats file does not exist: " + CD_STATS_FILE);
+      return;
+    }
+
+    Map<String, SongFileEntity> songsByPath = new HashMap<>();
+    for (SongFileEntity song : this.songs.values()) {
+
+      String naturalIdentity = normalizeSongPath(song.getNaturalIdentity());
+      songsByPath.put(naturalIdentity, song);
+    }
+
+    int restoredCount = 0;
+    try (BufferedReader reader = Files.newBufferedReader(statsFile, StandardCharsets.UTF_8)) {
+
+      String line;
+      while ((line = reader.readLine()) != null) {
+
+        line = line.trim();
+        if (line.isEmpty()) {
+          continue;
+        }
+
+        // Split into at most 4 parts:
+        // plays, ignored, ignored, full song path
+        String[] parts = line.split("\\s+", 4);
+
+        if (parts.length < 4) {
+          System.err.println("Skipping malformed CD stats line: " + line);
+          continue;
+        }
+
+        try {
+
+          int numPlays = Integer.parseInt(parts[0]);
+          if (numPlays > 0) {
+            String songPath = normalizeSongPath(parts[3]);
+            SongFileEntity song = songsByPath.get(songPath);
+            if (song != null) {
+              song.setNumPlays(numPlays);              
+            }            
+          }
+          restoredCount++;
+
+        } catch (NumberFormatException e) {
+
+          System.err.println("Could not parse num plays from line: " + line);
+
+        } catch (Exception e) {
+
+          System.err.println("Could not restore song stats from line: " + line);
+          e.printStackTrace();
+        }
+      }
+      System.out.println("Restored num plays for " + restoredCount + " songs.");
+
+    } catch (IOException e) {
+
+      System.err.println("Failed to restore song num plays from: " + CD_STATS_FILE);
+      e.printStackTrace();
+    }
+  }
+
+  private String normalizeSongPath(String path) {
+
+    if (path == null) {
+      return "";
+    }
+
+    return path.replace('\\', '/').trim().toLowerCase();
   }
 
   public GenreFolderEntity getGenreById(Integer id) throws EntityDoesNotExistException {

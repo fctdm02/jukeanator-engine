@@ -224,6 +224,7 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
       // Scan the file system for songs
       this.scanPath = scanRequest.getScanPath();
       this.root = songScanner.scanFileSystemForSongs(this.scanPath);
+      this.root.restoreSongNumPlays();
       
       // Store the song library
       if (this.songLibraryRepository instanceof SongLibraryRepositoryFileSystemImpl) {
