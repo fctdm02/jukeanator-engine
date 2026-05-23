@@ -2,6 +2,8 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import static java.util.Objects.requireNonNull;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import org.slf4j.Logger;
@@ -27,6 +29,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedExce
 import com.djt.jukeanator_engine.domain.songlibrary.mapper.SongLibraryMapper;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.NumPlaysComparable;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
@@ -195,7 +198,18 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
     if (!isInitialized) {
       throw new SongLibraryException("SongLibraryService has not been initialized yet!");
     }
-    return SongLibraryMapper.toGenreDtoList(root.getGenres());
+    List<GenreDto> dtos = new ArrayList<>();
+    for (GenreFolderEntity genre: root.getGenres()) {
+      
+      List<Integer> albumIds = new ArrayList<>();
+      for (AlbumFolderEntity album: root.getAlbumsForGenre(genre.getPersistentIdentity())) {
+       
+        albumIds.add(album.getPersistentIdentity());
+      }
+      Collections.sort(albumIds);
+      dtos.add(SongLibraryMapper.toGenreDto(genre, albumIds));
+    }    
+    return dtos;
   }
 
   @Override

@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,10 +24,11 @@ public class RootFolderEntity extends FolderEntity {
 
   private String rootPrefix;
 
-  private transient Map<Integer, GenreFolderEntity> genres;
-  private transient Map<Integer, ArtistFolderEntity> artists;
-  private transient Map<Integer, AlbumFolderEntity> albums;
-  private transient Map<String, SongFileEntity> songs;
+  private transient Map<Integer, GenreFolderEntity> genresMap;
+  private transient Map<GenreFolderEntity, Set<AlbumFolderEntity>> albumsByGenreMap;
+  private transient Map<Integer, ArtistFolderEntity> artistsMap;
+  private transient Map<Integer, AlbumFolderEntity> albumsMap;
+  private transient Map<String, SongFileEntity> songsMap;
 
   public RootFolderEntity() {}
 
@@ -134,51 +136,69 @@ public class RootFolderEntity extends FolderEntity {
   }
 
   public Collection<GenreFolderEntity> getGenres() {
-    return genres.values();
+    return genresMap.values();
   }
 
+  public Collection<AlbumFolderEntity> getAlbumsForGenre(Integer genreId) {
+    GenreFolderEntity genre = genresMap.get(genreId);
+    return albumsByGenreMap.get(genre);
+  }
+  
   public Collection<ArtistFolderEntity> getArtists() {
-    return artists.values();
+    return artistsMap.values();
   }
 
   public Collection<AlbumFolderEntity> getAlbums() {
-    return albums.values();
+    return albumsMap.values();
   }
 
   public Collection<SongFileEntity> getSongs() {
-    return songs.values();
+    return songsMap.values();
   }
 
   public void initialize() {
 
-    this.genres = new HashMap<>();
-    this.artists = new HashMap<>();
-    this.albums = new HashMap<>();
-    this.songs = new HashMap<>();
+    this.genresMap = new HashMap<>();
+    this.albumsByGenreMap = new HashMap<>();
+    this.artistsMap = new HashMap<>();
+    this.albumsMap = new HashMap<>();
+    this.songsMap = new HashMap<>();
 
     for (AlbumFolderEntity album : getAllAlbums()) {
 
       GenreFolderEntity genre = album.getParentGenre();
       Integer genreId = genre.getPersistentIdentity();
-      if (!this.genres.containsKey(genreId)) {
-        this.genres.put(genreId, genre);
+      if (!this.genresMap.containsKey(genreId)) {
+        this.genresMap.put(genreId, genre);
+      }
+      
+      Set<AlbumFolderEntity> genreAlbums = null;
+      if (!this.albumsByGenreMap.containsKey(genre)) {
+        genreAlbums = new HashSet<>();
+        genreAlbums.add(album);
+        this.albumsByGenreMap.put(genre, genreAlbums);
+      } else {
+        genreAlbums = this.albumsByGenreMap.get(genre);
+        if (!genreAlbums.contains(album)) {
+          genreAlbums.add(album);  
+        }
       }
 
       ArtistFolderEntity artist = album.getParentArtist();
       Integer artistId = artist.getPersistentIdentity();
-      if (!this.artists.containsKey(artistId)) {
-        this.artists.put(artistId, artist);
+      if (!this.artistsMap.containsKey(artistId)) {
+        this.artistsMap.put(artistId, artist);
       }
 
       Integer albumId = album.getPersistentIdentity();
-      if (!this.albums.containsKey(albumId)) {
-        this.albums.put(albumId, album);
+      if (!this.albumsMap.containsKey(albumId)) {
+        this.albumsMap.put(albumId, album);
       }
 
       for (SongFileEntity song : album.getChildSongs()) {
         String songKey = albumId.toString() + song.getPersistentIdentity().toString();
-        if (!this.songs.containsKey(songKey)) {
-          this.songs.put(songKey, song);
+        if (!this.songsMap.containsKey(songKey)) {
+          this.songsMap.put(songKey, song);
         }
       }
     }
@@ -186,7 +206,7 @@ public class RootFolderEntity extends FolderEntity {
 
   public void restoreSongNumPlays() {
     
-    if (this.songs == null) {
+    if (this.songsMap == null) {
       initialize();
     }
 
@@ -198,7 +218,7 @@ public class RootFolderEntity extends FolderEntity {
     }
 
     Map<String, SongFileEntity> songsByPath = new HashMap<>();
-    for (SongFileEntity song : this.songs.values()) {
+    for (SongFileEntity song : this.songsMap.values()) {
 
       String naturalIdentity = normalizeSongPath(song.getNaturalIdentity());
       songsByPath.put(naturalIdentity, song);
@@ -266,7 +286,7 @@ public class RootFolderEntity extends FolderEntity {
 
   public GenreFolderEntity getGenreById(Integer id) throws EntityDoesNotExistException {
 
-    GenreFolderEntity entity = genres.get(id);
+    GenreFolderEntity entity = genresMap.get(id);
     if (entity != null) {
       return entity;
     }
@@ -275,7 +295,7 @@ public class RootFolderEntity extends FolderEntity {
 
   public ArtistFolderEntity getArtistById(Integer id) throws EntityDoesNotExistException {
 
-    ArtistFolderEntity entity = artists.get(id);
+    ArtistFolderEntity entity = artistsMap.get(id);
     if (entity != null) {
       return entity;
     }
@@ -284,7 +304,7 @@ public class RootFolderEntity extends FolderEntity {
 
   public AlbumFolderEntity getAlbumById(Integer id) throws EntityDoesNotExistException {
 
-    AlbumFolderEntity entity = albums.get(id);
+    AlbumFolderEntity entity = albumsMap.get(id);
     if (entity != null) {
       return entity;
     }
@@ -295,7 +315,7 @@ public class RootFolderEntity extends FolderEntity {
       throws EntityDoesNotExistException {
 
     String songKey = albumId.toString() + songId.toString();
-    SongFileEntity entity = songs.get(songKey);
+    SongFileEntity entity = songsMap.get(songKey);
     if (entity != null) {
       return entity;
     }
