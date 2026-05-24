@@ -71,7 +71,8 @@ public class AlbumDetailDialog extends JDialog {
       int             priorityCost,
       int             threshold1,
       int             threshold2,
-      int             threshold3) {
+      int             threshold3,
+      boolean         enableBigScrollBars) {
 
     super(owner, album.getAlbumName(), true /* modal */);
 
@@ -107,6 +108,7 @@ public class AlbumDetailDialog extends JDialog {
     AlbumViewPanel albumView = new AlbumViewPanel(
         album, imageLoader,
         threshold1, threshold2, threshold3,
+        enableBigScrollBars,
         songClick);
 
     getContentPane().setBackground(BG_DARK);
@@ -235,12 +237,14 @@ public class AlbumDetailDialog extends JDialog {
       int              priorityCost,
       int              threshold1,
       int              threshold2,
-      int              threshold3) {
+      int              threshold3,
+      boolean          enableBigScrollBars) {
 
     AlbumDetailDialog dialog = new AlbumDetailDialog(
         owner, album, imageLoader, songQueueService,
         normalPlayCost, priorityCost,
-        threshold1, threshold2, threshold3);
+        threshold1, threshold2, threshold3,
+        enableBigScrollBars);
 
     dialog.setVisible(true); // blocks (modal)
   }

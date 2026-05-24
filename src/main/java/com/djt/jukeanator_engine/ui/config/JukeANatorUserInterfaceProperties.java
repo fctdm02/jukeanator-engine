@@ -8,7 +8,7 @@ import org.springframework.validation.annotation.Validated;
 public class JukeANatorUserInterfaceProperties {
 
   private boolean enabled = false; // if true, a JFC/Swing UI is launched, otherwise, a headless backend
-  private String baseUrl = "http://localhost:8080";
+  private boolean enableBigScrollBars = true;
 
   //
   // CREDIT CONFIGURATION
@@ -30,12 +30,12 @@ public class JukeANatorUserInterfaceProperties {
     this.enabled = enabled;
   }
 
-  public String getBaseUrl() {
-    return baseUrl;
+  public boolean getEnableBigScrollBars() {
+    return enableBigScrollBars;
   }
 
-  public void setBaseUrl(String baseUrl) {
-    this.baseUrl = baseUrl;
+  public void setEnableBigScrollBars(boolean enableBigScrollBars) {
+    this.enableBigScrollBars = enableBigScrollBars;
   }
 
   public int getCreditsPer() {

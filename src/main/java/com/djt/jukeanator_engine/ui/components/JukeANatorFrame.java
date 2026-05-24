@@ -58,10 +58,12 @@ public class JukeANatorFrame extends JFrame {
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
+  
   private final ImageLoader imageLoader = new ImageLoader();
   private static final int POPULARITY_THRESHOLD_1 = 10;
   private static final int POPULARITY_THRESHOLD_2 = 25;
   private static final int POPULARITY_THRESHOLD_3 = 50;
+  private boolean enableBigScrollBars;
   
   // COLORS
   private static final Color BG_DARK = new Color(10, 10, 10);
@@ -148,6 +150,8 @@ public class JukeANatorFrame extends JFrame {
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
+    
+    this.enableBigScrollBars = this.jukeANatorUserInterfaceProperties.getEnableBigScrollBars();
     
     this.creditsPer = this.jukeANatorUserInterfaceProperties.getCreditsPer();
     this.fiveBonusCredits = this.jukeANatorUserInterfaceProperties.getFiveBonusCredits();
@@ -932,7 +936,8 @@ public class JukeANatorFrame extends JFrame {
               creditsPer * 2,               // priority cost placeholder
               POPULARITY_THRESHOLD_1,
               POPULARITY_THRESHOLD_2,
-              POPULARITY_THRESHOLD_3);
+              POPULARITY_THRESHOLD_3,
+              enableBigScrollBars);
         }
       });
     }    

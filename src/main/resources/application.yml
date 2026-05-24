@@ -30,7 +30,7 @@ song-player:
 
 user-interface:
   enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend      
-  baseUrl: http://localhost:8080
+  enable-bigs-Scroll-bars: true
   #
   # CREDIT CONFIGURATION
   #
