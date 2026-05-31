@@ -3,10 +3,13 @@ package com.djt.jukeanator_engine.ui.components;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
 import java.util.List;
 import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
@@ -136,18 +139,6 @@ public class HomePanel extends JPanel {
     JPanel card = new JPanel(new BorderLayout(0, 0));
     card.setBackground(BG_DARK);
 
-    // Header bar
-    JPanel header = new JPanel(new BorderLayout());
-    header.setBackground(new Color(18, 18, 26));
-    header.setBorder(BorderFactory.createCompoundBorder(
-        BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(55, 55, 72)),
-        new EmptyBorder(10, 20, 10, 20)));
-
-    JLabel title = new JLabel("ALL ALBUMS");
-    title.setForeground(ACCENT_BLUE);
-    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
-    header.add(title, BorderLayout.WEST);
-
     // Album grid — loaded once
     List<AlbumDto> allAlbums;
     try {
@@ -155,6 +146,48 @@ public class HomePanel extends JPanel {
     } catch (Exception e) {
       allAlbums = List.of();
     }
+
+    // Header bar
+    JPanel header = new JPanel(new BorderLayout(16, 0));
+    header.setBackground(new Color(18, 18, 28));
+
+    header.setBorder(BorderFactory.createCompoundBorder(
+        BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(60, 60, 80)),
+        new EmptyBorder(12, 16, 12, 16)));
+
+    JLabel icon = new JLabel("♫");
+    icon.setPreferredSize(new Dimension(72, 72));
+    icon.setHorizontalAlignment(SwingConstants.CENTER);
+    icon.setVerticalAlignment(SwingConstants.CENTER);
+    icon.setOpaque(true);
+    icon.setBackground(new Color(20, 20, 32));
+    icon.setForeground(ACCENT_BLUE);
+    icon.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32));
+    icon.setBorder(BorderFactory.createLineBorder(new Color(60, 60, 80), 1));
+
+    JPanel textBlock = new JPanel();
+    textBlock.setOpaque(false);
+    textBlock.setLayout(new BoxLayout(textBlock, BoxLayout.Y_AXIS));
+
+    JLabel title = new JLabel("ALL ALBUMS");
+    title.setForeground(Color.WHITE);
+    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 26));
+
+    JLabel stats = new JLabel(allAlbums.size() + " albums");
+    stats.setForeground(TEXT_SECONDARY);
+    stats.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
+
+    textBlock.add(title);
+    textBlock.add(Box.createVerticalStrut(4));
+    textBlock.add(stats);
+
+    JPanel infoCluster = new JPanel(new BorderLayout(12, 0));
+    infoCluster.setOpaque(false);
+
+    infoCluster.add(icon, BorderLayout.WEST);
+    infoCluster.add(textBlock, BorderLayout.CENTER);
+
+    header.add(infoCluster, BorderLayout.CENTER);
 
     if (allAlbums.isEmpty()) {
       JLabel empty = new JLabel("No albums found.", SwingConstants.CENTER);
