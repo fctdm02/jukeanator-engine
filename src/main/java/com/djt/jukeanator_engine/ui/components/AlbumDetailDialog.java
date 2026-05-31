@@ -22,6 +22,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 
@@ -105,11 +106,27 @@ public class AlbumDetailDialog extends JDialog {
               new AddSongToQueueRequest(song.getAlbumId(), song.getSongId(), 1)));
     };
 
+    // ── Album-click listener: resets timeout then opens AddAlbumToQueueDialog
+    AlbumViewPanel.AlbumClickListener albumClick = clickedAlbum -> {
+
+      secondsRemaining = TIMEOUT_SECONDS;
+      updateTimeout();
+
+      AddAlbumToQueueDialog.show(owner, clickedAlbum, imageLoader, normalPlayCost, priorityCost,
+
+          () -> songQueueService
+              .addAlbumToQueue(new AddAlbumToQueueRequest(clickedAlbum.getAlbumId(), 0)),
+
+          () -> songQueueService
+              .addAlbumToQueue(new AddAlbumToQueueRequest(clickedAlbum.getAlbumId(), 1)));
+    };
+    
     AlbumViewPanel albumView = new AlbumViewPanel(
         album, imageLoader,
         threshold1, threshold2, threshold3,
         enableBigScrollBars,
-        songClick);
+        songClick,
+        albumClick);
 
     getContentPane().setBackground(BG_DARK);
     getContentPane().setLayout(new BorderLayout());

@@ -84,6 +84,11 @@ public class AlbumViewPanel extends JPanel {
     void onSongClicked(SongDto song);
   }
 
+  //── Album-click callback ───────────────────────────────────────────────────
+  public interface AlbumClickListener {
+    void onAlbumClicked(AlbumDto album);
+  }
+  
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
@@ -97,6 +102,7 @@ public class AlbumViewPanel extends JPanel {
    * @param enableBigScrollBars If true, applies {@link TouchScrollBarUI} to the
    *                            track-list scroll bar.
    * @param songClickListener   Called when a song row is clicked; null to disable.
+   * @param albumClickListener  Called when the album cover art is clicked; null to disable.
    */
   public AlbumViewPanel(
       AlbumDto          album,
@@ -105,12 +111,13 @@ public class AlbumViewPanel extends JPanel {
       int               threshold2,
       int               threshold3,
       boolean           enableBigScrollBars,
-      SongClickListener songClickListener) {
+      SongClickListener songClickListener,
+      AlbumClickListener albumClickListener) {
 
     setLayout(new BorderLayout(0, 0));
     setBackground(BG_MAIN);
 
-    add(buildSidebar(album, imageLoader),
+    add(buildSidebar(album, imageLoader, albumClickListener),
         BorderLayout.WEST);
     add(buildTrackList(album, threshold1, threshold2, threshold3,
                        enableBigScrollBars, songClickListener),
@@ -120,7 +127,7 @@ public class AlbumViewPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   // LEFT SIDEBAR  — cover art + album metadata
   // ─────────────────────────────────────────────────────────────────────────
-  private JPanel buildSidebar(AlbumDto album, ImageLoader imageLoader) {
+  private JPanel buildSidebar(AlbumDto album, ImageLoader imageLoader, AlbumClickListener albumClickListener) {
 
     JPanel sidebar = new JPanel(new BorderLayout(0, 0));
     sidebar.setBackground(BG_SIDEBAR);
@@ -146,6 +153,31 @@ public class AlbumViewPanel extends JPanel {
       cover.setText("♫");
       cover.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 64));
       cover.setForeground(new Color(80, 80, 100));
+    }
+    
+    cover.setBorder(BorderFactory.createLineBorder(new Color(50, 50, 65), 1));
+    
+    if (albumClickListener != null) {
+
+      cover.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+      cover.addMouseListener(new java.awt.event.MouseAdapter() {
+
+        @Override
+        public void mouseEntered(java.awt.event.MouseEvent e) {
+          cover.setBorder(BorderFactory.createLineBorder(ACCENT_BLUE, 3));
+        }
+
+        @Override
+        public void mouseExited(java.awt.event.MouseEvent e) {
+          cover.setBorder(null);
+        }
+
+        @Override
+        public void mouseClicked(java.awt.event.MouseEvent e) {
+          albumClickListener.onAlbumClicked(album);
+        }
+      });
     }
 
     // ── Metadata ──────────────────────────────────────────────────────────

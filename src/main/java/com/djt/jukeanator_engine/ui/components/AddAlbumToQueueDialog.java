@@ -25,9 +25,9 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 
-public class AddSongToQueueDialog extends JDialog {
+public class AddAlbumToQueueDialog extends JDialog {
 
   private static final long serialVersionUID = 1L;
 
@@ -61,17 +61,17 @@ public class AddSongToQueueDialog extends JDialog {
 
   /**
    * @param owner The parent Frame (pass JukeANatorFrame).
-   * @param song The song to display.
+   * @param album The album to display.
    * @param imageLoader Shared ImageLoader instance.
    * @param normalPlayCost Credits required for a normal play.
    * @param priorityCost Credits required for a priority play.
    * @param onNormalPlay Action to execute on "Play Song".
    * @param onPriorityPlay Action to execute on "Priority Play".
    */
-  public AddSongToQueueDialog(Frame owner, SongDto song, ImageLoader imageLoader,
+  public AddAlbumToQueueDialog(Frame owner, AlbumDto album, ImageLoader imageLoader,
       int normalPlayCost, int priorityCost, PlayAction onNormalPlay, PlayAction onPriorityPlay) {
 
-    super(owner, "Add Song to Queue", true /* modal */);
+    super(owner, "Add Album to Queue", true /* modal */);
 
     setUndecorated(true);
     setBackground(BG_DARK);
@@ -89,7 +89,7 @@ public class AddSongToQueueDialog extends JDialog {
 
     getContentPane().setBackground(BG_DARK);
     getContentPane().setLayout(new BorderLayout());
-    getContentPane().add(buildBorderPanel(song, imageLoader, normalPlayCost, priorityCost,
+    getContentPane().add(buildBorderPanel(album, imageLoader, normalPlayCost, priorityCost,
         onNormalPlay, onPriorityPlay));
 
     // ── Countdown timer ───────────────────────────────────────────────────
@@ -106,7 +106,7 @@ public class AddSongToQueueDialog extends JDialog {
   // ─────────────────────────────────────────────────────────────────────────
   // ROOT PANEL WITH ACCENT BORDER
   // ─────────────────────────────────────────────────────────────────────────
-  private JPanel buildBorderPanel(SongDto song, ImageLoader imageLoader, int normalPlayCost,
+  private JPanel buildBorderPanel(AlbumDto album, ImageLoader imageLoader, int normalPlayCost,
       int priorityCost, PlayAction onNormalPlay, PlayAction onPriorityPlay) {
 
     // Outer glowing border panel
@@ -125,7 +125,7 @@ public class AddSongToQueueDialog extends JDialog {
     };
     border.setBackground(BG_DARK);
     border.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
-    border.add(buildMainPanel(song, imageLoader, normalPlayCost, priorityCost, onNormalPlay,
+    border.add(buildMainPanel(album, imageLoader, normalPlayCost, priorityCost, onNormalPlay,
         onPriorityPlay));
     return border;
   }
@@ -133,14 +133,14 @@ public class AddSongToQueueDialog extends JDialog {
   // ─────────────────────────────────────────────────────────────────────────
   // MAIN CONTENT PANEL
   // ─────────────────────────────────────────────────────────────────────────
-  private JPanel buildMainPanel(SongDto song, ImageLoader imageLoader, int normalPlayCost,
+  private JPanel buildMainPanel(AlbumDto album, ImageLoader imageLoader, int normalPlayCost,
       int priorityCost, PlayAction onNormalPlay, PlayAction onPriorityPlay) {
 
     JPanel main = new JPanel(new BorderLayout(0, 0));
     main.setBackground(BG_PANEL);
     main.setBorder(BorderFactory.createEmptyBorder(24, 28, 20, 28));
 
-    main.add(buildInfoRow(song, imageLoader), BorderLayout.NORTH);
+    main.add(buildInfoRow(album, imageLoader), BorderLayout.NORTH);
     main.add(buildDivider(), BorderLayout.CENTER);
     main.add(buildBottomSection(normalPlayCost, priorityCost, onNormalPlay, onPriorityPlay),
         BorderLayout.SOUTH);
@@ -151,7 +151,7 @@ public class AddSongToQueueDialog extends JDialog {
   // ─────────────────────────────────────────────────────────────────────────
   // INFO ROW (cover art | song name / artist / album)
   // ─────────────────────────────────────────────────────────────────────────
-  private JPanel buildInfoRow(SongDto song, ImageLoader imageLoader) {
+  private JPanel buildInfoRow(AlbumDto album, ImageLoader imageLoader) {
 
     JPanel row = new JPanel(new BorderLayout(24, 0));
     row.setOpaque(false);
@@ -166,9 +166,9 @@ public class AddSongToQueueDialog extends JDialog {
     cover.setBackground(new Color(30, 30, 40));
     cover.setBorder(BorderFactory.createLineBorder(new Color(80, 80, 90), 1));
 
-    if (song.getCoverArtPath() != null) {
+    if (album.getCoverArtPath() != null) {
       try {
-        ImageIcon icon = imageLoader.loadFilesystemImage(song.getCoverArtPath(), 160, 160);
+        ImageIcon icon = imageLoader.loadFilesystemImage(album.getCoverArtPath(), 160, 160);
         if (icon != null) {
           cover.setIcon(icon);
         }
@@ -181,25 +181,19 @@ public class AddSongToQueueDialog extends JDialog {
     text.setOpaque(false);
     text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
 
-    JLabel songName = new JLabel(song.getSongName() != null ? song.getSongName() : "");
-    songName.setForeground(TEXT_PRIMARY);
-    songName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32));
+    JLabel albumName = new JLabel(album.getAlbumName() != null ? album.getAlbumName() : "");
+    albumName.setForeground(TEXT_PRIMARY);
+    albumName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32));
 
-    JLabel artistName = new JLabel(song.getArtistName() != null ? song.getArtistName() : "");
+    JLabel artistName = new JLabel(album.getArtistName() != null ? album.getArtistName() : "");
     artistName.setForeground(TEXT_PRIMARY);
     artistName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
 
-    JLabel albumName = new JLabel(song.getAlbumName() != null ? song.getAlbumName() : "");
-    albumName.setForeground(TEXT_PRIMARY);
-    albumName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
-
     text.add(Box.createVerticalGlue());
-    text.add(songName);
+    text.add(albumName);
     text.add(Box.createVerticalStrut(8));
     text.add(artistName);
     text.add(Box.createVerticalStrut(4));
-    text.add(albumName);
-    text.add(Box.createVerticalGlue());
 
     row.add(cover, BorderLayout.WEST);
     row.add(text, BorderLayout.CENTER);
@@ -241,12 +235,12 @@ public class AddSongToQueueDialog extends JDialog {
     JPanel buttons = new JPanel(new GridLayout(1, 2, 16, 0));
     buttons.setOpaque(false);
 
-    buttons.add(buildActionButton("Play Song", normalPlayCost + "cr", ACCENT_BLUE, () -> {
+    buttons.add(buildActionButton("Play Album", normalPlayCost + "cr", ACCENT_BLUE, () -> {
       dismiss();
       onNormalPlay.execute();
     }));
 
-    buttons.add(buildActionButton("Priority Song Play", priorityCost + "cr", ACCENT_GOLD, () -> {
+    buttons.add(buildActionButton("Priority Album Play", priorityCost + "cr", ACCENT_GOLD, () -> {
       dismiss();
       onPriorityPlay.execute();
     }));
@@ -409,17 +403,17 @@ public class AddSongToQueueDialog extends JDialog {
    * elapses.
    *
    * @param owner Parent frame.
-   * @param song Song to display.
+   * @param album Album to display.
    * @param imageLoader Shared loader.
    * @param normalPlayCost Credits for a normal play.
    * @param priorityCost Credits for a priority play.
    * @param onNormalPlay Callback for normal play.
    * @param onPriorityPlay Callback for priority play.
    */
-  public static void show(Frame owner, SongDto song, ImageLoader imageLoader, int normalPlayCost,
+  public static void show(Frame owner, AlbumDto album, ImageLoader imageLoader, int normalPlayCost,
       int priorityCost, PlayAction onNormalPlay, PlayAction onPriorityPlay) {
 
-    AddSongToQueueDialog dialog = new AddSongToQueueDialog(owner, song, imageLoader, normalPlayCost,
+    AddAlbumToQueueDialog dialog = new AddAlbumToQueueDialog(owner, album, imageLoader, normalPlayCost,
         priorityCost, onNormalPlay, onPriorityPlay);
 
     dialog.setVisible(true); // blocks here (modal)
