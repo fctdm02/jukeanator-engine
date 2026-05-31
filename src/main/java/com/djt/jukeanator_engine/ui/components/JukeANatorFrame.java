@@ -1011,16 +1011,21 @@ public class JukeANatorFrame extends JFrame {
           // needs the songs list populated.
           AlbumDto fullAlbum = songLibraryService.getAlbumById(album.getAlbumId());
 
+          // priority cost placeholder
+          int numSongs = fullAlbum.getSongs().size();
+          int albumNormalPlayCost = creditsPer * numSongs;
+          int albumPriorityPlayCost = (creditsPer * 2) * numSongs;
+
           AlbumDetailDialog.show(
-              owner,
-              fullAlbum,
-              imageLoader,
-              songQueueService,
-              creditsPer,
-              creditsPer * 2,               // priority cost placeholder
-              POPULARITY_THRESHOLD_1,
-              POPULARITY_THRESHOLD_2,
-              POPULARITY_THRESHOLD_3,
+              owner, 
+              fullAlbum, 
+              imageLoader, 
+              songQueueService, 
+              albumNormalPlayCost,
+              albumPriorityPlayCost, 
+              POPULARITY_THRESHOLD_1, 
+              POPULARITY_THRESHOLD_2, 
+              POPULARITY_THRESHOLD_3, 
               enableBigScrollBars);
         }
       });
@@ -1086,8 +1091,21 @@ public class JukeANatorFrame extends JFrame {
     } catch (Exception e) {
       fullAlbum = album;
     }
-    AlbumDetailDialog.show(owner, fullAlbum, imageLoader, songQueueService, creditsPer,
-        creditsPer * 2, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3,
+    // priority cost placeholder
+    int numSongs = fullAlbum.getSongs().size();
+    int albumNormalPlayCost = creditsPer * numSongs;
+    int albumPriorityPlayCost = (creditsPer * 2) * numSongs;
+
+    AlbumDetailDialog.show(
+        owner, 
+        fullAlbum, 
+        imageLoader, 
+        songQueueService, 
+        albumNormalPlayCost,
+        albumPriorityPlayCost, 
+        POPULARITY_THRESHOLD_1, 
+        POPULARITY_THRESHOLD_2, 
+        POPULARITY_THRESHOLD_3, 
         enableBigScrollBars);
   }  
   

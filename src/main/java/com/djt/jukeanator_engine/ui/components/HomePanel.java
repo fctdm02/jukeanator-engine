@@ -201,12 +201,22 @@ public class HomePanel extends JPanel {
       fullAlbum = album;
     }
     
+    // priority cost placeholder
     int numSongs = fullAlbum.getSongs().size();
     int albumNormalPlayCost = normalPlayCost * numSongs;
     int albumPriorityPlayCost = priorityCost * numSongs;
 
-    AlbumDetailDialog.show(owner, fullAlbum, imageLoader, songQueueService, albumNormalPlayCost,
-        albumPriorityPlayCost, popularityT1, popularityT2, popularityT3, enableBigScrollBars);
+    AlbumDetailDialog.show(
+        owner, 
+        fullAlbum, 
+        imageLoader, 
+        songQueueService, 
+        albumNormalPlayCost,
+        albumPriorityPlayCost, 
+        popularityT1, 
+        popularityT2, 
+        popularityT3, 
+        enableBigScrollBars);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
