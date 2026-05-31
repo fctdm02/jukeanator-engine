@@ -159,9 +159,7 @@ public final class SongScanner {
 
       // First, see if we can retrieve any of this information from tags embedded in the song file
       Map<String, String> albumMetadataResults = new HashMap<>();
-      Set<SongFileEntity> songs = album.getChildSongs();
-      List<SongFileEntity> songList = new ArrayList<>();
-      songList.addAll(songs);
+      List<SongFileEntity> songList = album.getChildSongs();
       for (int j = 0; j < songList.size(); j++) {
 
         SongFileEntity song = songList.get(j);

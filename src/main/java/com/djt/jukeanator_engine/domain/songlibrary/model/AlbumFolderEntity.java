@@ -1,5 +1,7 @@
 package com.djt.jukeanator_engine.domain.songlibrary.model;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
@@ -44,10 +46,12 @@ public class AlbumFolderEntity extends FolderEntity implements NumPlaysComparabl
     return addChild(childSongs, childSong, this);
   }
 
-  public Set<SongFileEntity> getChildSongs() {
-    return childSongs;
-  }
+  public List<SongFileEntity> getChildSongs() {
 
+    return childSongs.stream().sorted(Comparator.comparing(SongFileEntity::getTrackNumber,
+        Comparator.nullsLast(Integer::compareTo))).toList();
+  }
+  
   public SongFileEntity getChildSong(Integer persistentIdentity)
       throws EntityDoesNotExistException {
 
