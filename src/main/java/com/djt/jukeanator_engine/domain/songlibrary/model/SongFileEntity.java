@@ -73,13 +73,9 @@ public class SongFileEntity extends AbstractFileEntity implements NumPlaysCompar
 		this.trackNumber = trackNumber;
 	}
 
-	public Integer getTrackNumber() {
-
-		if (this.trackNumber != null && this.trackNumber.intValue() > 0) {
-			return this.trackNumber;
-		}
-		return extractTrackNumber(getName());
-	}
+    public Integer getTrackNumber() {
+      return this.trackNumber;
+    }
 	
 	public static String extractArtistName(String filename) {
 

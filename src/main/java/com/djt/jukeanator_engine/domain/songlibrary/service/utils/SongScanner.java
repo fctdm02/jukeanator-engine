@@ -165,9 +165,17 @@ public final class SongScanner {
       for (int j = 0; j < songList.size(); j++) {
 
         SongFileEntity song = songList.get(j);
+        
+        String songFile = song.getNaturalIdentity();
         song.setPersistentIdentity(j);
 
-        String songFile = song.getNaturalIdentity();
+        Integer trackNumber = SongFileEntity.extractTrackNumber(songFile);
+        if (trackNumber != null && trackNumber.intValue() > 0) {
+          song.setTrackNumber(trackNumber);
+        } else {
+          song.setTrackNumber(Integer.valueOf(j+1));
+        }              
+        
         if (!hasValidCoverArt) {
 
           this.jAudioTaggerClient.extractCoverArt(coverArtPath, songFile);
@@ -214,28 +222,6 @@ public final class SongScanner {
               songName = SongFileEntity.extractSongName(songFile);
               if (songName != null && !songName.trim().isBlank()) {
                 song.setSongName(songName);
-              }
-            }
-
-            Integer trackNumber = null;
-            try {
-
-              String strTrackNumber = tags.get(JAudioTaggerClient.TRACK_NUMBER);
-              if (strTrackNumber != null && !strTrackNumber.trim().isBlank()) {
-
-                trackNumber = Integer.parseInt(strTrackNumber);
-                if (trackNumber.intValue() > 0) {
-                  song.setTrackNumber(trackNumber);
-                }
-              }
-
-            } catch (NumberFormatException nfe) {
-
-              trackNumber = SongFileEntity.extractTrackNumber(songFile);
-              if (trackNumber != null && trackNumber.intValue() > 0) {
-                song.setTrackNumber(trackNumber);
-              } else {
-                song.setTrackNumber(Integer.valueOf(j));
               }
             }
           }

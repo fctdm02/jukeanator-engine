@@ -258,7 +258,7 @@ public class AlbumViewPanel extends JPanel {
     if (songs != null) {
       for (int i = 0; i < songs.size(); i++) {
         SongDto song = songs.get(i);
-        rows.add(buildTrackRow(album, i + 1, song, t1, t2, t3, listener));
+        rows.add(buildTrackRow(album, song, t1, t2, t3, listener));
         if (i < songs.size() - 1) {
           JSeparator sep = new JSeparator();
           sep.setForeground(SEPARATOR);
@@ -294,7 +294,6 @@ public class AlbumViewPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   private JPanel buildTrackRow(
       AlbumDto          album,
-      int               trackNum,
       SongDto           song,
       int               t1,
       int               t2,
@@ -317,7 +316,7 @@ public class AlbumViewPanel extends JPanel {
     barsPanel.setPreferredSize(new Dimension(3 * (BAR_WIDTH + BAR_GAP) + 6, BAR_MAX_H + 4));
 
     // ── Track number ──────────────────────────────────────────────────────
-    JLabel numLabel = new JLabel(String.format("%02d", trackNum));
+    JLabel numLabel = new JLabel(String.format("%02d", song.getTrackNumber()));
     numLabel.setForeground(TEXT_SECONDARY);
     numLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
     numLabel.setPreferredSize(new Dimension(34, 30));

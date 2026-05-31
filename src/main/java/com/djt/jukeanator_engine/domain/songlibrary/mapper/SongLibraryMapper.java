@@ -133,6 +133,7 @@ public final class SongLibraryMapper {
         album.getCoverArtPath(),
         songEntity.getPersistentIdentity(),
         songEntity.getSongName(),
+        songEntity.getTrackNumber(),
         songEntity.getNumPlays());
   }
 }

@@ -11,6 +11,7 @@ public class SongDto {
   private final String coverArtPath;
   private final Integer songId;
   private final String songName;
+  private final Integer trackNumber;
   private final Integer numPlays;
 
   public SongDto(
@@ -20,7 +21,8 @@ public class SongDto {
       String albumName,
       String coverArtPath, 
       Integer songId, 
-      String songName, 
+      String songName,
+      Integer trackNumber,
       Integer numPlays) {
     super();
     this.artistId = artistId;
@@ -30,6 +32,7 @@ public class SongDto {
     this.coverArtPath = coverArtPath;
     this.songId = songId;
     this.songName = songName;
+    this.trackNumber = trackNumber;
     this.numPlays = numPlays;
   }
 
@@ -60,6 +63,10 @@ public class SongDto {
   public String getSongName() {
     return songName;
   }
+  
+  public Integer getTrackNumber() {
+    return trackNumber;
+  }
 
   public Integer getNumPlays() {
     return numPlays;
@@ -85,6 +92,6 @@ public class SongDto {
   @Override
   public String toString() {
     return "SongDto [artistId=" + artistId + ", artistName=" + artistName + ", albumId=" + albumId
-        + ", albumName=" + albumName + ", songId=" + songId + ", songName=" + songName + "]";
+        + ", albumName=" + albumName + ", songId=" + songId + ", songName=" + songName + ", trackNumber=" + trackNumber + "]";
   }
 }
