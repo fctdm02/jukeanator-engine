@@ -54,7 +54,7 @@ public class SongQueueController implements SongQueueService {
   }
   
   @PostMapping("/addMultipleSongs")  
-  public List<Integer> addMultipleSongsToQueue(AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
+  public List<Integer> addMultipleSongsToQueue(@RequestBody AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
     
     return songQueueService.addMultipleSongsToQueue(addMultipleSongsToQueueRequest);
   }
