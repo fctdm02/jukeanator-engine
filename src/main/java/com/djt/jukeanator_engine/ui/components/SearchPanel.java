@@ -144,16 +144,15 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
   @Override
   public void pushAlbumDetail(AlbumDto album) {
+    
     Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
     AlbumDto full = fetchFull(album);
-    int albumNormal = normalPlayCost * full.getSongs().size();
-    int albumPriority = priorityCost * full.getSongs().size();
 
     if (currentDetailCard != null)
       currentDetailCard.dismiss();
 
-    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService, albumNormal,
-        albumPriority, popularityT1, popularityT2, popularityT3, enableBigScrollBars, this);
+    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService, normalPlayCost,
+        priorityCost, popularityT1, popularityT2, popularityT3, enableBigScrollBars, this);
 
     replaceCard(CARD_DETAIL, currentDetailCard);
     cardLayout.show(rootPanel, CARD_DETAIL);

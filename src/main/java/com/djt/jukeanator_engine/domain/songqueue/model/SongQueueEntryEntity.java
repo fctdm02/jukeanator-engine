@@ -6,10 +6,11 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 
 public class SongQueueEntryEntity extends AbstractPersistentEntity {
-  private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = 2L;
 
   private SongFileEntity song;
   private Integer priority;
+  private Integer indexOverride;
 
   public SongQueueEntryEntity(SongFileEntity song) {
     this(song, Integer.valueOf(0));
@@ -29,6 +30,14 @@ public class SongQueueEntryEntity extends AbstractPersistentEntity {
   
   public Integer getPriority() {
     return priority;
+  }
+  
+  public Integer getIndexOverride() {
+    return indexOverride;
+  }
+  
+  public void setIndexOverride(Integer indexOverride) {
+    this.indexOverride = indexOverride;
   }
 
   @Override

@@ -155,15 +155,13 @@ public class GenrePanel extends JPanel implements TabNavigator {
   public void pushAlbumDetail(AlbumDto album) {
     Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
     AlbumDto full = fetchFull(album);
-    int albumNormal = normalPlayCost * full.getSongs().size();
-    int albumPriority = priorityCost * full.getSongs().size();
 
     if (currentDetailCard != null) {
       currentDetailCard.dismiss();
     }
 
-    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService, albumNormal,
-        albumPriority, popularityT1, popularityT2, popularityT3, enableBigScrollBars, this);
+    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService, normalPlayCost,
+        priorityCost, popularityT1, popularityT2, popularityT3, enableBigScrollBars, this);
 
     replaceOuterCard(CARD_DETAIL, currentDetailCard);
     outerCardLayout.show(outerRoot, CARD_DETAIL);

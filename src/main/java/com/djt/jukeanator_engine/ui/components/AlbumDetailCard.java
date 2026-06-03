@@ -47,11 +47,15 @@ public class AlbumDetailCard extends JPanel {
           () -> songQueueService
               .addSongToQueue(new AddSongToQueueRequest(song.getAlbumId(), song.getSongId(), 1)));
     };
+    
+    int numSongs = album.getSongs().size();
+    int albumNormalPlayCost = normalPlayCost * numSongs;
+    int albumPriorityCost = priorityCost * numSongs; 
 
     AlbumViewPanel.AlbumClickListener albumClick = clicked -> {
       secondsRemaining = TIMEOUT_SECONDS;
       updateTimeout();
-      AddAlbumToQueueDialog.show(owner, clicked, imageLoader, normalPlayCost, priorityCost,
+      AddAlbumToQueueDialog.show(owner, clicked, imageLoader, albumNormalPlayCost, albumPriorityCost,
           () -> songQueueService
               .addAlbumToQueue(new AddAlbumToQueueRequest(clicked.getAlbumId(), 0)),
           () -> songQueueService

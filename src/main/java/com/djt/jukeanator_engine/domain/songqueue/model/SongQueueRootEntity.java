@@ -3,18 +3,17 @@ package com.djt.jukeanator_engine.domain.songqueue.model;
 import static java.util.Objects.requireNonNull;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.TreeSet;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 
 public class SongQueueRootEntity extends AbstractPersistentEntity {
-  private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = 2L;
   
   public static final String SONG_QUEUE_FILENAME = "JukeANator.PL";  
 
   private String location;
   
-  private TreeSet<SongQueueEntryEntity> songs = new TreeSet<>();
+  private ArrayList<SongQueueEntryEntity> songs = new ArrayList<>();
 
   public SongQueueRootEntity() {}
 
@@ -34,10 +33,7 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
   }
   
   public List<SongQueueEntryEntity> getSongs() {
-    
-    List<SongQueueEntryEntity> list = new ArrayList<>();
-    list.addAll(this.songs);
-    return list;
+    return songs;
   }
   
   public Integer flushQueue() {
@@ -50,9 +46,19 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
   public int addSongToQueue(SongFileEntity song, Integer priority) {
     
     SongQueueEntryEntity entry = new SongQueueEntryEntity(song, priority);
-    songs.add(entry);
-    List<SongQueueEntryEntity> list = getSongs();
-    return list.indexOf(entry);
+    
+    int index = 0;
+    for (int i=0; i < songs.size(); i++) {
+      
+      SongQueueEntryEntity e = songs.get(i);
+      if (e.getPriority() <= priority) {
+        index = i;
+       break; 
+      }      
+    }
+    
+    songs.add(index, entry);
+    return index;
   }
   
   public boolean removeSongFromQueue(SongQueueEntryEntity songQueueEntry) {
