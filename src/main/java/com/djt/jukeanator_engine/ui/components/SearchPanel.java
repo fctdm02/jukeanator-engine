@@ -336,8 +336,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
     JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
     row.setOpaque(false);
     for (char c : "QWERTYUIOP".toCharArray())
-      row.add(letterKey(String.valueOf(c)));
-    row.add(letterKey("'"));
+      row.add(letterKey(String.valueOf(c)));    
 
     JButton clear = styledKey("CLEAR", new Dimension(140, 60));
     clear.addActionListener(e -> resetSearch());
@@ -352,7 +351,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
     row.setOpaque(false);
     for (char c : "ASDFGHJKL".toCharArray())
       row.add(letterKey(String.valueOf(c)));
-
+        
+    row.add(letterKey("'"));
     row.add(buildModeToggleButton("123@", KeyboardMode.NUMERIC));
     row.add(buildModeToggleButton("ABC", KeyboardMode.ABC));
     return row;
@@ -361,7 +361,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private JPanel buildAbcRow3() {
     JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
     row.setOpaque(false);
-    for (char c : "ZXCVBNM".toCharArray())
+    for (char c : "ZXCVBNM,.".toCharArray())
       row.add(letterKey(String.valueOf(c)));
 
     JButton space = styledKey("SPACE", new Dimension(420, 60));

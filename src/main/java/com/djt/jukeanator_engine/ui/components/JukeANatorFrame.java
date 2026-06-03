@@ -905,8 +905,8 @@ public class JukeANatorFrame extends JFrame {
     // Add a little top padding so the text sits centred vertically
     textPanel.setBorder(new EmptyBorder(8, 0, 8, 0));
 
-    songLabel.setForeground(Color.CYAN);
-    songLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+    songLabel.setForeground(TEXT_PRIMARY);
+    songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
 
     artistLabel.setForeground(TEXT_PRIMARY);
     artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
