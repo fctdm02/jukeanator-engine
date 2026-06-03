@@ -1,6 +1,10 @@
 package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.Image;
+import java.awt.Toolkit;
+import java.awt.image.FilteredImageSource;
+import java.awt.image.ImageProducer;
+import java.awt.image.RGBImageFilter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
@@ -94,6 +98,32 @@ public class ImageLoader {
     }
   }
 
+  public static Image createTransparentImage(Image srcImage, boolean filterAbove, int threshold) {
+    
+    RGBImageFilter filter = new RGBImageFilter() {
+      @Override
+      public final int filterRGB(int x, int y, int rgb) {
+        int r = (rgb >> 16) & 0xFF;
+        int g = (rgb >> 8) & 0xFF;
+        int b = rgb & 0xFF;
+
+        if (filterAbove) {
+          if (r >= threshold && g >= threshold && b >= threshold) {
+            return 0x00FFFFFF & rgb; 
+          }          
+        } else {
+          if (r <= threshold && g <= threshold && b <= threshold) {
+            return 0x00FFFFFF & rgb; 
+          }          
+        }
+        return rgb;
+      }
+    };
+
+    ImageProducer ip = new FilteredImageSource(srcImage.getSource(), filter);
+    return Toolkit.getDefaultToolkit().createImage(ip);
+  }
+  
   private record CacheKey(URL url, int width, int height) {
     CacheKey {
       Objects.requireNonNull(url);

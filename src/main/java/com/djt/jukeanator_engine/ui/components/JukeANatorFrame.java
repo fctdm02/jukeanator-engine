@@ -831,8 +831,10 @@ public class JukeANatorFrame extends JFrame {
     bannerLabel.setVerticalAlignment(SwingConstants.CENTER);
 
     // Loaded at scaled dimensions to fit perfectly within the 100px banner row height constraints
-    ImageIcon logo = imageLoader.loadClasspathImage("JukeANatorLogo.png", 320, 96, 0);
-    bannerLabel.setIcon(logo);
+    ImageIcon icon = imageLoader.loadImage("JukeANatorLogo.png", 320, 96);
+    Image transparentStrippedImage = ImageLoader.createTransparentImage(icon.getImage(), false, 15);
+    icon = new ImageIcon(transparentStrippedImage);
+    bannerLabel.setIcon(icon);
     bannerPanel.add(bannerLabel);
     
     //

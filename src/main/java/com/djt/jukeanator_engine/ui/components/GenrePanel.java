@@ -12,9 +12,6 @@ import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.RenderingHints;
-import java.awt.image.FilteredImageSource;
-import java.awt.image.ImageProducer;
-import java.awt.image.RGBImageFilter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -436,7 +433,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
         if (getClass().getResource(resource) != null) {
           ImageIcon icon = imageLoader.loadImage(resource, 240, 240);
           if (icon != null) {
-            Image transparentStrippedImage = createTransparentImage(icon.getImage());
+            Image transparentStrippedImage = ImageLoader.createTransparentImage(icon.getImage(), true, 245);
             icon = new ImageIcon(transparentStrippedImage);
           }
           genreIconCache.put(name, icon);
@@ -459,25 +456,6 @@ public class GenrePanel extends JPanel implements TabNavigator {
     panel.add(textLabel, BorderLayout.SOUTH);
 
     return panel;
-  }
-
-  private static Image createTransparentImage(Image srcImage) {
-    RGBImageFilter whiteStripperFilter = new RGBImageFilter() {
-      @Override
-      public final int filterRGB(int x, int y, int rgb) {
-        int r = (rgb >> 16) & 0xFF;
-        int g = (rgb >> 8) & 0xFF;
-        int b = rgb & 0xFF;
-
-        if (r >= 245 && g >= 245 && b >= 245) {
-          return 0x00FFFFFF & rgb; 
-        }
-        return rgb;
-      }
-    };
-
-    ImageProducer ip = new FilteredImageSource(srcImage.getSource(), whiteStripperFilter);
-    return java.awt.Toolkit.getDefaultToolkit().createImage(ip);
   }
 
   private void showGenreAlbums(GenreDto genre) {
