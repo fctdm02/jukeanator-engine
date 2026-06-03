@@ -65,6 +65,30 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
         .retrieve()
         .body(SearchResultDto.class);
   }
+
+  @Override
+  public SearchResultDto getGenreMusicByTitle(String genreName) {
+
+    return restClient.get()
+        .uri(uriBuilder -> uriBuilder
+            .path("/api/song-library/genres/title")
+            .queryParam("genreName", genreName)
+            .build())
+        .retrieve()
+        .body(SearchResultDto.class);
+  }
+
+  @Override
+  public SearchResultDto getGenreMusicByReleaseDate(String genreName) {
+
+    return restClient.get()
+        .uri(uriBuilder -> uriBuilder
+            .path("/api/song-library/genres/releaseDate")
+            .queryParam("genreName", genreName)
+            .build())
+        .retrieve()
+        .body(SearchResultDto.class);
+  }
   
   @Override
   public List<ArtistDto> getArtists() {

@@ -143,6 +143,20 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
     return getMusicByPopularity(genreName);
   }
 
+  @Override
+  public SearchResultDto getGenreMusicByTitle(String genreName) {
+    
+    // TODO: Implement, returning music sorted by title (i.e. artist name, album name or song name)
+    throw new IllegalStateException("Not implemented yet!");
+  }
+
+  @Override
+  public SearchResultDto getGenreMusicByReleaseDate(String genreName) {
+    
+    // TODO: Implement, returning music sorted by release date
+    throw new IllegalStateException("Not implemented yet!");
+  }
+  
   private SearchResultDto getMusicByPopularity(String genreName) {
 
     if (!isInitialized) {
