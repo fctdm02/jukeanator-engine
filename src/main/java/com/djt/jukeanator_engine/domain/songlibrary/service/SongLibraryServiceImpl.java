@@ -97,11 +97,11 @@ public final class SongLibraryServiceImpl implements SongLibraryService, Aggrega
         .comparing(NumPlaysComparable::getNumPlays, Comparator.nullsFirst(Integer::compareTo))
         .reversed();
 
-    // Centralized rule: only items with strictly positive plays
-    java.util.function.Predicate<NumPlaysComparable> hasPlays =
-        item -> item.getNumPlays() != null && item.getNumPlays() > 0;
+    // When browsing by genre, show everything sorted by popularity.
+    // When browsing globally (no genre), restrict to items that have actually been played.
+    java.util.function.Predicate<NumPlaysComparable> hasPlays = genreName != null ? item -> true
+        : item -> item.getNumPlays() != null && item.getNumPlays() > 0;
 
-    // Generic genre filter — works for any entity that is a GenreDescendant
     java.util.function.Predicate<GenreDescendant> inGenre =
         item -> genreName == null || genreName.equalsIgnoreCase(item.getParentGenre().getName());
 
