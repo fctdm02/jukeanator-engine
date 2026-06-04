@@ -7,7 +7,9 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.LinearGradientPaint;
 import java.awt.RenderingHints;
+import java.awt.geom.Point2D;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -29,10 +31,9 @@ public class AlbumViewPanel extends JPanel {
 
   private static final int LEFT_PANEL_WIDTH = 320;
   private static final int COVER_SIZE = 320;
-  
+
   // ── Palette ───────────────────────────────────────────────────────────────
-  private static final Color BG_ROW = new Color(20, 20, 28);
-  private static final Color BG_ROW_HOVER = new Color(35, 35, 50);
+  private static final Color BG_ROW_HOVER = new Color(255, 255, 255, 25);
   private static final Color ACCENT_BLUE = new Color(0, 210, 255);
   private static final Color ACCENT_GREEN = new Color(60, 210, 80);
   private static final Color ACCENT_EXPLICIT = new Color(220, 60, 60);
@@ -85,14 +86,14 @@ public class AlbumViewPanel extends JPanel {
 
     // ── Cover art ─────────────────────────────────────────────────────────
     JLabel cover = new JLabel();
-    cover.setPreferredSize(new Dimension(COVER_SIZE, COVER_SIZE));
     cover.setHorizontalAlignment(SwingConstants.CENTER);
     cover.setVerticalAlignment(SwingConstants.CENTER);
     cover.setOpaque(false);
 
     if (album.getCoverArtPath() != null) {
       try {
-        ImageIcon icon = imageLoader.loadFilesystemImage(album.getCoverArtPath(), 260, 260);
+        ImageIcon icon =
+            imageLoader.loadFilesystemImage(album.getCoverArtPath(), COVER_SIZE, COVER_SIZE);
         if (icon != null)
           cover.setIcon(icon);
       } catch (Exception ignored) {
@@ -100,6 +101,7 @@ public class AlbumViewPanel extends JPanel {
     }
 
     if (cover.getIcon() == null) {
+      cover.setPreferredSize(new Dimension(COVER_SIZE, COVER_SIZE));
       cover.setText("♫");
       cover.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 64));
       cover.setForeground(new Color(80, 80, 100));
@@ -171,7 +173,7 @@ public class AlbumViewPanel extends JPanel {
     content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
     content.add(cover);
     content.add(meta);
-    
+
     sidebar.add(content, BorderLayout.NORTH);
 
     return sidebar;
@@ -196,8 +198,24 @@ public class AlbumViewPanel extends JPanel {
     headerLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
     header.add(headerLabel, BorderLayout.WEST);
 
-    // ── Rows ──────────────────────────────────────────────────────────────
-    JPanel rows = new JPanel();
+    // ── Rows — blue gradient background matching ResultsColumnPanel ───────────
+    JPanel rows = new JPanel() {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      protected void paintComponent(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        LinearGradientPaint blueGradient = new LinearGradientPaint(new Point2D.Float(0, 0),
+            new Point2D.Float(0, getHeight()), new float[] {0.0f, 1.0f},
+            new Color[] {new Color(24, 38, 60, 225), new Color(12, 18, 30, 245)});
+        g2.setPaint(blueGradient);
+        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
+        g2.dispose();
+        super.paintComponent(g);
+      }
+    };
     rows.setOpaque(false);
     rows.setLayout(new BoxLayout(rows, BoxLayout.Y_AXIS));
 
@@ -242,7 +260,7 @@ public class AlbumViewPanel extends JPanel {
       SongClickListener listener) {
 
     JPanel row = new JPanel(new BorderLayout(10, 0));
-    row.setBackground(BG_ROW);
+    row.setOpaque(false);
     row.setBorder(new EmptyBorder(10, 16, 10, 16));
     row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
 
@@ -289,13 +307,15 @@ public class AlbumViewPanel extends JPanel {
 
       @Override
       public void mouseEntered(java.awt.event.MouseEvent e) {
+        row.setOpaque(true);
         row.setBackground(BG_ROW_HOVER);
         repaintRowChildren(row);
       }
 
       @Override
       public void mouseExited(java.awt.event.MouseEvent e) {
-        row.setBackground(BG_ROW);
+        row.setOpaque(false);
+        row.setBackground(null);
         repaintRowChildren(row);
       }
 
@@ -381,7 +401,7 @@ public class AlbumViewPanel extends JPanel {
     // Cap width to the usable sidebar width so wrapping triggers correctly.
     // BoxLayout respects maximum width, so we match preferred/max.
     area.setMaximumSize(new Dimension(LEFT_PANEL_WIDTH - 28, Integer.MAX_VALUE));
-    
+
     return area;
   }
 
