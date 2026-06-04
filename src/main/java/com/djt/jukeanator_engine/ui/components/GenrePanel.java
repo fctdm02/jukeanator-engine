@@ -12,6 +12,7 @@ import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.RenderingHints;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
   private int currentPage = 0;
 
   // ── Genre data ────────────────────────────────────────────────────────────
+  private List<GenreDto> genres = new ArrayList<>();
   private final DefaultListModel<GenreDto> genresListModel = new DefaultListModel<>();
   private final Map<String, ImageIcon> genreIconCache = new HashMap<>();
 
@@ -138,16 +140,21 @@ public class GenrePanel extends JPanel implements TabNavigator {
   }
 
   public void setGenres(List<GenreDto> genres) {
-    genresListModel.clear();
-    if (genres != null)
-      genres.forEach(genresListModel::addElement);
+    
+    if (!genres.equals(this.genres)) {
 
-    int maxPage =
-        Math.max(0, (int) Math.ceil(genresListModel.size() / (double) GENRES_PER_PAGE) - 1);
-    if (currentPage > maxPage)
-      currentPage = maxPage;
+      this.genres = genres;
+      genresListModel.clear();
+      if (genres != null)
+        genres.forEach(genresListModel::addElement);
 
-    refreshGenresUI();
+      int maxPage =
+          Math.max(0, (int) Math.ceil(genresListModel.size() / (double) GENRES_PER_PAGE) - 1);
+      if (currentPage > maxPage)
+        currentPage = maxPage;
+
+      refreshGenresUI();
+    }
   }
 
   @Override

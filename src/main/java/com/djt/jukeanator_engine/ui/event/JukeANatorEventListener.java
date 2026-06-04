@@ -45,6 +45,7 @@ public class JukeANatorEventListener {
     if (frame == null) return;
     
     frame.refreshMusicByPopularityResults();
+    frame.setGenres(songLibraryService.getGenres());
   }
   
   @EventListener
