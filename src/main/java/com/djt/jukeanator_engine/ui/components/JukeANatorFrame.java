@@ -57,7 +57,7 @@ public class JukeANatorFrame extends JFrame {
   private boolean enableBigScrollBars;
   
   // COLORS
-  private static final Color BG_DARK = new Color(10, 10, 10);
+  //private static final Color BG_DARK = new Color(10, 10, 10);
   private static final Color ACCENT_BLUE = new Color(0, 210, 255);
   private static final Color TEXT_PRIMARY = Color.WHITE;
   private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
@@ -511,10 +511,9 @@ public class JukeANatorFrame extends JFrame {
     // LIST PANEL
     //
     JPanel queueListPanel = new JPanel(new BorderLayout());
-    queueListPanel.setBackground(BG_DARK);
-    queueListPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
+    queueListPanel.setOpaque(false);
 
-    queueList.setBackground(Color.BLACK);
+    queueList.setOpaque(false);
     queueList.setForeground(Color.WHITE);
     queueList.setSelectionBackground(ACCENT_BLUE);
     queueList.setSelectionForeground(Color.BLACK);
@@ -536,11 +535,12 @@ public class JukeANatorFrame extends JFrame {
     //
     // DETAILS PANEL
     //
-    queueDetailsPanel.setBackground(BG_DARK);
+    queueDetailsPanel.setOpaque(false);
 
     //
     // ROOT
     //
+    queueRootPanel.setOpaque(false);
     queueRootPanel.removeAll();
     queueRootPanel.add(queueListPanel, "LIST");
     queueRootPanel.add(queueDetailsPanel, "DETAILS");
@@ -579,7 +579,7 @@ public class JukeANatorFrame extends JFrame {
     // DETAILS CONTENT
     //
     JPanel contentPanel = new JPanel();
-    contentPanel.setBackground(BG_DARK);
+    contentPanel.setOpaque(false);
     contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
     contentPanel.setBorder(new EmptyBorder(40, 40, 40, 40));
 
@@ -953,7 +953,7 @@ public class JukeANatorFrame extends JFrame {
   private JPanel buildPlaceholderPanel() {
 
     JPanel panel = new JPanel(new CardLayout());
-    panel.setBackground(BG_DARK);
+    panel.setOpaque(false);
 
     JLabel label = new JLabel("NOT IMPLEMENTED");
     label.setForeground(TEXT_SECONDARY);
