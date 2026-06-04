@@ -105,7 +105,7 @@ public final class ResultsColumnPanel {
 
     // Navigation Layout container (Made transparent to allow background column gradient through)
     JPanel navPanel = new JPanel(new BorderLayout(8, 0));
-    navPanel.setOpaque(false);
+    navPanel.setBackground(Color.BLACK);
     navPanel.setBorder(new EmptyBorder(8, 12, 12, 12));
 
     JButton upBtn = navButton(true);
