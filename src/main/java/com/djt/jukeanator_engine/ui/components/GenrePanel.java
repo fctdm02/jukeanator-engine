@@ -7,7 +7,6 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
-import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
@@ -226,7 +225,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     int totalPages =
         Math.max(1, (int) Math.ceil(genresListModel.size() / (double) GENRES_PER_PAGE));
 
-    JButton prevBtn = createButton("❮");
+    JButton prevBtn = NavigationButtonFactory.createButton("❮");
     prevBtn.addActionListener(e -> {
       if (currentPage > 0) {
         currentPage--;
@@ -235,7 +234,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     });
     prevBtn.setVisible(currentPage > 0);
 
-    JButton nextBtn = createButton("❯");
+    JButton nextBtn = NavigationButtonFactory.createButton("❯");
     nextBtn.addActionListener(e -> {
       if (currentPage < totalPages - 1) {
         currentPage++;
@@ -270,115 +269,6 @@ public class GenrePanel extends JPanel implements TabNavigator {
     genresPaginationPanel.revalidate();
     genresPaginationPanel.repaint();
   }
-
-  private JButton createButton(String text) {
-
-    // Idle and hover fill colours mirror the sort button's active gradient
-    final Color GRAD_TOP = new Color(0, 160, 210);
-    final Color GRAD_BOTTOM = new Color(0, 80, 130);
-    final Color HOVER_TOP = new Color(0, 190, 240);
-    final Color HOVER_BOTTOM = new Color(0, 100, 160);
-
-    JButton button = new JButton(text) {
-
-      private static final long serialVersionUID = 1L;
-      private boolean hovered = false;
-
-      {
-        addMouseListener(new java.awt.event.MouseAdapter() {
-          @Override
-          public void mouseEntered(java.awt.event.MouseEvent e) {
-            hovered = true;
-            repaint();
-          }
-
-          @Override
-          public void mouseExited(java.awt.event.MouseEvent e) {
-            hovered = false;
-            repaint();
-          }
-        });
-      }
-
-      @Override
-      protected void paintComponent(Graphics g) {
-
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        // Gradient fill — brighter on hover
-        Color top = hovered ? HOVER_TOP : GRAD_TOP;
-        Color bottom = hovered ? HOVER_BOTTOM : GRAD_BOTTOM;
-        g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
-        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-
-        // Accent border
-        g2.setColor(ACCENT_BLUE);
-        g2.setStroke(new java.awt.BasicStroke(1.5f));
-        g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
-
-        g2.dispose();
-        super.paintComponent(g);
-      }
-    };
-
-    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
-    button.setForeground(Color.WHITE);
-    button.setContentAreaFilled(false);
-    button.setBorderPainted(false);
-    button.setFocusPainted(false);
-    button.setOpaque(false);
-    button.setPreferredSize(new Dimension(140, 36));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-    return button;
-  }
-
-  /*
-   * private JButton navButton(final boolean isLeftDirection) { JButton b = new JButton() { private
-   * static final long serialVersionUID = 1L;
-   * 
-   * @Override protected void paintComponent(Graphics g) { Graphics2D g2 = (Graphics2D) g.create();
-   * g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-   * g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
-   * 
-   * int w = getWidth(); int h = getHeight();
-   * 
-   * if (isEnabled() && getBackground() != null && getBackground().getAlpha() > 0) {
-   * g2.setColor(getBackground()); g2.fillRoundRect(0, 0, w, h, 8, 8); }
-   * 
-   * if (isEnabled()) { g2.setColor(getForeground()); } else { g2.setColor(new Color(255, 255, 255,
-   * 40)); }
-   * 
-   * g2.setStroke(new java.awt.BasicStroke(3.0f, java.awt.BasicStroke.CAP_ROUND,
-   * java.awt.BasicStroke.JOIN_ROUND));
-   * 
-   * int paddingX = Math.round(w * 0.38f); int paddingY = Math.round(h * 0.28f);
-   * 
-   * int topY = paddingY; int bottomY = h - paddingY; int centerY = h / 2;
-   * 
-   * if (isLeftDirection) { int leftX = paddingX; int rightX = w - paddingX; g2.drawLine(rightX,
-   * topY, leftX, centerY); g2.drawLine(leftX, centerY, rightX, bottomY); } else { int leftX =
-   * paddingX; int rightX = w - paddingX; g2.drawLine(leftX, topY, rightX, centerY);
-   * g2.drawLine(rightX, centerY, leftX, bottomY); }
-   * 
-   * g2.dispose(); } };
-   * 
-   * b.setPreferredSize(new java.awt.Dimension(120, 60)); b.setForeground(Color.WHITE);
-   * b.setBackground(new Color(255, 255, 255, 0)); b.setOpaque(false);
-   * b.setContentAreaFilled(false); b.setBorderPainted(false); b.setFocusPainted(false);
-   * b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-   * 
-   * b.addMouseListener(new java.awt.event.MouseAdapter() {
-   * 
-   * @Override public void mouseEntered(java.awt.event.MouseEvent e) { if (b.isEnabled()) {
-   * b.setBackground(ACCENT_BLUE); b.setForeground(Color.BLACK); b.repaint(); } }
-   * 
-   * @Override public void mouseExited(java.awt.event.MouseEvent e) { b.setBackground(new Color(255,
-   * 255, 255, 0)); b.setForeground(Color.WHITE); b.repaint(); } });
-   * 
-   * return b; }
-   */
 
   // ── FIXED ENHANCEMENT: CHROME GLASS POP-OUT DESIGN ────────────────────────
   private JPanel buildGenreTile(GenreDto genre) {
