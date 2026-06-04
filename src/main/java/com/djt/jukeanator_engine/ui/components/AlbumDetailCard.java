@@ -10,6 +10,7 @@ import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.util.concurrent.CompletableFuture;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -56,18 +57,29 @@ public class AlbumDetailCard extends JPanel {
     int numSongs = album.getSongs().size();
     int albumNormalPlayCost = normalPlayCost * numSongs;
     int albumPriorityCost = priorityCost * numSongs;
-
+    
     AlbumViewPanel.AlbumClickListener albumClick = clicked -> {
+
       secondsRemaining = TIMEOUT_SECONDS;
       updateTimeout();
-      AddAlbumToQueueDialog.show(owner, clicked, imageLoader, albumNormalPlayCost,
-          albumPriorityCost,
-          () -> songQueueService
-              .addAlbumToQueue(new AddAlbumToQueueRequest(clicked.getAlbumId(), 0)),
-          () -> songQueueService
-              .addAlbumToQueue(new AddAlbumToQueueRequest(clicked.getAlbumId(), 1)));
-    };
 
+      AddAlbumToQueueDialog.show(
+          owner,
+          clicked,
+          imageLoader,
+          albumNormalPlayCost,
+          albumPriorityCost,
+
+          () -> CompletableFuture.runAsync(() ->
+              songQueueService.addAlbumToQueue(
+                  new AddAlbumToQueueRequest(clicked.getAlbumId(), 0))),
+
+          () -> CompletableFuture.runAsync(() ->
+              songQueueService.addAlbumToQueue(
+                  new AddAlbumToQueueRequest(clicked.getAlbumId(), 1)))
+      );
+    };    
+    
     AlbumViewPanel albumView = new AlbumViewPanel(album, imageLoader, threshold1, threshold2,
         threshold3, songClick, albumClick);
 
