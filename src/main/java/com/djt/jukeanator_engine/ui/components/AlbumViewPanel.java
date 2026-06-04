@@ -7,6 +7,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GridBagLayout;
 import java.awt.LinearGradientPaint;
 import java.awt.RenderingHints;
 import java.awt.geom.Point2D;
@@ -94,7 +95,7 @@ public class AlbumViewPanel extends JPanel {
   private JPanel buildSidebar(AlbumDto album, ImageLoader imageLoader,
       AlbumClickListener albumClickListener) {
 
-    JPanel sidebar = new JPanel(new BorderLayout(0, 0));
+    JPanel sidebar = new JPanel(new GridBagLayout());
     sidebar.setOpaque(false);
     sidebar.setPreferredSize(new Dimension(LEFT_PANEL_WIDTH, 0));
     sidebar.setMinimumSize(new Dimension(LEFT_PANEL_WIDTH, 0));
@@ -102,7 +103,7 @@ public class AlbumViewPanel extends JPanel {
     // Left padding matches the ResultsColumnPanel outer column gutter (10px).
     // Right border is the separator line between the sidebar and the track list.
     sidebar.setBorder(BorderFactory.createCompoundBorder(
-        BorderFactory.createMatteBorder(0, 0, 0, 1, SEPARATOR), new EmptyBorder(8, 10, 0, 0)));
+        BorderFactory.createMatteBorder(0, 0, 0, 1, SEPARATOR), new EmptyBorder(8, 10, 8, 0)));
 
     // ── Cover art ─────────────────────────────────────────────────────────
     JLabel cover = new JLabel();
@@ -194,7 +195,13 @@ public class AlbumViewPanel extends JPanel {
     content.add(cover);
     content.add(meta);
 
-    sidebar.add(content, BorderLayout.NORTH);
+    // Place content in the centre of the sidebar so it is vertically centred
+    // regardless of how tall the panel grows.
+    java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
+    gbc.gridx = 0;
+    gbc.gridy = 0;
+    gbc.anchor = java.awt.GridBagConstraints.CENTER;
+    sidebar.add(content, gbc);
 
     return sidebar;
   }
@@ -216,7 +223,8 @@ public class AlbumViewPanel extends JPanel {
     JPanel wrapper = new JPanel(new BorderLayout());
     wrapper.setOpaque(false);
     // Right padding matches the ResultsColumnPanel outer column gutter (10px).
-    wrapper.setBorder(new EmptyBorder(0, 0, 0, 10));
+    // Left padding adds a visual gap between the sidebar separator and the track list.
+    wrapper.setBorder(new EmptyBorder(0, 12, 0, 10));
 
     // ── Blue gradient body — rows + footer nav ────────────────────────────
     // Mirrors ResultsColumnPanel.innerColumnBody: gradient fills the body panel;

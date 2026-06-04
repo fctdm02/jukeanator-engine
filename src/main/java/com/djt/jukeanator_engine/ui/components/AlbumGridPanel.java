@@ -143,9 +143,21 @@ public class AlbumGridPanel extends JPanel {
     pageLabel.setForeground(TEXT_SECONDARY);
     pageLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
 
-    navPanel.add(prevBtn, BorderLayout.WEST);
+    // Use a wrapper with a phantom button on each side so the label stays
+    // centred even when only one navigation button is visible.
+    JPanel prevWrapper = new JPanel(new BorderLayout());
+    prevWrapper.setOpaque(false);
+    prevWrapper.setPreferredSize(new Dimension(140, 52)); // same as button preferred size
+    prevWrapper.add(prevBtn, BorderLayout.CENTER);
+
+    JPanel nextWrapper = new JPanel(new BorderLayout());
+    nextWrapper.setOpaque(false);
+    nextWrapper.setPreferredSize(new Dimension(140, 52));
+    nextWrapper.add(nextBtn, BorderLayout.CENTER);
+
+    navPanel.add(prevWrapper, BorderLayout.WEST);
     navPanel.add(pageLabel, BorderLayout.CENTER);
-    navPanel.add(nextBtn, BorderLayout.EAST);
+    navPanel.add(nextWrapper, BorderLayout.EAST);
 
     // Only show nav bar when there is more than one page
     navPanel.setVisible(totalPages > 1);
@@ -220,6 +232,11 @@ public class AlbumGridPanel extends JPanel {
     tile.setBorder(new EmptyBorder(1, 1, 1, 1)); // breathing room inside border
 
     // ── Cover art ─────────────────────────────────────────────────────────
+    // Wrap in a panel so the image is centred both horizontally and vertically
+    // within whatever space the tile's CENTER region allocates.
+    JPanel artWrapper = new JPanel(new java.awt.GridBagLayout());
+    artWrapper.setOpaque(false);
+
     JLabel artLabel = new JLabel();
     artLabel.setPreferredSize(new Dimension(artW, artH));
     artLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -242,6 +259,8 @@ public class AlbumGridPanel extends JPanel {
       artLabel.setForeground(new Color(80, 80, 100));
     }
 
+    artWrapper.add(artLabel);
+
     // ── Text panel ────────────────────────────────────────────────────────
     // GridLayout gives each label the full tile width; CENTER alignment centres the text.
     JPanel textPanel = new JPanel(new java.awt.GridLayout(2, 1, 0, 2));
@@ -261,7 +280,7 @@ public class AlbumGridPanel extends JPanel {
     textPanel.add(albumLabel);
     textPanel.add(artistLabel);
 
-    tile.add(artLabel, BorderLayout.CENTER);
+    tile.add(artWrapper, BorderLayout.CENTER);
     tile.add(textPanel, BorderLayout.SOUTH);
 
     // ── Click ─────────────────────────────────────────────────────────────
