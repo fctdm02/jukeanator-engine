@@ -95,7 +95,6 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private final int popularityT1;
   private final int popularityT2;
   private final int popularityT3;
-  private final boolean enableBigScrollBars;
   private final boolean enableTypeAheadSearch;
   private final int gridCols;
   private final int gridRows;
@@ -108,8 +107,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
   public SearchPanel(SongLibraryService songLibraryService, SongQueueService songQueueService,
       ImageLoader imageLoader, int normalPlayCost, int priorityCost, int popularityT1,
-      int popularityT2, int popularityT3, boolean enableBigScrollBars,
-      boolean enableTypeAheadSearch, int gridCols, int gridRows, int artW, int artH) {
+      int popularityT2, int popularityT3, boolean enableTypeAheadSearch, int gridCols, int gridRows,
+      int artW, int artH) {
 
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
@@ -119,7 +118,6 @@ public class SearchPanel extends JPanel implements TabNavigator {
     this.popularityT1 = popularityT1;
     this.popularityT2 = popularityT2;
     this.popularityT3 = popularityT3;
-    this.enableBigScrollBars = enableBigScrollBars;
     this.enableTypeAheadSearch = enableTypeAheadSearch;
     this.gridCols = gridCols;
     this.gridRows = gridRows;
@@ -144,15 +142,15 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
   @Override
   public void pushAlbumDetail(AlbumDto album) {
-    
+
     Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
     AlbumDto full = fetchFull(album);
 
     if (currentDetailCard != null)
       currentDetailCard.dismiss();
 
-    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService, normalPlayCost,
-        priorityCost, popularityT1, popularityT2, popularityT3, enableBigScrollBars, this);
+    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService,
+        normalPlayCost, priorityCost, popularityT1, popularityT2, popularityT3, this);
 
     replaceCard(CARD_DETAIL, currentDetailCard);
     cardLayout.show(rootPanel, CARD_DETAIL);
@@ -335,7 +333,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
     JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
     row.setOpaque(false);
     for (char c : "QWERTYUIOP".toCharArray())
-      row.add(letterKey(String.valueOf(c)));    
+      row.add(letterKey(String.valueOf(c)));
 
     JButton clear = styledKey("CLEAR", new Dimension(140, 60));
     clear.addActionListener(e -> resetSearch());
@@ -350,7 +348,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
     row.setOpaque(false);
     for (char c : "ASDFGHJKL".toCharArray())
       row.add(letterKey(String.valueOf(c)));
-        
+
     row.add(letterKey("'"));
     row.add(buildModeToggleButton("123@", KeyboardMode.NUMERIC));
     row.add(buildModeToggleButton("ABC", KeyboardMode.ABC));

@@ -52,7 +52,6 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   private final int popularityT1;
   private final int popularityT2;
   private final int popularityT3;
-  private final boolean enableBigScrollBars;
   private final int gridCols;
   private final int gridRows;
   private final int artW;
@@ -64,8 +63,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
 
   public HotHerePanel(SongLibraryService songLibraryService, SongQueueService songQueueService,
       ImageLoader imageLoader, int normalPlayCost, int priorityCost, int popularityT1,
-      int popularityT2, int popularityT3, boolean enableBigScrollBars, int gridCols, int gridRows,
-      int artW, int artH) {
+      int popularityT2, int popularityT3, int gridCols, int gridRows, int artW, int artH) {
 
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
@@ -75,7 +73,6 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     this.popularityT1 = popularityT1;
     this.popularityT2 = popularityT2;
     this.popularityT3 = popularityT3;
-    this.enableBigScrollBars = enableBigScrollBars;
     this.gridCols = gridCols;
     this.gridRows = gridRows;
     this.artW = artW;
@@ -118,8 +115,8 @@ public class HotHerePanel extends JPanel implements TabNavigator {
       currentDetailCard.dismiss();
     }
 
-    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService, normalPlayCost,
-        priorityCost, popularityT1, popularityT2, popularityT3, enableBigScrollBars, this);
+    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService,
+        normalPlayCost, priorityCost, popularityT1, popularityT2, popularityT3, this);
 
     replaceCard(CARD_DETAIL, currentDetailCard);
     cardLayout.show(rootPanel, CARD_DETAIL);

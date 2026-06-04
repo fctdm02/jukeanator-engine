@@ -83,7 +83,6 @@ public class GenrePanel extends JPanel implements TabNavigator {
   private final int popularityT1;
   private final int popularityT2;
   private final int popularityT3;
-  private final boolean enableBigScrollBars;
   private final int gridCols;
   private final int gridRows;
   private final int artW;
@@ -95,8 +94,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
   public GenrePanel(SongLibraryService songLibraryService, SongQueueService songQueueService,
       ImageLoader imageLoader, int normalPlayCost, int priorityCost, int popularityT1,
-      int popularityT2, int popularityT3, boolean enableBigScrollBars, int gridCols, int gridRows,
-      int artW, int artH) {
+      int popularityT2, int popularityT3, int gridCols, int gridRows, int artW, int artH) {
 
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
@@ -106,7 +104,6 @@ public class GenrePanel extends JPanel implements TabNavigator {
     this.popularityT1 = popularityT1;
     this.popularityT2 = popularityT2;
     this.popularityT3 = popularityT3;
-    this.enableBigScrollBars = enableBigScrollBars;
     this.gridCols = gridCols;
     this.gridRows = gridRows;
     this.artW = artW;
@@ -162,9 +159,8 @@ public class GenrePanel extends JPanel implements TabNavigator {
       currentDetailCard.dismiss();
     }
 
-    currentDetailCard =
-        new AlbumDetailCard(owner, full, imageLoader, songQueueService, normalPlayCost,
-            priorityCost, popularityT1, popularityT2, popularityT3, enableBigScrollBars, this);
+    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService,
+        normalPlayCost, priorityCost, popularityT1, popularityT2, popularityT3, this);
 
     replaceOuterCard(CARD_DETAIL, currentDetailCard);
     outerCardLayout.show(outerRoot, CARD_DETAIL);
@@ -342,88 +338,52 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     return button;
   }
-  
+
   /*
-  private JButton navButton(final boolean isLeftDirection) {
-    JButton b = new JButton() {
-      private static final long serialVersionUID = 1L;
-
-      @Override
-      protected void paintComponent(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
-
-        int w = getWidth();
-        int h = getHeight();
-
-        if (isEnabled() && getBackground() != null && getBackground().getAlpha() > 0) {
-          g2.setColor(getBackground());
-          g2.fillRoundRect(0, 0, w, h, 8, 8);
-        }
-
-        if (isEnabled()) {
-          g2.setColor(getForeground());
-        } else {
-          g2.setColor(new Color(255, 255, 255, 40));
-        }
-
-        g2.setStroke(new java.awt.BasicStroke(3.0f, java.awt.BasicStroke.CAP_ROUND,
-            java.awt.BasicStroke.JOIN_ROUND));
-
-        int paddingX = Math.round(w * 0.38f);
-        int paddingY = Math.round(h * 0.28f);
-
-        int topY = paddingY;
-        int bottomY = h - paddingY;
-        int centerY = h / 2;
-
-        if (isLeftDirection) {
-          int leftX = paddingX;
-          int rightX = w - paddingX;
-          g2.drawLine(rightX, topY, leftX, centerY);
-          g2.drawLine(leftX, centerY, rightX, bottomY);
-        } else {
-          int leftX = paddingX;
-          int rightX = w - paddingX;
-          g2.drawLine(leftX, topY, rightX, centerY);
-          g2.drawLine(rightX, centerY, leftX, bottomY);
-        }
-
-        g2.dispose();
-      }
-    };
-
-    b.setPreferredSize(new java.awt.Dimension(120, 60));
-    b.setForeground(Color.WHITE);
-    b.setBackground(new Color(255, 255, 255, 0));
-    b.setOpaque(false);
-    b.setContentAreaFilled(false);
-    b.setBorderPainted(false);
-    b.setFocusPainted(false);
-    b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-    b.addMouseListener(new java.awt.event.MouseAdapter() {
-      @Override
-      public void mouseEntered(java.awt.event.MouseEvent e) {
-        if (b.isEnabled()) {
-          b.setBackground(ACCENT_BLUE);
-          b.setForeground(Color.BLACK);
-          b.repaint();
-        }
-      }
-
-      @Override
-      public void mouseExited(java.awt.event.MouseEvent e) {
-        b.setBackground(new Color(255, 255, 255, 0));
-        b.setForeground(Color.WHITE);
-        b.repaint();
-      }
-    });
-
-    return b;
-  }
-  */
+   * private JButton navButton(final boolean isLeftDirection) { JButton b = new JButton() { private
+   * static final long serialVersionUID = 1L;
+   * 
+   * @Override protected void paintComponent(Graphics g) { Graphics2D g2 = (Graphics2D) g.create();
+   * g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+   * g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+   * 
+   * int w = getWidth(); int h = getHeight();
+   * 
+   * if (isEnabled() && getBackground() != null && getBackground().getAlpha() > 0) {
+   * g2.setColor(getBackground()); g2.fillRoundRect(0, 0, w, h, 8, 8); }
+   * 
+   * if (isEnabled()) { g2.setColor(getForeground()); } else { g2.setColor(new Color(255, 255, 255,
+   * 40)); }
+   * 
+   * g2.setStroke(new java.awt.BasicStroke(3.0f, java.awt.BasicStroke.CAP_ROUND,
+   * java.awt.BasicStroke.JOIN_ROUND));
+   * 
+   * int paddingX = Math.round(w * 0.38f); int paddingY = Math.round(h * 0.28f);
+   * 
+   * int topY = paddingY; int bottomY = h - paddingY; int centerY = h / 2;
+   * 
+   * if (isLeftDirection) { int leftX = paddingX; int rightX = w - paddingX; g2.drawLine(rightX,
+   * topY, leftX, centerY); g2.drawLine(leftX, centerY, rightX, bottomY); } else { int leftX =
+   * paddingX; int rightX = w - paddingX; g2.drawLine(leftX, topY, rightX, centerY);
+   * g2.drawLine(rightX, centerY, leftX, bottomY); }
+   * 
+   * g2.dispose(); } };
+   * 
+   * b.setPreferredSize(new java.awt.Dimension(120, 60)); b.setForeground(Color.WHITE);
+   * b.setBackground(new Color(255, 255, 255, 0)); b.setOpaque(false);
+   * b.setContentAreaFilled(false); b.setBorderPainted(false); b.setFocusPainted(false);
+   * b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+   * 
+   * b.addMouseListener(new java.awt.event.MouseAdapter() {
+   * 
+   * @Override public void mouseEntered(java.awt.event.MouseEvent e) { if (b.isEnabled()) {
+   * b.setBackground(ACCENT_BLUE); b.setForeground(Color.BLACK); b.repaint(); } }
+   * 
+   * @Override public void mouseExited(java.awt.event.MouseEvent e) { b.setBackground(new Color(255,
+   * 255, 255, 0)); b.setForeground(Color.WHITE); b.repaint(); } });
+   * 
+   * return b; }
+   */
 
   // ── FIXED ENHANCEMENT: CHROME GLASS POP-OUT DESIGN ────────────────────────
   private JPanel buildGenreTile(GenreDto genre) {

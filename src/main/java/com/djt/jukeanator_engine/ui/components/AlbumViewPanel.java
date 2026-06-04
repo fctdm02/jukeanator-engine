@@ -32,7 +32,7 @@ public class AlbumViewPanel extends JPanel {
   private static final int LEFT_PANEL_WIDTH = 320;
   private static final int COVER_SIZE = 320;
   // Number of track rows shown per page in the nav-paginated track listing.
-  private static final int TRACKS_PER_PAGE = 12;
+  private static final int TRACKS_PER_PAGE = 16;
 
   // ── Palette ───────────────────────────────────────────────────────────────
   private static final Color BG_ROW_HOVER = new Color(255, 255, 255, 25);
@@ -75,8 +75,7 @@ public class AlbumViewPanel extends JPanel {
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
   public AlbumViewPanel(AlbumDto album, ImageLoader imageLoader, int threshold1, int threshold2,
-      int threshold3, boolean enableBigScrollBars, SongClickListener songClickListener,
-      AlbumClickListener albumClickListener) {
+      int threshold3, SongClickListener songClickListener, AlbumClickListener albumClickListener) {
 
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
@@ -85,8 +84,8 @@ public class AlbumViewPanel extends JPanel {
     setBorder(new EmptyBorder(0, 10, 0, 10));
 
     add(buildSidebar(album, imageLoader, albumClickListener), BorderLayout.WEST);
-    add(buildTrackList(album, threshold1, threshold2, threshold3, enableBigScrollBars,
-        songClickListener), BorderLayout.CENTER);
+    add(buildTrackList(album, threshold1, threshold2, threshold3, songClickListener),
+        BorderLayout.CENTER);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -204,7 +203,7 @@ public class AlbumViewPanel extends JPanel {
   // RIGHT PANEL — paginated track list with footer nav (mirrors ResultsColumnPanel)
   // ─────────────────────────────────────────────────────────────────────────
   private JPanel buildTrackList(AlbumDto album, int t1, int t2, int t3,
-      @SuppressWarnings("unused") boolean enableBigScrollBars, SongClickListener listener) {
+      SongClickListener listener) {
 
     // Stash state needed for page rebuilds.
     this.trackAlbum = album;
@@ -218,16 +217,6 @@ public class AlbumViewPanel extends JPanel {
     wrapper.setOpaque(false);
     // Right padding matches the ResultsColumnPanel outer column gutter (10px).
     wrapper.setBorder(new EmptyBorder(0, 0, 0, 10));
-
-    // ── Column header ─────────────────────────────────────────────────────
-    JPanel header = new JPanel(new BorderLayout());
-    header.setOpaque(false);
-    header.setBorder(new EmptyBorder(8, 16, 8, 16));
-
-    JLabel headerLabel = new JLabel("TRACKS");
-    headerLabel.setForeground(ACCENT_BLUE);
-    headerLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
-    header.add(headerLabel, BorderLayout.WEST);
 
     // ── Blue gradient body — rows + footer nav ────────────────────────────
     // Mirrors ResultsColumnPanel.innerColumnBody: gradient fills the body panel;
@@ -259,7 +248,7 @@ public class AlbumViewPanel extends JPanel {
 
     // ── Footer nav panel (mirrors ResultsColumnPanel navPanel) ────────────
     JPanel navPanel = new JPanel(new BorderLayout(8, 0));
-    navPanel.setOpaque(false);
+    navPanel.setBackground(Color.BLACK);
     navPanel.setBorder(new EmptyBorder(8, 12, 12, 12));
 
     trackPrevBtn = trackNavButton(true);
@@ -280,7 +269,6 @@ public class AlbumViewPanel extends JPanel {
     body.add(trackRowsPanel, BorderLayout.CENTER);
     body.add(navPanel, BorderLayout.SOUTH);
 
-    wrapper.add(header, BorderLayout.NORTH);
     wrapper.add(body, BorderLayout.CENTER);
 
     // Initial population.

@@ -44,44 +44,43 @@ import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 public class JukeANatorFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
-  
+
   private final JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
-  
+
   private final ImageLoader imageLoader = new ImageLoader();
   private static final int POPULARITY_THRESHOLD_1 = 10;
   private static final int POPULARITY_THRESHOLD_2 = 25;
   private static final int POPULARITY_THRESHOLD_3 = 50;
-  private boolean enableBigScrollBars;
-  
+
   // COLORS
-  //private static final Color BG_DARK = new Color(10, 10, 10);
+  // private static final Color BG_DARK = new Color(10, 10, 10);
   private static final Color ACCENT_BLUE = new Color(0, 210, 255);
   private static final Color TEXT_PRIMARY = Color.WHITE;
   private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
-  
+
   // TOP PANEL
   private JPanel nowPlayingPanel;
-  
+
   // HOME TAB
   private static final int HOME_GRID_COLS = 4;
   private static final int HOME_GRID_ROWS = 3;
   private static final int HOME_TILE_ART_W = 190;
   private static final int HOME_TILE_ART_H = 190;
   private HomePanel homePanel;
-  
+
   // SEARCH TAB
   private final boolean enableTypeAheadSearch;
   private SearchPanel searchPanel;
-  
+
   // HOT HERE TAB
   private HotHerePanel hotHerePanel;
-  
+
   // GENRE TAB
   private GenrePanel genrePanel;
-  
+
   // QUEUE TAB
   private final CardLayout queueCardLayout = new CardLayout();
   private final JPanel queueRootPanel = new JPanel(queueCardLayout);
@@ -91,9 +90,9 @@ public class JukeANatorFrame extends JFrame {
   private final JLabel queueDetailsArtist = new JLabel();
   private final JLabel queueDetailsAlbum = new JLabel();
   private final DefaultListModel<SongQueueEntryDto> queueListModel = new DefaultListModel<>();
-  private final JList<SongQueueEntryDto> queueList = new JList<>(queueListModel);  
+  private final JList<SongQueueEntryDto> queueList = new JList<>(queueListModel);
 
-  
+
   // NOW PLAYING
   private SongQueueEntryDto nowPlayingSong;
   private final JLabel albumArtLabel = new JLabel();
@@ -102,32 +101,28 @@ public class JukeANatorFrame extends JFrame {
   private final JLabel albumLabel = new JLabel("", SwingConstants.LEFT);
   private final JLabel playStatus = new JLabel();
   private boolean musicPaused = false;
-  
-  
+
+
   // SONG CREDITS
   private final int creditsPer;
   private final int fiveBonusCredits;
-  private final int tenBonusCredits; 
+  private final int tenBonusCredits;
 
-  
+
   // CONSTRUCTOR
-  public JukeANatorFrame(
-      JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
-      SongLibraryService songLibraryService,
-      SongQueueService songQueueService,
+  public JukeANatorFrame(JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
+      SongLibraryService songLibraryService, SongQueueService songQueueService,
       SongPlayerService songPlayerService) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
-    
-    this.enableBigScrollBars = this.jukeANatorUserInterfaceProperties.getEnableBigScrollBars();
-    
+
     this.creditsPer = this.jukeANatorUserInterfaceProperties.getCreditsPer();
     this.fiveBonusCredits = this.jukeANatorUserInterfaceProperties.getFiveBonusCredits();
     this.tenBonusCredits = this.jukeANatorUserInterfaceProperties.getTenBonusCredits();
-    
+
     this.enableTypeAheadSearch = this.jukeANatorUserInterfaceProperties.isEnableTypeAheadSearch();
 
     initialize();
@@ -139,7 +134,7 @@ public class JukeANatorFrame extends JFrame {
     setTitle("JukeANator");
     setUndecorated(true);
     setBackground(Color.BLACK);
-    
+
     JPanel contentPane = new JPanel(new BorderLayout()) {
       private static final long serialVersionUID = 1L;
 
@@ -192,15 +187,8 @@ public class JukeANatorFrame extends JFrame {
     getContentPane().add(contentPanelTabs, BorderLayout.CENTER);
   }
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
+
   // ============================================================
   // TABS PANEL
   // ============================================================
@@ -308,21 +296,21 @@ public class JukeANatorFrame extends JFrame {
 
     tabs.setForeground(Color.WHITE);
     tabs.setBorder(null);
-    tabs.setOpaque(false);    
+    tabs.setOpaque(false);
     tabs.setBackground(new Color(0, 0, 0, 0));
-    
+
     homePanel = buildHomePanel();
     tabs.addTab("HOME", homePanel);
-    
+
     searchPanel = buildSearchPanel();
     tabs.addTab("SEARCH", searchPanel);
-    
+
     hotHerePanel = buildHotHerePanel();
     tabs.addTab("HOT HERE", hotHerePanel);
-    
+
     genrePanel = buildGenresPanel();
     tabs.addTab("GENRES", genrePanel);
-    
+
     tabs.addTab("QUEUE", buildQueuePanel());
     tabs.addTab("ADMIN", buildPlaceholderPanel());
 
@@ -335,7 +323,7 @@ public class JukeANatorFrame extends JFrame {
 
     return tabs;
   }
-  
+
   private class JukeboxTabComponent extends JPanel {
 
     private static final long serialVersionUID = 1L;
@@ -398,110 +386,55 @@ public class JukeANatorFrame extends JFrame {
       super.paintComponent(g);
     }
   }
-  
-  
-  
-  
-  
-  
-  
-  
 
-  
+
+
   // ============================================================
   // HOME PANEL
   // ============================================================
   private HomePanel buildHomePanel() {
 
-    return new HomePanel(
-        songLibraryService,
-        songQueueService,
-        imageLoader,
-        creditsPer,
-        creditsPer * 2,           // priority cost placeholder
-        POPULARITY_THRESHOLD_1,
-        POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3,
-        enableBigScrollBars,
-        HOME_GRID_COLS,
-        HOME_GRID_ROWS,
-        HOME_TILE_ART_W,
-        HOME_TILE_ART_H);
-  }  
-  
+    return new HomePanel(songLibraryService, songQueueService, imageLoader, creditsPer,
+        creditsPer * 2, // priority cost placeholder
+        POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, HOME_GRID_COLS,
+        HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
+  }
+
   // ============================================================
   // SEARCH PANEL
   // ============================================================
   private SearchPanel buildSearchPanel() {
 
-    return new SearchPanel(
-        songLibraryService,
-        songQueueService,
-        imageLoader,
-        creditsPer,
-        creditsPer * 2,           // priority cost placeholder
-        POPULARITY_THRESHOLD_1,
-        POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3,
-        enableBigScrollBars,
-        enableTypeAheadSearch,
-        HOME_GRID_COLS,
-        HOME_GRID_ROWS,
-        HOME_TILE_ART_W,
-        HOME_TILE_ART_H);    
-  } 
-  
+    return new SearchPanel(songLibraryService, songQueueService, imageLoader, creditsPer,
+        creditsPer * 2, // priority cost placeholder
+        POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3,
+        enableTypeAheadSearch, HOME_GRID_COLS, HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
+  }
+
   // ============================================================
   // HOT HERE PANEL
   // ============================================================
   private HotHerePanel buildHotHerePanel() {
 
-    return new HotHerePanel(
-        songLibraryService,
-        songQueueService,
-        imageLoader,
-        creditsPer,
-        creditsPer * 2,           // priority cost placeholder
-        POPULARITY_THRESHOLD_1,
-        POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3,
-        enableBigScrollBars,
-        HOME_GRID_COLS,
-        HOME_GRID_ROWS,
-        HOME_TILE_ART_W,
-        HOME_TILE_ART_H);
-  }  
-  
+    return new HotHerePanel(songLibraryService, songQueueService, imageLoader, creditsPer,
+        creditsPer * 2, // priority cost placeholder
+        POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, HOME_GRID_COLS,
+        HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
+  }
+
   // ============================================================
   // GENRE PANEL
   // ============================================================
   private GenrePanel buildGenresPanel() {
 
-    return new GenrePanel(
-        songLibraryService,
-        songQueueService,
-        imageLoader,
-        creditsPer,
-        creditsPer * 2,           // priority cost placeholder
-        POPULARITY_THRESHOLD_1,
-        POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3,
-        enableBigScrollBars,
-        HOME_GRID_COLS,
-        HOME_GRID_ROWS,
-        HOME_TILE_ART_W,
-        HOME_TILE_ART_H);
+    return new GenrePanel(songLibraryService, songQueueService, imageLoader, creditsPer,
+        creditsPer * 2, // priority cost placeholder
+        POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, HOME_GRID_COLS,
+        HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }
-  
 
 
-  
-  
-  
-  
-  
-  
-  
+
   // ============================================================
   // QUEUE PANEL
   // ============================================================
@@ -552,7 +485,7 @@ public class JukeANatorFrame extends JFrame {
 
   // QUEUE SONG DETAILS
   private void showQueueSongDetails(SongQueueEntryDto songQueueEntryDto) {
-    
+
     SongDto song = songQueueEntryDto.getSong();
 
     queueDetailsPanel.removeAll();
@@ -639,7 +572,7 @@ public class JukeANatorFrame extends JFrame {
       implements javax.swing.ListCellRenderer<SongQueueEntryDto> {
 
     private static final long serialVersionUID = 1L;
-    
+
     private final JLabel cover = new JLabel();
     private final JLabel title = new JLabel();
     private final JLabel subtitle = new JLabel();
@@ -745,14 +678,8 @@ public class JukeANatorFrame extends JFrame {
     }
   }
 
-  
-  
-  
-  
-  
-  
-  
-  
+
+
   // ============================================================
   // TOP PANEL
   // ============================================================
@@ -773,7 +700,7 @@ public class JukeANatorFrame extends JFrame {
     creditsPanel.setPreferredSize(sidePanelSize);
     creditsPanel.setMinimumSize(sidePanelSize);
     creditsPanel.setMaximumSize(sidePanelSize);
-    
+
     //
     // LOCATION LOGO (96x96 — same size as Now Playing cover art)
     //
@@ -842,7 +769,7 @@ public class JukeANatorFrame extends JFrame {
     icon = new ImageIcon(transparentStrippedImage);
     bannerLabel.setIcon(icon);
     bannerPanel.add(bannerLabel);
-    
+
     //
     // RIGHT : NOW PLAYING
     //
@@ -932,21 +859,14 @@ public class JukeANatorFrame extends JFrame {
     panel.add(playStatus, BorderLayout.WEST);
     panel.add(textPanel, BorderLayout.CENTER);
     panel.add(albumArtLabel, BorderLayout.EAST);
-    
+
     panel.setVisible(false); // hidden until a song starts
 
     return panel;
   }
-  
-  
-  
 
 
-  
-  
-  
-  
-  
+
   // ============================================================
   // PLACEHOLDER
   // ============================================================
@@ -965,15 +885,8 @@ public class JukeANatorFrame extends JFrame {
     return panel;
   }
 
-  
-  
-  
-  
-  
-  
-    
- 
-  
+
+
   // FULLSCREEN
   public void showFullscreen() {
 
@@ -984,10 +897,10 @@ public class JukeANatorFrame extends JFrame {
 
   // GENRE LIST
   public void setGenres(List<GenreDto> genres) {
-    
+
     genrePanel.setGenres(genres);
   }
-  
+
   // SONG QUEUE LIST
   public void setQueue(List<SongQueueEntryDto> queue) {
 
@@ -1000,7 +913,7 @@ public class JukeANatorFrame extends JFrame {
       }
     });
   }
-  
+
   // NOW PLAYING
   public void setNowPlaying(SongDto songDto) {
     SwingUtilities.invokeLater(() -> {
@@ -1015,7 +928,8 @@ public class JukeANatorFrame extends JFrame {
       albumArtLabel.setIcon(imageLoader.loadFilesystemImage(songDto.getCoverArtPath(), 96, 96));
 
       musicPaused = false;
-      playStatus.setIcon(imageLoader.loadClasspathImage("music_playing.gif", 96, 96, Image.SCALE_DEFAULT));
+      playStatus.setIcon(
+          imageLoader.loadClasspathImage("music_playing.gif", 96, 96, Image.SCALE_DEFAULT));
 
       // Make the panel visible now that there's something to show.
       nowPlayingPanel.setVisible(true);
@@ -1051,9 +965,11 @@ public class JukeANatorFrame extends JFrame {
       musicPaused = !musicPaused;
 
       if (musicPaused) {
-        playStatus.setIcon(imageLoader.loadClasspathImage("music_paused.png", 96, 96, Image.SCALE_DEFAULT));
+        playStatus.setIcon(
+            imageLoader.loadClasspathImage("music_paused.png", 96, 96, Image.SCALE_DEFAULT));
       } else {
-        playStatus.setIcon(imageLoader.loadClasspathImage("music_playing.gif", 96, 96, Image.SCALE_DEFAULT));
+        playStatus.setIcon(
+            imageLoader.loadClasspathImage("music_playing.gif", 96, 96, Image.SCALE_DEFAULT));
       }
     });
   }

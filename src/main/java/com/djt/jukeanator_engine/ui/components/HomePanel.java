@@ -46,7 +46,6 @@ public class HomePanel extends JPanel implements TabNavigator {
   private final int popularityT1;
   private final int popularityT2;
   private final int popularityT3;
-  private final boolean enableBigScrollBars;
   private final int gridCols;
   private final int gridRows;
   private final int artW;
@@ -65,7 +64,6 @@ public class HomePanel extends JPanel implements TabNavigator {
    * @param popularityT1 Lower popularity threshold (1 bar).
    * @param popularityT2 Middle popularity threshold (2 bars).
    * @param popularityT3 Upper popularity threshold (3 bars).
-   * @param enableBigScrollBars Wide touch-friendly scroll bars.
    * @param gridCols Columns in the home album grid.
    * @param gridRows Rows in the home album grid.
    * @param artW Tile art pixel width.
@@ -73,8 +71,7 @@ public class HomePanel extends JPanel implements TabNavigator {
    */
   public HomePanel(SongLibraryService songLibraryService, SongQueueService songQueueService,
       ImageLoader imageLoader, int normalPlayCost, int priorityCost, int popularityT1,
-      int popularityT2, int popularityT3, boolean enableBigScrollBars, int gridCols, int gridRows,
-      int artW, int artH) {
+      int popularityT2, int popularityT3, int gridCols, int gridRows, int artW, int artH) {
 
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
@@ -84,7 +81,6 @@ public class HomePanel extends JPanel implements TabNavigator {
     this.popularityT1 = popularityT1;
     this.popularityT2 = popularityT2;
     this.popularityT3 = popularityT3;
-    this.enableBigScrollBars = enableBigScrollBars;
     this.gridCols = gridCols;
     this.gridRows = gridRows;
     this.artW = artW;
@@ -125,9 +121,9 @@ public class HomePanel extends JPanel implements TabNavigator {
       currentDetailCard.dismiss(); // stop the countdown timer
     }
 
-    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService, normalPlayCost,
-        priorityCost, popularityT1, popularityT2, popularityT3, enableBigScrollBars, this); // TabNavigator
-                                                                                             // back-reference
+    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService,
+        normalPlayCost, priorityCost, popularityT1, popularityT2, popularityT3, this); // TabNavigator
+                                                                                       // back-reference
 
     replaceCard(CARD_DETAIL, currentDetailCard);
     cardLayout.show(rootPanel, CARD_DETAIL);
@@ -183,8 +179,8 @@ public class HomePanel extends JPanel implements TabNavigator {
     }
 
     ImageIcon allAlbumsIcon = imageLoader.loadImage("AllAlbumsLogo.png", 72, 72);
-    DetailHeaderPanel header =
-        new DetailHeaderPanel(null, null, allAlbumsIcon, "♫", "ALL ALBUMS", allAlbums.size() + " albums");
+    DetailHeaderPanel header = new DetailHeaderPanel(null, null, allAlbumsIcon, "♫", "ALL ALBUMS",
+        allAlbums.size() + " albums");
     header.setOpaque(false);
 
     if (allAlbums.isEmpty()) {

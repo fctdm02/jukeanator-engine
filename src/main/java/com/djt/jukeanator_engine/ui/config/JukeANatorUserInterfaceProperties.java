@@ -7,8 +7,8 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "user-interface")
 public class JukeANatorUserInterfaceProperties {
 
-  private boolean enabled = false; // if true, a JFC/Swing UI is launched, otherwise, a headless backend
-  private boolean enableBigScrollBars = true;
+  private boolean enabled = false; // if true, a JFC/Swing UI is launched, otherwise, a headless
+                                   // backend
 
   //
   // CREDIT CONFIGURATION
@@ -16,7 +16,7 @@ public class JukeANatorUserInterfaceProperties {
   private int creditsPer = 3;
   private int fiveBonusCredits = 3;
   private int tenBonusCredits = 10;
-  
+
   //
   // SEARCH CONFIGURATION
   //
@@ -28,14 +28,6 @@ public class JukeANatorUserInterfaceProperties {
 
   public void setEnabled(boolean enabled) {
     this.enabled = enabled;
-  }
-
-  public boolean getEnableBigScrollBars() {
-    return enableBigScrollBars;
-  }
-
-  public void setEnableBigScrollBars(boolean enableBigScrollBars) {
-    this.enableBigScrollBars = enableBigScrollBars;
   }
 
   public int getCreditsPer() {

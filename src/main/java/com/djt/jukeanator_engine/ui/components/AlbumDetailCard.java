@@ -26,11 +26,11 @@ public class AlbumDetailCard extends JPanel {
 
   private static final int TIMEOUT_SECONDS = 120;
 
-  private static final Color ACCENT_BLUE    = new Color(0, 210, 255);
-  //private static final Color BG_DARK        = new Color(10, 10, 10);
-  //private static final Color BG_FOOTER      = new Color(18, 18, 26);
+  private static final Color ACCENT_BLUE = new Color(0, 210, 255);
+  // private static final Color BG_DARK = new Color(10, 10, 10);
+  // private static final Color BG_FOOTER = new Color(18, 18, 26);
   private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
-  
+
   private int secondsRemaining = TIMEOUT_SECONDS;
   private final Timer countdownTimer;
   private final JLabel timeoutLabel = new JLabel();
@@ -38,7 +38,7 @@ public class AlbumDetailCard extends JPanel {
 
   public AlbumDetailCard(Frame owner, AlbumDto album, ImageLoader imageLoader,
       SongQueueService songQueueService, int normalPlayCost, int priorityCost, int threshold1,
-      int threshold2, int threshold3, boolean enableBigScrollBars, TabNavigator navigator) {
+      int threshold2, int threshold3, TabNavigator navigator) {
 
     setLayout(new BorderLayout());
     setOpaque(false);
@@ -52,15 +52,16 @@ public class AlbumDetailCard extends JPanel {
           () -> songQueueService
               .addSongToQueue(new AddSongToQueueRequest(song.getAlbumId(), song.getSongId(), 1)));
     };
-    
+
     int numSongs = album.getSongs().size();
     int albumNormalPlayCost = normalPlayCost * numSongs;
-    int albumPriorityCost = priorityCost * numSongs; 
+    int albumPriorityCost = priorityCost * numSongs;
 
     AlbumViewPanel.AlbumClickListener albumClick = clicked -> {
       secondsRemaining = TIMEOUT_SECONDS;
       updateTimeout();
-      AddAlbumToQueueDialog.show(owner, clicked, imageLoader, albumNormalPlayCost, albumPriorityCost,
+      AddAlbumToQueueDialog.show(owner, clicked, imageLoader, albumNormalPlayCost,
+          albumPriorityCost,
           () -> songQueueService
               .addAlbumToQueue(new AddAlbumToQueueRequest(clicked.getAlbumId(), 0)),
           () -> songQueueService
@@ -68,7 +69,7 @@ public class AlbumDetailCard extends JPanel {
     };
 
     AlbumViewPanel albumView = new AlbumViewPanel(album, imageLoader, threshold1, threshold2,
-        threshold3, enableBigScrollBars, songClick, albumClick);
+        threshold3, songClick, albumClick);
 
     add(albumView, BorderLayout.CENTER);
     add(buildFooter(navigator), BorderLayout.SOUTH);
@@ -189,7 +190,7 @@ public class AlbumDetailCard extends JPanel {
 
     return button;
   }
-  
+
   private void updateTimeout() {
     timeoutBar.setValue(secondsRemaining);
     timeoutLabel.setText("Closes in " + secondsRemaining + "s");
