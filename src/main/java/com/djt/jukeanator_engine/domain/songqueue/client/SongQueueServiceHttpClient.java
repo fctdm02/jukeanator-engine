@@ -34,34 +34,34 @@ public class SongQueueServiceHttpClient implements SongQueueService {
   }
 
   @Override
-  public Integer addSongToQueue(AddSongToQueueRequest addSongToQueueRequest) {
+  public SongQueueEntryDto addSongToQueue(AddSongToQueueRequest addSongToQueueRequest) {
 
     return restClient.post()
         .uri("/api/song-queue/addSong")
         .body(addSongToQueueRequest)
         .retrieve()
-        .body(Integer.class);
+        .body(SongQueueEntryDto.class);
   }
 
   @Override
-  public List<Integer> addAlbumToQueue(AddAlbumToQueueRequest addAlbumToQueueRequest) {
+  public List<SongQueueEntryDto> addAlbumToQueue(AddAlbumToQueueRequest addAlbumToQueueRequest) {
 
     return restClient.post()
         .uri("/api/song-queue/addAlbum")
         .body(addAlbumToQueueRequest)
         .retrieve()
-        .body(new ParameterizedTypeReference<List<Integer>>() {});
+        .body(new ParameterizedTypeReference<List<SongQueueEntryDto>>() {});
   }
   
   @Override
-  public List<Integer> addMultipleSongsToQueue(
+  public List<SongQueueEntryDto> addMultipleSongsToQueue(
       AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
 
     return restClient.post()
         .uri("/api/song-queue/addMultipleSongs")
         .body(addMultipleSongsToQueueRequest)
         .retrieve()
-        .body(new ParameterizedTypeReference<List<Integer>>() {});
+        .body(new ParameterizedTypeReference<List<SongQueueEntryDto>>() {});
   }
   
   @Override

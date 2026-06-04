@@ -8,7 +8,6 @@ import java.util.concurrent.Executors;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 
 /**
  * @author tmyers
@@ -72,14 +71,10 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
   }
   
   @Override
-  public Integer incrementNumPlaysForSong(
-      Integer albumId,
-      Integer songId) throws EntityDoesNotExistException {
-
-    SongFileEntity song = this.root.getSongById(albumId, songId);
-    Integer incrementedNumPlays = song.incrementNumPlays();
+  public void storeSongLibraryAsync() throws EntityDoesNotExistException {
+    
     RootFolderEntity rootToPersist = this.root;
-
+    
     persistenceExecutor.submit(() -> {
 
       try {
@@ -88,7 +83,5 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
         throw new SongLibraryException("Could not asynchronously persist song library", e);
       }
     });
-
-    return incrementedNumPlays;
   }
 }

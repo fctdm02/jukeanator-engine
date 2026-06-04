@@ -24,7 +24,8 @@ import com.djt.jukeanator_engine.domain.songplayer.service.utils.Player;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.VideoVlcMediaPlayer;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.VlcMediaPlayer;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
-import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import jakarta.annotation.PreDestroy;
 
@@ -169,15 +170,25 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
   }
 
   @EventListener
-  public void handleAddSongToQueueEvent(AddSongToQueueEvent event) {
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
 
     log.info("""
-        Received AddSongToQueueEvent:{}
-        """, event);
+        Received SongAddedToQueueEvent:{}
+        """, event.queueEntry());
 
     submitQueueProcessing();
   }
 
+  @EventListener
+  public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
+
+    log.info("""
+        Received MultipleSongsAddedToQueueEvent:{}
+        """, event.queueEntries());
+
+    submitQueueProcessing();
+  }
+  
   /**
    * THE ONLY PLACE processQueue() IS EVER INVOKED.
    */

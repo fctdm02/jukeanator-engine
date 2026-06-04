@@ -894,6 +894,12 @@ public class JukeANatorFrame extends JFrame {
 
     gd.setFullScreenWindow(this);
   }
+  
+  // HOT HERE
+  public void refreshMusicByPopularityResults() {
+    
+    hotHerePanel.refreshMusicByPopularityResults();
+  }
 
   // GENRE LIST
   public void setGenres(List<GenreDto> genres) {

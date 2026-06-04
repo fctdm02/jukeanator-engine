@@ -88,9 +88,8 @@ public class SongPlayerServiceTest {
     Integer songId = song.getSongId();
     Integer priority = Integer.valueOf(1);
     AddSongToQueueRequest addSongToQueueRequest = new AddSongToQueueRequest(albumId, songId, priority);
-    Integer songQueueIndex = songQueueService.addSongToQueue(addSongToQueueRequest);
-    assertNotNull(songQueueIndex, "songQueueIndex should not be null");
-    assertTrue(songQueueIndex >= 0, "songQueueIndex should be non-zero");
+    SongQueueEntryDto queueEntry = songQueueService.addSongToQueue(addSongToQueueRequest);
+    assertNotNull(queueEntry, "queueEntry should not be null");
     
     
     // Get the currently playing song

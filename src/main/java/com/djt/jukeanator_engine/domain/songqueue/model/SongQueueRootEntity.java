@@ -50,7 +50,7 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
     return Integer.valueOf(this.songs.size());
   }
   
-  public int addSongToQueue(SongFileEntity song, Integer priority) {
+  public SongQueueEntryEntity addSongToQueue(SongFileEntity song, Integer priority) {
     
     SongQueueEntryEntity entry = new SongQueueEntryEntity(song, priority);
     
@@ -65,7 +65,7 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
     }
     
     songs.add(index, entry);
-    return index;
+    return entry;
   }
   
   public boolean removeSongFromQueue(SongQueueEntryEntity songQueueEntry) {

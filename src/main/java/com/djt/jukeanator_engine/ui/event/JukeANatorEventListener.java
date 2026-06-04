@@ -1,18 +1,18 @@
 package com.djt.jukeanator_engine.ui.event;
 
-import java.util.List;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import com.djt.jukeanator_engine.domain.songlibrary.event.ResetSongStatisticsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.event.AllSongsDonePlayingEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackPausedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStoppedEvent;
-import com.djt.jukeanator_engine.domain.songplayer.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
-import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
-import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
 
@@ -39,28 +39,29 @@ public class JukeANatorEventListener {
   public void setSongPlayerService(SongPlayerService songPlayerService) {
     this.songPlayerService = songPlayerService;
   }
-  
+
   @EventListener
-  public void handleAddSongToQueueEvent(AddSongToQueueEvent event) {
-    
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
+
     if (frame == null) return;
     
-    updateQueue(event.queuedSongs());
+    frame.refreshMusicByPopularityResults();
   }
+  
+  @EventListener
+  public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
 
+    if (frame == null) return;
+    
+    frame.refreshMusicByPopularityResults();
+  }
+  
   @EventListener
   public void handleSongQueueChangedEvent(SongQueueChangedEvent event) {
     
     if (frame == null) return;
     
-    updateQueue(event.queuedSongs());
-  }
-  
-  private void updateQueue(List<SongQueueEntryDto> queue) {
-    
-    if (frame == null) return;
-    
-    frame.setQueue(queue);    
+    frame.setQueue(event.queuedSongs());
   }
   
   @EventListener
@@ -102,11 +103,20 @@ public class JukeANatorEventListener {
     
     initializeUi();
   }
+
+  @EventListener
+  public void handleResetSongStatisticsEvent(ResetSongStatisticsEvent event) {
+
+    if (frame == null) return;
+    
+    frame.refreshMusicByPopularityResults();
+  }
   
   private void initializeUi() {
 
-    this.frame.setGenres(songLibraryService.getGenres());
-    this.frame.setNowPlaying(songPlayerService.getNowPlayingSong());
-    this.frame.setQueue(songQueueService.getQueuedSongs());
+    frame.refreshMusicByPopularityResults();
+    frame.setGenres(songLibraryService.getGenres());
+    frame.setNowPlaying(songPlayerService.getNowPlayingSong());
+    frame.setQueue(songQueueService.getQueuedSongs());
   }  
 }

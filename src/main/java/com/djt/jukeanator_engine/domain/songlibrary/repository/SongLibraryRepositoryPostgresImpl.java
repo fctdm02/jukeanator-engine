@@ -33,7 +33,7 @@ public final class SongLibraryRepositoryPostgresImpl implements SongLibraryRepos
   }
   
   @Override
-  public Integer incrementNumPlaysForSong(Integer albumId, Integer songId) throws EntityDoesNotExistException {
+  public void storeSongLibraryAsync() throws EntityDoesNotExistException {
     
     throw new SongLibraryException("Not implemented yet!");
   }

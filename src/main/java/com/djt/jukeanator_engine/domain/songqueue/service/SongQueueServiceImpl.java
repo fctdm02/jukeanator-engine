@@ -1,7 +1,6 @@
 package com.djt.jukeanator_engine.domain.songqueue.service;
 
 import static java.util.Objects.requireNonNull;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -21,13 +20,14 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
-import com.djt.jukeanator_engine.domain.songplayer.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
-import com.djt.jukeanator_engine.domain.songqueue.event.AddSongToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.exception.SongQueueException;
 import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
@@ -80,25 +80,23 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
   }
   
   @Override
-  public Integer addSongToQueue(AddSongToQueueRequest addSongToQueueRequest) {
+  public SongQueueEntryDto addSongToQueue(AddSongToQueueRequest addSongToQueueRequest) {
     
     Integer albumId = addSongToQueueRequest.getAlbumId();
     Integer songId = addSongToQueueRequest.getSongId();
     Integer priority = addSongToQueueRequest.getPriority();
 
-    Integer songQueueIndex = addSongToQueue(albumId, songId, priority);
+    SongQueueEntryDto queueEntryDto = addSongToQueue(albumId, songId, priority);
     
     // Publish the event
-    eventPublisher.publishEvent(
-        new AddSongToQueueEvent(
-            getQueuedSongs(),
-            Instant.now()));
+    eventPublisher.publishEvent(new SongAddedToQueueEvent(queueEntryDto)); // to increment num plays
+    eventPublisher.publishEvent(new SongQueueChangedEvent(getQueuedSongs())); // On UI, to update queue view
     
-    return songQueueIndex;          
+    return queueEntryDto;          
   }
   
   @Override
-  public List<Integer> addAlbumToQueue(AddAlbumToQueueRequest addAlbumToQueueRequest) {
+  public List<SongQueueEntryDto> addAlbumToQueue(AddAlbumToQueueRequest addAlbumToQueueRequest) {
     
     if (addAlbumToQueueRequest == null) {
       return List.of();
@@ -124,26 +122,24 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
   }
   
   @Override
-  public List<Integer> addMultipleSongsToQueue(AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
+  public List<SongQueueEntryDto> addMultipleSongsToQueue(AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
     
     if (addMultipleSongsToQueueRequest == null || addMultipleSongsToQueueRequest.getSongIdentifiers().isEmpty()) {
       return List.of();
     }
     
-    List<Integer> songQueueIndices = new ArrayList<>();
+    List<SongQueueEntryDto> queueEntries = new ArrayList<>();
     Integer priority = addMultipleSongsToQueueRequest.getPriority();
     for (SongIdentifier songIdentifier: addMultipleSongsToQueueRequest.getSongIdentifiers()) {
     
-      songQueueIndices.add(addSongToQueue(songIdentifier.getAlbumId(), songIdentifier.getSongId(), priority));
+      queueEntries.add(addSongToQueue(songIdentifier.getAlbumId(), songIdentifier.getSongId(), priority));
     }
 
-    // Publish the event
-    eventPublisher.publishEvent(
-        new AddSongToQueueEvent(
-            getQueuedSongs(),
-            Instant.now()));
+    // Publish the events
+    eventPublisher.publishEvent(new MultipleSongsAddedToQueueEvent(queueEntries)); // to increment num plays 
+    eventPublisher.publishEvent(new SongQueueChangedEvent(getQueuedSongs())); // On UI, to update queue view
     
-    return songQueueIndices;
+    return queueEntries;
   }
   
   @Override
@@ -173,10 +169,8 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
     
     return numSongsRandomized;
   }
-  
-  
 
-  private Integer addSongToQueue(Integer albumId, Integer songId, Integer priority) {
+  private SongQueueEntryDto addSongToQueue(Integer albumId, Integer songId, Integer priority) {
     
     try {
       AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
@@ -185,11 +179,11 @@ public final class SongQueueServiceImpl implements SongQueueService, AggregateRo
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
           
-          Integer songQueueIndex = songQueueRoot.addSongToQueue(song, priority);
+          SongQueueEntryEntity queueEntry = songQueueRoot.addSongToQueue(song, priority);
           
           songQueueRepository.storeAggregateRoot(songQueueRoot);
           
-          return songQueueIndex;          
+          return SongQueueMapper.toDto(queueEntry);
         }
       }         
     } catch (EntityDoesNotExistException e) { }

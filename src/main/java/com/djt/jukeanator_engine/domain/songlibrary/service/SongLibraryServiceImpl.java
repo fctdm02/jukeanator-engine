@@ -1,7 +1,6 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import static java.util.Objects.requireNonNull;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -23,6 +22,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
+import com.djt.jukeanator_engine.domain.songlibrary.event.ResetSongStatisticsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
@@ -36,7 +36,9 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
-import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
+import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
 /**
  * @author tmyers
@@ -354,8 +356,7 @@ public final class SongLibraryServiceImpl
       initializeSongLibrary();
 
       // Publish the event
-      eventPublisher.publishEvent(
-          new ScanFileSystemForSongsEvent(scanPath, root.getAlbums().size(), Instant.now()));
+      eventPublisher.publishEvent(new ScanFileSystemForSongsEvent(scanPath, root.getAlbums().size()));
 
       return Integer.valueOf(root.getAlbums().size());
     } catch (SongLibraryException sle) {
@@ -382,8 +383,7 @@ public final class SongLibraryServiceImpl
       initializeSongLibrary();
 
       // Publish the event
-      eventPublisher.publishEvent(
-          new ScanFileSystemForSongsEvent(scanPath, root.getAlbums().size(), Instant.now()));
+      eventPublisher.publishEvent(new ResetSongStatisticsEvent());
 
       return Integer.valueOf(root.getAlbums().size());
 
@@ -450,21 +450,39 @@ public final class SongLibraryServiceImpl
 
   // Event handlers
   @EventListener
-  public void handleSongPlaybackStartedEvent(SongPlaybackStartedEvent event) {
-
-    SongDto song = event.songQueueEntry().getSong();
-
-    Integer albumId = song.getAlbumId();
-    Integer songId = song.getSongId();
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
 
     try {
 
-      this.songLibraryRepository.incrementNumPlaysForSong(albumId, songId);
+      SongFileEntity song = this.root.getSongById(event.queueEntry().getSong().getAlbumId(), event.queueEntry().getSong().getSongId());
+      song.incrementNumPlays();
+      
+      this.songLibraryRepository.storeSongLibraryAsync();
 
     } catch (EntityDoesNotExistException ednee) {
       throw new SongLibraryException(
-          "Could not increment num plays for song with albumId: " + albumId + ", songId: " + songId,
+          "Could not increment num plays for: " + event.queueEntry(), 
           ednee);
     }
   }
+  
+  @EventListener
+  public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
+
+    try {
+
+      for (SongQueueEntryDto queueEntry: event.queueEntries()) {
+        
+        SongFileEntity song = this.root.getSongById(queueEntry.getSong().getAlbumId(), queueEntry.getSong().getSongId());
+        song.incrementNumPlays();
+      }
+      
+      this.songLibraryRepository.storeSongLibraryAsync();
+
+    } catch (EntityDoesNotExistException ednee) {
+      throw new SongLibraryException(
+          "Could not increment num plays for: " + event.queueEntries(), 
+          ednee);
+    }
+  }  
 }

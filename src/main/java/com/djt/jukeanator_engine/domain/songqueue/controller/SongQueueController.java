@@ -42,19 +42,19 @@ public class SongQueueController implements SongQueueService {
   }
 
   @PostMapping("/addSong")
-  public Integer addSongToQueue(@RequestBody AddSongToQueueRequest addSongToQueueRequest) {
+  public SongQueueEntryDto addSongToQueue(@RequestBody AddSongToQueueRequest addSongToQueueRequest) {
 
     return songQueueService.addSongToQueue(addSongToQueueRequest);
   }
 
   @PostMapping("/addAlbum")
-  public List<Integer> addAlbumToQueue(@RequestBody AddAlbumToQueueRequest addAlbumToQueueRequest) {
+  public List<SongQueueEntryDto> addAlbumToQueue(@RequestBody AddAlbumToQueueRequest addAlbumToQueueRequest) {
 
     return songQueueService.addAlbumToQueue(addAlbumToQueueRequest);
   }
   
   @PostMapping("/addMultipleSongs")  
-  public List<Integer> addMultipleSongsToQueue(@RequestBody AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
+  public List<SongQueueEntryDto> addMultipleSongsToQueue(@RequestBody AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
     
     return songQueueService.addMultipleSongsToQueue(addMultipleSongsToQueueRequest);
   }

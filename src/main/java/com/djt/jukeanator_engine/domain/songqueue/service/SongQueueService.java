@@ -21,21 +21,21 @@ public interface SongQueueService {
    * @param addSongToQueueRequest
    * @return
    */
-  Integer addSongToQueue(AddSongToQueueRequest addSongToQueueRequest);
+  SongQueueEntryDto addSongToQueue(AddSongToQueueRequest addSongToQueueRequest);
 
   /**
    * 
    * @param addAlbumToQueueRequest
    * @return
    */
-  List<Integer> addAlbumToQueue(AddAlbumToQueueRequest addAlbumToQueueRequest);
+  List<SongQueueEntryDto> addAlbumToQueue(AddAlbumToQueueRequest addAlbumToQueueRequest);
   
   /**
    * 
    * @param addMultipleSongsToQueueRequest
    * @return
    */
-  List<Integer> addMultipleSongsToQueue(AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest);
+  List<SongQueueEntryDto> addMultipleSongsToQueue(AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest);
   
   /**
    * @return

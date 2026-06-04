@@ -41,7 +41,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   private AlbumDetailCard currentDetailCard;
 
   // ── Popularity data (loaded once at construction) ─────────────────────────
-  private final SearchResultDto results;
+  private SearchResultDto results;
 
   // ── Dependencies ──────────────────────────────────────────────────────────
   private final SongLibraryService songLibraryService;
@@ -78,14 +78,6 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     this.artW = artW;
     this.artH = artH;
 
-    SearchResultDto loaded;
-    try {
-      loaded = songLibraryService.getMusicByPopularity();
-    } catch (Exception e) {
-      loaded = new SearchResultDto();
-    }
-    this.results = loaded;
-
     setLayout(new BorderLayout());
     setOpaque(false);
 
@@ -97,6 +89,17 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     rootPanel.add(placeholder(), CARD_ARTIST);
     rootPanel.add(placeholder(), CARD_DETAIL);
 
+    refreshMusicByPopularityResults();
+  }
+  
+  public void refreshMusicByPopularityResults() {
+    
+    try {
+      this.results = songLibraryService.getMusicByPopularity();
+    } catch (Exception e) {
+      this.results = new SearchResultDto();
+    }
+    
     rebuildColumnsPanel();
     cardLayout.show(rootPanel, CARD_CONTENT);
   }
