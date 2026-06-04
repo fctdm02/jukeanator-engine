@@ -38,6 +38,8 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
   // ── Palette ───────────────────────────────────────────────────────────────
   private static final Color ACCENT_BLUE = new Color(0, 210, 255);
+  private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
+
 
   // ── Grid layout ───────────────────────────────────────────────────────────
   private static final int GENRES_PER_PAGE = 12; // 2 rows × 6 cols
@@ -62,7 +64,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
   // ── Pagination ────────────────────────────────────────────────────────────
   private final JPanel genresPaginationPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
-  private int currentGenresPage = 0;
+  private int currentPage = 0;
 
   // ── Genre data ────────────────────────────────────────────────────────────
   private final DefaultListModel<GenreDto> genresListModel = new DefaultListModel<>();
@@ -144,8 +146,8 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     int maxPage =
         Math.max(0, (int) Math.ceil(genresListModel.size() / (double) GENRES_PER_PAGE) - 1);
-    if (currentGenresPage > maxPage)
-      currentGenresPage = maxPage;
+    if (currentPage > maxPage)
+      currentPage = maxPage;
 
     refreshGenresUI();
   }
@@ -201,7 +203,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
   private void refreshGenresPage() {
     genresGridPanel.removeAll();
 
-    int start = currentGenresPage * GENRES_PER_PAGE;
+    int start = currentPage * GENRES_PER_PAGE;
     int end = Math.min(start + GENRES_PER_PAGE, genresListModel.size());
 
     for (int i = start; i < end; i++) {
@@ -223,55 +225,50 @@ public class GenrePanel extends JPanel implements TabNavigator {
     genresPaginationPanel.setLayout(new BorderLayout());
     genresPaginationPanel.setOpaque(false);
 
-    int pageCount = Math.max(1, (int) Math.ceil(genresListModel.size() / (double) GENRES_PER_PAGE));
+    int totalPages =
+        Math.max(1, (int) Math.ceil(genresListModel.size() / (double) GENRES_PER_PAGE));
 
     JButton prevBtn = createButton("❮");
     prevBtn.addActionListener(e -> {
-      if (currentGenresPage > 0) {
-        currentGenresPage--;
+      if (currentPage > 0) {
+        currentPage--;
         refreshGenresUI();
       }
     });
-    prevBtn.setVisible(currentGenresPage > 0);
+    prevBtn.setVisible(currentPage > 0);
 
     JButton nextBtn = createButton("❯");
     nextBtn.addActionListener(e -> {
-      if (currentGenresPage < pageCount - 1) {
-        currentGenresPage++;
+      if (currentPage < totalPages - 1) {
+        currentPage++;
         refreshGenresUI();
       }
     });
-    nextBtn.setVisible(currentGenresPage < pageCount - 1);
+    nextBtn.setVisible(currentPage < totalPages - 1);
 
-    JPanel dots = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
-    dots.setOpaque(false);
-    for (int i = 0; i < pageCount; i++) {
-      JButton dot = new JButton("●");
-      dot.setForeground(i == currentGenresPage ? ACCENT_BLUE : Color.WHITE);
-      dot.setOpaque(false);
-      dot.setBorderPainted(false);
-      dot.setFocusPainted(false);
-      dot.setContentAreaFilled(false);
-      dot.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
-      final int page = i;
-      dot.addActionListener(e -> {
-        currentGenresPage = page;
-        refreshGenresUI();
-      });
-      dots.add(dot);
-    }
+    JLabel pageLabel = new JLabel((currentPage + 1) + " / " + totalPages, SwingConstants.CENTER);
+    pageLabel.setForeground(TEXT_SECONDARY);
+    pageLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
 
-    JPanel leftWrap = new JPanel(new FlowLayout(FlowLayout.LEFT));
-    leftWrap.setOpaque(false);
-    leftWrap.add(prevBtn);
+    // Use a wrapper with a phantom button on each side so the label stays
+    // centred even when only one navigation button is visible.
+    JPanel prevWrapper = new JPanel(new BorderLayout());
+    prevWrapper.setOpaque(false);
+    prevWrapper.setPreferredSize(new Dimension(140, 52)); // same as button preferred size
+    prevWrapper.add(prevBtn, BorderLayout.CENTER);
 
-    JPanel rightWrap = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-    rightWrap.setOpaque(false);
-    rightWrap.add(nextBtn);
+    JPanel nextWrapper = new JPanel(new BorderLayout());
+    nextWrapper.setOpaque(false);
+    nextWrapper.setPreferredSize(new Dimension(140, 52));
+    nextWrapper.add(nextBtn, BorderLayout.CENTER);
 
-    genresPaginationPanel.add(leftWrap, BorderLayout.WEST);
-    genresPaginationPanel.add(dots, BorderLayout.CENTER);
-    genresPaginationPanel.add(rightWrap, BorderLayout.EAST);
+    genresPaginationPanel.add(prevWrapper, BorderLayout.WEST);
+    genresPaginationPanel.add(pageLabel, BorderLayout.CENTER);
+    genresPaginationPanel.add(nextWrapper, BorderLayout.EAST);
+
+    // Only show nav bar when there is more than one page
+    genresPaginationPanel.setVisible(totalPages > 1);
+
     genresPaginationPanel.revalidate();
     genresPaginationPanel.repaint();
   }
