@@ -82,7 +82,10 @@ public class AlbumViewPanel extends JPanel {
     sidebar.setOpaque(false);
     sidebar.setPreferredSize(new Dimension(LEFT_PANEL_WIDTH, 0));
     sidebar.setMinimumSize(new Dimension(LEFT_PANEL_WIDTH, 0));
-    sidebar.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, SEPARATOR));
+    // Left padding matches the ResultsColumnPanel outer column gutter (10px); right border is the
+    // separator line between the sidebar and the track list.
+    sidebar.setBorder(BorderFactory.createCompoundBorder(
+        BorderFactory.createMatteBorder(0, 0, 0, 1, SEPARATOR), new EmptyBorder(0, 10, 0, 0)));
 
     // ── Cover art ─────────────────────────────────────────────────────────
     JLabel cover = new JLabel();
@@ -187,6 +190,8 @@ public class AlbumViewPanel extends JPanel {
 
     JPanel wrapper = new JPanel(new BorderLayout());
     wrapper.setOpaque(false);
+    // Right padding matches the ResultsColumnPanel outer column gutter (10px).
+    wrapper.setBorder(new EmptyBorder(0, 0, 0, 10));
 
     // ── Column header ─────────────────────────────────────────────────────
     JPanel header = new JPanel(new BorderLayout());
@@ -199,6 +204,9 @@ public class AlbumViewPanel extends JPanel {
     header.add(headerLabel, BorderLayout.WEST);
 
     // ── Rows — blue gradient background matching ResultsColumnPanel ───────────
+    // The gradient panel is placed in NORTH of a transparent scroll-content wrapper so it
+    // sizes to its rows only; the scroll viewport expands below it without stretching the
+    // gradient rectangle down into empty space.
     JPanel rows = new JPanel() {
       private static final long serialVersionUID = 1L;
 
@@ -234,8 +242,14 @@ public class AlbumViewPanel extends JPanel {
       }
     }
 
+    // Anchor rows to the top of the scroll viewport so the gradient block never
+    // stretches down to fill empty space below the last track.
+    JPanel scrollContent = new JPanel(new BorderLayout());
+    scrollContent.setOpaque(false);
+    scrollContent.add(rows, BorderLayout.NORTH);
+
     // ── Scroll pane ───────────────────────────────────────────────────────
-    JScrollPane scroll = new JScrollPane(rows);
+    JScrollPane scroll = new JScrollPane(scrollContent);
     scroll.setBorder(null);
     scroll.setOpaque(false);
     scroll.getViewport().setOpaque(false);

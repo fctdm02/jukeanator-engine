@@ -11,8 +11,6 @@ import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.util.List;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -245,23 +243,20 @@ public class AlbumGridPanel extends JPanel {
     }
 
     // ── Text panel ────────────────────────────────────────────────────────
-    JPanel textPanel = new JPanel();
+    // GridLayout gives each label the full tile width; CENTER alignment centres the text.
+    JPanel textPanel = new JPanel(new java.awt.GridLayout(2, 1, 0, 2));
     textPanel.setOpaque(false);
-    textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
     textPanel.setBorder(new EmptyBorder(6, 8, 6, 8));
 
-    JLabel albumLabel = new JLabel(truncate(album.getAlbumName(), 24));
+    JLabel albumLabel = new JLabel(truncate(album.getAlbumName(), 24), SwingConstants.CENTER);
     albumLabel.setForeground(TEXT_PRIMARY);
     albumLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
-    albumLabel.setAlignmentX(LEFT_ALIGNMENT);
 
-    JLabel artistLabel = new JLabel(truncate(album.getArtistName(), 24));
+    JLabel artistLabel = new JLabel(truncate(album.getArtistName(), 24), SwingConstants.CENTER);
     artistLabel.setForeground(TEXT_SECONDARY);
     artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
-    artistLabel.setAlignmentX(LEFT_ALIGNMENT);
 
     textPanel.add(albumLabel);
-    textPanel.add(Box.createVerticalStrut(2));
     textPanel.add(artistLabel);
 
     tile.add(artLabel, BorderLayout.CENTER);
