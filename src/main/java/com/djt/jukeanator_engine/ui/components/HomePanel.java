@@ -14,6 +14,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class HomePanel extends JPanel implements TabNavigator {
 
@@ -38,6 +39,7 @@ public class HomePanel extends JPanel implements TabNavigator {
   private AlbumDetailCard currentDetailCard;
 
   // ── Dependencies ──────────────────────────────────────────────────────────
+  private final CreditManager creditManager;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
   private final ImageLoader imageLoader;
@@ -50,27 +52,12 @@ public class HomePanel extends JPanel implements TabNavigator {
   private final int artW;
   private final int artH;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CONSTRUCTOR
-  // ─────────────────────────────────────────────────────────────────────────
+  public HomePanel(CreditManager creditManager, SongLibraryService songLibraryService,
+      SongQueueService songQueueService, ImageLoader imageLoader, int priorityCostMultiplier,
+      int popularityT1, int popularityT2, int popularityT3, int gridCols, int gridRows, int artW,
+      int artH) {
 
-  /**
-   * @param songLibraryService Service for fetching albums / artist details.
-   * @param songQueueService Service for queuing songs.
-   * @param imageLoader Shared loader.
-   * @param priorityCostMultiplier
-   * @param popularityT1 Lower popularity threshold (1 bar).
-   * @param popularityT2 Middle popularity threshold (2 bars).
-   * @param popularityT3 Upper popularity threshold (3 bars).
-   * @param gridCols Columns in the home album grid.
-   * @param gridRows Rows in the home album grid.
-   * @param artW Tile art pixel width.
-   * @param artH Tile art pixel height.
-   */
-  public HomePanel(SongLibraryService songLibraryService, SongQueueService songQueueService,
-      ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
-      int popularityT3, int gridCols, int gridRows, int artW, int artH) {
-
+    this.creditManager = creditManager;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.imageLoader = imageLoader;
@@ -119,8 +106,8 @@ public class HomePanel extends JPanel implements TabNavigator {
     }
 
     currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService,
-        priorityCostMultiplier, popularityT1, popularityT2, popularityT3, this); // TabNavigator
-                                                                                 // back-reference
+        priorityCostMultiplier, popularityT1, popularityT2, popularityT3, this, creditManager); // TabNavigator
+    // back-reference
 
     replaceCard(CARD_DETAIL, currentDetailCard);
     cardLayout.show(rootPanel, CARD_DETAIL);

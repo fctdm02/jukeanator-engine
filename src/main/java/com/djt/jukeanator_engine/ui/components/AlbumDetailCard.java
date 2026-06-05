@@ -17,6 +17,7 @@ import javax.swing.JProgressBar;
 import javax.swing.Timer;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class AlbumDetailCard extends JPanel {
 
@@ -33,7 +34,7 @@ public class AlbumDetailCard extends JPanel {
 
   public AlbumDetailCard(Frame owner, AlbumDto album, ImageLoader imageLoader,
       SongQueueService songQueueService, int priorityCostMultiplier, int threshold1, int threshold2,
-      int threshold3, TabNavigator navigator) {
+      int threshold3, TabNavigator navigator, CreditManager creditManager) {
 
     setLayout(new BorderLayout());
     setOpaque(false);
@@ -41,7 +42,8 @@ public class AlbumDetailCard extends JPanel {
     AlbumViewPanel.SongClickListener songClick = song -> {
       secondsRemaining = TIMEOUT_SECONDS;
       updateTimeout();
-      AddSongToQueueDialog.show(owner, song, imageLoader, priorityCostMultiplier, songQueueService);
+      AddSongToQueueDialog.show(owner, song, imageLoader, priorityCostMultiplier, songQueueService,
+          creditManager);
     };
 
     AlbumViewPanel.AlbumClickListener albumClick = clicked -> {
@@ -50,7 +52,7 @@ public class AlbumDetailCard extends JPanel {
       updateTimeout();
 
       AddAlbumToQueueDialog.show(owner, clicked, imageLoader, priorityCostMultiplier,
-          songQueueService);
+          songQueueService, creditManager);
     };
 
     AlbumViewPanel albumView = new AlbumViewPanel(album, imageLoader, threshold1, threshold2,

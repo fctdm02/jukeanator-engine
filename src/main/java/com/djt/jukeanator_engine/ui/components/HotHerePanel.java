@@ -13,6 +13,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class HotHerePanel extends JPanel implements TabNavigator {
 
@@ -43,6 +44,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   private SearchResultDto results;
 
   // ── Dependencies ──────────────────────────────────────────────────────────
+  private final CreditManager creditManager;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
   private final ImageLoader imageLoader;
@@ -59,10 +61,12 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
 
-  public HotHerePanel(SongLibraryService songLibraryService, SongQueueService songQueueService,
-      ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
-      int popularityT3, int gridCols, int gridRows, int artW, int artH) {
+  public HotHerePanel(CreditManager creditManager, SongLibraryService songLibraryService,
+      SongQueueService songQueueService, ImageLoader imageLoader, int priorityCostMultiplier,
+      int popularityT1, int popularityT2, int popularityT3, int gridCols, int gridRows, int artW,
+      int artH) {
 
+    this.creditManager = creditManager;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.imageLoader = imageLoader;
@@ -116,7 +120,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     }
 
     currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService,
-        priorityCostMultiplier, popularityT1, popularityT2, popularityT3, this);
+        priorityCostMultiplier, popularityT1, popularityT2, popularityT3, this, creditManager);
 
     replaceCard(CARD_DETAIL, currentDetailCard);
     cardLayout.show(rootPanel, CARD_DETAIL);
@@ -187,7 +191,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
         if (item instanceof SongDto song) {
           Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
           AddSongToQueueDialog.show(owner, song, imageLoader, priorityCostMultiplier,
-              songQueueService);
+              songQueueService, creditManager);
         }
       }
     }

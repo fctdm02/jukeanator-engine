@@ -40,6 +40,7 @@ import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
+import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class JukeANatorFrame extends JFrame {
 
@@ -62,6 +63,8 @@ public class JukeANatorFrame extends JFrame {
   private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
 
   // TOP PANEL
+  private final CreditManager creditManager;
+  private JLabel creditsTitle;
   private JPanel nowPlayingPanel;
 
   // HOME TAB
@@ -131,6 +134,8 @@ public class JukeANatorFrame extends JFrame {
     this.tenDollarBonusCredits = this.jukeANatorUserInterfaceProperties.getTenDollarBonusCredits();
 
     this.enableTypeAheadSearch = this.jukeANatorUserInterfaceProperties.isEnableTypeAheadSearch();
+    
+    this.creditManager = new CreditManager(numCredits, creditsPerDollar, fiveDollarBonusCredits, tenDollarBonusCredits);
 
     initialize();
   }
@@ -192,9 +197,28 @@ public class JukeANatorFrame extends JFrame {
     //
     JTabbedPane contentPanelTabs = buildContentPanelTabs();
     getContentPane().add(contentPanelTabs, BorderLayout.CENTER);
+
+    //
+    // CREDIT MANAGER AND KEYBOARD LISTENER
+    //
+    // Register listener to update UI instantly when credit manager updates
+    this.creditManager.addListener(() -> {
+      creditsTitle.setText("CREDITS: " + creditManager.getCredits());
+    });
+
+    // Hardware Bill Acceptor Key Bindings
+    this.setFocusable(true);
+    this.addKeyListener(new java.awt.event.KeyAdapter() {
+      @Override
+      public void keyTyped(java.awt.event.KeyEvent e) {
+        if (e.getKeyChar() == incrementCreditsKey) {
+          creditManager.addDollar();
+        }
+      }
+    });
+
+    requestFocusInWindow();
   }
-
-
 
   // ============================================================
   // TABS PANEL
@@ -401,9 +425,9 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private HomePanel buildHomePanel() {
 
-    return new HomePanel(songLibraryService, songQueueService, imageLoader, priorityCostMultiplier,
-        POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, HOME_GRID_COLS,
-        HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
+    return new HomePanel(creditManager, songLibraryService, songQueueService, imageLoader,
+        priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
+        POPULARITY_THRESHOLD_3, HOME_GRID_COLS, HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }
 
   // ============================================================
@@ -411,7 +435,7 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private SearchPanel buildSearchPanel() {
 
-    return new SearchPanel(songLibraryService, songQueueService, imageLoader,
+    return new SearchPanel(creditManager, songLibraryService, songQueueService, imageLoader,
         priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
         POPULARITY_THRESHOLD_3, enableTypeAheadSearch, HOME_GRID_COLS, HOME_GRID_ROWS,
         HOME_TILE_ART_W, HOME_TILE_ART_H);
@@ -422,7 +446,7 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private HotHerePanel buildHotHerePanel() {
 
-    return new HotHerePanel(songLibraryService, songQueueService, imageLoader,
+    return new HotHerePanel(creditManager, songLibraryService, songQueueService, imageLoader,
         priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
         POPULARITY_THRESHOLD_3, HOME_GRID_COLS, HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }
@@ -432,9 +456,9 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private GenrePanel buildGenresPanel() {
 
-    return new GenrePanel(songLibraryService, songQueueService, imageLoader, priorityCostMultiplier,
-        POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, HOME_GRID_COLS,
-        HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
+    return new GenrePanel(creditManager, songLibraryService, songQueueService, imageLoader,
+        priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
+        POPULARITY_THRESHOLD_3, HOME_GRID_COLS, HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }
 
 
@@ -741,7 +765,7 @@ public class JukeANatorFrame extends JFrame {
     creditsTextPanel.setOpaque(true);
     creditsTextPanel.setLayout(new BoxLayout(creditsTextPanel, BoxLayout.Y_AXIS));
 
-    JLabel creditsTitle = new JLabel("CREDITS: 12");
+    creditsTitle = new JLabel("CREDITS: " + numCredits);
     creditsTitle.setForeground(Color.YELLOW);
     creditsTitle.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
 

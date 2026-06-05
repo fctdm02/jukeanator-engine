@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Frame;
 import java.awt.GradientPaint;
 import java.awt.Graphics;
@@ -29,6 +30,7 @@ import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class AddSongToQueueDialog extends JDialog {
 
@@ -52,13 +54,19 @@ public class AddSongToQueueDialog extends JDialog {
   private final int priorityCostMultiplier;
   private final SongQueueService songQueueService;
 
+  private final CreditManager creditManager;
+  private final int normalPlayCost = 1;
+  private JButton normalButton;
+  private JButton priorityButton;
+  private Runnable creditListener;
+
   private final Timer countdownTimer;
   private int secondsRemaining = TIMEOUT_SECONDS;
   private final JLabel timeoutLabel = new JLabel();
   private final JProgressBar timeoutBar = new JProgressBar(0, TIMEOUT_SECONDS);
 
   public AddSongToQueueDialog(Frame owner, SongDto song, ImageLoader imageLoader,
-      int priorityCostMultiplier, SongQueueService songQueueService) {
+      int priorityCostMultiplier, SongQueueService songQueueService, CreditManager creditManager) {
 
     super(owner, "Add Song to Queue", true /* modal */);
 
@@ -66,6 +74,7 @@ public class AddSongToQueueDialog extends JDialog {
     this.song = song;
     this.priorityCostMultiplier = priorityCostMultiplier;
     this.songQueueService = songQueueService;
+    this.creditManager = creditManager;
 
     setUndecorated(true);
     setBackground(BG_DARK);
@@ -229,21 +238,56 @@ public class AddSongToQueueDialog extends JDialog {
     JPanel buttons = new JPanel(new GridLayout(1, 2, 16, 0));
     buttons.setOpaque(false);
 
-    int normalPlayCost = 1;
     int highestPriority = songQueueService.getHighestPriority();
     int priorityCost = highestPriority * priorityCostMultiplier;
 
-    buttons.add(buildActionButton("Play Song", normalPlayCost + "cr", ACCENT_BLUE, () -> {
+
+
+    this.normalButton = createQueueButton("Play Song", normalPlayCost, e -> {
+      songQueueService
+          .addSongToQueue(new AddSongToQueueRequest(song.getAlbumId(), song.getSongId(), 1));
+    });
+
+    this.priorityButton = createQueueButton("Priority Song Play", priorityCost, e -> {
+      songQueueService.addSongToQueue(
+          new AddSongToQueueRequest(song.getAlbumId(), song.getSongId(), highestPriority));
+    });
+
+
+
+    this.normalButton = buildActionButton("Play Song", normalPlayCost + "cr", ACCENT_BLUE, () -> {
       dismiss();
       songQueueService
           .addSongToQueue(new AddSongToQueueRequest(song.getAlbumId(), song.getSongId(), 1));
-    }));
+    });
 
-    buttons.add(buildActionButton("Priority Song Play", priorityCost + "cr", ACCENT_GOLD, () -> {
-      dismiss();
-      songQueueService.addSongToQueue(
-          new AddSongToQueueRequest(song.getAlbumId(), song.getSongId(), highestPriority));
-    }));
+    this.priorityButton =
+        buildActionButton("Priority Song Play", priorityCost + "cr", ACCENT_GOLD, () -> {
+          dismiss();
+          songQueueService.addSongToQueue(
+              new AddSongToQueueRequest(song.getAlbumId(), song.getSongId(), highestPriority));
+        });
+
+
+
+    // Add selection buttons to the button panel
+    buttons.add(this.normalButton);
+    buttons.add(this.priorityButton);
+
+    // Attach reactive listeners
+    this.creditListener = this::updateButtonStates;
+    this.creditManager.addListener(creditListener);
+
+    // Run initialization configuration tick
+    updateButtonStates();
+
+    // IMPORTANT: Clean up memory leaks when window is closed
+    this.addWindowListener(new java.awt.event.WindowAdapter() {
+      @Override
+      public void windowClosed(java.awt.event.WindowEvent e) {
+        creditManager.removeListener(creditListener);
+      }
+    });
 
     // ── Cancel button ─────────────────────────────────────────────────────
     JButton cancel = createCancelButton("CANCEL");
@@ -437,11 +481,118 @@ public class AddSongToQueueDialog extends JDialog {
     return button;
   }
 
+  private void updateButtonStates() {
+
+    int currentCredits = creditManager.getCredits();
+
+    int highestPriority = songQueueService.getHighestPriority();
+    int priorityCost = highestPriority * priorityCostMultiplier;
+
+    normalButton.setEnabled(currentCredits >= normalPlayCost);
+    priorityButton.setEnabled(currentCredits >= priorityCost);
+
+    normalButton.repaint();
+    priorityButton.repaint();
+  }
+
+  private JButton createQueueButton(String actionText, int cost,
+      java.awt.event.ActionListener onSuccess) {
+
+    JButton button = new JButton() {
+      private static final long serialVersionUID = 1L;
+      private boolean hovered = false;
+      {
+        addMouseListener(new java.awt.event.MouseAdapter() {
+          public void mouseEntered(java.awt.event.MouseEvent e) {
+            if (isEnabled()) {
+              hovered = true;
+              repaint();
+            }
+          }
+
+          public void mouseExited(java.awt.event.MouseEvent e) {
+            hovered = false;
+            repaint();
+          }
+        });
+      }
+
+      @Override
+      protected void paintComponent(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        boolean enabled = isEnabled();
+        int w = getWidth();
+        int h = getHeight();
+
+        if (enabled) {
+          // Normal UI Theme Linear Flow
+          Color top = hovered ? new Color(0, 240, 255) : new Color(0, 170, 255);
+          Color bottom = hovered ? new Color(0, 150, 200) : new Color(0, 100, 150);
+          g2.setPaint(new GradientPaint(0, 0, top, 0, h, bottom));
+          g2.fillRoundRect(0, 0, w, h, 8, 8);
+          g2.setColor(new Color(0, 210, 255)); // ACCENT_BLUE
+        } else {
+          // Disabled AMI Hardware Interface Spec
+          g2.setColor(new Color(25, 10, 10)); // Deep dark red backdrop tint
+          g2.fillRoundRect(0, 0, w, h, 8, 8);
+          g2.setColor(new Color(220, 40, 40)); // Solid Warning Red Border
+        }
+
+        g2.setStroke(new java.awt.BasicStroke(2.0f));
+        g2.drawRoundRect(1, 1, w - 3, h - 3, 8, 8);
+
+        // Text Engine Formatting
+        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 15));
+        FontMetrics fm = g2.getFontMetrics();
+
+        if (enabled) {
+          g2.setColor(Color.WHITE);
+          int textX = (w - fm.stringWidth(actionText)) / 2;
+          int textY = (h - fm.getHeight()) / 2 + fm.getAscent();
+          g2.drawString(actionText, textX, textY);
+        } else {
+          // Multi-line warning layout text rendering
+          g2.setColor(new Color(220, 40, 40));
+          String line1 = actionText;
+          int needed = cost - creditManager.getCredits();
+          String line2 = "ADD " + needed + " " + (needed == 1 ? "CREDIT" : "CREDITS");
+
+          int y1 = (h / 2) - 2;
+          int y2 = (h / 2) + fm.getAscent() - 2;
+
+          g2.drawString(line1, (w - fm.stringWidth(line1)) / 2, y1);
+          g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
+          FontMetrics fmSmall = g2.getFontMetrics();
+          g2.drawString(line2, (w - fmSmall.stringWidth(line2)) / 2, y2);
+        }
+        g2.dispose();
+      }
+    };
+
+    button.setContentAreaFilled(false);
+    button.setBorderPainted(false);
+    button.setFocusPainted(false);
+    button.setOpaque(false);
+    button.setPreferredSize(new Dimension(150, 55));
+    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+    button.addActionListener(e -> {
+      if (creditManager.deductCredits(cost)) {
+        onSuccess.actionPerformed(e);
+        dismiss();
+      }
+    });
+
+    return button;
+  }
+
   public static void show(Frame owner, SongDto song, ImageLoader imageLoader,
-      int priorityCostMultiplier, SongQueueService songQueueService) {
+      int priorityCostMultiplier, SongQueueService songQueueService, CreditManager creditManager) {
 
     AddSongToQueueDialog dialog = new AddSongToQueueDialog(owner, song, imageLoader,
-        priorityCostMultiplier, songQueueService);
+        priorityCostMultiplier, songQueueService, creditManager);
 
     dialog.setVisible(true); // blocks here (modal)
   }

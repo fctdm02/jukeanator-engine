@@ -34,7 +34,7 @@ user-interface:
   # CREDIT CONFIGURATION
   #
   increment-credits-key: a
-  num-credits: 10
+  num-credits: 0
   priority-cost-multiplier: 2
   credits-per-dollar: 3
   five-dollar-bonus-credits: 3

@@ -30,6 +30,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class GenrePanel extends JPanel implements TabNavigator {
 
@@ -77,6 +78,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
   private GenreDto activeGenre;
 
   // ── Dependencies ──────────────────────────────────────────────────────────
+  private final CreditManager creditManager;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
   private final ImageLoader imageLoader;
@@ -93,10 +95,12 @@ public class GenrePanel extends JPanel implements TabNavigator {
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
 
-  public GenrePanel(SongLibraryService songLibraryService, SongQueueService songQueueService,
-      ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
-      int popularityT3, int gridCols, int gridRows, int artW, int artH) {
+  public GenrePanel(CreditManager creditManager, SongLibraryService songLibraryService,
+      SongQueueService songQueueService, ImageLoader imageLoader, int priorityCostMultiplier,
+      int popularityT1, int popularityT2, int popularityT3, int gridCols, int gridRows, int artW,
+      int artH) {
 
+    this.creditManager = creditManager;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.imageLoader = imageLoader;
@@ -165,7 +169,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     }
 
     currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService,
-        priorityCostMultiplier, popularityT1, popularityT2, popularityT3, this);
+        priorityCostMultiplier, popularityT1, popularityT2, popularityT3, this, creditManager);
 
     replaceOuterCard(CARD_DETAIL, currentDetailCard);
     outerCardLayout.show(outerRoot, CARD_DETAIL);
@@ -395,7 +399,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
           activeGenre = null;
           innerCardLayout.show(innerRoot, INNER_GRID);
         }, album -> pushAlbumDetail(album), artist -> pushArtistFromGenre(artist),
-        songLibraryService);
+        songLibraryService, creditManager);
 
     genreAlbumsSlot.removeAll();
     genreAlbumsSlot.add(detailPanel, BorderLayout.CENTER);

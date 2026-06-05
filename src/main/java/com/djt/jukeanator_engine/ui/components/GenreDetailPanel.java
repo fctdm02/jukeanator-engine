@@ -25,25 +25,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.ui.model.CreditManager;
 
-/**
- * Reusable panel that renders a genre header (genre icon + name + stats) above a three-column
- * ResultsColumnPanel layout (Artists / Albums / Songs) — matching the Hot Here tab layout.
- *
- * <p>
- * The NORTH area shows a styled {@link DetailHeaderPanel} with a back/close button and genre info.
- * The CENTER area is a three-column {@link ResultsColumnPanel} showing the artists, albums, and
- * songs that belong to the genre, sourced from a {@link SearchResultDto}.
- *
- * <p>
- * Usage — inside the Genres tab CardLayout:
- *
- * <pre>
- * GenreDetailPanel panel = new GenreDetailPanel(genre, results, imageLoader, songQueueService,
- *     normalPlayCost, priorityCost, "← GENRES",
- *     () -> genresCardLayout.show(genresContentPanel, "GRID"), album -> openAlbumDetail(album));
- * </pre>
- */
 public class GenreDetailPanel extends JPanel {
 
   private static final long serialVersionUID = 1L;
@@ -89,6 +72,7 @@ public class GenreDetailPanel extends JPanel {
   private final AlbumGridPanel.AlbumClickListener onAlbumClicked;
   private final ArtistClickListener onArtistClicked;
   private final SongLibraryService songLibraryService;
+  private final CreditManager creditManager;
 
   // ── Current sort state ────────────────────────────────────────────────────
   private SortMode currentSort = SortMode.POPULARITY;
@@ -98,26 +82,11 @@ public class GenreDetailPanel extends JPanel {
     void onArtistClicked(ArtistDto artist);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CONSTRUCTOR
-  // ─────────────────────────────────────────────────────────────────────────
-
-  /**
-   * @param genre The genre to display.
-   * @param results Popularity/content data for this genre (artists, albums, songs).
-   * @param imageLoader Shared loader.
-   * @param songQueueService Service used to queue individual songs when a song row is tapped.
-   * @param priorityCostMultiplier Value to multiply against current highest priority in song queue.
-   * @param priorityCost Credits for a high-priority queue insertion.
-   * @param backLabel Text on the back button, e.g. "← GENRES".
-   * @param onBack Runnable executed when the back button is pressed.
-   * @param onAlbumClicked Called when the user selects an album row.
-   * @param onArtistClicked Called when the user selects an artist row.
-   */
   public GenreDetailPanel(GenreDto genre, SearchResultDto results, ImageLoader imageLoader,
       SongQueueService songQueueService, int priorityCostMultiplier, String backLabel,
       Runnable onBack, AlbumGridPanel.AlbumClickListener onAlbumClicked,
-      ArtistClickListener onArtistClicked, SongLibraryService songLibraryService) {
+      ArtistClickListener onArtistClicked, SongLibraryService songLibraryService,
+      CreditManager creditManager) {
 
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
@@ -129,6 +98,7 @@ public class GenreDetailPanel extends JPanel {
     this.onAlbumClicked = onAlbumClicked;
     this.onArtistClicked = onArtistClicked;
     this.songLibraryService = songLibraryService;
+    this.creditManager = creditManager;
 
     SearchResultDto safe = results != null ? results : new SearchResultDto();
     this.artists = safeList(safe.getArtists());
@@ -346,7 +316,7 @@ public class GenreDetailPanel extends JPanel {
         if (item instanceof SongDto song) {
           Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
           AddSongToQueueDialog.show(owner, song, imageLoader, priorityCostMultiplier,
-              songQueueService);
+              songQueueService, creditManager);
         }
       }
     }
