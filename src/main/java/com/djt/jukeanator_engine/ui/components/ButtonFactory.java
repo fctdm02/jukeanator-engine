@@ -10,16 +10,16 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import javax.swing.JButton;
 
-public final class NavigationButtonFactory {
+public final class ButtonFactory {
 
-  // Idle and hover fill colours mirror the sort button's active gradient
-  private static final Color ACCENT_BLUE = new Color(0, 210, 255);
-  private static final Color GRAD_TOP = new Color(0, 160, 210);
-  private static final Color GRAD_BOTTOM = new Color(0, 80, 130);
-  private static final Color HOVER_TOP = new Color(0, 190, 240);
-  private static final Color HOVER_BOTTOM = new Color(0, 100, 160);
-
-  public static JButton createButton(String text) {
+  // Navigation buttons
+  private static final Color NB_ACCENT_BLUE = new Color(0, 210, 255);
+  private static final Color NB_GRAD_TOP = new Color(0, 160, 210);
+  private static final Color NB_GRAD_BOTTOM = new Color(0, 80, 130);
+  private static final Color NB_HOVER_TOP = new Color(0, 190, 240);
+  private static final Color NB_HOVER_BOTTOM = new Color(0, 100, 160);
+  
+  public static JButton createNavigationButton(String text) {
 
     JButton button = new JButton(text) {
 
@@ -49,13 +49,13 @@ public final class NavigationButtonFactory {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         // Gradient fill — brighter on hover
-        Color top = hovered ? HOVER_TOP : GRAD_TOP;
-        Color bottom = hovered ? HOVER_BOTTOM : GRAD_BOTTOM;
+        Color top = hovered ? NB_HOVER_TOP : NB_GRAD_TOP;
+        Color bottom = hovered ? NB_HOVER_BOTTOM : NB_GRAD_BOTTOM;
         g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
         g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
 
         // Accent border
-        g2.setColor(ACCENT_BLUE);
+        g2.setColor(NB_ACCENT_BLUE);
         g2.setStroke(new java.awt.BasicStroke(1.5f));
         g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
 

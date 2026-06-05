@@ -124,14 +124,14 @@ public class AlbumGridPanel extends JPanel {
     // ── Navigation ────────────────────────────────────────────────────────
     navPanel.removeAll();
 
-    JButton prevBtn = NavigationButtonFactory.createButton("❮");
+    JButton prevBtn = ButtonFactory.createNavigationButton("❮");
     prevBtn.setVisible(currentPage > 0);
     prevBtn.addActionListener(e -> {
       currentPage--;
       refresh();
     });
 
-    JButton nextBtn = NavigationButtonFactory.createButton("❯");
+    JButton nextBtn = ButtonFactory.createNavigationButton("❯");
     nextBtn.setVisible(currentPage < totalPages - 1);
     nextBtn.addActionListener(e -> {
       currentPage++;

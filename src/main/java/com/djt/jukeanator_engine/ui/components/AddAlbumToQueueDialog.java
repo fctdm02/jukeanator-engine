@@ -351,7 +351,7 @@ public class AddAlbumToQueueDialog extends JDialog {
         int w = getWidth();
         int h = getHeight();
 
-        // 1. Background Tint
+        // 1. Background Fill Logic
         if (enabled) {
           g2.setColor(hovered ? BTN_HOVER : BTN_NORMAL);
         } else {
@@ -359,20 +359,22 @@ public class AddAlbumToQueueDialog extends JDialog {
         }
         g2.fillRoundRect(0, 0, w, h, 10, 10);
 
-        // 2. Hardware Spec Borders
+        // 2. Structural Border Paint
         g2.setColor(enabled ? accentColor : AM_WARN_BORDER);
         g2.setStroke(new java.awt.BasicStroke(2.0f));
         g2.drawRoundRect(1, 1, w - 3, h - 3, 10, 10);
 
-        // 3. Typography Positioning Engine
+        // 3. Dual-Line Typography Rendering Engines
         g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
         FontMetrics fm = g2.getFontMetrics();
         int y1 = h / 2 - 2;
 
         if (enabled) {
+          // Label Line
           g2.setColor(TEXT_PRIMARY);
           g2.drawString(actionText, (w - fm.stringWidth(actionText)) / 2, y1);
 
+          // Credit Cost Line
           g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
           g2.setColor(accentColor);
           FontMetrics fmCost = g2.getFontMetrics();
@@ -380,9 +382,11 @@ public class AddAlbumToQueueDialog extends JDialog {
           g2.drawString(costText, (w - fmCost.stringWidth(costText)) / 2,
               h / 2 + fmCost.getAscent());
         } else {
+          // Warning Label Line 1
           g2.setColor(TEXT_PRIMARY);
           g2.drawString(actionText, (w - fm.stringWidth(actionText)) / 2, y1);
 
+          // Hardware Spec Needed Line 2
           g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
           g2.setColor(AM_WARN_BORDER);
           FontMetrics fmSmall = g2.getFontMetrics();

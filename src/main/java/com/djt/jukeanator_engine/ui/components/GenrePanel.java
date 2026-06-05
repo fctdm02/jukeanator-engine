@@ -237,7 +237,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     int totalPages =
         Math.max(1, (int) Math.ceil(genresListModel.size() / (double) GENRES_PER_PAGE));
 
-    JButton prevBtn = NavigationButtonFactory.createButton("❮");
+    JButton prevBtn = ButtonFactory.createNavigationButton("❮");
     prevBtn.addActionListener(e -> {
       if (currentPage > 0) {
         currentPage--;
@@ -246,7 +246,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     });
     prevBtn.setVisible(currentPage > 0);
 
-    JButton nextBtn = NavigationButtonFactory.createButton("❯");
+    JButton nextBtn = ButtonFactory.createNavigationButton("❯");
     nextBtn.addActionListener(e -> {
       if (currentPage < totalPages - 1) {
         currentPage++;
