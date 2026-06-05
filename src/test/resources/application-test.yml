@@ -33,8 +33,10 @@ user-interface:
   #
   # CREDIT CONFIGURATION
   #
-  credits-per: 3
-  five-bonus-credits: 3
-  ten-bonus-credits: 10
+  increment-credits-key: a
+  num-credits: 10  
+  credits-per-dollar: 3
+  five-dollar-bonus-credits: 3
+  ten-dollar-bonus-credits: 10
   #SEARCH CONFIGURATION
   enable-type-ahead-search: true

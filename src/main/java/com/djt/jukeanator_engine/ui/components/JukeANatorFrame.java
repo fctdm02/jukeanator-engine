@@ -104,9 +104,11 @@ public class JukeANatorFrame extends JFrame {
 
 
   // SONG CREDITS
-  private final int creditsPer;
-  private final int fiveBonusCredits;
-  private final int tenBonusCredits;
+  private final char incrementCreditsKey;
+  private int numCredits = 6;
+  private final int creditsPerDollar;
+  private final int fiveDollarBonusCredits;
+  private final int tenDollarBonusCredits;
 
 
   // CONSTRUCTOR
@@ -119,9 +121,11 @@ public class JukeANatorFrame extends JFrame {
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
 
-    this.creditsPer = this.jukeANatorUserInterfaceProperties.getCreditsPer();
-    this.fiveBonusCredits = this.jukeANatorUserInterfaceProperties.getFiveBonusCredits();
-    this.tenBonusCredits = this.jukeANatorUserInterfaceProperties.getTenBonusCredits();
+    this.incrementCreditsKey = jukeANatorUserInterfaceProperties.getIncrementCreditsKey();
+    this.numCredits = jukeANatorUserInterfaceProperties.getNumCredits();    
+    this.creditsPerDollar = this.jukeANatorUserInterfaceProperties.getCreditsPerDollar();
+    this.fiveDollarBonusCredits = this.jukeANatorUserInterfaceProperties.getFiveDollarBonusCredits();
+    this.tenDollarBonusCredits = this.jukeANatorUserInterfaceProperties.getTenDollarBonusCredits();
 
     this.enableTypeAheadSearch = this.jukeANatorUserInterfaceProperties.isEnableTypeAheadSearch();
 
@@ -394,8 +398,8 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private HomePanel buildHomePanel() {
 
-    return new HomePanel(songLibraryService, songQueueService, imageLoader, creditsPer,
-        creditsPer * 2, // priority cost placeholder
+    return new HomePanel(songLibraryService, songQueueService, imageLoader, creditsPerDollar,
+        creditsPerDollar * 2, // priority cost placeholder
         POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, HOME_GRID_COLS,
         HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }
@@ -405,8 +409,8 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private SearchPanel buildSearchPanel() {
 
-    return new SearchPanel(songLibraryService, songQueueService, imageLoader, creditsPer,
-        creditsPer * 2, // priority cost placeholder
+    return new SearchPanel(songLibraryService, songQueueService, imageLoader, creditsPerDollar,
+        creditsPerDollar * 2, // priority cost placeholder
         POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3,
         enableTypeAheadSearch, HOME_GRID_COLS, HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }
@@ -416,8 +420,8 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private HotHerePanel buildHotHerePanel() {
 
-    return new HotHerePanel(songLibraryService, songQueueService, imageLoader, creditsPer,
-        creditsPer * 2, // priority cost placeholder
+    return new HotHerePanel(songLibraryService, songQueueService, imageLoader, creditsPerDollar,
+        creditsPerDollar * 2, // priority cost placeholder
         POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, HOME_GRID_COLS,
         HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }
@@ -427,8 +431,8 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private GenrePanel buildGenresPanel() {
 
-    return new GenrePanel(songLibraryService, songQueueService, imageLoader, creditsPer,
-        creditsPer * 2, // priority cost placeholder
+    return new GenrePanel(songLibraryService, songQueueService, imageLoader, creditsPerDollar,
+        creditsPerDollar * 2, // priority cost placeholder
         POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, HOME_GRID_COLS,
         HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }
@@ -791,9 +795,9 @@ public class JukeANatorFrame extends JFrame {
 
   private String buildCreditsDescription() {
 
-    int oneDollarCredits = creditsPer;
-    int fiveDollarCredits = (5 * creditsPer) + fiveBonusCredits;
-    int tenDollarCredits = (10 * creditsPer) + tenBonusCredits;
+    int oneDollarCredits = creditsPerDollar;
+    int fiveDollarCredits = (5 * creditsPerDollar) + fiveDollarBonusCredits;
+    int tenDollarCredits = (10 * creditsPerDollar) + tenDollarBonusCredits;
 
     return String.format("1$=%dcr | 5$=%dcr | 10$=%dcr", oneDollarCredits, fiveDollarCredits,
         tenDollarCredits);

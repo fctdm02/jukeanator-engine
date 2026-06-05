@@ -13,9 +13,11 @@ public class JukeANatorUserInterfaceProperties {
   //
   // CREDIT CONFIGURATION
   //
-  private int creditsPer = 3;
-  private int fiveBonusCredits = 3;
-  private int tenBonusCredits = 10;
+  private char incrementCreditsKey = 'a';
+  private int numCredits = 6; 
+  private int creditsPerDollar = 3;
+  private int fiveDollarBonusCredits = 3;
+  private int tenDollarBonusCredits = 10;
 
   //
   // SEARCH CONFIGURATION
@@ -29,29 +31,45 @@ public class JukeANatorUserInterfaceProperties {
   public void setEnabled(boolean enabled) {
     this.enabled = enabled;
   }
-
-  public int getCreditsPer() {
-    return creditsPer;
+  
+  public char getIncrementCreditsKey() {
+    return incrementCreditsKey;
   }
 
-  public void setCreditsPer(int creditsPer) {
-    this.creditsPer = creditsPer;
+  public void setIncrementCreditsKey(char incrementCreditsKey) {
+    this.incrementCreditsKey = incrementCreditsKey;
   }
 
-  public int getFiveBonusCredits() {
-    return fiveBonusCredits;
+  public int getNumCredits() {
+    return numCredits;
   }
 
-  public void setFiveBonusCredits(int fiveBonusCredits) {
-    this.fiveBonusCredits = fiveBonusCredits;
+  public void setNumCredits(int numCredits) {
+    this.numCredits = numCredits;
   }
 
-  public int getTenBonusCredits() {
-    return tenBonusCredits;
+  public int getCreditsPerDollar() {
+    return creditsPerDollar;
   }
 
-  public void setTenBonusCredits(int tenBonusCredits) {
-    this.tenBonusCredits = tenBonusCredits;
+  public void setCreditsPerDollar(int creditsPerDollar) {
+    this.creditsPerDollar = creditsPerDollar;
+  }
+
+  public int getFiveDollarBonusCredits() {
+    return fiveDollarBonusCredits;
+  }
+
+  public void setFiveDollarBonusCredits(int fiveDollarBonusCredits) {
+    this.fiveDollarBonusCredits = fiveDollarBonusCredits;
+  }
+
+  public int getTenDollarBonusCredits() {
+    return tenDollarBonusCredits;
+  }
+
+  public void setTenDollarBonusCredits(int tenDollarBonusCredits) {
+    this.tenDollarBonusCredits = tenDollarBonusCredits;
   }
 
   public boolean isEnableTypeAheadSearch() {
