@@ -7,7 +7,6 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Frame;
-import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
@@ -46,6 +45,10 @@ public class AddAlbumToQueueDialog extends JDialog {
   private static final Color BTN_NORMAL = new Color(40, 40, 55);
   private static final Color BTN_HOVER = new Color(0, 140, 180);
 
+  // Jukebox Warning Colors
+  private static final Color AM_WARN_BG = new Color(25, 10, 10);
+  private static final Color AM_WARN_BORDER = new Color(220, 40, 40);
+
   // ── Timeout ───────────────────────────────────────────────────────────────
   private static final int TIMEOUT_SECONDS = 120;
 
@@ -55,7 +58,6 @@ public class AddAlbumToQueueDialog extends JDialog {
   private final SongQueueService songQueueService;
 
   private final CreditManager creditManager;
-  private final int normalPlayCost = 1;
   private JButton normalButton;
   private JButton priorityButton;
   private Runnable creditListener;
@@ -94,7 +96,6 @@ public class AddAlbumToQueueDialog extends JDialog {
     getContentPane().setLayout(new BorderLayout());
     getContentPane().add(buildBorderPanel());
 
-    // ── Countdown timer ───────────────────────────────────────────────────
     countdownTimer = new Timer(1000, e -> {
       secondsRemaining--;
       updateTimeout();
@@ -105,12 +106,7 @@ public class AddAlbumToQueueDialog extends JDialog {
     countdownTimer.start();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // ROOT PANEL WITH ACCENT BORDER
-  // ─────────────────────────────────────────────────────────────────────────
   private JPanel buildBorderPanel() {
-
-    // Outer glowing border panel
     JPanel border = new JPanel(new BorderLayout()) {
       private static final long serialVersionUID = -6872340517984425563L;
 
@@ -130,11 +126,7 @@ public class AddAlbumToQueueDialog extends JDialog {
     return border;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // MAIN CONTENT PANEL
-  // ─────────────────────────────────────────────────────────────────────────
   private JPanel buildMainPanel() {
-
     JPanel main = new JPanel(new BorderLayout(0, 0));
     main.setBackground(BG_PANEL);
     main.setBorder(BorderFactory.createEmptyBorder(24, 28, 20, 28));
@@ -146,16 +138,11 @@ public class AddAlbumToQueueDialog extends JDialog {
     return main;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // INFO ROW (cover art | song name / artist / album)
-  // ─────────────────────────────────────────────────────────────────────────
   private JPanel buildInfoRow(AlbumDto album, ImageLoader imageLoader) {
-
     JPanel row = new JPanel(new BorderLayout(24, 0));
     row.setOpaque(false);
     row.setBorder(new EmptyBorder(0, 0, 14, 0));
 
-    // ── Cover art ────────────────────────────────────────────────────────
     JLabel cover = new JLabel();
     cover.setPreferredSize(new Dimension(160, 160));
     cover.setHorizontalAlignment(SwingConstants.CENTER);
@@ -174,7 +161,6 @@ public class AddAlbumToQueueDialog extends JDialog {
       }
     }
 
-    // ── Text block ────────────────────────────────────────────────────────
     JPanel text = new JPanel();
     text.setOpaque(false);
     text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
@@ -199,11 +185,7 @@ public class AddAlbumToQueueDialog extends JDialog {
     return row;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // DIVIDER
-  // ─────────────────────────────────────────────────────────────────────────
   private JPanel buildDivider() {
-
     JPanel divider = new JPanel() {
       private static final long serialVersionUID = -3555442413130451178L;
 
@@ -219,16 +201,11 @@ public class AddAlbumToQueueDialog extends JDialog {
     return divider;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // BOTTOM SECTION (action buttons + cancel + timeout)
-  // ─────────────────────────────────────────────────────────────────────────
   private JPanel buildBottomSection() {
-
     JPanel bottom = new JPanel(new BorderLayout(0, 12));
     bottom.setOpaque(false);
     bottom.setBorder(new EmptyBorder(12, 0, 0, 0));
 
-    // ── Action buttons ────────────────────────────────────────────────────
     JPanel buttons = new JPanel(new GridLayout(1, 2, 16, 0));
     buttons.setOpaque(false);
 
@@ -237,44 +214,29 @@ public class AddAlbumToQueueDialog extends JDialog {
     int highestPriority = songQueueService.getHighestPriority();
     int priorityCost = numSongs * (highestPriority * priorityCostMultiplier);
 
-
-
-    this.normalButton = createQueueButton("Play Album", normalPlayCost, e -> {
-      songQueueService.addAlbumToQueue(new AddAlbumToQueueRequest(album.getAlbumId(), 1));
+    this.normalButton = createQueueButton("Play Album", normalPlayCost, ACCENT_BLUE, e -> {
+      if (creditManager.deductCredits(normalPlayCost)) {
+        songQueueService.addAlbumToQueue(new AddAlbumToQueueRequest(album.getAlbumId(), 1));
+        dismiss();
+      }
     });
 
-    this.priorityButton = createQueueButton("Priority Album Play", priorityCost, e -> {
-      songQueueService
-          .addAlbumToQueue(new AddAlbumToQueueRequest(album.getAlbumId(), highestPriority));
+    this.priorityButton = createQueueButton("Priority Album Play", priorityCost, ACCENT_GOLD, e -> {
+      if (creditManager.deductCredits(priorityCost)) {
+        songQueueService
+            .addAlbumToQueue(new AddAlbumToQueueRequest(album.getAlbumId(), highestPriority));
+        dismiss();
+      }
     });
 
-
-
-    buttons.add(buildActionButton("Play Album", normalPlayCost + "cr", ACCENT_BLUE, () -> {
-      dismiss();
-      songQueueService.addAlbumToQueue(new AddAlbumToQueueRequest(album.getAlbumId(), 1));
-    }));
-
-    buttons.add(buildActionButton("Priority Album Play", priorityCost + "cr", ACCENT_GOLD, () -> {
-      dismiss();
-      songQueueService
-          .addAlbumToQueue(new AddAlbumToQueueRequest(album.getAlbumId(), highestPriority));
-    }));
-
-
-
-    // Add selection buttons to the button panel
     buttons.add(this.normalButton);
     buttons.add(this.priorityButton);
 
-    // Attach reactive listeners
     this.creditListener = this::updateButtonStates;
     this.creditManager.addListener(creditListener);
-
-    // Run initialization configuration tick
+    
     updateButtonStates();
 
-    // IMPORTANT: Clean up memory leaks when window is closed
     this.addWindowListener(new java.awt.event.WindowAdapter() {
       @Override
       public void windowClosed(java.awt.event.WindowEvent e) {
@@ -282,14 +244,11 @@ public class AddAlbumToQueueDialog extends JDialog {
       }
     });
 
-    // ── Cancel button ─────────────────────────────────────────────────────
     JButton cancel = createCancelButton("CANCEL");
-
     JPanel cancelRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
     cancelRow.setOpaque(false);
     cancelRow.add(cancel);
 
-    // ── Timeout bar ───────────────────────────────────────────────────────
     JPanel timeoutRow = buildTimeoutRow();
 
     bottom.add(buttons, BorderLayout.NORTH);
@@ -299,79 +258,7 @@ public class AddAlbumToQueueDialog extends JDialog {
     return bottom;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // ACTION BUTTON (two-line: label on top, cost in accent colour below)
-  // ─────────────────────────────────────────────────────────────────────────
-  private JButton buildActionButton(String label, String cost, Color accentColor,
-      Runnable onClick) {
-
-    // Custom two-line button painted manually
-    JButton button = new JButton() {
-      private static final long serialVersionUID = 373087729838840160L;
-
-      @Override
-      protected void paintComponent(Graphics g) {
-
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        // Background
-        g2.setColor(getBackground());
-        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
-
-        // Border
-        g2.setColor(accentColor);
-        g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 10, 10);
-
-        // Label (top line)
-        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
-        g2.setColor(TEXT_PRIMARY);
-        java.awt.FontMetrics fm1 = g2.getFontMetrics();
-        int labelX = (getWidth() - fm1.stringWidth(label)) / 2;
-        g2.drawString(label, labelX, getHeight() / 2 - 2);
-
-        // Cost (bottom line, accent colour)
-        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
-        g2.setColor(accentColor);
-        java.awt.FontMetrics fm2 = g2.getFontMetrics();
-        int costX = (getWidth() - fm2.stringWidth(cost)) / 2;
-        g2.drawString(cost, costX, getHeight() / 2 + fm2.getAscent());
-
-        g2.dispose();
-      }
-    };
-
-    button.setBackground(BTN_NORMAL);
-    button.setFocusPainted(false);
-    button.setBorderPainted(false);
-    button.setContentAreaFilled(false);
-    button.setPreferredSize(new Dimension(200, 80));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-    button.addActionListener(e -> onClick.run());
-
-    // Hover
-    button.addMouseListener(new java.awt.event.MouseAdapter() {
-      @Override
-      public void mouseEntered(java.awt.event.MouseEvent e) {
-        button.setBackground(BTN_HOVER);
-        button.repaint();
-      }
-
-      @Override
-      public void mouseExited(java.awt.event.MouseEvent e) {
-        button.setBackground(BTN_NORMAL);
-        button.repaint();
-      }
-    });
-
-    return button;
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // TIMEOUT ROW (label + progress bar)
-  // ─────────────────────────────────────────────────────────────────────────
   private JPanel buildTimeoutRow() {
-
     JPanel row = new JPanel(new BorderLayout(10, 0));
     row.setOpaque(false);
     row.setBorder(new EmptyBorder(6, 0, 0, 0));
@@ -379,7 +266,7 @@ public class AddAlbumToQueueDialog extends JDialog {
     timeoutLabel.setForeground(TEXT_SECONDARY);
     timeoutLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
     timeoutLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-    updateTimeout(); // set initial text
+    updateTimeout();
 
     timeoutBar.setValue(TIMEOUT_SECONDS);
     timeoutBar.setForeground(ACCENT_BLUE);
@@ -394,92 +281,24 @@ public class AddAlbumToQueueDialog extends JDialog {
     return row;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
-
   private void updateTimeout() {
-
     timeoutBar.setValue(secondsRemaining);
     timeoutLabel.setText("Closes in " + secondsRemaining + "s");
   }
 
   private void dismiss() {
-
     countdownTimer.stop();
     SwingUtilities.invokeLater(this::dispose);
-  }
-
-  private JButton createCancelButton(String text) {
-
-    // Idle and hover fill colours mirror the sort button's active gradient
-    final Color GRAD_TOP = new Color(0, 160, 210);
-    final Color GRAD_BOTTOM = new Color(0, 80, 130);
-    final Color HOVER_TOP = new Color(0, 190, 240);
-    final Color HOVER_BOTTOM = new Color(0, 100, 160);
-
-    JButton button = new JButton(text) {
-
-      private static final long serialVersionUID = 1L;
-      private boolean hovered = false;
-
-      {
-        addMouseListener(new java.awt.event.MouseAdapter() {
-          @Override
-          public void mouseEntered(java.awt.event.MouseEvent e) {
-            hovered = true;
-            repaint();
-          }
-
-          @Override
-          public void mouseExited(java.awt.event.MouseEvent e) {
-            hovered = false;
-            repaint();
-          }
-        });
-      }
-
-      @Override
-      protected void paintComponent(Graphics g) {
-
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        // Gradient fill — brighter on hover
-        Color top = hovered ? HOVER_TOP : GRAD_TOP;
-        Color bottom = hovered ? HOVER_BOTTOM : GRAD_BOTTOM;
-        g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
-        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-
-        // Accent border
-        g2.setColor(ACCENT_BLUE);
-        g2.setStroke(new java.awt.BasicStroke(1.5f));
-        g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
-
-        g2.dispose();
-        super.paintComponent(g);
-      }
-    };
-
-    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
-    button.setForeground(Color.WHITE);
-    button.setContentAreaFilled(false);
-    button.setBorderPainted(false);
-    button.setFocusPainted(false);
-    button.setOpaque(false);
-    button.setPreferredSize(new Dimension(140, 52));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-    button.addActionListener(e -> dismiss());
-
-    return button;
   }
 
   private void updateButtonStates() {
 
     int currentCredits = creditManager.getCredits();
 
+    int numSongs = album.getSongs().size();
+    int normalPlayCost = numSongs;
     int highestPriority = songQueueService.getHighestPriority();
-    int priorityCost = highestPriority * priorityCostMultiplier;
+    int priorityCost = numSongs * (highestPriority * priorityCostMultiplier);
 
     normalButton.setEnabled(currentCredits >= normalPlayCost);
     priorityButton.setEnabled(currentCredits >= priorityCost);
@@ -488,9 +307,8 @@ public class AddAlbumToQueueDialog extends JDialog {
     priorityButton.repaint();
   }
 
-  private JButton createQueueButton(String actionText, int cost,
-      java.awt.event.ActionListener onSuccess) {
-
+  private JButton createQueueButton(String actionText, int cost, Color accentColor,
+      java.awt.event.ActionListener onClick) {
     JButton button = new JButton() {
       private static final long serialVersionUID = 1L;
       private boolean hovered = false;
@@ -519,46 +337,45 @@ public class AddAlbumToQueueDialog extends JDialog {
         int w = getWidth();
         int h = getHeight();
 
+        // 1. Background Tint
         if (enabled) {
-          // Normal UI Theme Linear Flow
-          Color top = hovered ? new Color(0, 240, 255) : new Color(0, 170, 255);
-          Color bottom = hovered ? new Color(0, 150, 200) : new Color(0, 100, 150);
-          g2.setPaint(new GradientPaint(0, 0, top, 0, h, bottom));
-          g2.fillRoundRect(0, 0, w, h, 8, 8);
-          g2.setColor(new Color(0, 210, 255)); // ACCENT_BLUE
+          g2.setColor(hovered ? BTN_HOVER : BTN_NORMAL);
         } else {
-          // Disabled AMI Hardware Interface Spec
-          g2.setColor(new Color(25, 10, 10)); // Deep dark red backdrop tint
-          g2.fillRoundRect(0, 0, w, h, 8, 8);
-          g2.setColor(new Color(220, 40, 40)); // Solid Warning Red Border
+          g2.setColor(AM_WARN_BG);
         }
+        g2.fillRoundRect(0, 0, w, h, 10, 10);
 
+        // 2. Hardware Spec Borders
+        g2.setColor(enabled ? accentColor : AM_WARN_BORDER);
         g2.setStroke(new java.awt.BasicStroke(2.0f));
-        g2.drawRoundRect(1, 1, w - 3, h - 3, 8, 8);
+        g2.drawRoundRect(1, 1, w - 3, h - 3, 10, 10);
 
-        // Text Engine Formatting
-        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 15));
+        // 3. Typography Positioning Engine
+        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
         FontMetrics fm = g2.getFontMetrics();
+        int y1 = h / 2 - 2;
 
         if (enabled) {
-          g2.setColor(Color.WHITE);
-          int textX = (w - fm.stringWidth(actionText)) / 2;
-          int textY = (h - fm.getHeight()) / 2 + fm.getAscent();
-          g2.drawString(actionText, textX, textY);
+          g2.setColor(TEXT_PRIMARY);
+          g2.drawString(actionText, (w - fm.stringWidth(actionText)) / 2, y1);
+
+          g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+          g2.setColor(accentColor);
+          FontMetrics fmCost = g2.getFontMetrics();
+          String costText = cost + (cost == 1 ? " credit" : " credits");
+          g2.drawString(costText, (w - fmCost.stringWidth(costText)) / 2,
+              h / 2 + fmCost.getAscent());
         } else {
-          // Multi-line warning layout text rendering
-          g2.setColor(new Color(220, 40, 40));
-          String line1 = actionText;
-          int needed = cost - creditManager.getCredits();
-          String line2 = "ADD " + needed + " " + (needed == 1 ? "CREDIT" : "CREDITS");
+          g2.setColor(TEXT_PRIMARY);
+          g2.drawString(actionText, (w - fm.stringWidth(actionText)) / 2, y1);
 
-          int y1 = (h / 2) - 2;
-          int y2 = (h / 2) + fm.getAscent() - 2;
-
-          g2.drawString(line1, (w - fm.stringWidth(line1)) / 2, y1);
-          g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
+          g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+          g2.setColor(AM_WARN_BORDER);
           FontMetrics fmSmall = g2.getFontMetrics();
-          g2.drawString(line2, (w - fmSmall.stringWidth(line2)) / 2, y2);
+          int needed = cost - creditManager.getCredits();
+          String warningText = "ADD " + needed + " " + (needed == 1 ? "CREDIT" : "CREDITS");
+          g2.drawString(warningText, (w - fmSmall.stringWidth(warningText)) / 2,
+              h / 2 + fmSmall.getAscent());
         }
         g2.dispose();
       }
@@ -568,28 +385,71 @@ public class AddAlbumToQueueDialog extends JDialog {
     button.setBorderPainted(false);
     button.setFocusPainted(false);
     button.setOpaque(false);
-    button.setPreferredSize(new Dimension(150, 55));
+    button.setPreferredSize(new Dimension(200, 80));
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-    button.addActionListener(e -> {
-      if (creditManager.deductCredits(cost)) {
-        onSuccess.actionPerformed(e);
-        dismiss();
-      }
-    });
+    button.addActionListener(onClick);
 
     return button;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // STATIC FACTORY — convenience method for call sites
-  // ─────────────────────────────────────────────────────────────────────────
+  private JButton createCancelButton(String text) {
+    JButton button = new JButton() {
+      private static final long serialVersionUID = 1L;
+      private boolean hovered = false;
+      {
+        addMouseListener(new java.awt.event.MouseAdapter() {
+          public void mouseEntered(java.awt.event.MouseEvent e) {
+            hovered = true;
+            repaint();
+          }
+
+          public void mouseExited(java.awt.event.MouseEvent e) {
+            hovered = false;
+            repaint();
+          }
+        });
+      }
+
+      @Override
+      protected void paintComponent(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        int w = getWidth();
+        int h = getHeight();
+
+        g2.setColor(hovered ? BTN_HOVER : BTN_NORMAL);
+        g2.fillRoundRect(0, 0, w, h, 10, 10);
+
+        g2.setColor(ACCENT_BLUE);
+        g2.setStroke(new java.awt.BasicStroke(2.0f));
+        g2.drawRoundRect(1, 1, w - 3, h - 3, 10, 10);
+
+        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
+        FontMetrics fm = g2.getFontMetrics();
+        g2.setColor(TEXT_PRIMARY);
+        g2.drawString(text, (w - fm.stringWidth(text)) / 2,
+            (h - fm.getHeight()) / 2 + fm.getAscent() - 2);
+
+        g2.dispose();
+      }
+    };
+
+    button.setContentAreaFilled(false);
+    button.setBorderPainted(false);
+    button.setFocusPainted(false);
+    button.setOpaque(false);
+    button.setPreferredSize(new Dimension(200, 56));
+    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    button.addActionListener(e -> dismiss());
+
+    return button;
+  }
+
   public static void show(Frame owner, AlbumDto album, ImageLoader imageLoader,
       int priorityCostMultiplier, SongQueueService songQueueService, CreditManager creditManager) {
-
     AddAlbumToQueueDialog dialog = new AddAlbumToQueueDialog(owner, album, imageLoader,
         priorityCostMultiplier, songQueueService, creditManager);
-
-    dialog.setVisible(true); // blocks here (modal)
+    dialog.setVisible(true);
   }
 }
