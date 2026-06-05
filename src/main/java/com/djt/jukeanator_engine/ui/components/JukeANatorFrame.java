@@ -425,7 +425,7 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private HomePanel buildHomePanel() {
 
-    return new HomePanel(creditManager, songLibraryService, songQueueService, imageLoader,
+    return new HomePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService, imageLoader,
         priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
         POPULARITY_THRESHOLD_3, HOME_GRID_COLS, HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }
@@ -435,7 +435,7 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private SearchPanel buildSearchPanel() {
 
-    return new SearchPanel(creditManager, songLibraryService, songQueueService, imageLoader,
+    return new SearchPanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService, imageLoader,
         priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
         POPULARITY_THRESHOLD_3, enableTypeAheadSearch, HOME_GRID_COLS, HOME_GRID_ROWS,
         HOME_TILE_ART_W, HOME_TILE_ART_H);
@@ -446,7 +446,7 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private HotHerePanel buildHotHerePanel() {
 
-    return new HotHerePanel(creditManager, songLibraryService, songQueueService, imageLoader,
+    return new HotHerePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService, imageLoader,
         priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
         POPULARITY_THRESHOLD_3, HOME_GRID_COLS, HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }
@@ -456,7 +456,7 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private GenrePanel buildGenresPanel() {
 
-    return new GenrePanel(creditManager, songLibraryService, songQueueService, imageLoader,
+    return new GenrePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService, imageLoader,
         priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
         POPULARITY_THRESHOLD_3, HOME_GRID_COLS, HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
   }

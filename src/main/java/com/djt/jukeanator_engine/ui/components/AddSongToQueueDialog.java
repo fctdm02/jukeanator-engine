@@ -70,7 +70,8 @@ public class AddSongToQueueDialog extends JDialog {
   private final JProgressBar timeoutBar = new JProgressBar(0, TIMEOUT_SECONDS);
 
   public AddSongToQueueDialog(Frame owner, SongDto song, ImageLoader imageLoader,
-      int priorityCostMultiplier, SongQueueService songQueueService, CreditManager creditManager) {
+      int priorityCostMultiplier, SongQueueService songQueueService, CreditManager creditManager,
+      char incrementCreditsKey) {
 
     super(owner, "Add Song to Queue", true /* modal */);
 
@@ -106,6 +107,19 @@ public class AddSongToQueueDialog extends JDialog {
       }
     });
     countdownTimer.start();
+
+    // Hardware Bill Acceptor Key Bindings
+    this.setFocusable(true);
+    this.addKeyListener(new java.awt.event.KeyAdapter() {
+      @Override
+      public void keyTyped(java.awt.event.KeyEvent e) {
+        if (e.getKeyChar() == incrementCreditsKey) {
+          creditManager.addDollar();
+        }
+      }
+    });
+
+    requestFocusInWindow();
   }
 
   private JPanel buildBorderPanel() {
@@ -241,7 +255,7 @@ public class AddSongToQueueDialog extends JDialog {
 
     this.creditListener = this::updateButtonStates;
     this.creditManager.addListener(creditListener);
-    
+
     updateButtonStates();
 
     this.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -457,9 +471,10 @@ public class AddSongToQueueDialog extends JDialog {
   }
 
   public static void show(Frame owner, SongDto song, ImageLoader imageLoader,
-      int priorityCostMultiplier, SongQueueService songQueueService, CreditManager creditManager) {
+      int priorityCostMultiplier, SongQueueService songQueueService, CreditManager creditManager,
+      char incrementCreditsKey) {
     AddSongToQueueDialog dialog = new AddSongToQueueDialog(owner, song, imageLoader,
-        priorityCostMultiplier, songQueueService, creditManager);
+        priorityCostMultiplier, songQueueService, creditManager, incrementCreditsKey);
     dialog.setVisible(true);
   }
 }

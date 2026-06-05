@@ -34,7 +34,8 @@ public class AlbumDetailCard extends JPanel {
 
   public AlbumDetailCard(Frame owner, AlbumDto album, ImageLoader imageLoader,
       SongQueueService songQueueService, int priorityCostMultiplier, int threshold1, int threshold2,
-      int threshold3, TabNavigator navigator, CreditManager creditManager) {
+      int threshold3, TabNavigator navigator, CreditManager creditManager,
+      char incrementCreditsKey) {
 
     setLayout(new BorderLayout());
     setOpaque(false);
@@ -43,7 +44,7 @@ public class AlbumDetailCard extends JPanel {
       secondsRemaining = TIMEOUT_SECONDS;
       updateTimeout();
       AddSongToQueueDialog.show(owner, song, imageLoader, priorityCostMultiplier, songQueueService,
-          creditManager);
+          creditManager, incrementCreditsKey);
     };
 
     AlbumViewPanel.AlbumClickListener albumClick = clicked -> {
@@ -52,7 +53,7 @@ public class AlbumDetailCard extends JPanel {
       updateTimeout();
 
       AddAlbumToQueueDialog.show(owner, clicked, imageLoader, priorityCostMultiplier,
-          songQueueService, creditManager);
+          songQueueService, creditManager, incrementCreditsKey);
     };
 
     AlbumViewPanel albumView = new AlbumViewPanel(album, imageLoader, threshold1, threshold2,

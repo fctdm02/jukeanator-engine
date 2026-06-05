@@ -73,6 +73,7 @@ public class GenreDetailPanel extends JPanel {
   private final ArtistClickListener onArtistClicked;
   private final SongLibraryService songLibraryService;
   private final CreditManager creditManager;
+  private final char incrementCreditsKey;
 
   // ── Current sort state ────────────────────────────────────────────────────
   private SortMode currentSort = SortMode.POPULARITY;
@@ -86,7 +87,7 @@ public class GenreDetailPanel extends JPanel {
       SongQueueService songQueueService, int priorityCostMultiplier, String backLabel,
       Runnable onBack, AlbumGridPanel.AlbumClickListener onAlbumClicked,
       ArtistClickListener onArtistClicked, SongLibraryService songLibraryService,
-      CreditManager creditManager) {
+      CreditManager creditManager, char incrementCreditsKey) {
 
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
@@ -99,6 +100,7 @@ public class GenreDetailPanel extends JPanel {
     this.onArtistClicked = onArtistClicked;
     this.songLibraryService = songLibraryService;
     this.creditManager = creditManager;
+    this.incrementCreditsKey = incrementCreditsKey;
 
     SearchResultDto safe = results != null ? results : new SearchResultDto();
     this.artists = safeList(safe.getArtists());
@@ -316,7 +318,7 @@ public class GenreDetailPanel extends JPanel {
         if (item instanceof SongDto song) {
           Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
           AddSongToQueueDialog.show(owner, song, imageLoader, priorityCostMultiplier,
-              songQueueService, creditManager);
+              songQueueService, creditManager, incrementCreditsKey);
         }
       }
     }

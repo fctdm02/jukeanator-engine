@@ -78,6 +78,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
   private GenreDto activeGenre;
 
   // ── Dependencies ──────────────────────────────────────────────────────────
+  private final char incrementCreditsKey;
   private final CreditManager creditManager;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
@@ -95,11 +96,12 @@ public class GenrePanel extends JPanel implements TabNavigator {
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
 
-  public GenrePanel(CreditManager creditManager, SongLibraryService songLibraryService,
-      SongQueueService songQueueService, ImageLoader imageLoader, int priorityCostMultiplier,
-      int popularityT1, int popularityT2, int popularityT3, int gridCols, int gridRows, int artW,
-      int artH) {
+  public GenrePanel(char incrementCreditsKey, CreditManager creditManager,
+      SongLibraryService songLibraryService, SongQueueService songQueueService,
+      ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
+      int popularityT3, int gridCols, int gridRows, int artW, int artH) {
 
+    this.incrementCreditsKey = incrementCreditsKey;
     this.creditManager = creditManager;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
@@ -168,8 +170,9 @@ public class GenrePanel extends JPanel implements TabNavigator {
       currentDetailCard.dismiss();
     }
 
-    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService,
-        priorityCostMultiplier, popularityT1, popularityT2, popularityT3, this, creditManager);
+    currentDetailCard =
+        new AlbumDetailCard(owner, full, imageLoader, songQueueService, priorityCostMultiplier,
+            popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey);
 
     replaceOuterCard(CARD_DETAIL, currentDetailCard);
     outerCardLayout.show(outerRoot, CARD_DETAIL);
@@ -399,7 +402,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
           activeGenre = null;
           innerCardLayout.show(innerRoot, INNER_GRID);
         }, album -> pushAlbumDetail(album), artist -> pushArtistFromGenre(artist),
-        songLibraryService, creditManager);
+        songLibraryService, creditManager, incrementCreditsKey);
 
     genreAlbumsSlot.removeAll();
     genreAlbumsSlot.add(detailPanel, BorderLayout.CENTER);

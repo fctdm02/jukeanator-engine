@@ -44,6 +44,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   private SearchResultDto results;
 
   // ── Dependencies ──────────────────────────────────────────────────────────
+  private final char incrementCreditsKey;
   private final CreditManager creditManager;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
@@ -61,11 +62,12 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
 
-  public HotHerePanel(CreditManager creditManager, SongLibraryService songLibraryService,
-      SongQueueService songQueueService, ImageLoader imageLoader, int priorityCostMultiplier,
-      int popularityT1, int popularityT2, int popularityT3, int gridCols, int gridRows, int artW,
-      int artH) {
+  public HotHerePanel(char incrementCreditsKey, CreditManager creditManager,
+      SongLibraryService songLibraryService, SongQueueService songQueueService,
+      ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
+      int popularityT3, int gridCols, int gridRows, int artW, int artH) {
 
+    this.incrementCreditsKey = incrementCreditsKey;
     this.creditManager = creditManager;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
@@ -119,8 +121,9 @@ public class HotHerePanel extends JPanel implements TabNavigator {
       currentDetailCard.dismiss();
     }
 
-    currentDetailCard = new AlbumDetailCard(owner, full, imageLoader, songQueueService,
-        priorityCostMultiplier, popularityT1, popularityT2, popularityT3, this, creditManager);
+    currentDetailCard =
+        new AlbumDetailCard(owner, full, imageLoader, songQueueService, priorityCostMultiplier,
+            popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey);
 
     replaceCard(CARD_DETAIL, currentDetailCard);
     cardLayout.show(rootPanel, CARD_DETAIL);
@@ -191,7 +194,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
         if (item instanceof SongDto song) {
           Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
           AddSongToQueueDialog.show(owner, song, imageLoader, priorityCostMultiplier,
-              songQueueService, creditManager);
+              songQueueService, creditManager, incrementCreditsKey);
         }
       }
     }
