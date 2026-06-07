@@ -4,6 +4,8 @@ import java.util.Objects;
 
 public class SongDto {
 
+  private final Integer genreId;
+  private final String genreName;
   private final Integer artistId;
   private final String artistName;
   private final Integer albumId;
@@ -14,17 +16,12 @@ public class SongDto {
   private final Integer trackNumber;
   private final Integer numPlays;
 
-  public SongDto(
-      Integer artistId, 
-      String artistName, 
-      Integer albumId, 
-      String albumName,
-      String coverArtPath, 
-      Integer songId, 
-      String songName,
-      Integer trackNumber,
-      Integer numPlays) {
+  public SongDto(Integer genreId, String genreName, Integer artistId, String artistName,
+      Integer albumId, String albumName, String coverArtPath, Integer songId, String songName,
+      Integer trackNumber, Integer numPlays) {
     super();
+    this.genreId = genreId;
+    this.genreName = genreName;
     this.artistId = artistId;
     this.artistName = artistName;
     this.albumId = albumId;
@@ -34,6 +31,14 @@ public class SongDto {
     this.songName = songName;
     this.trackNumber = trackNumber;
     this.numPlays = numPlays;
+  }
+
+  public Integer getGenreId() {
+    return genreId;
+  }
+
+  public String getGenreName() {
+    return genreName;
   }
 
   public Integer getArtistId() {
@@ -63,7 +68,7 @@ public class SongDto {
   public String getSongName() {
     return songName;
   }
-  
+
   public Integer getTrackNumber() {
     return trackNumber;
   }
@@ -71,7 +76,7 @@ public class SongDto {
   public Integer getNumPlays() {
     return numPlays;
   }
-  
+
   @Override
   public int hashCode() {
     return Objects.hash(albumId, songId);
@@ -88,10 +93,11 @@ public class SongDto {
     SongDto other = (SongDto) obj;
     return Objects.equals(albumId, other.albumId) && Objects.equals(songId, other.songId);
   }
-  
+
   @Override
   public String toString() {
     return "SongDto [artistId=" + artistId + ", artistName=" + artistName + ", albumId=" + albumId
-        + ", albumName=" + albumName + ", songId=" + songId + ", songName=" + songName + ", trackNumber=" + trackNumber + "]";
+        + ", albumName=" + albumName + ", songId=" + songId + ", songName=" + songName
+        + ", trackNumber=" + trackNumber + "]";
   }
 }

@@ -27,6 +27,23 @@ public class AlbumGridPanel extends JPanel {
   static final Color TEXT_PRIMARY = Color.WHITE;
   static final Color TEXT_SECONDARY = new Color(180, 180, 180);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // SHARED DISPLAY HELPER
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns the album name with the genre appended in parentheses when a non-blank genre name is
+   * available — e.g. {@code "Rebel Yell (80s)"}. Falls back to just the album name (or an empty
+   * string) when either value is absent.
+   */
+  public static String albumDisplayName(String albumName, String genreName) {
+    String name = albumName != null ? albumName : "";
+    if (genreName != null && !genreName.isBlank()) {
+      return name + " (" + genreName + ")";
+    }
+    return name;
+  }
+
   // ── State ─────────────────────────────────────────────────────────────────
   private final List<AlbumDto> albums;
   private final ImageLoader imageLoader;
@@ -268,8 +285,8 @@ public class AlbumGridPanel extends JPanel {
     textPanel.setOpaque(false);
     textPanel.setBorder(new EmptyBorder(6, 8, 6, 8));
 
-    JLabel albumLabel =
-        new JLabel(album.getAlbumName() != null ? album.getAlbumName() : "", SwingConstants.CENTER);
+    JLabel albumLabel = new JLabel(albumDisplayName(album.getAlbumName(), album.getGenreName()),
+        SwingConstants.CENTER);
     albumLabel.setForeground(TEXT_PRIMARY);
     albumLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
 

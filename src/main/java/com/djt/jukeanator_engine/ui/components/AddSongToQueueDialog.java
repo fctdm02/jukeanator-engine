@@ -44,14 +44,11 @@ public class AddSongToQueueDialog extends JDialog {
   private static final Color ACCENT_GOLD = new Color(255, 200, 0);
   private static final Color TEXT_PRIMARY = Color.WHITE;
   private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
-  private static final Color BTN_NORMAL = new Color(40, 40, 55);
-  private static final Color BTN_HOVER = new Color(0, 140, 180);
 
   // Jukebox Warning Colors
-  private static final Color AM_WARN_BG = new Color(25, 10, 10);
   private static final Color AM_WARN_BORDER = new Color(220, 40, 40);
 
-  // ── AMI 3D button palette ─────────────────────────────────────────────────
+  // ── 3D button palette ─────────────────────────────────────────────────
   // Face gradient: deep blue-slate body matching the AMI dark-teal look
   private static final Color BTN3D_FACE_TOP = new Color(28, 45, 72);
   private static final Color BTN3D_FACE_MID = new Color(18, 32, 54);
@@ -208,7 +205,8 @@ public class AddSongToQueueDialog extends JDialog {
     artistName.setForeground(TEXT_PRIMARY);
     artistName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
 
-    JLabel albumName = new JLabel(song.getAlbumName() != null ? song.getAlbumName() : "");
+    JLabel albumName =
+        new JLabel(AlbumGridPanel.albumDisplayName(song.getAlbumName(), song.getGenreName()));
     albumName.setForeground(TEXT_PRIMARY);
     albumName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
 
@@ -350,20 +348,6 @@ public class AddSongToQueueDialog extends JDialog {
     priorityButton.repaint();
   }
 
-  /**
-   * AMI-style 3D queue button.
-   *
-   * <p>
-   * Structure (top → bottom, z-order):
-   * <ol>
-   * <li>Drop-shadow slab — offset 3 px down, fully opaque, very dark</li>
-   * <li>Bottom "shelf" band — the dark front face that gives the button depth</li>
-   * <li>Top face — three-stop vertical gradient (bright → mid → dim) with a specular highlight line
-   * across the very top edge and subtle side sheens</li>
-   * <li>Glowing border — 2 px, accent colour, drawn last so it sits on top</li>
-   * <li>Two-line label (action text white, cost gold / warning red)</li>
-   * </ol>
-   */
   private JButton createQueueButton(String actionText, int cost, Color accentColor,
       java.awt.event.ActionListener onClick) {
 
@@ -498,10 +482,6 @@ public class AddSongToQueueDialog extends JDialog {
     return button;
   }
 
-  /**
-   * AMI-style 3D cancel button — same physical structure as the queue buttons but a single centred
-   * label and no cost line.
-   */
   private JButton createCancelButton(String text) {
 
     JButton button = new JButton() {

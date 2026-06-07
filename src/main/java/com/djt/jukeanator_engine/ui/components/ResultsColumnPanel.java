@@ -232,7 +232,7 @@ public final class ResultsColumnPanel {
       return a.getCoverArtPath();
     }
     if ("ALBUMS".equals(category) && item instanceof AlbumDto a) {
-      line1.setText(a.getAlbumName());
+      line1.setText(AlbumGridPanel.albumDisplayName(a.getAlbumName(), a.getGenreName()));
       line2.setText(a.getArtistName());
       return a.getCoverArtPath();
     }

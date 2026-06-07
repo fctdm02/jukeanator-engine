@@ -128,6 +128,8 @@ public final class SongLibraryMapper {
   public static SongDto toSongDto(ArtistFolderEntity artist, AlbumFolderEntity album, SongFileEntity songEntity) {
 
     return new SongDto(
+        album.getParentGenre().getPersistentIdentity(),
+        album.getParentGenre().getName(),
         artist.getPersistentIdentity(),
         songEntity.getArtistName(),
         album.getPersistentIdentity(),

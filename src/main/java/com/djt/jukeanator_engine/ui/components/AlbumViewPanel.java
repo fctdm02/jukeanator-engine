@@ -160,7 +160,9 @@ public class AlbumViewPanel extends JPanel {
     meta.setBorder(new EmptyBorder(14, 14, 14, 14));
 
     // Album name — wraps if long
-    meta.add(wrappingMetaLabel(album.getAlbumName(), Font.BOLD, 20, TEXT_PRIMARY));
+    meta.add(wrappingMetaLabel(
+        AlbumGridPanel.albumDisplayName(album.getAlbumName(), album.getGenreName()), Font.BOLD, 20,
+        TEXT_PRIMARY));
     meta.add(Box.createVerticalStrut(6));
 
     // Artist name — wraps if long
