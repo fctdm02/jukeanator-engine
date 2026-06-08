@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import java.util.List;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
@@ -109,4 +110,12 @@ public interface SongLibraryService {
    * @return
    */
   Integer resetSongStatistics();
+  
+  /**
+   * 
+   * @param artistName
+   * @param albumName
+   * @return
+   */
+  List<AlbumMetadataSearchResultDto> searchInternetForAlbumMetadata(String artistName, String albumName);
 }

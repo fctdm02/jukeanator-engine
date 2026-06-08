@@ -17,6 +17,7 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
@@ -395,6 +396,23 @@ public final class SongLibraryServiceImpl
 
     } catch (Exception e) {
       throw new SongLibraryException("Could not reset song statistics", e);
+    }
+  }
+
+  @Override
+  public List<AlbumMetadataSearchResultDto> searchInternetForAlbumMetadata(String artistName, String albumName) {
+    try {
+      
+      List<AlbumMetadataSearchResultDto> searchResults = new ArrayList<>();
+      
+      
+      // TODO: TDM: Implement searchInternetForAlbumMetadata
+
+
+      return searchResults;
+
+    } catch (Exception e) {
+      throw new SongLibraryException("Could not search internet for album metadata for artist: " + artistName + " and album: " + albumName, e);
     }
   }
 

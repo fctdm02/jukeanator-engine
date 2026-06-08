@@ -2,8 +2,10 @@ package com.djt.jukeanator_engine.domain.songlibrary.client;
 
 import java.util.List;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.client.RestClient;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
@@ -161,4 +163,12 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
         .uri("/api/song-library/resetSongStatistics").retrieve()
         .body(Integer.class);
   }
+  
+  @Override
+  public List<AlbumMetadataSearchResultDto> searchInternetForAlbumMetadata(@RequestParam String artistName, @RequestParam String albumName) {
+
+    return restClient.get()
+        .uri("/api/song-library/searchInternetForAlbumMetadata").retrieve()
+        .body(new ParameterizedTypeReference<>() {});
+  }    
 }

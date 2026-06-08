@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
@@ -106,21 +107,31 @@ public class SongLibraryController implements SongLibraryService {
     return songLibraryService.getSongById(albumId, songId);
   }
 
+  @Override
   @PostMapping("/scanNoPath")
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 
     return songLibraryService.scanFileSystemForSongs();
   }
   
+  @Override
   @PostMapping("/scan")
   public Integer scanFileSystemForSongs(@RequestBody ScanRequest scanRequest) throws SongScanFailedException {
 
     return songLibraryService.scanFileSystemForSongs(scanRequest);
   }
 
+  @Override
   @PostMapping("/resetSongStatistics")
   public Integer resetSongStatistics() {
 
     return songLibraryService.resetSongStatistics();
-  } 
+  }
+
+  @Override
+  @GetMapping("/searchInternetForAlbumMetadata")
+  public List<AlbumMetadataSearchResultDto> searchInternetForAlbumMetadata(@RequestParam String artistName, @RequestParam String albumName) {
+    
+    return songLibraryService.searchInternetForAlbumMetadata(artistName, albumName);
+  }  
 }

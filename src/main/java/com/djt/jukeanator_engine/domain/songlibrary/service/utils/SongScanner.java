@@ -226,18 +226,10 @@ public final class SongScanner {
           }
         }
       }
-
+      
       if (!hasValidCoverArt || (requiresMetadata && !hasValidMetadata)) {
 
-        albumMetadataResults = this.musicBrainzClientWrapper.searchForAlbumMetadata(
-            album.getParentFolder().getName(), album.getName(), this.useGenre);
-
-        if ((albumMetadataResults == null || albumMetadataResults.isEmpty())
-            && this.discogsClientWrapper.hasValidApiKey()) {
-
-          albumMetadataResults = this.discogsClientWrapper
-              .searchForAlbumMetadata(album.getParentFolder().getName(), album.getName());
-        }
+        albumMetadataResults = searchInternetForAlbumMetadata(album); 
 
         if (!hasValidCoverArt) {
 
@@ -250,9 +242,27 @@ public final class SongScanner {
           album.getMetaData().writeMetadataToFileSystem(albumMetadataResults);
         }
       }
+      
     }
 
     return rootFolder;
+  }
+  
+  public Map<String, String> searchInternetForAlbumMetadata(AlbumFolderEntity album) {
+    
+    Map<String, String> albumMetadataResults = new HashMap<>();
+    
+    albumMetadataResults = this.musicBrainzClientWrapper.searchForAlbumMetadata(
+        album.getParentFolder().getName(), album.getName(), this.useGenre);
+
+    if ((albumMetadataResults == null || albumMetadataResults.isEmpty())
+        && this.discogsClientWrapper.hasValidApiKey()) {
+
+      albumMetadataResults = this.discogsClientWrapper
+          .searchForAlbumMetadata(album.getParentFolder().getName(), album.getName());
+    }
+    
+    return albumMetadataResults;    
   }
 
   private void process(FolderEntity parentFolder) {
