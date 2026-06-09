@@ -136,21 +136,22 @@ public class EditAlbumDialog extends JDialog {
     mainPanel.add(topContainer, BorderLayout.NORTH);
 
     // 2. Central Content splitting Base Data and Internet Lookup
-    // Expanded layout bounds context to seamlessly track more search layout variables
     JPanel centerSplitPanel = new JPanel(new GridLayout(1, 2, 15, 0));
     centerSplitPanel.setOpaque(false);
 
     // ==========================================
-    // LEFT PANEL: CURRENT PROPERTIES (Items #1 & #2)
+    // LEFT PANEL: CURRENT PROPERTIES (Read-Only)
     // ==========================================
     JPanel leftPanel = new JPanel();
     leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
     leftPanel.setBackground(CARD_BG);
     leftPanel.setBorder(BorderFactory.createTitledBorder(
         BorderFactory.createLineBorder(ACCENT_BLUE), "Current Properties", 0, 0, null, TEXT_LIGHT));
-    leftPanel.add(Box.createVerticalStrut(10));
 
-    // Item #1: 250x250 Local Cover Art Placeholder Display Box
+    // Item #3 alignment padding to sync horizontal layout with search row shifts
+    leftPanel.add(Box.createVerticalStrut(51));
+
+    // Item #1 & #3: Horizontal alignment locked artwork box
     lblCurrentCoverArt = new JLabel();
     lblCurrentCoverArt.setPreferredSize(new Dimension(250, 250));
     lblCurrentCoverArt.setMinimumSize(new Dimension(250, 250));
@@ -163,7 +164,7 @@ public class EditAlbumDialog extends JDialog {
     leftPanel.add(lblCurrentCoverArt);
     leftPanel.add(Box.createVerticalStrut(15));
 
-    // Item #2: Current values fields
+    // Current values form tracking local storage
     JPanel fieldsForm = new JPanel(new GridBagLayout());
     fieldsForm.setOpaque(false);
     GridBagConstraints gbc = new GridBagConstraints();
@@ -176,6 +177,7 @@ public class EditAlbumDialog extends JDialog {
     gbc.gridx = 1;
     tfReleaseDate = new JTextField(15);
     setupTextField(tfReleaseDate);
+    tfReleaseDate.setEditable(false); // Item #1 Enforcement
     fieldsForm.add(tfReleaseDate, gbc);
 
     gbc.gridx = 0;
@@ -184,6 +186,7 @@ public class EditAlbumDialog extends JDialog {
     gbc.gridx = 1;
     tfRecordLabel = new JTextField(15);
     setupTextField(tfRecordLabel);
+    tfRecordLabel.setEditable(false); // Item #1 Enforcement
     fieldsForm.add(tfRecordLabel, gbc);
 
     gbc.gridx = 0;
@@ -191,20 +194,24 @@ public class EditAlbumDialog extends JDialog {
     gbc.gridwidth = 2;
     chbHasExplicit = new JCheckBox("Has Explicit Lyrics");
     setupCheckBox(chbHasExplicit);
+    chbHasExplicit.setEnabled(false); // Item #1 Enforcement
     fieldsForm.add(chbHasExplicit, gbc);
 
     leftPanel.add(fieldsForm);
+
+    // Item #1: Dynamic padding gap buffer directly below explicit checkbox
+    leftPanel.add(Box.createVerticalStrut(12));
     centerSplitPanel.add(leftPanel);
 
     // ==========================================
-    // RIGHT PANEL: INTERNET SEARCH ENGINE (Item #3)
+    // RIGHT PANEL: INTERNET SEARCH ENGINE (Editable)
     // ==========================================
     JPanel rightPanel = new JPanel(new BorderLayout(5, 5));
     rightPanel.setBackground(CARD_BG);
     rightPanel.setBorder(BorderFactory.createTitledBorder(
         BorderFactory.createLineBorder(ACCENT_BLUE), "Internet Search", 0, 0, null, TEXT_LIGHT));
 
-    // Item #3: Multi-Column single horizontal alignment row layout logic
+    // Artist / Album Input parameters row
     JPanel searchInputsPanel = new JPanel(new GridBagLayout());
     searchInputsPanel.setOpaque(false);
     GridBagConstraints gbcS = new GridBagConstraints();
@@ -239,12 +246,12 @@ public class EditAlbumDialog extends JDialog {
 
     rightPanel.add(searchInputsPanel, BorderLayout.NORTH);
 
-    // Middle Workspace area tracking visual results and data structures
+    // Central workspace tracking runtime lookups
     JPanel rightCenterContainer = new JPanel();
     rightCenterContainer.setLayout(new BoxLayout(rightCenterContainer, BoxLayout.Y_AXIS));
     rightCenterContainer.setOpaque(false);
 
-    // 250x250 Image Canvas
+    // Item #3: Horizontal alignment locked preview box
     lblCoverArtCanvas = new JLabel();
     lblCoverArtCanvas.setPreferredSize(new Dimension(250, 250));
     lblCoverArtCanvas.setMinimumSize(new Dimension(250, 250));
@@ -255,13 +262,13 @@ public class EditAlbumDialog extends JDialog {
     lblCoverArtCanvas.setOpaque(true);
     lblCoverArtCanvas.setAlignmentX(CENTER_ALIGNMENT);
     rightCenterContainer.add(lblCoverArtCanvas);
-    rightCenterContainer.add(Box.createVerticalStrut(10));
+    rightCenterContainer.add(Box.createVerticalStrut(15));
 
-    // Item #3: Layout expansion area displaying downloaded lookups
+    // Item #2 Form Layout tracking interactive editable online structures
     JPanel resultsFormPanel = new JPanel(new GridBagLayout());
     resultsFormPanel.setOpaque(false);
     GridBagConstraints gbcR = new GridBagConstraints();
-    gbcR.insets = new Insets(4, 8, 4, 8);
+    gbcR.insets = new Insets(6, 8, 6, 8);
     gbcR.fill = GridBagConstraints.HORIZONTAL;
 
     gbcR.gridx = 0;
@@ -270,7 +277,7 @@ public class EditAlbumDialog extends JDialog {
     gbcR.gridx = 1;
     tfResultReleaseDate = new JTextField(15);
     setupTextField(tfResultReleaseDate);
-    tfResultReleaseDate.setEditable(false); // Read-only indicators populated by search results
+    tfResultReleaseDate.setEditable(true); // Item #2 Enforcement
     resultsFormPanel.add(tfResultReleaseDate, gbcR);
 
     gbcR.gridx = 0;
@@ -279,7 +286,7 @@ public class EditAlbumDialog extends JDialog {
     gbcR.gridx = 1;
     tfResultRecordLabel = new JTextField(15);
     setupTextField(tfResultRecordLabel);
-    tfResultRecordLabel.setEditable(false);
+    tfResultRecordLabel.setEditable(true); // Item #2 Enforcement
     resultsFormPanel.add(tfResultRecordLabel, gbcR);
 
     gbcR.gridx = 0;
@@ -287,13 +294,13 @@ public class EditAlbumDialog extends JDialog {
     gbcR.gridwidth = 2;
     chbResultHasExplicit = new JCheckBox("Found Explicit Content Designation");
     setupCheckBox(chbResultHasExplicit);
-    chbResultHasExplicit.setEnabled(false);
+    chbResultHasExplicit.setEnabled(true); // Item #2 Enforcement
     resultsFormPanel.add(chbResultHasExplicit, gbcR);
 
     rightCenterContainer.add(resultsFormPanel);
     rightPanel.add(rightCenterContainer, BorderLayout.CENTER);
 
-    // Search Results Navigation and Sync Actions Base Control Group
+    // Interactive operations control strip
     JPanel searchControlPanel = new JPanel();
     searchControlPanel.setLayout(new BoxLayout(searchControlPanel, BoxLayout.Y_AXIS));
     searchControlPanel.setOpaque(false);
@@ -327,7 +334,7 @@ public class EditAlbumDialog extends JDialog {
     centerSplitPanel.add(rightPanel);
     mainPanel.add(centerSplitPanel, BorderLayout.CENTER);
 
-    // 3. Footer Operations
+    // Footer Block
     JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
     footerPanel.setOpaque(false);
     JButton btnCancel = createStyledButton("Cancel", e -> dispose());
@@ -337,8 +344,8 @@ public class EditAlbumDialog extends JDialog {
     setContentPane(mainPanel);
     pack();
 
-    // Item #3: Intentionally expanding display box bounds to completely fit newly added components
-    setSize(new Dimension(820, 560));
+    // Item #2: Expanded sizing parameters to safely host modified layouts
+    setSize(new Dimension(860, 620));
     setLocationRelativeTo(getOwner());
   }
 
@@ -381,7 +388,6 @@ public class EditAlbumDialog extends JDialog {
       lblCurrentCoverArt.setText("No local artwork path specified.");
     }
 
-    // Evaluate valid album index constraints to paint button availability contextually
     if (currentAlbumIndex == -1 || invalidAlbumsList == null) {
       btnPrevAlbum.setEnabled(false);
       btnNextAlbum.setEnabled(false);
@@ -390,7 +396,6 @@ public class EditAlbumDialog extends JDialog {
       btnNextAlbum.setEnabled(currentAlbumIndex < invalidAlbumsList.size() - 1);
     }
 
-    // Reset internet data context state
     searchResults.clear();
     currentResultIndex = -1;
     updateSearchResultUI();
@@ -420,7 +425,6 @@ public class EditAlbumDialog extends JDialog {
 
     lblSearchStatus.setText("Searching Web Assets...");
 
-    // Decouple network request block from EDT
     new Thread(() -> {
       try {
         List<AlbumMetadataDto> results =
@@ -475,14 +479,13 @@ public class EditAlbumDialog extends JDialog {
 
     AlbumMetadataDto selectedMeta = searchResults.get(currentResultIndex);
 
-    // Item #3: Synchronize internet findings fields live to the search results display area
+    // Synchronize internet findings fields live to the search fields area
     tfResultReleaseDate
         .setText(selectedMeta.getReleaseDate() == null ? "" : selectedMeta.getReleaseDate());
     tfResultRecordLabel
         .setText(selectedMeta.getRecordLabel() == null ? "" : selectedMeta.getRecordLabel());
     chbResultHasExplicit.setSelected(selectedMeta.hasExplicit());
 
-    // Stream and scale image url inside non-blocking background task
     String urlStr = selectedMeta.getCoverArtUrl();
     lblCoverArtCanvas.setIcon(null);
     lblCoverArtCanvas.setText("");
@@ -510,8 +513,6 @@ public class EditAlbumDialog extends JDialog {
     if (currentAlbum == null)
       return;
     try {
-      // In a live engine environment, updates pass values from the user interface back down to the
-      // database layers
       JOptionPane.showMessageDialog(this,
           "Album metadata saved successfully via engine service layer.", "Success",
           JOptionPane.INFORMATION_MESSAGE);

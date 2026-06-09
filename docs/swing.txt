@@ -38,3 +38,20 @@ horizontally
 
 
 
+Refine EditAlbumDialog as follows:
+
+Item #1: For the "Internet Search" section, move the "Update Metadata" and "Download Cover Art" buttons to the bottom of the dialog, to 
+the left of the "Cancel" button, and center all three buttons horizontally.  Also, the "Update Metadata" and "Download Cover Art" buttons
+should be disabled unless there is a search result being displayed that has non-empty values for the release year, record label and
+cover art images. 
+
+Item #2: For the "Internet Search" section, rename "Found Year" to "Release Year" and add a "Record Label" field below it (like as is shown
+for the "Current Properties" section.  Also, add a "Has Explicit Lyrics" checkbox below it, again like current properties.
+
+Item #3: For the "Internet Search" section, move the prev result and next result buttons to the bottom of the section and move the 
+"Result X of N" label to be between these two buttons.  The end result is that the Internet Search section mirrors the Current
+Properties section, except the fields are editable by the user and show the results of the internet search.
+
+
+
+
