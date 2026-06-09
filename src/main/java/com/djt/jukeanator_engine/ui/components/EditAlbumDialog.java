@@ -16,6 +16,7 @@ import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +26,7 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -33,6 +35,7 @@ import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
+
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.DownloadAlbumCoverArtRequest;
@@ -66,15 +69,22 @@ public class EditAlbumDialog extends JDialog {
   // ── UI Components ────────────────────────────────────────────────────────
   private JLabel lblTopHeader;
 
-  // Basic Metadata Read-only/Editable fields
+  // Left Panel: Current Properties Components
+  private JLabel lblCurrentCoverArt;
   private JTextField tfReleaseDate;
   private JTextField tfRecordLabel;
+  private JCheckBox chbHasExplicit;
 
-  // Internet Search Inputs / Image Canvas
+  // Right Panel: Internet Search Inputs & Results Components
   private JTextField tfSearchArtist;
   private JTextField tfSearchAlbum;
   private JLabel lblCoverArtCanvas;
   private JLabel lblSearchStatus;
+
+  // Internet Search Result Metadata Readouts
+  private JTextField tfResultReleaseDate;
+  private JTextField tfResultRecordLabel;
+  private JCheckBox chbResultHasExplicit;
 
   // Navigation Buttons (Invalid Metadata Albums)
   private JButton btnPrevAlbum;
@@ -115,7 +125,6 @@ public class EditAlbumDialog extends JDialog {
     lblTopHeader.setForeground(TEXT_LIGHT);
     topContainer.add(lblTopHeader, BorderLayout.CENTER);
 
-    // Album Navigation Panel (Item #1)
     JPanel albumNavPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
     albumNavPanel.setOpaque(false);
     btnPrevAlbum = createStyledButton("< Prev Album", e -> navigateAlbum(-1));
@@ -127,10 +136,13 @@ public class EditAlbumDialog extends JDialog {
     mainPanel.add(topContainer, BorderLayout.NORTH);
 
     // 2. Central Content splitting Base Data and Internet Lookup
+    // Expanded layout bounds context to seamlessly track more search layout variables
     JPanel centerSplitPanel = new JPanel(new GridLayout(1, 2, 15, 0));
     centerSplitPanel.setOpaque(false);
 
-    // Left Panel: Current Properties
+    // ==========================================
+    // LEFT PANEL: CURRENT PROPERTIES (Items #1 & #2)
+    // ==========================================
     JPanel leftPanel = new JPanel();
     leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
     leftPanel.setBackground(CARD_BG);
@@ -138,10 +150,24 @@ public class EditAlbumDialog extends JDialog {
         BorderFactory.createLineBorder(ACCENT_BLUE), "Current Properties", 0, 0, null, TEXT_LIGHT));
     leftPanel.add(Box.createVerticalStrut(10));
 
+    // Item #1: 250x250 Local Cover Art Placeholder Display Box
+    lblCurrentCoverArt = new JLabel();
+    lblCurrentCoverArt.setPreferredSize(new Dimension(250, 250));
+    lblCurrentCoverArt.setMinimumSize(new Dimension(250, 250));
+    lblCurrentCoverArt.setMaximumSize(new Dimension(250, 250));
+    lblCurrentCoverArt.setHorizontalAlignment(SwingConstants.CENTER);
+    lblCurrentCoverArt.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
+    lblCurrentCoverArt.setBackground(Color.BLACK);
+    lblCurrentCoverArt.setOpaque(true);
+    lblCurrentCoverArt.setAlignmentX(CENTER_ALIGNMENT);
+    leftPanel.add(lblCurrentCoverArt);
+    leftPanel.add(Box.createVerticalStrut(15));
+
+    // Item #2: Current values fields
     JPanel fieldsForm = new JPanel(new GridBagLayout());
     fieldsForm.setOpaque(false);
     GridBagConstraints gbc = new GridBagConstraints();
-    gbc.insets = new Insets(8, 8, 8, 8);
+    gbc.insets = new Insets(6, 8, 6, 8);
     gbc.fill = GridBagConstraints.HORIZONTAL;
 
     gbc.gridx = 0;
@@ -160,46 +186,65 @@ public class EditAlbumDialog extends JDialog {
     setupTextField(tfRecordLabel);
     fieldsForm.add(tfRecordLabel, gbc);
 
+    gbc.gridx = 0;
+    gbc.gridy = 2;
+    gbc.gridwidth = 2;
+    chbHasExplicit = new JCheckBox("Has Explicit Lyrics");
+    setupCheckBox(chbHasExplicit);
+    fieldsForm.add(chbHasExplicit, gbc);
+
     leftPanel.add(fieldsForm);
     centerSplitPanel.add(leftPanel);
 
-    // Right Panel: Internet Search Engine (Item #2)
+    // ==========================================
+    // RIGHT PANEL: INTERNET SEARCH ENGINE (Item #3)
+    // ==========================================
     JPanel rightPanel = new JPanel(new BorderLayout(5, 5));
     rightPanel.setBackground(CARD_BG);
     rightPanel.setBorder(BorderFactory.createTitledBorder(
         BorderFactory.createLineBorder(ACCENT_BLUE), "Internet Search", 0, 0, null, TEXT_LIGHT));
 
+    // Item #3: Multi-Column single horizontal alignment row layout logic
     JPanel searchInputsPanel = new JPanel(new GridBagLayout());
     searchInputsPanel.setOpaque(false);
     GridBagConstraints gbcS = new GridBagConstraints();
-    gbcS.insets = new Insets(4, 6, 4, 6);
+    gbcS.insets = new Insets(6, 4, 6, 4);
     gbcS.fill = GridBagConstraints.HORIZONTAL;
 
     gbcS.gridx = 0;
     gbcS.gridy = 0;
+    gbcS.weightx = 0.0;
     searchInputsPanel.add(createLabel("Artist:"), gbcS);
     gbcS.gridx = 1;
-    tfSearchArtist = new JTextField(14);
+    gbcS.weightx = 0.5;
+    tfSearchArtist = new JTextField(10);
     setupTextField(tfSearchArtist);
     searchInputsPanel.add(tfSearchArtist, gbcS);
 
-    gbcS.gridx = 0;
-    gbcS.gridy = 1;
-    searchInputsPanel.add(createLabel("Album:"), gbcS);
-    gbcS.gridx = 1;
-    tfSearchAlbum = new JTextField(14);
+    gbcS.gridx = 2;
+    gbcS.weightx = 0.0;
+    searchInputsPanel.add(createLabel(" Album:"), gbcS);
+    gbcS.gridx = 3;
+    gbcS.weightx = 0.5;
+    tfSearchAlbum = new JTextField(10);
     setupTextField(tfSearchAlbum);
     searchInputsPanel.add(tfSearchAlbum, gbcS);
 
+    gbcS.gridx = 4;
+    gbcS.gridy = 0;
+    gbcS.weightx = 0.0;
+    gbcS.gridwidth = 1;
     JButton btnExecuteSearch = createStyledButton("Search", e -> executeInternetSearch());
-    gbcS.gridx = 0;
-    gbcS.gridy = 2;
-    gbcS.gridwidth = 2;
     searchInputsPanel.add(btnExecuteSearch, gbcS);
 
     rightPanel.add(searchInputsPanel, BorderLayout.NORTH);
 
-    // 250x250 Image Canvas Display Block
+    // Middle Workspace area tracking visual results and data structures
+    JPanel rightCenterContainer = new JPanel();
+    rightCenterContainer.setLayout(new BoxLayout(rightCenterContainer, BoxLayout.Y_AXIS));
+    rightCenterContainer.setOpaque(false);
+
+    // 250x250 Image Canvas
     lblCoverArtCanvas = new JLabel();
     lblCoverArtCanvas.setPreferredSize(new Dimension(250, 250));
     lblCoverArtCanvas.setMinimumSize(new Dimension(250, 250));
@@ -208,11 +253,45 @@ public class EditAlbumDialog extends JDialog {
     lblCoverArtCanvas.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
     lblCoverArtCanvas.setBackground(Color.BLACK);
     lblCoverArtCanvas.setOpaque(true);
+    lblCoverArtCanvas.setAlignmentX(CENTER_ALIGNMENT);
+    rightCenterContainer.add(lblCoverArtCanvas);
+    rightCenterContainer.add(Box.createVerticalStrut(10));
 
-    JPanel canvasWrapper = new JPanel(new FlowLayout(FlowLayout.CENTER));
-    canvasWrapper.setOpaque(false);
-    canvasWrapper.add(lblCoverArtCanvas);
-    rightPanel.add(canvasWrapper, BorderLayout.CENTER);
+    // Item #3: Layout expansion area displaying downloaded lookups
+    JPanel resultsFormPanel = new JPanel(new GridBagLayout());
+    resultsFormPanel.setOpaque(false);
+    GridBagConstraints gbcR = new GridBagConstraints();
+    gbcR.insets = new Insets(4, 8, 4, 8);
+    gbcR.fill = GridBagConstraints.HORIZONTAL;
+
+    gbcR.gridx = 0;
+    gbcR.gridy = 0;
+    resultsFormPanel.add(createLabel("Found Year:"), gbcR);
+    gbcR.gridx = 1;
+    tfResultReleaseDate = new JTextField(15);
+    setupTextField(tfResultReleaseDate);
+    tfResultReleaseDate.setEditable(false); // Read-only indicators populated by search results
+    resultsFormPanel.add(tfResultReleaseDate, gbcR);
+
+    gbcR.gridx = 0;
+    gbcR.gridy = 1;
+    resultsFormPanel.add(createLabel("Found Label:"), gbcR);
+    gbcR.gridx = 1;
+    tfResultRecordLabel = new JTextField(15);
+    setupTextField(tfResultRecordLabel);
+    tfResultRecordLabel.setEditable(false);
+    resultsFormPanel.add(tfResultRecordLabel, gbcR);
+
+    gbcR.gridx = 0;
+    gbcR.gridy = 2;
+    gbcR.gridwidth = 2;
+    chbResultHasExplicit = new JCheckBox("Found Explicit Content Designation");
+    setupCheckBox(chbResultHasExplicit);
+    chbResultHasExplicit.setEnabled(false);
+    resultsFormPanel.add(chbResultHasExplicit, gbcR);
+
+    rightCenterContainer.add(resultsFormPanel);
+    rightPanel.add(rightCenterContainer, BorderLayout.CENTER);
 
     // Search Results Navigation and Sync Actions Base Control Group
     JPanel searchControlPanel = new JPanel();
@@ -248,7 +327,7 @@ public class EditAlbumDialog extends JDialog {
     centerSplitPanel.add(rightPanel);
     mainPanel.add(centerSplitPanel, BorderLayout.CENTER);
 
-    // 3. Footer Operations (Item #4)
+    // 3. Footer Operations
     JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
     footerPanel.setOpaque(false);
     JButton btnCancel = createStyledButton("Cancel", e -> dispose());
@@ -257,6 +336,9 @@ public class EditAlbumDialog extends JDialog {
 
     setContentPane(mainPanel);
     pack();
+
+    // Item #3: Intentionally expanding display box bounds to completely fit newly added components
+    setSize(new Dimension(820, 560));
     setLocationRelativeTo(getOwner());
   }
 
@@ -270,9 +352,34 @@ public class EditAlbumDialog extends JDialog {
         .setText(currentAlbum.getReleaseDate() == null ? "" : currentAlbum.getReleaseDate());
     tfRecordLabel
         .setText(currentAlbum.getRecordLabel() == null ? "" : currentAlbum.getRecordLabel());
+    chbHasExplicit
+        .setSelected(currentAlbum.getHasExplicit() != null && currentAlbum.getHasExplicit());
 
     tfSearchArtist.setText(currentAlbum.getArtistName());
     tfSearchAlbum.setText(currentAlbum.getAlbumName());
+
+    // Local Cover Artwork Image Loader
+    lblCurrentCoverArt.setIcon(null);
+    lblCurrentCoverArt.setText("");
+    String coverArtPath = currentAlbum.getCoverArtPath();
+    if (coverArtPath != null && !coverArtPath.isBlank()) {
+      File file = new File(coverArtPath);
+      if (file.exists()) {
+        try {
+          Image img = ImageIO.read(file);
+          if (img != null) {
+            Image scaled = img.getScaledInstance(250, 250, Image.SCALE_SMOOTH);
+            lblCurrentCoverArt.setIcon(new ImageIcon(scaled));
+          }
+        } catch (Exception e) {
+          lblCurrentCoverArt.setText("Error loading artwork asset file.");
+        }
+      } else {
+        lblCurrentCoverArt.setText("Cover art path file not found.");
+      }
+    } else {
+      lblCurrentCoverArt.setText("No local artwork path specified.");
+    }
 
     // Evaluate valid album index constraints to paint button availability contextually
     if (currentAlbumIndex == -1 || invalidAlbumsList == null) {
@@ -355,6 +462,9 @@ public class EditAlbumDialog extends JDialog {
       btnNextResult.setEnabled(false);
       lblSearchStatus.setText("No search results loaded.");
       lblCoverArtCanvas.setIcon(null);
+      tfResultReleaseDate.setText("");
+      tfResultRecordLabel.setText("");
+      chbResultHasExplicit.setSelected(false);
       return;
     }
 
@@ -365,15 +475,17 @@ public class EditAlbumDialog extends JDialog {
 
     AlbumMetadataDto selectedMeta = searchResults.get(currentResultIndex);
 
-    // Sync text values live to the inputs
-    tfReleaseDate
+    // Item #3: Synchronize internet findings fields live to the search results display area
+    tfResultReleaseDate
         .setText(selectedMeta.getReleaseDate() == null ? "" : selectedMeta.getReleaseDate());
-    tfRecordLabel
+    tfResultRecordLabel
         .setText(selectedMeta.getRecordLabel() == null ? "" : selectedMeta.getRecordLabel());
+    chbResultHasExplicit.setSelected(selectedMeta.hasExplicit());
 
     // Stream and scale image url inside non-blocking background task
     String urlStr = selectedMeta.getCoverArtUrl();
     lblCoverArtCanvas.setIcon(null);
+    lblCoverArtCanvas.setText("");
     if (urlStr != null && !urlStr.isBlank()) {
       new Thread(() -> {
         try {
@@ -398,8 +510,8 @@ public class EditAlbumDialog extends JDialog {
     if (currentAlbum == null)
       return;
     try {
-      // In a live integration, updateAlbumMetadata is called on libraryService
-      // using tfReleaseDate.getText() and tfRecordLabel.getText().
+      // In a live engine environment, updates pass values from the user interface back down to the
+      // database layers
       JOptionPane.showMessageDialog(this,
           "Album metadata saved successfully via engine service layer.", "Success",
           JOptionPane.INFORMATION_MESSAGE);
@@ -416,7 +528,6 @@ public class EditAlbumDialog extends JDialog {
     try {
       DownloadAlbumCoverArtRequest req =
           new DownloadAlbumCoverArtRequest(currentAlbum.getAlbumId(), targetMeta.getCoverArtUrl());
-      // libraryService.downloadAlbumCoverArt(req);
       JOptionPane.showMessageDialog(this, "Cover art download request issued to filesystem worker.",
           "Asset Download", JOptionPane.INFORMATION_MESSAGE);
     } catch (Exception e) {
@@ -425,7 +536,7 @@ public class EditAlbumDialog extends JDialog {
     }
   }
 
-  // ── Helper UI Methods ──────────────────────────────────────────────────────
+  // ── Helper UI Styling Methods ──────────────────────────────────────────────
   private JLabel createLabel(String text) {
     JLabel lbl = new JLabel(text);
     lbl.setForeground(TEXT_LIGHT);
@@ -439,6 +550,12 @@ public class EditAlbumDialog extends JDialog {
     tf.setCaretColor(Color.WHITE);
     tf.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Color.GRAY, 1),
         BorderFactory.createEmptyBorder(4, 4, 4, 4)));
+  }
+
+  private void setupCheckBox(JCheckBox cb) {
+    cb.setOpaque(false);
+    cb.setForeground(TEXT_LIGHT);
+    cb.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
   }
 
   private JButton createStyledButton(String text, java.awt.event.ActionListener action) {

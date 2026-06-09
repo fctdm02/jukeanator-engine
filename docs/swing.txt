@@ -21,3 +21,20 @@ by what was just described in item #2
 
 Item #4: EditAlbumDialog needs to remove the "Save" button at the bottom of the screen, as the update methods are in Item #2.  There should 
 still be a "Cancel" button that is centered on the screen however, that dismisses the dialog without making any changes.
+
+
+
+Refine EditAlbumDialog as follows:
+
+Item #1: For the "Current Properties" section, the "Has Explicit Lyrics" checkbox needs to have a little padding below it.  Also make it, 
+record label and release year read only. 
+
+Item #2: For the "Internet Search" section, add Release Date/Year, Record Label album metada search results text fields, as well as a 
+"Has Explicit Lyrics" chexkbox, which all are editable and are updated whenever a given album metadata search result is displayed. In
+order to accommodate theese new fields, make the width of the dialog both wider and taller. 
+
+Item #3, align everything between the "Current Properties" and "Internet Search" sections so that the two cover art images are aligned
+horizontally
+
+
+
