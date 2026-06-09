@@ -245,7 +245,7 @@ public class EditAlbumDialog extends JDialog {
     gbcS.gridy = 0;
     gbcS.weightx = 0.0;
     gbcS.gridwidth = 1;
-    JButton btnExecuteSearch = createStyledButton("Search", e -> executeInternetSearch());
+    JButton btnExecuteSearch = createStyledButton("Search", e -> doInternetSearch());
     searchInputsPanel.add(btnExecuteSearch, gbcS);
 
     rightPanel.add(searchInputsPanel, BorderLayout.NORTH);
@@ -410,44 +410,6 @@ public class EditAlbumDialog extends JDialog {
     }
   }
 
-  private void executeInternetSearch() {
-    String artistQuery = tfSearchArtist.getText().trim();
-    String albumQuery = tfSearchAlbum.getText().trim();
-
-    if (artistQuery.isEmpty() || albumQuery.isEmpty()) {
-      JOptionPane.showMessageDialog(this,
-          "Artist and Album text fields are required fields to query.", "Warning",
-          JOptionPane.WARNING_MESSAGE);
-      return;
-    }
-
-    lblSearchStatus.setText("Searching...");
-
-    new Thread(() -> {
-      try {
-        List<AlbumMetadataDto> results =
-            songLibraryService.searchInternetForAlbumMetadata(artistQuery, albumQuery, 10);
-        SwingUtilities.invokeLater(() -> {
-          this.searchResults = (results != null) ? results : new ArrayList<>();
-          if (!searchResults.isEmpty()) {
-            this.currentResultIndex = 0;
-          } else {
-            this.currentResultIndex = -1;
-            JOptionPane.showMessageDialog(this, "No matches found on the web.", "Information",
-                JOptionPane.INFORMATION_MESSAGE);
-          }
-          updateSearchResultUI();
-        });
-      } catch (Exception ex) {
-        SwingUtilities.invokeLater(() -> {
-          lblSearchStatus.setText("Search failed.");
-          JOptionPane.showMessageDialog(this, "Error executing lookup: " + ex.getMessage(), "Error",
-              JOptionPane.ERROR_MESSAGE);
-        });
-      }
-    }).start();
-  }
-
   private void navigateSearchResult(int offset) {
     if (searchResults.isEmpty())
       return;
@@ -517,6 +479,47 @@ public class EditAlbumDialog extends JDialog {
     }
   }
 
+  private void doInternetSearch() {
+    
+    String artistQuery = tfSearchArtist.getText().trim();
+    String albumQuery = tfSearchAlbum.getText().trim();
+
+    if (artistQuery.isEmpty() || albumQuery.isEmpty()) {
+      JOptionPane.showMessageDialog(this,
+          "Artist and Album text fields are required fields to query.", "Warning",
+          JOptionPane.WARNING_MESSAGE);
+      return;
+    }
+
+    lblSearchStatus.setText("Searching...");
+
+    new Thread(() -> {
+      try {
+        
+        List<AlbumMetadataDto> results =
+            songLibraryService.searchInternetForAlbumMetadata(artistQuery, albumQuery, 5);
+        
+        SwingUtilities.invokeLater(() -> {
+          this.searchResults = (results != null) ? results : new ArrayList<>();
+          if (!searchResults.isEmpty()) {
+            this.currentResultIndex = 0;
+          } else {
+            this.currentResultIndex = -1;
+            JOptionPane.showMessageDialog(this, "No matches found on the web.", "Information",
+                JOptionPane.INFORMATION_MESSAGE);
+          }
+          updateSearchResultUI();
+        });
+      } catch (Exception ex) {
+        SwingUtilities.invokeLater(() -> {
+          lblSearchStatus.setText("Search failed.");
+          JOptionPane.showMessageDialog(this, "Error executing lookup: " + ex.getMessage(), "Error",
+              JOptionPane.ERROR_MESSAGE);
+        });
+      }
+    }).start();
+  }
+  
   private void doMetadataUpdate() {
 
     if (currentAlbum == null)

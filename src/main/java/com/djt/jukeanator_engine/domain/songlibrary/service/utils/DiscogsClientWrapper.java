@@ -64,16 +64,15 @@ public final class DiscogsClientWrapper {
     return true;
   }
 
-  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName,
-      String albumName) {
+  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName, String albumName) {
 
     return searchForAlbumMetadata(artistName, albumName, 1);
   }
 
-  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName,
-      String albumName, int limit) {
+  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName, String albumName,
+      int limit) {
 
-    log.info("searchForAlbumMetadata(): artist: {}, album: {}, limit", artistName, albumName,
+    log.info("searchForAlbumMetadata(): artist: {}, album: {}, limit: {}", artistName, albumName,
         limit);
 
     List<AlbumMetadataDto> albumMetadataResults = new ArrayList<>();
@@ -127,8 +126,8 @@ public final class DiscogsClientWrapper {
         }
       }
 
-      albumMetadataResults.add(new AlbumMetadataDto(artistName, albumName, recordLabel,
-          releaseDate, genre, coverArtUrl, hasExplicit));
+      albumMetadataResults.add(new AlbumMetadataDto(artistName, albumName, recordLabel, releaseDate,
+          genre, coverArtUrl, hasExplicit));
     }
 
     return albumMetadataResults;

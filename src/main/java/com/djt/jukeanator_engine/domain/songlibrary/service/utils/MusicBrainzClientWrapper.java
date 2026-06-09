@@ -59,15 +59,15 @@ public class MusicBrainzClientWrapper {
   // =========================================================
   // PUBLIC BLOCKING API (NO EXPLICIT CONCURRENCY)
   // =========================================================
-  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName,
-      String albumName, boolean useGenre) {
+  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName, String albumName,
+      boolean useGenre) {
     return searchForAlbumMetadata(artistName, albumName, useGenre, 1);
   }
 
-  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName,
-      String albumName, boolean useGenre, int limit) {
+  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName, String albumName,
+      boolean useGenre, int limit) {
 
-    log.info("searchForAlbumMetadata(): artist: {}, album: {}, limit", artistName, albumName,
+    log.info("searchForAlbumMetadata(): artist: {}, album: {}, limit: {}", artistName, albumName,
         limit);
 
     List<AlbumMetadataDto> albumMetadataResults = new ArrayList<>();
@@ -105,8 +105,8 @@ public class MusicBrainzClientWrapper {
 
         boolean hasExplicit = false;
 
-        albumMetadataResults.add(new AlbumMetadataDto(artistName, albumName,
-            recordLabel, releaseDate, genre, coverArtUrl, hasExplicit));
+        albumMetadataResults.add(new AlbumMetadataDto(artistName, albumName, recordLabel,
+            releaseDate, genre, coverArtUrl, hasExplicit));
       }
     }
 
