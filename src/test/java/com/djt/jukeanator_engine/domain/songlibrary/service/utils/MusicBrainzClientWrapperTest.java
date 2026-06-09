@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.io.IOException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 
 /**
  * @author tmyers
@@ -24,14 +24,14 @@ public class MusicBrainzClientWrapperTest {
 
 
     // STEP 2: ACT
-    List<AlbumMetadataSearchResultDto> albumMetadataResults =
+    List<AlbumMetadataDto> albumMetadataResults =
         musicBrainzClientWrapper.searchForAlbumMetadata(artist, album, useGenre);
 
 
     // STEP 3: ASSERT
     assertNotNull(albumMetadataResults, "albumMetadataResults was null");
     assertFalse(albumMetadataResults.isEmpty(), "albumMetadataResults expected to be non-empty");
-    AlbumMetadataSearchResultDto albumMetadataResult = albumMetadataResults.get(0);
+    AlbumMetadataDto albumMetadataResult = albumMetadataResults.get(0);
 
     String expected =
         "https://coverartarchive.org/release/005d4e48-e2be-410b-a56f-e6d64622f48b/front";

@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.io.IOException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 
 /**
  * @author tmyers
@@ -23,14 +23,14 @@ public class DiscogsClientWrapperTest {
 
 
     // STEP 2: ACT
-    List<AlbumMetadataSearchResultDto> albumMetadataResults =
+    List<AlbumMetadataDto> albumMetadataResults =
         discogsClientWrapper.searchForAlbumMetadata(artist, album);
 
 
     // STEP 3: ASSERT
     assertNotNull(albumMetadataResults, "albumMetadataResults was null");
     assertFalse(albumMetadataResults.isEmpty(), "albumMetadataResults expected to be non-empty");
-    AlbumMetadataSearchResultDto albumMetadataResult = albumMetadataResults.get(0);
+    AlbumMetadataDto albumMetadataResult = albumMetadataResults.get(0);
 
     String expected =
         "https://i.discogs.com/cl5sG3Y7_n9cVne4vq0A5-0-3k0zoFYUVZioZsJ_LYs/rs:fit/g:sm/q:90/h:595/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTEwODE4/MDEtMTYxMjA1MTcy/NS00Njg3LmpwZWc.jpeg";

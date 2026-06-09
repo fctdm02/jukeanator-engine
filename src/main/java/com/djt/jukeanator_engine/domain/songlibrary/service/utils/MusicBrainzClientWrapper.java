@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -59,18 +59,18 @@ public class MusicBrainzClientWrapper {
   // =========================================================
   // PUBLIC BLOCKING API (NO EXPLICIT CONCURRENCY)
   // =========================================================
-  public List<AlbumMetadataSearchResultDto> searchForAlbumMetadata(String artistName,
+  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName,
       String albumName, boolean useGenre) {
     return searchForAlbumMetadata(artistName, albumName, useGenre, 1);
   }
 
-  public List<AlbumMetadataSearchResultDto> searchForAlbumMetadata(String artistName,
+  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName,
       String albumName, boolean useGenre, int limit) {
 
     log.info("searchForAlbumMetadata(): artist: {}, album: {}, limit", artistName, albumName,
         limit);
 
-    List<AlbumMetadataSearchResultDto> albumMetadataResults = new ArrayList<>();
+    List<AlbumMetadataDto> albumMetadataResults = new ArrayList<>();
 
     List<AlbumResult> albumResults = lookupAlbum(artistName, albumName, useGenre, limit);
     for (AlbumResult albumResult : albumResults) {
@@ -105,7 +105,7 @@ public class MusicBrainzClientWrapper {
 
         boolean hasExplicit = false;
 
-        albumMetadataResults.add(new AlbumMetadataSearchResultDto(artistName, albumName,
+        albumMetadataResults.add(new AlbumMetadataDto(artistName, albumName,
             recordLabel, releaseDate, genre, coverArtUrl, hasExplicit));
       }
     }

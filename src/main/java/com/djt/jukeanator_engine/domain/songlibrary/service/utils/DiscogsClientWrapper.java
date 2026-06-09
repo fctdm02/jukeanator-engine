@@ -12,7 +12,7 @@ import com.amilesend.discogs.model.database.SearchRequest;
 import com.amilesend.discogs.model.database.SearchResponse;
 import com.amilesend.discogs.model.database.type.SearchResult;
 import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 
 /**
@@ -64,19 +64,19 @@ public final class DiscogsClientWrapper {
     return true;
   }
 
-  public List<AlbumMetadataSearchResultDto> searchForAlbumMetadata(String artistName,
+  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName,
       String albumName) {
 
     return searchForAlbumMetadata(artistName, albumName, 1);
   }
 
-  public List<AlbumMetadataSearchResultDto> searchForAlbumMetadata(String artistName,
+  public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName,
       String albumName, int limit) {
 
     log.info("searchForAlbumMetadata(): artist: {}, album: {}, limit", artistName, albumName,
         limit);
 
-    List<AlbumMetadataSearchResultDto> albumMetadataResults = new ArrayList<>();
+    List<AlbumMetadataDto> albumMetadataResults = new ArrayList<>();
 
     SearchRequest request = SearchRequest.builder().artist(artistName).releaseTitle(albumName)
         .perPage(limit).page(limit).build();
@@ -127,7 +127,7 @@ public final class DiscogsClientWrapper {
         }
       }
 
-      albumMetadataResults.add(new AlbumMetadataSearchResultDto(artistName, albumName, recordLabel,
+      albumMetadataResults.add(new AlbumMetadataDto(artistName, albumName, recordLabel,
           releaseDate, genre, coverArtUrl, hasExplicit));
     }
 

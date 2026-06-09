@@ -1,6 +1,6 @@
 package com.djt.jukeanator_engine.domain.songlibrary.dto;
 
-public class AlbumMetadataSearchResultDto {
+public class AlbumMetadataDto {
 
   private final String artistName;
   private final String albumName;
@@ -10,7 +10,7 @@ public class AlbumMetadataSearchResultDto {
   private final String coverArtUrl;
   private final boolean hasExplicit;
 
-  public AlbumMetadataSearchResultDto(String artistName, String albumName, String recordLabel,
+  public AlbumMetadataDto(String artistName, String albumName, String recordLabel,
       String releaseDate, String genre, String coverArtUrl, boolean hasExplicit) {
     super();
     this.artistName = artistName;

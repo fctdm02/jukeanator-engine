@@ -17,7 +17,7 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.DownloadAlbumCoverArtRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
@@ -403,12 +403,12 @@ public final class SongLibraryServiceImpl
   }
 
   @Override
-  public List<AlbumMetadataSearchResultDto> searchInternetForAlbumMetadata(String artistName,
+  public List<AlbumMetadataDto> searchInternetForAlbumMetadata(String artistName,
       String albumName, int limit) {
 
     try {
 
-      List<AlbumMetadataSearchResultDto> albumMetadataResults =
+      List<AlbumMetadataDto> albumMetadataResults =
           this.songScanner.searchInternetForAlbumMetadata(artistName, albumName, limit);
 
       return albumMetadataResults;

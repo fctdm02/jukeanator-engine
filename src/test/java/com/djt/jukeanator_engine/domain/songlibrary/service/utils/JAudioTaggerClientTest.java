@@ -17,7 +17,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 
 /**
  * @author tmyers
@@ -151,7 +151,7 @@ public class JAudioTaggerClientTest {
 				if (!jAudioTaggerClient.hasGenre(file.getAbsolutePath())) {
 					
 					String genre = null;
-					List<AlbumMetadataSearchResultDto> albumMetadataResults = new ArrayList<>();
+					List<AlbumMetadataDto> albumMetadataResults = new ArrayList<>();
 
 					Map<String, String> tags = jAudioTaggerClient.getTags(file.getAbsolutePath());
 					String genreTag = tags.get(JAudioTaggerClient.GENRE_NAME);
@@ -160,7 +160,7 @@ public class JAudioTaggerClientTest {
 						String artist = tags.get(JAudioTaggerClient.ARTIST_NAME);
 						String album = tags.get(JAudioTaggerClient.ALBUM_NAME);
 						albumMetadataResults = musicBrainzClientWrapper.searchForAlbumMetadata(artist, album, useGenre);
-						AlbumMetadataSearchResultDto albumMetadataResult = albumMetadataResults.get(0);
+						AlbumMetadataDto albumMetadataResult = albumMetadataResults.get(0);
 						genre = albumMetadataResult.getGenre();
 						
 						if ((genre == null || genre.isBlank()) && discogsClientWrapper.hasValidApiKey()) {
@@ -184,13 +184,13 @@ public class JAudioTaggerClientTest {
 				if (!jAudioTaggerClient.hasCoverArt(file.getAbsolutePath())) {
 					
 					String coverArtUrl = null;
-					List<AlbumMetadataSearchResultDto> albumMetadataResults = new ArrayList<>();
+					List<AlbumMetadataDto> albumMetadataResults = new ArrayList<>();
 
 					Map<String, String> tags = jAudioTaggerClient.getTags(file.getAbsolutePath());
 					String artist = tags.get(JAudioTaggerClient.ARTIST_NAME);
 					String album = tags.get(JAudioTaggerClient.ALBUM_NAME);
 					albumMetadataResults = musicBrainzClientWrapper.searchForAlbumMetadata(artist, album, useGenre);
-					AlbumMetadataSearchResultDto albumMetadataResult = albumMetadataResults.get(0);
+					AlbumMetadataDto albumMetadataResult = albumMetadataResults.get(0);
 					coverArtUrl = albumMetadataResult.getCoverArtUrl();
 					
 					if ((coverArtUrl == null || coverArtUrl.isBlank()) && discogsClientWrapper.hasValidApiKey()) {

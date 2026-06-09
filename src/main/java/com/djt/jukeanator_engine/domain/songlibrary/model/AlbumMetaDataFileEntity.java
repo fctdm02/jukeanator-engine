@@ -7,7 +7,7 @@ import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 
 public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Serializable {
@@ -131,13 +131,13 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
 
   public void writeMetadataToFileSystem() {
 
-    AlbumMetadataSearchResultDto metadata = new AlbumMetadataSearchResultDto("", "", recordLabel,
+    AlbumMetadataDto metadata = new AlbumMetadataDto("", "", recordLabel,
         releaseDate, genre, coverArtUrl, hasExplicit);
 
     writeMetadataToFileSystem(metadata);
   }
 
-  public void writeMetadataToFileSystem(AlbumMetadataSearchResultDto metadata) {
+  public void writeMetadataToFileSystem(AlbumMetadataDto metadata) {
 
     // Populate fields safely
     this.genre = safe(metadata.getGenre());

@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataSearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
@@ -195,8 +195,8 @@ public final class SongScanner {
             String recordLabel = tags.get(JAudioTaggerClient.RECORD_LABEL);
             String releaseDate = tags.get(JAudioTaggerClient.RELEASE_DATE);
 
-            AlbumMetadataSearchResultDto metadata =
-                new AlbumMetadataSearchResultDto("", "", recordLabel, releaseDate, "", "", false);
+            AlbumMetadataDto metadata =
+                new AlbumMetadataDto("", "", recordLabel, releaseDate, "", "", false);
 
             if (!metadata.isEmpty()) {
 
@@ -219,19 +219,19 @@ public final class SongScanner {
 
       if (!hasValidCoverArt || (requiresMetadata && !hasValidMetadata)) {
 
-        List<AlbumMetadataSearchResultDto> albumMetadataResults =
+        List<AlbumMetadataDto> albumMetadataResults =
             searchInternetForAlbumMetadata(album);
 
         if (!hasValidCoverArt && !albumMetadataResults.isEmpty()) {
 
-          AlbumMetadataSearchResultDto albumMetadataResult = albumMetadataResults.get(0);
+          AlbumMetadataDto albumMetadataResult = albumMetadataResults.get(0);
           String coverArtUrl = albumMetadataResult.getCoverArtUrl();
           downloadCoverArt(coverArtPath, coverArtUrl);
         }
 
         if (!hasValidMetadata && !albumMetadataResults.isEmpty()) {
 
-          AlbumMetadataSearchResultDto albumMetadataResult = albumMetadataResults.get(0);
+          AlbumMetadataDto albumMetadataResult = albumMetadataResults.get(0);
           album.getMetaData().writeMetadataToFileSystem(albumMetadataResult);
         }
       }
@@ -246,16 +246,16 @@ public final class SongScanner {
     this.coverArtDownloader.downloadCoverArt(coverArtPath, coverArtUrl);
   }
 
-  public List<AlbumMetadataSearchResultDto> searchInternetForAlbumMetadata(
+  public List<AlbumMetadataDto> searchInternetForAlbumMetadata(
       AlbumFolderEntity album) {
 
     return searchInternetForAlbumMetadata(album.getParentFolder().getName(), album.getName(), 1);
   }
 
-  public List<AlbumMetadataSearchResultDto> searchInternetForAlbumMetadata(String artistName,
+  public List<AlbumMetadataDto> searchInternetForAlbumMetadata(String artistName,
       String albumName, int limit) {
 
-    List<AlbumMetadataSearchResultDto> albumMetadataResults = this.musicBrainzClientWrapper
+    List<AlbumMetadataDto> albumMetadataResults = this.musicBrainzClientWrapper
         .searchForAlbumMetadata(artistName, albumName, this.useGenre, limit);
 
     if ((albumMetadataResults == null || albumMetadataResults.isEmpty())
