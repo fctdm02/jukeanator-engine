@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.songqueue.service;
 
 import static java.util.Objects.requireNonNull;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -34,6 +35,7 @@ import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
+import com.djt.jukeanator_engine.domain.songqueue.service.utils.PlaylistManager;
 
 /**
  * @author tmyers
@@ -72,6 +74,27 @@ public final class SongQueueServiceImpl
   }
 
   // Service methods
+  @Override
+  public synchronized SongQueueEntryDto dequeueNextSong() {
+
+    List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
+
+    if (songs.isEmpty()) {
+      return null;
+    }
+
+    SongQueueEntryEntity nextSong = songs.getFirst();
+
+    songQueueRoot.removeSongFromQueue(nextSong);
+
+    songQueueRepository.storeAggregateRoot(songQueueRoot);
+
+    eventPublisher
+        .publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
+
+    return SongQueueMapper.toDto(nextSong);
+  }
+
   @Override
   public Integer getHighestPriority() {
 
@@ -188,13 +211,13 @@ public final class SongQueueServiceImpl
 
     return numSongsRandomized;
   }
-  
-  @Override 
+
+  @Override
   public Integer moveSongUpInQueue(ChangeSongQueueRequest changeSongQueueRequest) {
-    
+
     int albumId = changeSongQueueRequest.getAlbumId();
     int songId = changeSongQueueRequest.getSongId();
-    
+
     try {
       AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
       if (album != null) {
@@ -204,26 +227,28 @@ public final class SongQueueServiceImpl
 
           Integer numSongsInQueue = songQueueRoot.moveSongUpInQueue(song);
           if (numSongsInQueue.intValue() > 0) {
-            
+
             songQueueRepository.storeAggregateRoot(songQueueRoot);
 
-            eventPublisher.publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
-          }                    
+            eventPublisher.publishEvent(
+                new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
+          }
           return numSongsInQueue;
         }
       }
     } catch (EntityDoesNotExistException e) {
     }
-    
-    throw new SongQueueException("Could not add move song up in queue, albumId: " + albumId + ", songId: " + songId);
+
+    throw new SongQueueException(
+        "Could not add move song up in queue, albumId: " + albumId + ", songId: " + songId);
   }
 
-  @Override  
+  @Override
   public Integer moveSongDownInQueue(ChangeSongQueueRequest changeSongQueueRequest) {
-    
+
     int albumId = changeSongQueueRequest.getAlbumId();
     int songId = changeSongQueueRequest.getSongId();
-    
+
     try {
       AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
       if (album != null) {
@@ -233,26 +258,28 @@ public final class SongQueueServiceImpl
 
           Integer numSongsInQueue = songQueueRoot.moveSongDownInQueue(song);
           if (numSongsInQueue.intValue() > 0) {
-           
+
             songQueueRepository.storeAggregateRoot(songQueueRoot);
 
-            eventPublisher.publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
-          }                    
+            eventPublisher.publishEvent(
+                new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
+          }
           return numSongsInQueue;
         }
       }
     } catch (EntityDoesNotExistException e) {
     }
-    
-    throw new SongQueueException("Could not add move song down in queue, albumId: " + albumId + ", songId: " + songId);
-  }    
 
-  @Override  
+    throw new SongQueueException(
+        "Could not add move song down in queue, albumId: " + albumId + ", songId: " + songId);
+  }
+
+  @Override
   public Integer removeSongDownFromQueue(ChangeSongQueueRequest changeSongQueueRequest) {
-    
+
     int albumId = changeSongQueueRequest.getAlbumId();
     int songId = changeSongQueueRequest.getSongId();
-    
+
     try {
       AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
       if (album != null) {
@@ -262,20 +289,72 @@ public final class SongQueueServiceImpl
 
           Integer numSongsInQueue = songQueueRoot.removeSongFromQueue(song);
           if (numSongsInQueue.intValue() > 0) {
-           
+
             songQueueRepository.storeAggregateRoot(songQueueRoot);
 
-            eventPublisher.publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
-          }                    
+            eventPublisher.publishEvent(
+                new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
+          }
           return numSongsInQueue;
         }
       }
     } catch (EntityDoesNotExistException e) {
     }
-    
-    throw new SongQueueException("Could not add move song down in queue, albumId: " + albumId + ", songId: " + songId);
-  }    
-  
+
+    throw new SongQueueException(
+        "Could not add move song down in queue, albumId: " + albumId + ", songId: " + songId);
+  }
+
+  @Override
+  public Integer saveQueueAsPlaylist(String filename) {
+
+    try {
+
+      List<String> songPathnames = new ArrayList<>();
+      for (SongQueueEntryEntity queueEntry : this.songQueueRoot.getSongs()) {
+
+        SongFileEntity song = queueEntry.getSong();
+        String songPathname = song.getNaturalIdentity();
+        songPathnames.add(songPathname);
+      }
+
+      PlaylistManager.savePlayList(new File(filename), songPathnames);
+
+      return Integer.valueOf(songPathnames.size());
+
+    } catch (Exception e) {
+      throw new SongQueueException("Could not save queue as playlist: " + filename, e);
+    }
+  }
+
+  @Override
+  public Integer loadPlaylistIntoQueue(String filename) {
+
+    try {
+
+      List<SongIdentifier> songIdentifiers = new ArrayList<>();
+      Integer priority = 0; // TODO: Implement loadPlaylistIntoQueue() ability to specify priority
+
+      for (String songPathname : PlaylistManager.loadPlayList(new File(filename))) {
+
+        SongFileEntity song = this.songLibraryRoot.getSongByPath(songPathname);
+
+        songIdentifiers.add(new SongIdentifier(song.getAlbum().getPersistentIdentity(),
+            song.getPersistentIdentity()));
+      }
+
+      AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest =
+          new AddMultipleSongsToQueueRequest(songIdentifiers, priority);
+
+      addMultipleSongsToQueue(addMultipleSongsToQueueRequest);
+
+      return Integer.valueOf(songIdentifiers.size());
+
+    } catch (Exception e) {
+      throw new SongQueueException("Could not load playlist into queue: " + filename, e);
+    }
+  }
+
   private SongQueueEntryDto addSongToQueue(Integer albumId, Integer songId, Integer priority) {
 
     try {
@@ -297,27 +376,6 @@ public final class SongQueueServiceImpl
 
     throw new SongQueueException("Could not add song to queue, albumId: " + albumId + ", songId: "
         + songId + ", priority: " + priority);
-  }
-
-  @Override
-  public synchronized SongQueueEntryDto dequeueNextSong() {
-
-    List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
-
-    if (songs.isEmpty()) {
-      return null;
-    }
-
-    SongQueueEntryEntity nextSong = songs.getFirst();
-
-    songQueueRoot.removeSongFromQueue(nextSong);
-
-    songQueueRepository.storeAggregateRoot(songQueueRoot);
-
-    eventPublisher
-        .publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
-
-    return SongQueueMapper.toDto(nextSong);
   }
 
   // Repository methods

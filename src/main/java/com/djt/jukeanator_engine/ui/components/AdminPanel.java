@@ -38,7 +38,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
@@ -46,26 +45,14 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
-import com.djt.jukeanator_engine.ui.util.PlayListManager;
 
-/**
- * Admin panel providing direct control over the song queue, album library management, and jukebox
- * operation. Styled to match the JukeANator dark UI palette.
- *
- * <p>
- * Layout (mirrors the reference screenshot):
- * <ul>
- * <li><b>WEST</b> — Narrow column of fixed-size library action buttons (operate on selected album;
- * use {@link SongLibraryService}).</li>
- * <li><b>CENTER</b> — Side-by-side scrollable album list (left) and song-queue list (right). Queue
- * rows render the same green popularity bars as {@link AlbumViewPanel}.</li>
- * <li><b>EAST</b> — Narrow column of fixed-size queue action buttons (operate on selected queue
- * entry; use {@link SongQueueService}).</li>
- * </ul>
- */
 public class AdminPanel extends JPanel {
 
   private static final long serialVersionUID = 1L;
+
+  // ── Button icons ──────────────────────────────────────────────────────────
+  private static final String SHUFFLE_ICON = new String(Character.toChars(0x1F500));
+  // Plus sign: ➕ U+271A
 
   // ── Palette ───────────────────────────────────────────────────────────────
   private static final Color ACCENT_BLUE = new Color(0, 210, 255);
@@ -115,18 +102,6 @@ public class AdminPanel extends JPanel {
   // ── Invalid Metadata Tracking Cache (Item #1) ─────────────────────────────
   private final List<AlbumDto> albumsWithInvalidMetadata = new ArrayList<>();
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CONSTRUCTOR
-  // ─────────────────────────────────────────────────────────────────────────
-
-  /**
-   * @param ownerFrame Parent frame (for dialogs).
-   * @param songLibraryService Library service.
-   * @param songQueueService Queue service.
-   * @param songPlayerService Player service.
-   * @param creditManager Credit manager (shared with main UI).
-   * @param imageLoader Shared image loader.
-   */
   public AdminPanel(Frame ownerFrame, SongLibraryService songLibraryService,
       SongQueueService songQueueService, SongPlayerService songPlayerService,
       CreditManager creditManager, ImageLoader imageLoader) {
@@ -317,7 +292,7 @@ public class AdminPanel extends JPanel {
 
     // ── Playback ──────────────────────────────────────────────────────────
     strip.add(sideButton("▶▶\nNext", ACCENT_GREEN, e -> doPlayNextTrack()));
-    strip.add(sideButton("⏸\nPause", ACCENT_BLUE, e -> doPause()));
+    strip.add(sideButton("❚❚\nPause", ACCENT_BLUE, e -> doPause()));
     strip.add(sideButton("▶\nPlay", ACCENT_GREEN, e -> doPlaySelected()));
 
     strip.add(verticalSpacer(8));
@@ -331,7 +306,7 @@ public class AdminPanel extends JPanel {
 
     // ── Queue management ──────────────────────────────────────────────────
     strip.add(sideButton("🗑\nFlush", ACCENT_RED, e -> doFlushQueue()));
-    strip.add(sideButton("⇌\nShuffle", ACCENT_VIOLET, e -> doRandomizeQueue()));
+    strip.add(sideButton(SHUFFLE_ICON + "\nShuffle", ACCENT_VIOLET, e -> doRandomizeQueue()));
 
     strip.add(verticalSpacer(8));
 
@@ -342,8 +317,8 @@ public class AdminPanel extends JPanel {
     strip.add(Box.createVerticalGlue());
 
     // ── Playlist I/O ──────────────────────────────────────────────────────
-    strip.add(sideButton("📂\nLoad Playlist", ACCENT_GOLD, e -> doLoadPlayList()));
-    strip.add(sideButton("💾\nSave Playlist", ACCENT_GOLD, e -> doSavePlayList()));
+    strip.add(sideButton("📂\nLoad Playlist", ACCENT_GOLD, e -> doLoadPlaylist()));
+    strip.add(sideButton("💾\nSave Playlist", ACCENT_GOLD, e -> doSavePlaylist()));
 
     JPanel wrapper = new JPanel(new BorderLayout());
     wrapper.setOpaque(false);
@@ -563,81 +538,56 @@ public class AdminPanel extends JPanel {
 
   // ── Playlist ──────────────────────────────────────────────────────────────
 
-  private void doLoadPlayList() {
+  private void doLoadPlaylist() {
     JFileChooser chooser = new JFileChooser();
-    chooser.setDialogTitle("Load PlayList");
-    chooser.setFileFilter(new FileNameExtensionFilter("PlayList files (*.txt)", "txt"));
-    chooser.setCurrentDirectory(PlayListManager.defaultPlayListFile().getParentFile());
+    chooser.setDialogTitle("Load Playlist");
+    chooser.setFileFilter(new FileNameExtensionFilter("Playlist files (*.txt)", "txt"));
+    chooser.setCurrentDirectory(new File(""));
 
     if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION)
       return;
 
-    File file = chooser.getSelectedFile();
+    String filename = chooser.getSelectedFile().getAbsolutePath();
     CompletableFuture.runAsync(() -> {
       try {
-        List<String> paths = PlayListManager.loadPlayList(file);
-        int loaded = 0;
-        for (String path : paths) {
-          try {
-            // TODO: implement SongLibraryService.getSongByFilePath(path)
-            SongDto song = null;
-            if (song != null) {
-              songQueueService.addSongToQueue(
-                  new com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest(
-                      song.getAlbumId(), song.getSongId(), 1));
-              loaded++;
-            }
-          } catch (Exception ignored) {
-          }
-        }
-        final int finalLoaded = loaded;
-        SwingUtilities.invokeLater(() -> {
-          refreshQueueList();
-          JOptionPane.showMessageDialog(this,
-              "Loaded " + finalLoaded + " of " + paths.size() + " songs.", "PlayList Loaded",
-              JOptionPane.INFORMATION_MESSAGE);
-        });
+
+        this.songQueueService.loadPlaylistIntoQueue(filename);
+
+        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Loaded " + filename,
+            " playlist", JOptionPane.INFORMATION_MESSAGE));
+
       } catch (Exception ex) {
         ex.printStackTrace();
         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this,
             "Failed to load playlist: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE));
       }
     });
+
   }
 
-  private void doSavePlayList() {
+  private void doSavePlaylist() {
     JFileChooser chooser = new JFileChooser();
-    chooser.setDialogTitle("Save PlayList");
-    chooser.setFileFilter(new FileNameExtensionFilter("PlayList files (*.txt)", "txt"));
-    chooser.setSelectedFile(PlayListManager.defaultPlayListFile());
+    chooser.setDialogTitle("Save Playlist");
+    chooser.setFileFilter(new FileNameExtensionFilter("Playlist files (*.txt)", "txt"));
 
     if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION)
       return;
 
+    String filename = chooser.getSelectedFile().getAbsolutePath();
     CompletableFuture.runAsync(() -> {
       try {
-        List<String> paths = new ArrayList<>();
-        for (int i = 0; i < queueListModel.getSize(); i++) {
-          SongQueueEntryDto entry = queueListModel.getElementAt(i);
-          // TODO: implement entry.getSong().getFilePath()
-          String fp = null;
-          if (fp != null)
-            paths.add(fp);
-        }
-        File selectedFile = chooser.getSelectedFile();
-        final File file = selectedFile.getName().toLowerCase().endsWith(".txt") ? selectedFile
-            : new File(selectedFile.getAbsolutePath() + ".txt");
+        this.songQueueService.saveQueueAsPlaylist(filename);
 
-        PlayListManager.savePlayList(file, paths);
-        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this,
-            "Saved " + paths.size() + " songs to:\n" + file.getAbsolutePath(), "PlayList Saved",
-            JOptionPane.INFORMATION_MESSAGE));
+        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Saved " + filename,
+            " playlist", JOptionPane.INFORMATION_MESSAGE));
+
       } catch (Exception ex) {
         ex.printStackTrace();
         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this,
             "Failed to save playlist: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE));
       }
     });
+
   }
 
   // ─────────────────────────────────────────────────────────────────────────

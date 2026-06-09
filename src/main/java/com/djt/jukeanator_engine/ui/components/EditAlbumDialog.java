@@ -17,6 +17,7 @@ import java.awt.Image;
 import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.io.File;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +36,6 @@ import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
-
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.DownloadAlbumCoverArtRequest;
@@ -57,7 +57,7 @@ public class EditAlbumDialog extends JDialog {
   private static final Color GRAD_TOP = new Color(44, 62, 80);
   private static final Color GRAD_BOTTOM = new Color(22, 32, 43);
 
-  private final SongLibraryService libraryService;
+  private final SongLibraryService songLibraryService;
   private final List<AlbumDto> invalidAlbumsList;
   private int currentAlbumIndex = -1;
   private AlbumDto currentAlbum;
@@ -98,10 +98,10 @@ public class EditAlbumDialog extends JDialog {
   private JButton btnUpdateMeta;
   private JButton btnDownloadArt;
 
-  public EditAlbumDialog(Frame owner, SongLibraryService libraryService, AlbumDto selectedAlbum,
+  public EditAlbumDialog(Frame owner, SongLibraryService songLibraryService, AlbumDto selectedAlbum,
       List<AlbumDto> invalidAlbumsList) {
-    super(owner, "Edit Album Properties", true);
-    this.libraryService = libraryService;
+    super(owner, "Edit Album Metadata", true);
+    this.songLibraryService = songLibraryService;
     this.invalidAlbumsList = invalidAlbumsList;
     this.currentAlbum = selectedAlbum;
 
@@ -327,8 +327,8 @@ public class EditAlbumDialog extends JDialog {
     JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 10));
     footerPanel.setOpaque(false);
 
-    btnUpdateMeta = createStyledButton("Update Metadata", e -> pushMetadataUpdate());
-    btnDownloadArt = createStyledButton("Download Cover Art", e -> triggerCoverArtDownload());
+    btnUpdateMeta = createStyledButton("Update Metadata", e -> doMetadataUpdate());
+    btnDownloadArt = createStyledButton("Download Cover Art", e -> doCoverArtDownload());
     JButton btnCancel = createStyledButton("Cancel", e -> dispose());
 
     btnUpdateMeta.setEnabled(false);
@@ -426,7 +426,7 @@ public class EditAlbumDialog extends JDialog {
     new Thread(() -> {
       try {
         List<AlbumMetadataDto> results =
-            libraryService.searchInternetForAlbumMetadata(artistQuery, albumQuery, 10);
+            songLibraryService.searchInternetForAlbumMetadata(artistQuery, albumQuery, 10);
         SwingUtilities.invokeLater(() -> {
           this.searchResults = (results != null) ? results : new ArrayList<>();
           if (!searchResults.isEmpty()) {
@@ -500,7 +500,7 @@ public class EditAlbumDialog extends JDialog {
     if (urlStr != null && !urlStr.isBlank()) {
       new Thread(() -> {
         try {
-          URL url = new URL(urlStr);
+          URL url = URI.create(urlStr).toURL();
           Image img = ImageIO.read(url);
           if (img != null) {
             Image scaled = img.getScaledInstance(250, 250, Image.SCALE_SMOOTH);
@@ -517,8 +517,8 @@ public class EditAlbumDialog extends JDialog {
     }
   }
 
-  // Item #3: Synchronize user-edited values safely down to persistence workflows
-  private void pushMetadataUpdate() {
+  private void doMetadataUpdate() {
+
     if (currentAlbum == null)
       return;
 
@@ -527,23 +527,27 @@ public class EditAlbumDialog extends JDialog {
     boolean updatedExplicit = chbResultHasExplicit.isSelected();
 
     try {
-      // In your application engine, assign these parsed variables directly to your update services:
-      // libraryService.updateAlbumProperties(currentAlbum.getAlbumId(), updatedYear, updatedLabel,
-      // updatedExplicit);
+
+      AlbumMetadataDto metadata =
+          new AlbumMetadataDto("", "", updatedLabel, updatedYear, "", "", updatedExplicit);
+
+      songLibraryService.updateAlbumMetadata(currentAlbum.getAlbumId(), metadata);
 
       String messageDetails =
           String.format("Successfully staged values for update:\nYear: %s\nLabel: %s\nExplicit: %b",
               updatedYear, updatedLabel, updatedExplicit);
+
       JOptionPane.showMessageDialog(this, messageDetails, "Success",
           JOptionPane.INFORMATION_MESSAGE);
+
     } catch (Exception e) {
       JOptionPane.showMessageDialog(this, "Failed updating record metadata: " + e.getMessage(),
           "Error", JOptionPane.ERROR_MESSAGE);
     }
   }
 
-  // Item #3: Pass matching search target URL parameters to processing requests
-  private void triggerCoverArtDownload() {
+  private void doCoverArtDownload() {
+
     if (currentAlbum == null || currentResultIndex == -1 || searchResults.isEmpty())
       return;
 
@@ -551,16 +555,17 @@ public class EditAlbumDialog extends JDialog {
     String liveArtUrlStr = targetMeta.getCoverArtUrl();
 
     try {
+
       // Constructs operational scan paths safely linked to the active track record context
-      DownloadAlbumCoverArtRequest req =
+      DownloadAlbumCoverArtRequest downloadAlbumCoverArtRequest =
           new DownloadAlbumCoverArtRequest(currentAlbum.getAlbumId(), liveArtUrlStr);
 
-      // Pass this request entity into your engine service file handlers:
-      // libraryService.downloadAlbumCoverArt(req);
+      songLibraryService.downloadAlbumCoverArt(downloadAlbumCoverArtRequest);
 
       JOptionPane.showMessageDialog(this,
           "Cover art download request staged via asset URL:\n" + liveArtUrlStr, "Asset Download",
           JOptionPane.INFORMATION_MESSAGE);
+
     } catch (Exception e) {
       JOptionPane.showMessageDialog(this, "Failed downloading art asset payload: " + e.getMessage(),
           "Error", JOptionPane.ERROR_MESSAGE);

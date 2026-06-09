@@ -13,6 +13,13 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 public interface SongQueueService {
 
   /**
+   * NOTE: This method should only be involved by SongPlayerService when playing the next song
+   * 
+   * @return
+   */
+  SongQueueEntryDto dequeueNextSong();
+
+  /**
    * 
    * @return a priority value that is one higher than the highest priority that is currently in the
    *         queue. For example, if the largest priority value of a song that is currently in the
@@ -82,7 +89,15 @@ public interface SongQueueService {
 
   /**
    * 
+   * @param filename
    * @return
    */
-  SongQueueEntryDto dequeueNextSong();
+  Integer saveQueueAsPlaylist(String filename);
+
+  /**
+   * 
+   * @param filename
+   * @return
+   */
+  Integer loadPlaylistIntoQueue(String filename);
 }

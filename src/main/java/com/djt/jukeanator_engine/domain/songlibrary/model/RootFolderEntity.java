@@ -30,6 +30,9 @@ public class RootFolderEntity extends FolderEntity {
   private transient Map<Integer, AlbumFolderEntity> albumsMap;
   private transient Map<String, SongFileEntity> songsMap;
 
+  // Used only by SongQueueService.loadPlaylistIntoQueue()
+  private transient Map<String, SongFileEntity> songsByPathMap;
+
   public RootFolderEntity() {}
 
   /**
@@ -143,7 +146,7 @@ public class RootFolderEntity extends FolderEntity {
     GenreFolderEntity genre = genresMap.get(genreId);
     return albumsByGenreMap.get(genre);
   }
-  
+
   public Collection<ArtistFolderEntity> getArtists() {
     return artistsMap.values();
   }
@@ -171,7 +174,7 @@ public class RootFolderEntity extends FolderEntity {
       if (!this.genresMap.containsKey(genreId)) {
         this.genresMap.put(genreId, genre);
       }
-      
+
       Set<AlbumFolderEntity> genreAlbums = null;
       if (!this.albumsByGenreMap.containsKey(genre)) {
         genreAlbums = new HashSet<>();
@@ -180,7 +183,7 @@ public class RootFolderEntity extends FolderEntity {
       } else {
         genreAlbums = this.albumsByGenreMap.get(genre);
         if (!genreAlbums.contains(album)) {
-          genreAlbums.add(album);  
+          genreAlbums.add(album);
         }
       }
 
@@ -205,7 +208,7 @@ public class RootFolderEntity extends FolderEntity {
   }
 
   public void restoreSongNumPlays() {
-    
+
     if (this.songsMap == null) {
       initialize();
     }
@@ -251,8 +254,8 @@ public class RootFolderEntity extends FolderEntity {
             String songPath = normalizeSongPath(parts[3]);
             SongFileEntity song = songsByPath.get(songPath);
             if (song != null) {
-              song.setNumPlays(numPlays);              
-            }            
+              song.setNumPlays(numPlays);
+            }
           }
           restoredCount++;
 
@@ -274,9 +277,9 @@ public class RootFolderEntity extends FolderEntity {
       e.printStackTrace();
     }
   }
-  
+
   public void resetSongStatistics() {
-    
+
     if (this.songsMap == null) {
       initialize();
     }
@@ -333,5 +336,30 @@ public class RootFolderEntity extends FolderEntity {
     }
     throw new EntityDoesNotExistException(
         "Song with songId: [" + songId + "] and albumId: [" + albumId + "] not found.");
+  }
+
+  public SongFileEntity getSongByPath(String songPathname) throws EntityDoesNotExistException {
+
+    if (songsByPathMap == null) {
+      initializeSongsByPathMap();
+    }
+
+    SongFileEntity entity = songsMap.get(songPathname);
+    if (entity != null) {
+      return entity;
+    }
+    throw new EntityDoesNotExistException("Song with path: [" + songPathname + "] not found.");
+  }
+
+  private void initializeSongsByPathMap() {
+
+    songsByPathMap = new HashMap<>();
+
+    for (SongFileEntity song : this.songsMap.values()) {
+      String songPathname = song.getNaturalIdentity();
+      if (!this.songsMap.containsKey(songPathname)) {
+        this.songsMap.put(songPathname, song);
+      }
+    }
   }
 }

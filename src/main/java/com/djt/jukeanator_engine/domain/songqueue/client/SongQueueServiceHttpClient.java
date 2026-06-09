@@ -24,6 +24,13 @@ public class SongQueueServiceHttpClient implements SongQueueService {
   }
 
   @Override
+  public SongQueueEntryDto dequeueNextSong() {
+
+    return restClient.get().uri("/api/song-queue/dequeueNextSong").retrieve()
+        .body(SongQueueEntryDto.class);
+  }
+
+  @Override
   public Integer getHighestPriority() {
 
     return restClient.post().uri("/api/song-queue/highestPriority").retrieve().body(Integer.class);
@@ -93,9 +100,16 @@ public class SongQueueServiceHttpClient implements SongQueueService {
   }
 
   @Override
-  public SongQueueEntryDto dequeueNextSong() {
+  public Integer saveQueueAsPlaylist(String filename) {
 
-    return restClient.get().uri("/api/song-queue/dequeueNextSong").retrieve()
-        .body(SongQueueEntryDto.class);
+    return restClient.post().uri("/api/song-queue/saveQueueAsPlaylist").body(filename).retrieve()
+        .body(Integer.class);
+  }
+
+  @Override
+  public Integer loadPlaylistIntoQueue(String filename) {
+
+    return restClient.post().uri("/api/song-queue/loadPlaylistIntoQueue").body(filename).retrieve()
+        .body(Integer.class);
   }
 }

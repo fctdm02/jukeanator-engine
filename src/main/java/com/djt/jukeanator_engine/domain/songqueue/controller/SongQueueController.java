@@ -25,21 +25,9 @@ public class SongQueueController implements SongQueueService {
   private final SongQueueService songQueueService;
 
   public SongQueueController(@Qualifier("songQueueService") SongQueueService songQueueService) {
-    
+
     requireNonNull(songQueueService, "songQueueService cannot be null");
     this.songQueueService = songQueueService;
-  }
-
-  @PostMapping("/highestPriority")  
-  public Integer getHighestPriority() {
-    
-    return songQueueService.getHighestPriority();
-  }  
-
-  @Override
-  @GetMapping("/queuedSongs")
-  public List<SongQueueEntryDto> getQueuedSongs() {
-    return songQueueService.getQueuedSongs();
   }
 
   @Override
@@ -48,51 +36,90 @@ public class SongQueueController implements SongQueueService {
     return songQueueService.dequeueNextSong();
   }
 
+  @Override
+  @GetMapping("/highestPriority")
+  public Integer getHighestPriority() {
+
+    return songQueueService.getHighestPriority();
+  }
+
+  @Override
+  @GetMapping("/queuedSongs")
+  public List<SongQueueEntryDto> getQueuedSongs() {
+    return songQueueService.getQueuedSongs();
+  }
+
+  @Override
   @PostMapping("/addSong")
-  public SongQueueEntryDto addSongToQueue(@RequestBody AddSongToQueueRequest addSongToQueueRequest) {
+  public SongQueueEntryDto addSongToQueue(
+      @RequestBody AddSongToQueueRequest addSongToQueueRequest) {
 
     return songQueueService.addSongToQueue(addSongToQueueRequest);
   }
 
+  @Override
   @PostMapping("/addAlbum")
-  public List<SongQueueEntryDto> addAlbumToQueue(@RequestBody AddAlbumToQueueRequest addAlbumToQueueRequest) {
+  public List<SongQueueEntryDto> addAlbumToQueue(
+      @RequestBody AddAlbumToQueueRequest addAlbumToQueueRequest) {
 
     return songQueueService.addAlbumToQueue(addAlbumToQueueRequest);
   }
-  
-  @PostMapping("/addMultipleSongs")  
-  public List<SongQueueEntryDto> addMultipleSongsToQueue(@RequestBody AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
-    
+
+  @Override
+  @PostMapping("/addMultipleSongs")
+  public List<SongQueueEntryDto> addMultipleSongsToQueue(
+      @RequestBody AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
+
     return songQueueService.addMultipleSongsToQueue(addMultipleSongsToQueueRequest);
   }
-  
-  @PostMapping("/flushQueue")  
+
+  @Override
+  @PostMapping("/flushQueue")
   public Integer flushQueue() {
-    
+
     return songQueueService.flushQueue();
   }
-  
-  @PostMapping("/randomizeQueue")  
+
+  @Override
+  @PostMapping("/randomizeQueue")
   public Integer randomizeQueue() {
-    
+
     return songQueueService.randomizeQueue();
   }
-  
-  @PostMapping("/moveSongUpInQueue") 
+
+  @Override
+  @PostMapping("/moveSongUpInQueue")
   public Integer moveSongUpInQueue(ChangeSongQueueRequest changeSongQueueRequest) {
-    
+
     return songQueueService.moveSongUpInQueue(changeSongQueueRequest);
   }
 
-  @PostMapping("/moveSongDownInQueue")  
+  @Override
+  @PostMapping("/moveSongDownInQueue")
   public Integer moveSongDownInQueue(ChangeSongQueueRequest changeSongQueueRequest) {
-    
+
     return songQueueService.moveSongDownInQueue(changeSongQueueRequest);
   }
-  
-  @PostMapping("/removeSongDownFromQueue")  
+
+  @Override
+  @PostMapping("/removeSongDownFromQueue")
   public Integer removeSongDownFromQueue(ChangeSongQueueRequest changeSongQueueRequest) {
-    
+
     return songQueueService.removeSongDownFromQueue(changeSongQueueRequest);
-  }   
+  }
+
+
+  @Override
+  @PostMapping("/saveQueueAsPlaylist")
+  public Integer saveQueueAsPlaylist(String filename) {
+
+    return songQueueService.saveQueueAsPlaylist(filename);
+  }
+
+  @Override
+  @PostMapping("/loadPlaylistIntoQueue")
+  public Integer loadPlaylistIntoQueue(String filename) {
+
+    return songQueueService.loadPlaylistIntoQueue(filename);
+  }
 }

@@ -1,4 +1,4 @@
-package com.djt.jukeanator_engine.ui.util;
+package com.djt.jukeanator_engine.domain.songqueue.service.utils;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -16,9 +16,9 @@ import java.util.List;
  * File format: one song file path per line. Blank lines and lines starting with {@code #} are
  * treated as comments and ignored on load.
  */
-public final class PlayListManager {
+public final class PlaylistManager {
 
-  private PlayListManager() {}
+  private PlaylistManager() {}
 
   // ─────────────────────────────────────────────────────────────────────────
   // SAVE
