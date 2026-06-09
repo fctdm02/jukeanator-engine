@@ -94,6 +94,10 @@ public class EditAlbumDialog extends JDialog {
   private JButton btnPrevResult;
   private JButton btnNextResult;
 
+  // Global Actions Buttons
+  private JButton btnUpdateMeta;
+  private JButton btnDownloadArt;
+
   public EditAlbumDialog(Frame owner, SongLibraryService libraryService, AlbumDto selectedAlbum,
       List<AlbumDto> invalidAlbumsList) {
     super(owner, "Edit Album Properties", true);
@@ -148,10 +152,10 @@ public class EditAlbumDialog extends JDialog {
     leftPanel.setBorder(BorderFactory.createTitledBorder(
         BorderFactory.createLineBorder(ACCENT_BLUE), "Current Properties", 0, 0, null, TEXT_LIGHT));
 
-    // Item #3 alignment padding to sync horizontal layout with search row shifts
+    // Balanced spacing padding to completely map horizontally with the search section's header
     leftPanel.add(Box.createVerticalStrut(51));
 
-    // Item #1 & #3: Horizontal alignment locked artwork box
+    // Cover Art Box
     lblCurrentCoverArt = new JLabel();
     lblCurrentCoverArt.setPreferredSize(new Dimension(250, 250));
     lblCurrentCoverArt.setMinimumSize(new Dimension(250, 250));
@@ -164,7 +168,7 @@ public class EditAlbumDialog extends JDialog {
     leftPanel.add(lblCurrentCoverArt);
     leftPanel.add(Box.createVerticalStrut(15));
 
-    // Current values form tracking local storage
+    // Form Grid
     JPanel fieldsForm = new JPanel(new GridBagLayout());
     fieldsForm.setOpaque(false);
     GridBagConstraints gbc = new GridBagConstraints();
@@ -177,7 +181,7 @@ public class EditAlbumDialog extends JDialog {
     gbc.gridx = 1;
     tfReleaseDate = new JTextField(15);
     setupTextField(tfReleaseDate);
-    tfReleaseDate.setEditable(false); // Item #1 Enforcement
+    tfReleaseDate.setEditable(false);
     fieldsForm.add(tfReleaseDate, gbc);
 
     gbc.gridx = 0;
@@ -186,7 +190,7 @@ public class EditAlbumDialog extends JDialog {
     gbc.gridx = 1;
     tfRecordLabel = new JTextField(15);
     setupTextField(tfRecordLabel);
-    tfRecordLabel.setEditable(false); // Item #1 Enforcement
+    tfRecordLabel.setEditable(false);
     fieldsForm.add(tfRecordLabel, gbc);
 
     gbc.gridx = 0;
@@ -194,13 +198,11 @@ public class EditAlbumDialog extends JDialog {
     gbc.gridwidth = 2;
     chbHasExplicit = new JCheckBox("Has Explicit Lyrics");
     setupCheckBox(chbHasExplicit);
-    chbHasExplicit.setEnabled(false); // Item #1 Enforcement
+    chbHasExplicit.setEnabled(false);
     fieldsForm.add(chbHasExplicit, gbc);
 
     leftPanel.add(fieldsForm);
-
-    // Item #1: Dynamic padding gap buffer directly below explicit checkbox
-    leftPanel.add(Box.createVerticalStrut(12));
+    leftPanel.add(Box.createVerticalStrut(12)); // Bottom vertical alignment padding
     centerSplitPanel.add(leftPanel);
 
     // ==========================================
@@ -211,7 +213,7 @@ public class EditAlbumDialog extends JDialog {
     rightPanel.setBorder(BorderFactory.createTitledBorder(
         BorderFactory.createLineBorder(ACCENT_BLUE), "Internet Search", 0, 0, null, TEXT_LIGHT));
 
-    // Artist / Album Input parameters row
+    // Input row parameters
     JPanel searchInputsPanel = new JPanel(new GridBagLayout());
     searchInputsPanel.setOpaque(false);
     GridBagConstraints gbcS = new GridBagConstraints();
@@ -246,12 +248,12 @@ public class EditAlbumDialog extends JDialog {
 
     rightPanel.add(searchInputsPanel, BorderLayout.NORTH);
 
-    // Central workspace tracking runtime lookups
+    // Central search data content cluster
     JPanel rightCenterContainer = new JPanel();
     rightCenterContainer.setLayout(new BoxLayout(rightCenterContainer, BoxLayout.Y_AXIS));
     rightCenterContainer.setOpaque(false);
 
-    // Item #3: Horizontal alignment locked preview box
+    // Found Cover Artwork Container
     lblCoverArtCanvas = new JLabel();
     lblCoverArtCanvas.setPreferredSize(new Dimension(250, 250));
     lblCoverArtCanvas.setMinimumSize(new Dimension(250, 250));
@@ -264,7 +266,7 @@ public class EditAlbumDialog extends JDialog {
     rightCenterContainer.add(lblCoverArtCanvas);
     rightCenterContainer.add(Box.createVerticalStrut(15));
 
-    // Item #2 Form Layout tracking interactive editable online structures
+    // Item #2: Form elements mapped identically to left panel
     JPanel resultsFormPanel = new JPanel(new GridBagLayout());
     resultsFormPanel.setOpaque(false);
     GridBagConstraints gbcR = new GridBagConstraints();
@@ -273,78 +275,72 @@ public class EditAlbumDialog extends JDialog {
 
     gbcR.gridx = 0;
     gbcR.gridy = 0;
-    resultsFormPanel.add(createLabel("Found Year:"), gbcR);
+    resultsFormPanel.add(createLabel("Release Year:"), gbcR);
     gbcR.gridx = 1;
     tfResultReleaseDate = new JTextField(15);
     setupTextField(tfResultReleaseDate);
-    tfResultReleaseDate.setEditable(true); // Item #2 Enforcement
+    tfResultReleaseDate.setEditable(true);
     resultsFormPanel.add(tfResultReleaseDate, gbcR);
 
     gbcR.gridx = 0;
     gbcR.gridy = 1;
-    resultsFormPanel.add(createLabel("Found Label:"), gbcR);
+    resultsFormPanel.add(createLabel("Record Label:"), gbcR);
     gbcR.gridx = 1;
     tfResultRecordLabel = new JTextField(15);
     setupTextField(tfResultRecordLabel);
-    tfResultRecordLabel.setEditable(true); // Item #2 Enforcement
+    tfResultRecordLabel.setEditable(true);
     resultsFormPanel.add(tfResultRecordLabel, gbcR);
 
     gbcR.gridx = 0;
     gbcR.gridy = 2;
     gbcR.gridwidth = 2;
-    chbResultHasExplicit = new JCheckBox("Found Explicit Content Designation");
+    chbResultHasExplicit = new JCheckBox("Has Explicit Lyrics");
     setupCheckBox(chbResultHasExplicit);
-    chbResultHasExplicit.setEnabled(true); // Item #2 Enforcement
+    chbResultHasExplicit.setEnabled(true);
     resultsFormPanel.add(chbResultHasExplicit, gbcR);
 
     rightCenterContainer.add(resultsFormPanel);
     rightPanel.add(rightCenterContainer, BorderLayout.CENTER);
 
-    // Interactive operations control strip
-    JPanel searchControlPanel = new JPanel();
-    searchControlPanel.setLayout(new BoxLayout(searchControlPanel, BoxLayout.Y_AXIS));
+    // Item #3: Re-positioned Result pagination block
+    JPanel searchControlPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 5));
     searchControlPanel.setOpaque(false);
+
+    btnPrevResult = createStyledButton("< Prev Result", e -> navigateSearchResult(-1));
+    btnNextResult = createStyledButton("Next Result >", e -> navigateSearchResult(1));
 
     lblSearchStatus = new JLabel("No search performed", SwingConstants.CENTER);
     lblSearchStatus.setForeground(Color.LIGHT_GRAY);
-    lblSearchStatus.setAlignmentX(CENTER_ALIGNMENT);
+    lblSearchStatus.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+
+    searchControlPanel.add(btnPrevResult);
     searchControlPanel.add(lblSearchStatus);
-    searchControlPanel.add(Box.createVerticalStrut(5));
-
-    JPanel resultsNavRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
-    resultsNavRow.setOpaque(false);
-    btnPrevResult = createStyledButton("< Prev Result", e -> navigateSearchResult(-1));
-    btnNextResult = createStyledButton("Next Result >", e -> navigateSearchResult(1));
-    resultsNavRow.add(btnPrevResult);
-    resultsNavRow.add(btnNextResult);
-    searchControlPanel.add(resultsNavRow);
-    searchControlPanel.add(Box.createVerticalStrut(8));
-
-    JPanel syncActionsRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
-    syncActionsRow.setOpaque(false);
-    JButton btnUpdateMeta = createStyledButton("Update Metadata", e -> pushMetadataUpdate());
-    JButton btnDownloadArt =
-        createStyledButton("Download Cover Art", e -> triggerCoverArtDownload());
-    syncActionsRow.add(btnUpdateMeta);
-    syncActionsRow.add(btnDownloadArt);
-    searchControlPanel.add(syncActionsRow);
-    searchControlPanel.add(Box.createVerticalStrut(5));
+    searchControlPanel.add(btnNextResult);
 
     rightPanel.add(searchControlPanel, BorderLayout.SOUTH);
     centerSplitPanel.add(rightPanel);
     mainPanel.add(centerSplitPanel, BorderLayout.CENTER);
 
-    // Footer Block
-    JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+    // 3. Item #1: Globally unified action footer control panel
+    JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 10));
     footerPanel.setOpaque(false);
+
+    btnUpdateMeta = createStyledButton("Update Metadata", e -> pushMetadataUpdate());
+    btnDownloadArt = createStyledButton("Download Cover Art", e -> triggerCoverArtDownload());
     JButton btnCancel = createStyledButton("Cancel", e -> dispose());
+
+    // Initial runtime state defaults to disabled prior to search activation
+    btnUpdateMeta.setEnabled(false);
+    btnDownloadArt.setEnabled(false);
+
+    footerPanel.add(btnUpdateMeta);
+    footerPanel.add(btnDownloadArt);
     footerPanel.add(btnCancel);
     mainPanel.add(footerPanel, BorderLayout.SOUTH);
 
     setContentPane(mainPanel);
     pack();
 
-    // Item #2: Expanded sizing parameters to safely host modified layouts
     setSize(new Dimension(860, 620));
     setLocationRelativeTo(getOwner());
   }
@@ -365,7 +361,7 @@ public class EditAlbumDialog extends JDialog {
     tfSearchArtist.setText(currentAlbum.getArtistName());
     tfSearchAlbum.setText(currentAlbum.getAlbumName());
 
-    // Local Cover Artwork Image Loader
+    // Local file system cover art asset rendering
     lblCurrentCoverArt.setIcon(null);
     lblCurrentCoverArt.setText("");
     String coverArtPath = currentAlbum.getCoverArtPath();
@@ -423,7 +419,7 @@ public class EditAlbumDialog extends JDialog {
       return;
     }
 
-    lblSearchStatus.setText("Searching Web Assets...");
+    lblSearchStatus.setText("Searching...");
 
     new Thread(() -> {
       try {
@@ -464,11 +460,15 @@ public class EditAlbumDialog extends JDialog {
     if (currentResultIndex == -1 || searchResults.isEmpty()) {
       btnPrevResult.setEnabled(false);
       btnNextResult.setEnabled(false);
-      lblSearchStatus.setText("No search results loaded.");
+      lblSearchStatus.setText("No results loaded.");
       lblCoverArtCanvas.setIcon(null);
       tfResultReleaseDate.setText("");
       tfResultRecordLabel.setText("");
       chbResultHasExplicit.setSelected(false);
+
+      // Item #1: Fallback protection logic if context drops off completely
+      btnUpdateMeta.setEnabled(false);
+      btnDownloadArt.setEnabled(false);
       return;
     }
 
@@ -479,14 +479,22 @@ public class EditAlbumDialog extends JDialog {
 
     AlbumMetadataDto selectedMeta = searchResults.get(currentResultIndex);
 
-    // Synchronize internet findings fields live to the search fields area
     tfResultReleaseDate
         .setText(selectedMeta.getReleaseDate() == null ? "" : selectedMeta.getReleaseDate());
     tfResultRecordLabel
         .setText(selectedMeta.getRecordLabel() == null ? "" : selectedMeta.getRecordLabel());
     chbResultHasExplicit.setSelected(selectedMeta.hasExplicit());
 
+    // Item #1 Validation check sequence to determine operational safety rules
+    String yearVal = tfResultReleaseDate.getText().trim();
+    String labelVal = tfResultRecordLabel.getText().trim();
     String urlStr = selectedMeta.getCoverArtUrl();
+
+    boolean hasValidMetadata =
+        !yearVal.isEmpty() && !labelVal.isEmpty() && urlStr != null && !urlStr.isBlank();
+    btnUpdateMeta.setEnabled(hasValidMetadata);
+    btnDownloadArt.setEnabled(hasValidMetadata);
+
     lblCoverArtCanvas.setIcon(null);
     lblCoverArtCanvas.setText("");
     if (urlStr != null && !urlStr.isBlank()) {
@@ -582,6 +590,22 @@ public class EditAlbumDialog extends JDialog {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         int w = getWidth(), h = getHeight();
+
+        // Render simple baseline tracking states if action buttons become disabled
+        if (!isEnabled()) {
+          g2.setColor(CARD_BG.brighter());
+          g2.fillRoundRect(0, 0, w, h, 8, 8);
+          g2.setColor(Color.DARK_GRAY);
+          g2.drawRoundRect(1, 1, w - 3, h - 3, 8, 8);
+          g2.setFont(getFont());
+          g2.setColor(Color.GRAY);
+          java.awt.FontMetrics fm = g2.getFontMetrics();
+          g2.drawString(getText(), (w - fm.stringWidth(getText())) / 2,
+              (h - fm.getHeight()) / 2 + fm.getAscent());
+          g2.dispose();
+          return;
+        }
+
         Color top = hovered ? GRAD_TOP.brighter() : GRAD_TOP;
         Color bot = hovered ? GRAD_BOTTOM.brighter() : GRAD_BOTTOM;
         g2.setPaint(new GradientPaint(0, 0, top, 0, h, bot));

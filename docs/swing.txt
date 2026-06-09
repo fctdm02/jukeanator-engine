@@ -55,3 +55,18 @@ Properties section, except the fields are editable by the user and show the resu
 
 
 
+Refine EditAlbumDialog as follows:
+
+Item #1: For the "Internet Search" section, Add a "Has Explicit Lyrics" checkbox below the "Record Label" field, to mirror current properties.
+
+Item #2: As a result of Item #1 above, it will be necessary to make the height of the dialog taller.  So, the current properties box will have
+extra padding at the bottom in order to be the same size as the internet search box, as the search box has the additional row of 
+prev result button, "Result X of N" label and next result button
+
+Item #3, Ensure that the "Update Metadata" button takes the values of the Release Year, Record Label and Has Explicit Lyrics fields, as well as
+download cover art should download the displayed search result cover art image url to the cover art path of the album dto
+
+
+
+
+
