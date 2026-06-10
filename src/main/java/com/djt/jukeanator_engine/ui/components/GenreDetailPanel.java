@@ -46,7 +46,9 @@ public class GenreDetailPanel extends JPanel {
   private static final Color SORT_TEXT_IDLE = new Color(160, 165, 180);
 
   // ── Preview row count (matches HotHerePanel) ──────────────────────────────
-  private static final int PREVIEW_COUNT = 10;
+  // Number of result rows visible at one time in each column.
+  // Tune this value if the screen resolution changes the visible row count.
+  private static final int PREVIEW_COUNT = 9;
 
   // ── Offset state per column ───────────────────────────────────────────────
   private int artistsOffset = 0;

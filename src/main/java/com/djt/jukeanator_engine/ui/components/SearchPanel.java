@@ -54,7 +54,9 @@ public class SearchPanel extends JPanel implements TabNavigator {
   // ── Layout constants ──────────────────────────────────────────────────────
   private static final int KEYBOARD_HEIGHT = 260;
   private static final int SEARCH_BAR_HEIGHT = 90;
-  private static final int SEARCH_PREVIEW_COUNT = 6;
+  // Number of result rows visible at one time in each column.
+  // Tune this value if the screen resolution changes the visible row count.
+  private static final int SEARCH_PREVIEW_COUNT = 5;
 
   // Unified Screen Margin Padding to expose base background gradient
   private static final int SCREEN_PADDING_HORIZONTAL = 60;
@@ -175,6 +177,14 @@ public class SearchPanel extends JPanel implements TabNavigator {
       currentDetailCard = null;
     }
     cardLayout.show(rootPanel, lastResult != null ? CARD_RESULTS : CARD_ENTRY);
+  }
+
+  /**
+   * Resets the Search tab to its initial entry state (blank query, no results). Called whenever the
+   * user switches to this tab.
+   */
+  public void resetToDefaultView() {
+    resetSearch();
   }
 
   // ─────────────────────────────────────────────────────────────────────────

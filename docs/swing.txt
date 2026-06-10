@@ -70,6 +70,26 @@ download cover art should download the displayed search result cover art image u
 
 
 
+
+For Java 21, refine SongLibraryServiceImpl.getMusicBySearch() to be more like a traditional "fuzzy search" in that calculateSearchResultWeight() assigns weights as follows:
+- Matched Leading Letter: +10 
+- Consecutive Match: +5
+- Unmatched Letter: -1
+- Complete Match: +20
+  
+These matching criteria work together as follows:
+- Matched Leading Letter: Algorithms heavily prioritize matches that start with the same letter as the search query. This increases the confidence that the results share the same context.
+- Consecutive Match: Sequences of letters typed in the exact correct order (e.g., contiguous blocks) receive significant scoring bonuses over scattered or fragmented characters.
+- Unmatched Letter: These represent errors, typos, or omitted characters. Algorithms penalize unmatched letters by calculating an "edit distance" (like insertions, deletions, or substitutions) to determine how far the query strays from the target word.
+- Complete Match: A perfect 100% alignment where the search query is character-for-character identical to the target string, resulting in an edit distance of 0.
+
+Use the attached Levenshtein Distance search algorithm example for guidance
+
+
+
+
+
+
 Refactor JukeANatorFrame, AdminPanel and AlbumViewPanel as follows:
 
 Item #1: The song track listing with green popularity bars is duplicated between AdminPanel and AlbumViewPanel, so create a common Song Track Renderer
@@ -102,25 +122,41 @@ Item #3: Gray out the buttons completely if a song is not selected for the song 
 Item #4.  If the first song is selected, then gray out the "Move Up" button
 
 
+Do the following refactoring:
+
+Item #1:
+For the Search and Genre panels, the pagination on the results column panels is not working properly.  That is, the Search panel displays 
+5 results at a time, but when you clock on the down/next page icon, it shows items 7 to 11, instead of 6 to 10.  Likewise, the Genre panel 
+displays 9 results at a time, but when you clock on the down/next page icon, it shows items 11 to 19, instead of 10 to 18.  NOTE: The Hot Here
+panel has correct pagination in that it shows 10 items at a time, with the second page showing 11-20 correctly.  Instead of hardcoding, there
+needs to be a way of making these search results columns responsive to the amount of screen height that they are allowed to have.  But in the 
+meantime, if there needs to be tunable constants that can be turned into application settings for a given screen resolution, then so be it, 
+but for now, fix the pagination as described above.
+
+Item #2, For all of the tabs in the JTabbed Pane, the Search, Hot Here and Genres need to show a default view when switching to the tab.  This
+default view is the same as when the UI is constructed, so there should be a standard "reset" type of method to put these panels into a default
+state when switching into the panel.
+
+Item #3, For the SongQueueDialog, the height can be shortened in order to reduce all of the extra space between the Now Playing Song bar and the
+Queued Songs panel.
+
+Item #4, For the SongQueueDialog, the "Remove Song" button, when there are enough credits, should be rendered the same as the "Move Song Up" and
+"Move Song Down" buttons (i.e. they all should render the same as their cost is the same)
 
 
 
-For Java 21, refine SongLibraryServiceImpl.getMusicBySearch() to be more like a traditional "fuzzy search" in that calculateSearchResultWeight() assigns weights as follows:
-- Matched Leading Letter: +10 
-- Consecutive Match: +5
-- Unmatched Letter: -1
-- Complete Match: +20
-  
-These matching criteria work together as follows:
-- Matched Leading Letter: Algorithms heavily prioritize matches that start with the same letter as the search query. This increases the confidence that the results share the same context.
-- Consecutive Match: Sequences of letters typed in the exact correct order (e.g., contiguous blocks) receive significant scoring bonuses over scattered or fragmented characters.
-- Unmatched Letter: These represent errors, typos, or omitted characters. Algorithms penalize unmatched letters by calculating an "edit distance" (like insertions, deletions, or substitutions) to determine how far the query strays from the target word.
-- Complete Match: A perfect 100% alignment where the search query is character-for-character identical to the target string, resulting in an edit distance of 0.
+Do the following:
 
-Use the attached Levenshtein Distance search algorithm example for guidance
+Item #1: The SongQueueDialog can be refined as follows: Some padding needs to be added between the Queue Panel Label and the bottom of the 
+now playing song panel.  The Cancel button should also be the same size as the other buttons on the dialog and be centered horizontally.
 
+Item #2: When the Admin Panel is shown, the keyboard listener doesn't work.  That is, when the 'a' key on the physical keyboard is pressed, then
+the CreditManager should have the dollar amount and credits incremented.  Instead, pressing 'a' moves the selection down on the album list.
 
+Item #3, For the Admin Panel, add a simple filter to the right of the "JUKEBOX LIST" label that shows the first album that starts with the given 
+filter.
 
+Item #4, For the Admin Panel, center the action buttons on the left/WEST and right/EAST vertically along the panel
 
  
 

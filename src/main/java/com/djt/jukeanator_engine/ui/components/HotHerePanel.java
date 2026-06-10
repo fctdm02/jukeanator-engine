@@ -142,6 +142,14 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     cardLayout.show(rootPanel, CARD_CONTENT);
   }
 
+  /**
+   * Resets the Hot Here tab to its default popularity view. Called whenever the user switches to
+   * this tab.
+   */
+  public void resetToDefaultView() {
+    refreshMusicByPopularityResults();
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // CONTENT PANEL
   // ─────────────────────────────────────────────────────────────────────────

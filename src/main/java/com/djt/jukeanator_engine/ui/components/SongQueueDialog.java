@@ -62,7 +62,6 @@ public class SongQueueDialog extends JDialog {
   private static final Color ACCENT_BLUE = new Color(0, 210, 255);
   private static final Color ACCENT_GOLD = new Color(255, 200, 0);
   private static final Color ACCENT_GREEN = new Color(60, 210, 80);
-  private static final Color ACCENT_RED = new Color(220, 60, 60);
   private static final Color TEXT_PRIMARY = Color.WHITE;
   private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
   private static final Color AM_WARN_BORDER = new Color(220, 40, 40);
@@ -128,9 +127,8 @@ public class SongQueueDialog extends JDialog {
 
     setUndecorated(true);
     setBackground(BG_DARK);
-    // 760px is tall enough to show the Now Playing card + 5 full queue rows
-    // + all action buttons without any scroll bar.
-    setSize(900, 760);
+    // Reduced height: Now Playing card + 5 queue rows + action buttons, minimal spacing
+    setSize(900, 660);
     setLocationRelativeTo(owner);
     setResizable(false);
 
@@ -152,7 +150,7 @@ public class SongQueueDialog extends JDialog {
         dismiss();
     });
     countdownTimer.start();
-    
+
     // Hardware Bill Acceptor Key Bindings
     this.setFocusable(true);
     this.addKeyListener(new java.awt.event.KeyAdapter() {
@@ -164,7 +162,7 @@ public class SongQueueDialog extends JDialog {
       }
     });
 
-    requestFocusInWindow();    
+    requestFocusInWindow();
   }
 
   // ── Layout ────────────────────────────────────────────────────────────────
@@ -192,7 +190,7 @@ public class SongQueueDialog extends JDialog {
   private JPanel buildMainPanel() {
     JPanel main = new JPanel(new BorderLayout(0, 0));
     main.setBackground(BG_PANEL);
-    main.setBorder(BorderFactory.createEmptyBorder(24, 28, 20, 28));
+    main.setBorder(BorderFactory.createEmptyBorder(16, 28, 14, 28));
 
     main.add(buildNowPlayingSection(), BorderLayout.NORTH);
     main.add(buildDivider(), BorderLayout.CENTER);
@@ -294,7 +292,7 @@ public class SongQueueDialog extends JDialog {
       }
     };
     divider.setOpaque(false);
-    divider.setPreferredSize(new Dimension(0, 16));
+    divider.setPreferredSize(new Dimension(0, 8));
     return divider;
   }
 
@@ -362,7 +360,7 @@ public class SongQueueDialog extends JDialog {
 
     moveUpButton = createActionButton("Move Song Up", 0, ACCENT_BLUE, e -> doMoveUp());
     moveDownButton = createActionButton("Move Song Down", 0, ACCENT_BLUE, e -> doMoveDown());
-    removeButton = createActionButton("Remove Song", 0, ACCENT_RED, e -> doRemove());
+    removeButton = createActionButton("Remove Song", 0, ACCENT_BLUE, e -> doRemove());
 
     buttons.add(moveUpButton);
     buttons.add(moveDownButton);

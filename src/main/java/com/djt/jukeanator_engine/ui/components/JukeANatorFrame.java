@@ -340,6 +340,17 @@ public class JukeANatorFrame extends JFrame {
     tabs.setTabComponentAt(3, new JukeboxTabComponent("GENRES", "▣", Color.WHITE));
     tabs.setTabComponentAt(4, new JukeboxTabComponent("ADMIN", "⚙", new Color(255, 220, 0)));
 
+    // Reset each tab to its default state when the user switches to it
+    tabs.addChangeListener(e -> {
+      switch (tabs.getSelectedIndex()) {
+        case 1 -> searchPanel.resetToDefaultView();
+        case 2 -> hotHerePanel.resetToDefaultView();
+        case 3 -> genrePanel.resetToDefaultView();
+        default -> {
+          /* HOME and ADMIN require no reset */ }
+      }
+    });
+
     return tabs;
   }
 

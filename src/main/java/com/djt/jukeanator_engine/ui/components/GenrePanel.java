@@ -191,6 +191,22 @@ public class GenrePanel extends JPanel implements TabNavigator {
     innerCardLayout.show(innerRoot, activeGenre != null ? INNER_ALBUMS : INNER_GRID);
   }
 
+  /**
+   * Resets the Genres tab to the top-level genre grid. Called whenever the user switches to this
+   * tab.
+   */
+  public void resetToDefaultView() {
+    if (currentDetailCard != null) {
+      currentDetailCard.dismiss();
+      currentDetailCard = null;
+    }
+    activeGenre = null;
+    outerCardLayout.show(outerRoot, CARD_GENRES);
+    innerCardLayout.show(innerRoot, INNER_GRID);
+    currentPage = 0;
+    refreshGenresUI();
+  }
+
   private JPanel buildGenreGridCard() {
 
     JPanel pageWrapper = new JPanel(new BorderLayout());
