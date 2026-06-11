@@ -335,9 +335,13 @@ public class AdminPanel extends JPanel {
 
     AlbumDto selected = albumList.getSelectedValue();
     if (selected == null) {
-      JOptionPane.showMessageDialog(this, "Please select an album first.", "No Selection",
-          JOptionPane.WARNING_MESSAGE);
-      return;
+      if (!albumsWithInvalidMetadata.isEmpty()) {
+        selected = albumsWithInvalidMetadata.getFirst();
+      } else {
+        JOptionPane.showMessageDialog(this, "Please select an album first.", "No Selection",
+            JOptionPane.WARNING_MESSAGE);
+        return;
+      }      
     }
 
     EditAlbumDialog dialog =

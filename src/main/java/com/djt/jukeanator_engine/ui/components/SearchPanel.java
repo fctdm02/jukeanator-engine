@@ -411,7 +411,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private JPanel buildNumRow2() {
     JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
     row.setOpaque(false);
-    for (String s : new String[] {"!", "@", "#", "$", "%", "^", "&", "*", "\""})
+    for (String s : new String[] {"!", "@", "#", "$", "%", "^", "&", "*", "\"", "'"})
       row.add(letterKey(s));
 
     row.add(buildModeToggleButton("123@", KeyboardMode.NUMERIC));
@@ -422,7 +422,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private JPanel buildNumRow3() {
     JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
     row.setOpaque(false);
-    for (String s : new String[] {"(", ")", "[", "]", "/", "\\", "?", ":", ";", "~"})
+    for (String s : new String[] {"(", ")", "[", "]", "/", "\\", "?", ":", ";"})
       row.add(letterKey(s));
 
     JButton space = styledKey("SPACE", new Dimension(420, 60));

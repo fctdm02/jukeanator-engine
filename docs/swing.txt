@@ -192,15 +192,6 @@ first page of each of these columns.  In fact, this method should ONLY be doing 
 
 
 
-
-
-
-
-
-
-
-
-
 Modify SongQueueDialog to have the buttons for "Move Song Up", "Move Song Down" and "Remove Song" be rendered like the 
 "Play Song" buttons on AddSongToQueueDialog, in that there will be a cost, in credits, to perform these operations, of which will be 2 times the value of 
 the selected song's priority.  The buttons are to be rendered like "Play Song" in that if there's not enough credits, they will have the red border with
@@ -208,4 +199,62 @@ the add credits warning.  If enough credits are entered, then they should be ren
 out (with no cost/warning label) if a song is not selected.
 
 
+
+
+
+
+Do the following: 
+
+Item #1:  
+
+
+
+
+
+
+
+TODO:
+1: Albums with songs with duplicate track numbers, no track numbers, use song index in album childSongs list as track number.  Do this at scan time
+
+2: AlbumViewPanel: Add a header panel, same size, background color as footer/navigation panel, that shows column descriptions of "Popularity", "TrackNumber"
+and "Song Name".  If a compilation album (the album needs to determine this based on whether or not all the song artist names are the same and match that
+of the album's parent artist), then the "Artist" column needs to be rendered as well
+
+3: The "Compilations" artists should never be displayed to the user.  Any songs in albums in these compilations folders need to use the song artist name instead,
+so at scan time, the song library root should construct a bunch of artists based on the song artist names.  For example, the Top Gun soundtrack has
+the song: "Take My Breath Away" by "Berlin".  Berlin should be created as an artist then.  There is a remix of this song in a new wave 80s compilation, so 
+any search for Berlin, should result in a Berlin artist, whose 2 albums are Top Gun and this new wave 80s compilation
+
+4: When searching for "Pub", "Sgt, Pepper's Lonely Hearts Club Band" shows up as an album result, presumably because of the distance weighting given to
+"Club".  Eliminate, or refine the weighting, so this does not show up in the album results.
+
+5: For Edit Album, allow the user to enter in text for Release Date and Record Label without having to do a search first, and when either/both of these fields
+are non-empty, then enable the "Update Metadata" button
+
+6: For Edit Album, add a cover art URL image to allow the user to specify any URL from the web
+
+7: Extract KeyboardPanel from SearchPanel, so that it can be re-used for a LoginPanel that will be needed to password-protect the AdminPanel
+
+8: For KeyboardPanel, add a highlight around either the "ABC" or "123@", depending upon which is currently displaying 
+
+9: When doing a search, strip out any characters from the album/artist/song name that are NOT available to the on-screen keyboard (e.g. ~)
+
+
+
+
+ 
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  
