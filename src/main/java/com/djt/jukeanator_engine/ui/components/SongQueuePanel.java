@@ -39,7 +39,10 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 
-public class SongQueueDialog extends JDialog {
+// ─────────────────────────────────────────────────────────────────────────
+// CONSTRUCTOR
+// ─────────────────────────────────────────────────────────────────────────
+public class SongQueuePanel extends JDialog {
 
   private static final long serialVersionUID = 1L;
 
@@ -68,7 +71,7 @@ public class SongQueueDialog extends JDialog {
   private static final Color LIST_BG = new Color(10, 12, 18);
   private static final Color SEPARATOR = new Color(40, 44, 60);
 
-  // ── 3-D button palette (mirrors AddSongToQueueDialog) ─────────────────────
+  // ── 3-D button palette (mirrors AddSongToQueuePanel) ─────────────────────
   private static final Color BTN3D_FACE_TOP = new Color(28, 45, 72);
   private static final Color BTN3D_FACE_MID = new Color(18, 32, 54);
   private static final Color BTN3D_FACE_BOTTOM = new Color(10, 18, 34);
@@ -110,7 +113,7 @@ public class SongQueueDialog extends JDialog {
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
-  public SongQueueDialog(Frame owner, SongPlayerService songPlayerService,
+  public SongQueuePanel(Frame owner, SongPlayerService songPlayerService,
       List<SongQueueEntryDto> queue, SongQueueService songQueueService, CreditManager creditManager,
       ImageLoader imageLoader, int popularityT1, int popularityT2, int popularityT3,
       char incrementCreditsKey) {
@@ -829,7 +832,7 @@ public class SongQueueDialog extends JDialog {
       ImageLoader imageLoader, int popularityT1, int popularityT2, int popularityT3,
       char incrementCreditsKey) {
 
-    SongQueueDialog dialog = new SongQueueDialog(owner, songPlayerService, queue, songQueueService,
+    SongQueuePanel dialog = new SongQueuePanel(owner, songPlayerService, queue, songQueueService,
         creditManager, imageLoader, popularityT1, popularityT2, popularityT3, incrementCreditsKey);
     dialog.setVisible(true);
   }

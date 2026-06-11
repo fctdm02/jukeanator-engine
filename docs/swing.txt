@@ -203,10 +203,8 @@ out (with no cost/warning label) if a song is not selected.
 
 
 
-Do the following: 
-
-Item #1:  
-
+Rework the attached UI Code, where the main JFrame is in JukeANatorFrame, so that no JDialogs are ever instantiated.  Right now, there are 3
+JDialog based classes: AddSongToQueuePanel, EditAlbumPanel and SongQueuePanel
 
 
 

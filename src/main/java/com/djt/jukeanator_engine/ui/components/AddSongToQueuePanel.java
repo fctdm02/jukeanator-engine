@@ -33,7 +33,10 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 
-public class AddSongToQueueDialog extends JDialog {
+// ─────────────────────────────────────────────────────────────────────────
+// CONSTRUCTOR
+// ─────────────────────────────────────────────────────────────────────────
+public class AddSongToQueuePanel extends JDialog {
 
   private static final long serialVersionUID = 1L;
 
@@ -88,7 +91,7 @@ public class AddSongToQueueDialog extends JDialog {
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
-  public AddSongToQueueDialog(Frame owner, SongDto song, ImageLoader imageLoader,
+  public AddSongToQueuePanel(Frame owner, SongDto song, ImageLoader imageLoader,
       int priorityCostMultiplier, SongQueueService songQueueService, CreditManager creditManager,
       char incrementCreditsKey) {
 
@@ -578,7 +581,7 @@ public class AddSongToQueueDialog extends JDialog {
   public static void show(Frame owner, SongDto song, ImageLoader imageLoader,
       int priorityCostMultiplier, SongQueueService songQueueService, CreditManager creditManager,
       char incrementCreditsKey) {
-    AddSongToQueueDialog dialog = new AddSongToQueueDialog(owner, song, imageLoader,
+    AddSongToQueuePanel dialog = new AddSongToQueuePanel(owner, song, imageLoader,
         priorityCostMultiplier, songQueueService, creditManager, incrementCreditsKey);
     dialog.setVisible(true);
   }

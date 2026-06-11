@@ -18,7 +18,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
  * queue-position / priority badge, and song name + artist/album sub-label.
  *
  * <p>
- * Used by both {@link AdminPanel} and {@link SongQueueDialog}.
+ * Used by both {@link AdminPanel} and {@link SongQueuePanel}.
  */
 public class SongTrackCellRenderer extends JPanel
     implements javax.swing.ListCellRenderer<SongQueueEntryDto> {

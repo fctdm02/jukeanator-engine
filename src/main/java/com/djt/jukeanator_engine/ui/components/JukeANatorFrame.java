@@ -657,7 +657,7 @@ public class JukeANatorFrame extends JFrame {
     panel.addMouseListener(new java.awt.event.MouseAdapter() {
       @Override
       public void mouseClicked(java.awt.event.MouseEvent e) {
-        SongQueueDialog.show(JukeANatorFrame.this, songPlayerService, currentQueue,
+        SongQueuePanel.show(JukeANatorFrame.this, songPlayerService, currentQueue,
             songQueueService, creditManager, imageLoader, POPULARITY_THRESHOLD_1,
             POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, incrementCreditsKey);
       }

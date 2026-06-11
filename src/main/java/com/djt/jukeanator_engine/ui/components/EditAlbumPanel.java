@@ -41,11 +41,10 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.DownloadAlbumCoverArtRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
-/**
- * Modal dialog for inspecting and fixing album metadata. Features navigation through problematic
- * albums and integrated internet lookups.
- */
-public class EditAlbumDialog extends JDialog {
+// ─────────────────────────────────────────────────────────────────────────
+// CONSTRUCTOR
+// ─────────────────────────────────────────────────────────────────────────
+public class EditAlbumPanel extends JDialog {
 
   private static final long serialVersionUID = 1L;
 
@@ -101,7 +100,7 @@ public class EditAlbumDialog extends JDialog {
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
-  public EditAlbumDialog(Frame owner, SongLibraryService songLibraryService, AlbumDto selectedAlbum,
+  public EditAlbumPanel(Frame owner, SongLibraryService songLibraryService, AlbumDto selectedAlbum,
       List<AlbumDto> invalidAlbumsList) {
     super(owner, "Edit Album Metadata", true);
     this.songLibraryService = songLibraryService;

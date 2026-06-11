@@ -46,7 +46,7 @@ public class AlbumDetailCard extends JPanel {
     AlbumViewPanel.SongClickListener songClick = song -> {
       secondsRemaining = TIMEOUT_SECONDS;
       updateTimeout();
-      AddSongToQueueDialog.show(owner, song, imageLoader, priorityCostMultiplier, songQueueService,
+      AddSongToQueuePanel.show(owner, song, imageLoader, priorityCostMultiplier, songQueueService,
           creditManager, incrementCreditsKey);
     };
 
