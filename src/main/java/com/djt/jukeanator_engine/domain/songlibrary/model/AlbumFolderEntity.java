@@ -18,9 +18,12 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
   private AlbumCoverArtFileEntity coverArt;
   private AlbumMetaDataFileEntity metaData;
   private Set<SongFileEntity> childSongs = new TreeSet<SongFileEntity>();
-  
+
   private transient GenreFolderEntity parentGenre;
   private transient Year releaseDate;
+  private transient Boolean isCompilation; // Returns true if there are at least 2 songs where the
+                                           // song artist (that is embedded in the song filename)
+                                           // are different from one another
 
   public AlbumFolderEntity() {}
 
@@ -112,7 +115,7 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
         }
       }
       if (parentGenre == null) {
-        parentGenre = new GenreFolderEntity(parentFolder, "None");  
+        parentGenre = new GenreFolderEntity(parentFolder, "None");
       }
     }
     return parentGenre;
@@ -162,15 +165,15 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
     }
     return releaseDate;
   }
-  
+
   public void setReleaseDate(Year year) {
-    
+
     if (year != null) {
       this.metaData.setReleaseDate(year.toString());
       this.getMetaData().writeMetadataToFileSystem();
     }
   }
-  
+
   @Override
   public String getTitle() {
     return this.getName();
@@ -178,5 +181,64 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
 
   public String getCoverArtPath() {
     return this.coverArt.getNaturalIdentity();
+  }
+
+  public Boolean getIsCompilation() {
+    return this.isCompilation;
+  }
+
+  public void setIsCompilation(Boolean isCompilation) {
+    this.isCompilation = isCompilation;
+  }
+
+  /**
+   * Post-processes child songs to guarantee sequential track numbers if anomalies are found, and
+   * detects whether this album functions as a compilation.
+   */
+  public void postProcessSongs() {
+    List<SongFileEntity> songs = getChildSongs();
+    if (songs.isEmpty()) {
+      this.isCompilation = Boolean.FALSE;
+      return;
+    }
+
+    boolean reassignTracks = false;
+    Set<Integer> seenTracks = new java.util.HashSet<>();
+    Set<String> uniqueArtists = new java.util.HashSet<>();
+
+    int expectedTrack = 1;
+
+    for (SongFileEntity song : songs) {
+      Integer track = song.getTrackNumber();
+
+      // Condition check for Item #1: duplicate or non-consecutive tracking
+      if (track == null || seenTracks.contains(track) || track.intValue() != expectedTrack) {
+        reassignTracks = true;
+      }
+      if (track != null) {
+        seenTracks.add(track);
+      }
+      expectedTrack++;
+
+      // Condition check for Item #2: capture artist names safely
+      String artist = song.getArtistName();
+      if (artist != null && !artist.trim().isBlank() && !artist.equalsIgnoreCase("Unknown")) {
+        uniqueArtists.add(artist.trim().toLowerCase());
+      }
+    }
+
+    // Item #1 Execution: Re-assign consecutive track numbers based on current sort index
+    if (reassignTracks) {
+      for (int i = 0; i < songs.size(); i++) {
+        songs.get(i).setTrackNumber(Integer.valueOf(i + 1));
+      }
+    }
+
+    // Item #2 Execution: Flag compilation if at least 2 distinct artists are found
+    if (uniqueArtists.size() >= 2) {
+      this.isCompilation = Boolean.TRUE;
+    } else {
+      this.isCompilation = Boolean.FALSE;
+    }
   }
 }

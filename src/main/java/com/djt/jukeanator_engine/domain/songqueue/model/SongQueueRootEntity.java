@@ -134,14 +134,14 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
   public Integer removeSongFromQueue(SongFileEntity song) {
 
     int index = getIndexForSongQueueEntry(song);
-    if (index > 0) {
+    if (index >= 0) {
 
       SongQueueEntryEntity current = this.songs.get(index);
       this.songs.remove(current);
 
-      return Integer.valueOf(this.songs.size());
+      return Integer.valueOf(1);
     }
-    return -1;
+    return Integer.valueOf(0);
   }
   
   /**

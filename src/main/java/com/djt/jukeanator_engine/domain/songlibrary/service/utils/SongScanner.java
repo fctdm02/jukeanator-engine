@@ -220,6 +220,9 @@ public final class SongScanner {
         }
       }
 
+      // Execute the post-processing track correction and compilation analysis
+      album.postProcessSongs();
+
       if (!hasValidCoverArt || (requiresMetadata && !hasValidMetadata)) {
 
         List<AlbumMetadataDto> albumMetadataResults = searchInternetForAlbumMetadata(album);

@@ -203,29 +203,44 @@ out (with no cost/warning label) if a song is not selected.
 
 
 
-Rework the attached UI Code, where the main JFrame is in JukeANatorFrame, so that no JDialogs are ever instantiated.  Right now, there are 3
+Rework the attached UI Code, where the main JFrame is in JukeANatorFrame, so that no JDialogs are ever instantiated. Right now, there are 3
 JDialog based classes: AddSongToQueuePanel, EditAlbumPanel and SongQueuePanel.  The general strategy is this: Similar to GenrePanel where there
 is an initial landing panel, then a "details" panel, the main content area, which is everything below the topPanel that has the credits label, 
 jukebox logo image and now playing song panel, is a JTabbedPane with tabs for Home, Search, Hot Here, Genres and Admin, will have a card layout
 that will have hidden cards for:  
-- AlbumDetailCard
-- AddSongToQueuePanel
-- EditAlbumPanel
-- SongQueuePanel
+- AlbumDetailCard/AlbumViewCard
+- AddSongToQueueCard
+- EditAlbumCard
+- SongQueueCard
 
-These cards will then be shown, based on the current source code implementation.  For example, the EditAlbumPanel is only used by AdminPanel, but the
-AlbumViewPanel and AddSongToQueuePanels are used by Home, Search, Hot Here and Genres.  The SongQueuePanel, since it is used by the topPanel, 
+These cards will then be shown, based on the current source code implementation.  For example, the EditAlbumCard is only used by AdminPanel, but 
+AlbumDetailCard/AlbumViewCard and AddSongToQueueCard are used by Home, Search, Hot Here and Genres.  The SongQueueCard, since it is used by the topPanel, 
 is, by proxy, available anywhere (however, it should be DISABLED when the AdminPanel is being displayed, as the AdminPanel has song queue
 functionality already).
 
-As such, the current "timeout" behavior will, instead of dismissing the JDialog, "pop" back to the calling panel.  For example, if the AlbumViewPanel
+As such, the current "timeout" behavior will, instead of dismissing the JDialog, "pop" back to the calling panel.  This is similar to how 
+AlbumDetailCard/AlbumViewCard are currently implemented, when it times out, it pops back to the calling panel.
+
+If you need further clarification, please ask before going down an ill-advised path.
 
 
 
-For any of these panels
-that have the ability to display an AlbumViewPanel, 
 
+Gemini
+------
+In SongScanner, as an album's songs are iterated, a call is made to set the track number (if one can be extracted from the song filename)
+If one cannot be extracted, then one is set by using the index of the song as it was processed in the parent album's childSongs collection.
+The problem with this approach is that there could be many songs in an album that have the same embedded track number (see the attached screenshot
+for an example).  The solution is to add a post-processing check to an album that does the following:
 
+Item #1, If any duplicate track numbers, or non-consectuive track numbers are detected, then re-assign all track numbers to be based off a 
+child song's order, if these child songs were added to a list (i.e. index of song in a list)
+
+Item 2#, At the same time, call the getArtistName() as the songs are done in this post-processing step by an album, and if there are at least
+two songs with a different artist value (embedded from the song filename), then set the transient Boolean property called "isCompilation"
+
+The end result is that a track listing of an album's songs will have consecutive, non-duplicating track numbers and isCompilation will be 
+true if at least two songs have different artists...
 
 
 
@@ -256,6 +271,7 @@ are non-empty, then enable the "Update Metadata" button
 
 9: When doing a search, strip out any characters from the album/artist/song name that are NOT available to the on-screen keyboard (e.g. ~)
 
+DONE 10: Remove song does not work from AdminPanel, nor from SongQueuePanel
 
 
 

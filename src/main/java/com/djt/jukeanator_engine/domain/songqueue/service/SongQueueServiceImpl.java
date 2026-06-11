@@ -287,15 +287,15 @@ public final class SongQueueServiceImpl
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
 
-          Integer numSongsInQueue = songQueueRoot.removeSongFromQueue(song);
-          if (numSongsInQueue.intValue() > 0) {
+          Integer numSongsRemoved = songQueueRoot.removeSongFromQueue(song);
+          if (numSongsRemoved.intValue() > 0) {
 
             songQueueRepository.storeAggregateRoot(songQueueRoot);
 
             eventPublisher.publishEvent(
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }
-          return numSongsInQueue;
+          return numSongsRemoved;
         }
       }
     } catch (EntityDoesNotExistException e) {
