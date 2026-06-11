@@ -68,6 +68,10 @@ public class ArtistFolderEntity extends FolderEntity implements LibraryItem {
   @Override
   public Year getReleaseDate() {
     
+    if (albums == null) {
+      getAlbums();
+    }
+    
     if (releaseDate == null) {
       Year newestReleaseDate = Year.parse("1950");
       for (AlbumFolderEntity album: getAlbums()) {

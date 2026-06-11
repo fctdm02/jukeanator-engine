@@ -246,7 +246,7 @@ true if at least two songs have different artists...
 
 
 TODO:
-1: Albums with songs with duplicate track numbers, no track numbers, use song index in album childSongs list as track number.  Do this at scan time
+DONE 1: Albums with songs with duplicate track numbers, no track numbers, use song index in album childSongs list as track number.  Do this at scan time
 
 2: AlbumViewPanel: Add a header panel, same size, background color as footer/navigation panel, that shows column descriptions of "Popularity", "TrackNumber"
 and "Song Name".  If a compilation album (the album needs to determine this based on whether or not all the song artist names are the same and match that
