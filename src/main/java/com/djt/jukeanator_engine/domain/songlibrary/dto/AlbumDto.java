@@ -15,6 +15,7 @@ public class AlbumDto {
   private String recordLabel;
   private String releaseDate;
   private String coverArtPath;
+  private Boolean isCompilation;
   private List<SongDto> songs;
 
   public AlbumDto(
@@ -27,7 +28,8 @@ public class AlbumDto {
       Boolean hasExplicit, 
       String recordLabel,
       String releaseDate, 
-      String coverArtPath, 
+      String coverArtPath,
+      Boolean isCompilation,
       List<SongDto> songs) {
     super();
     this.genreId = genreId;
@@ -40,6 +42,7 @@ public class AlbumDto {
     this.recordLabel = recordLabel;
     this.releaseDate = releaseDate;
     this.coverArtPath = coverArtPath;
+    this.isCompilation = isCompilation;
     this.songs = songs;
   }
 
@@ -81,6 +84,10 @@ public class AlbumDto {
 
   public String getCoverArtPath() {
     return coverArtPath;
+  }
+  
+  public Boolean isCompilation() {
+    return isCompilation;
   }
 
   public List<SongDto> getSongs() {

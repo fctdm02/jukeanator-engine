@@ -411,7 +411,7 @@ public class AlbumViewCard extends JPanel {
     numLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
     String songDescription = "";
-    if (album.getArtistName().equals("Compilations")) {
+    if (album.isCompilation()) {
       songDescription = song.getSongName() + " - " + song.getArtistName();
     } else {
       songDescription = song.getSongName();

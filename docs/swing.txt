@@ -267,6 +267,30 @@ true if at least two songs have different artists...
 
 
 
+Gemini
+When AlbumChange AlbumViewCard to have a header panel that is at the top/NORTH of the track listing that is the same size and background color 
+of the bottom/SOUTH footer/ nav panel, but has header labels for the track listing columns when AlbumDTO.isCompilation=true for Popularity, 
+Track #,  Artist and Song.  When AlbumDTO.isCompilation=false, then just have Popularity, Track # and Song.  Change the track row to not have 
+a song description, but separate Artist and Song columns for isCompilation=true and just Song when false.
+
+
+
+So, this code is going away:
+
+    String songDescription = "";
+
+    if (album.isCompilation()) {
+
+      songDescription = song.getSongName() + " - " + song.getArtistName();
+
+    } else {
+
+      songDescription = song.getSongName();
+
+    }
+    
+
+
 TODO:
 DONE 1: Albums with songs with duplicate track numbers, no track numbers, use song index in album childSongs list as track number.  Do this at scan time
 
