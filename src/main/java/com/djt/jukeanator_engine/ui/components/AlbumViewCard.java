@@ -32,8 +32,9 @@ public class AlbumViewCard extends JPanel {
 
   private static final int LEFT_PANEL_WIDTH = 320;
   private static final int COVER_SIZE = 320;
+
   // Number of track rows shown per page in the nav-paginated track listing.
-  private static final int TRACKS_PER_PAGE = 16;
+  private static final int TRACKS_PER_PAGE = 15;
 
   // ── Palette ───────────────────────────────────────────────────────────────
   private static final Color BG_ROW_HOVER = new Color(255, 255, 255, 25);
@@ -47,6 +48,10 @@ public class AlbumViewCard extends JPanel {
   private static final int BAR_WIDTH = SongTrackCellRenderer.BAR_WIDTH;
   private static final int BAR_GAP = SongTrackCellRenderer.BAR_GAP;
   private static final int BAR_MAX_H = SongTrackCellRenderer.BAR_MAX_H;
+
+  // ── Widen Left Columns Allocation Dimensions to prevent clipping ─────────
+  private static final int PLAYS_COLUMN_WIDTH = 64;
+  private static final int TRK_NUM_COLUMN_WIDTH = 48;
 
   // ── Track list pagination state ───────────────────────────────────────────
   private int trackOffset = 0;
@@ -194,6 +199,56 @@ public class AlbumViewCard extends JPanel {
     // Right padding matches the ResultsColumnPanel outer column gutter (10px).
     // Left padding adds a visual gap between the sidebar separator and the track list.
     wrapper.setBorder(new EmptyBorder(0, 12, 0, 10));
+
+    // ── Header Panel (NORTH) ──────────────────────────────────────────────
+    // Matches the size and background profile of the bottom nav panel layout structure
+    JPanel headerPanel = new JPanel(new BorderLayout(10, 0));
+    headerPanel.setBackground(Color.BLACK);
+    headerPanel.setBorder(new EmptyBorder(8, 16, 8, 16));
+    headerPanel.setPreferredSize(new Dimension(headerPanel.getPreferredSize().width, 45)); // Same
+                                                                                           // height
+                                                                                           // profile
+                                                                                           // as the
+                                                                                           // footer
+                                                                                           // elements
+
+    // Replicating column distribution using sub-panels matching the track rows layout
+    JPanel headerLeftCluster = new JPanel(new BorderLayout(6, 0));
+    headerLeftCluster.setOpaque(false);
+
+    JLabel popHeaderLabel = new JLabel("# Plays");
+    popHeaderLabel.setForeground(TEXT_SECONDARY);
+    popHeaderLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    popHeaderLabel.setPreferredSize(new Dimension(PLAYS_COLUMN_WIDTH, 30));
+
+    JLabel trackHeaderLabel = new JLabel("Trk #");
+    trackHeaderLabel.setForeground(TEXT_SECONDARY);
+    trackHeaderLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    trackHeaderLabel.setPreferredSize(new Dimension(TRK_NUM_COLUMN_WIDTH, 30));
+    trackHeaderLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+    headerLeftCluster.add(popHeaderLabel, BorderLayout.WEST);
+    headerLeftCluster.add(trackHeaderLabel, BorderLayout.CENTER);
+
+    JPanel headerCenterCluster =
+        new JPanel(new java.awt.GridLayout(1, album.isCompilation() ? 2 : 1, 10, 0));
+    headerCenterCluster.setOpaque(false);
+
+    if (album.isCompilation()) {
+      JLabel artistHeaderLabel = new JLabel("Artist");
+      artistHeaderLabel.setForeground(TEXT_SECONDARY);
+      artistHeaderLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+      headerCenterCluster.add(artistHeaderLabel);
+    }
+
+    JLabel songHeaderLabel = new JLabel("Song");
+    songHeaderLabel.setForeground(TEXT_SECONDARY);
+    songHeaderLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    headerCenterCluster.add(songHeaderLabel);
+
+    headerPanel.add(headerLeftCluster, BorderLayout.WEST);
+    headerPanel.add(headerCenterCluster, BorderLayout.CENTER);
+    wrapper.add(headerPanel, BorderLayout.NORTH);
 
     // ── Blue gradient body — rows + footer nav ────────────────────────────
     // Mirrors ResultsColumnPanel.innerColumnBody: gradient fills the body panel;
@@ -407,29 +462,43 @@ public class AlbumViewCard extends JPanel {
     JLabel numLabel = new JLabel(String.format("%02d", song.getTrackNumber()));
     numLabel.setForeground(TEXT_SECONDARY);
     numLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
-    numLabel.setPreferredSize(new Dimension(34, 30));
+    numLabel.setPreferredSize(new Dimension(TRK_NUM_COLUMN_WIDTH, 30));
     numLabel.setHorizontalAlignment(SwingConstants.CENTER);
-
-    String songDescription = "";
-    if (album.isCompilation()) {
-      songDescription = song.getSongName() + " - " + song.getArtistName();
-    } else {
-      songDescription = song.getSongName();
-    }
-
-    // ── Song name ─────────────────────────────────────────────────────────
-    JLabel songDescriptionLabel = new JLabel(songDescription);
-    songDescriptionLabel.setForeground(TEXT_PRIMARY);
-    songDescriptionLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 17));
 
     // ── Left cluster: bars + track num ────────────────────────────────────
     JPanel left = new JPanel(new BorderLayout(6, 0));
     left.setOpaque(false);
-    left.add(barsPanel, BorderLayout.WEST);
-    left.add(numLabel, BorderLayout.CENTER);
 
+    // Wrap barsPanel inside an alignment block matching PLAYS_COLUMN_WIDTH constraint
+    JPanel barsAlignmentPanel = new JPanel(new BorderLayout());
+    barsAlignmentPanel.setOpaque(false);
+    barsAlignmentPanel.setPreferredSize(new Dimension(PLAYS_COLUMN_WIDTH, 30));
+    barsAlignmentPanel.add(barsPanel, BorderLayout.WEST);
+
+    left.add(barsAlignmentPanel, BorderLayout.WEST);
+    left.add(numLabel, BorderLayout.CENTER);
     row.add(left, BorderLayout.WEST);
-    row.add(songDescriptionLabel, BorderLayout.CENTER);
+
+    // ── Split Columns (CENTER) ────────────────────────────────────────────
+    // Creates structured grid labels layout depending on whether the album object represents a
+    // compilation
+    JPanel columnsPanel =
+        new JPanel(new java.awt.GridLayout(1, album.isCompilation() ? 2 : 1, 10, 0));
+    columnsPanel.setOpaque(false);
+
+    if (album.isCompilation()) {
+      JLabel artistLabel = new JLabel(song.getArtistName());
+      artistLabel.setForeground(TEXT_PRIMARY);
+      artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 17));
+      columnsPanel.add(artistLabel);
+    }
+
+    JLabel songLabel = new JLabel(song.getSongName());
+    songLabel.setForeground(TEXT_PRIMARY);
+    songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 17));
+    columnsPanel.add(songLabel);
+
+    row.add(columnsPanel, BorderLayout.CENTER);
 
     // ── Hover + click ─────────────────────────────────────────────────────
     row.addMouseListener(new java.awt.event.MouseAdapter() {

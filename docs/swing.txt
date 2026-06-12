@@ -321,6 +321,7 @@ DONE 10: Remove song does not work from AdminPanel, nor from SongQueuePanel
 
 11: Investigate and eliminate duplicate artists in Hot Here, some of it may be due to case and/or spelling, as artist names are coming from songs too now
 
+12: For ArtistFromSong entities, do not count songs from different artists from the compilation albums
 
  
 

@@ -184,6 +184,25 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
   }
 
   public Boolean isCompilation() {
+
+    if (this.isCompilation == null) {
+
+      List<SongFileEntity> songs = getChildSongs();
+      Set<String> uniqueArtists = new java.util.HashSet<>();
+      for (SongFileEntity song : songs) {
+
+        String artist = song.getArtistName();
+        if (artist != null && !artist.trim().isBlank() && !artist.equalsIgnoreCase("Unknown")) {
+          uniqueArtists.add(artist.trim().toLowerCase());
+        }
+      }
+
+      if (uniqueArtists.size() >= 2) {
+        this.isCompilation = Boolean.TRUE;
+      } else {
+        this.isCompilation = Boolean.FALSE;
+      }
+    }
     return this.isCompilation;
   }
 
