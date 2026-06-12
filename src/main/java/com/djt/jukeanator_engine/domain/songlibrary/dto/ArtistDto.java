@@ -58,7 +58,11 @@ public class ArtistDto {
     // If all are compilations, then return t
     int maxAlbumNumPlays = 0;
     for (AlbumDto album : albums) {
-      if (!album.isCompilation() && album.getNumPlays() > maxAlbumNumPlays) {
+
+      int albumNumPlays = album.getNumPlays();
+      if (!album.isCompilation() && albumNumPlays > maxAlbumNumPlays) {
+
+        maxAlbumNumPlays = album.getNumPlays();
         coverArtPath = album.getCoverArtPath();
       }
     }

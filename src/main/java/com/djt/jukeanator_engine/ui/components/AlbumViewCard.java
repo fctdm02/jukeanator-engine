@@ -167,7 +167,7 @@ public class AlbumViewCard extends JPanel {
 
     int trackCount = album.getSongs() == null ? 0 : album.getSongs().size();
     meta.add(Box.createVerticalStrut(6));
-    meta.add(singleLineMetaLabel(trackCount + " tracks", Font.PLAIN, 13, TEXT_SECONDARY));
+    meta.add(singleLineMetaLabel(trackCount + " songs", Font.PLAIN, 13, TEXT_SECONDARY));
 
     int playCount = album.getNumPlays() == null ? 0 : album.getNumPlays();
     String formattedPlayCount = NumberFormat.getIntegerInstance().format(playCount);

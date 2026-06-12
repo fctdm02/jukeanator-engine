@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.mapper;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -17,11 +18,13 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
  */
 public final class SongLibraryMapper {
 
-  public static GenreDto toGenreDto(GenreFolderEntity genreEntity, List<Integer> albumIds, Integer numPlays) {
+  public static GenreDto toGenreDto(GenreFolderEntity genreEntity, List<Integer> albumIds,
+      Integer numPlays) {
 
-    return new GenreDto(genreEntity.getPersistentIdentity(), genreEntity.getName(), albumIds, numPlays);
+    return new GenreDto(genreEntity.getPersistentIdentity(), genreEntity.getName(), albumIds,
+        numPlays);
   }
-  
+
   public static List<ArtistDto> toArtistDtoList(Collection<ArtistFolderEntity> artistEntities) {
 
     List<ArtistDto> artistDtos = new ArrayList<>();
@@ -34,10 +37,16 @@ public final class SongLibraryMapper {
 
   public static ArtistDto toArtistDto(ArtistFolderEntity artistEntity) {
 
+    List<AlbumFolderEntity> albums = artistEntity.getAlbums().stream()
+        .sorted(Comparator
+            .comparing(AlbumFolderEntity::getNumPlays, Comparator.nullsFirst(Integer::compareTo))
+            .reversed())
+        .toList();
+
     return new ArtistDto(artistEntity.getPersistentIdentity(), artistEntity.getName(),
-        SongLibraryMapper.toAlbumDtoList(artistEntity, artistEntity.getAlbums()));
+        SongLibraryMapper.toAlbumDtoList(artistEntity, albums));
   }
-  
+
   public static List<AlbumDto> toAlbumDtoList(Collection<AlbumFolderEntity> albumEntities) {
 
     List<AlbumDto> albumDtos = new ArrayList<>();
@@ -50,7 +59,8 @@ public final class SongLibraryMapper {
     return albumDtos;
   }
 
-  public static List<AlbumDto> toAlbumDtoList(ArtistFolderEntity artist, Collection<AlbumFolderEntity> albumEntities) {
+  public static List<AlbumDto> toAlbumDtoList(ArtistFolderEntity artist,
+      Collection<AlbumFolderEntity> albumEntities) {
 
     List<AlbumDto> albumDtos = new ArrayList<>();
     for (AlbumFolderEntity albumEntity : albumEntities) {
@@ -65,27 +75,17 @@ public final class SongLibraryMapper {
     ArtistFolderEntity artist = albumEntity.getParentArtist();
     return toAlbumDto(artist, albumEntity);
   }
-  
+
   public static AlbumDto toAlbumDto(ArtistFolderEntity artist, AlbumFolderEntity albumEntity) {
 
-    return new AlbumDto(
-        albumEntity.getParentGenre().getPersistentIdentity(),
-        albumEntity.getParentGenre().getName(),        
-        artist.getPersistentIdentity(), 
-        artist.getName(),
-        albumEntity.getPersistentIdentity(), 
-        albumEntity.getName(), 
-        albumEntity.hasExplicit(),
-        albumEntity.getRecordLabel(), 
-        albumEntity.getReleaseDate().toString(), 
-        albumEntity.getCoverArtPath(),
-        albumEntity.isCompilation(),
-        SongLibraryMapper.toSongDtoList(
-            artist, 
-            albumEntity, 
-            albumEntity.getChildSongs()));
+    return new AlbumDto(albumEntity.getParentGenre().getPersistentIdentity(),
+        albumEntity.getParentGenre().getName(), artist.getPersistentIdentity(), artist.getName(),
+        albumEntity.getPersistentIdentity(), albumEntity.getName(), albumEntity.hasExplicit(),
+        albumEntity.getRecordLabel(), albumEntity.getReleaseDate().toString(),
+        albumEntity.getCoverArtPath(), albumEntity.isCompilation(),
+        SongLibraryMapper.toSongDtoList(artist, albumEntity, albumEntity.getChildSongs()));
   }
-  
+
   public static List<SongDto> toSongDtoList(Collection<SongFileEntity> songEntities) {
 
     List<SongDto> songDtos = new ArrayList<>();
@@ -94,51 +94,37 @@ public final class SongLibraryMapper {
       AlbumFolderEntity album = songEntity.getAlbum();
       ArtistFolderEntity artist = album.getParentArtist();
 
-      songDtos.add(toSongDto(
-          artist,
-          album,
-          songEntity));
+      songDtos.add(toSongDto(artist, album, songEntity));
     }
     return songDtos;
   }
 
-  public static List<SongDto> toSongDtoList(
-      ArtistFolderEntity artist,
-      AlbumFolderEntity album,
+  public static List<SongDto> toSongDtoList(ArtistFolderEntity artist, AlbumFolderEntity album,
       Collection<SongFileEntity> songEntities) {
 
     List<SongDto> songDtos = new ArrayList<>();
     for (SongFileEntity songEntity : songEntities) {
 
-      songDtos.add(toSongDto(
-          artist,
-          album,
-          songEntity));
+      songDtos.add(toSongDto(artist, album, songEntity));
     }
     return songDtos;
   }
 
   public static SongDto toSongDto(SongFileEntity songEntity) {
-    
+
     AlbumFolderEntity album = songEntity.getAlbum();
     ArtistFolderEntity artist = album.getParentArtist();
-    
+
     return SongLibraryMapper.toSongDto(artist, album, songEntity);
   }
-  
-  public static SongDto toSongDto(ArtistFolderEntity artist, AlbumFolderEntity album, SongFileEntity songEntity) {
 
-    return new SongDto(
-        album.getParentGenre().getPersistentIdentity(),
-        album.getParentGenre().getName(),
-        artist.getPersistentIdentity(),
-        songEntity.getArtistName(),
-        album.getPersistentIdentity(),
-        album.getName(),
-        album.getCoverArtPath(),
-        songEntity.getPersistentIdentity(),
-        songEntity.getSongName(),
-        songEntity.getTrackNumber(),
-        songEntity.getNumPlays());
+  public static SongDto toSongDto(ArtistFolderEntity artist, AlbumFolderEntity album,
+      SongFileEntity songEntity) {
+
+    return new SongDto(album.getParentGenre().getPersistentIdentity(),
+        album.getParentGenre().getName(), artist.getPersistentIdentity(),
+        songEntity.getArtistName(), album.getPersistentIdentity(), album.getName(),
+        album.getCoverArtPath(), songEntity.getPersistentIdentity(), songEntity.getSongName(),
+        songEntity.getTrackNumber(), songEntity.getNumPlays());
   }
 }

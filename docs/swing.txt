@@ -327,6 +327,12 @@ DONE 13: Add play count to AlbumViewCard
 
 14: When viewing an AlbumViewCard from the Artists detail panel, from either Search, Hot Here or Genre, when the user clicks on the back button, they
 are returned to the search results panel for Search, Hot Here or Genre, rather than the Artists detail panel where they started from, please correct this behavior
+
+15: When viewing albums for an artist, the albums should be sorted by popularity
+
+16: The cover art image for an artist, doesn't show the most popular album for Search, Hot Here and Genre panels
+
+17: For Hot Here, the artists results have not been de-duplicated
  
 
 
