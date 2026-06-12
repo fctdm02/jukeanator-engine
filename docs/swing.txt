@@ -274,12 +274,12 @@ DONE 1: Albums with songs with duplicate track numbers, no track numbers, use so
 and "Song Name".  If a compilation album (the album needs to determine this based on whether or not all the song artist names are the same and match that
 of the album's parent artist), then the "Artist" column needs to be rendered as well
 
-3: The "Compilations" artists should never be displayed to the user.  Any songs in albums in these compilations folders need to use the song artist name instead,
+DONE 3: The "Compilations" artists should never be displayed to the user.  Any songs in albums in these compilations folders need to use the song artist name instead,
 so at scan time, the song library root should construct a bunch of artists based on the song artist names.  For example, the Top Gun soundtrack has
 the song: "Take My Breath Away" by "Berlin".  Berlin should be created as an artist then.  There is a remix of this song in a new wave 80s compilation, so 
 any search for Berlin, should result in a Berlin artist, whose 2 albums are Top Gun and this new wave 80s compilation
 
-4: When searching for "Pub", "Sgt, Pepper's Lonely Hearts Club Band" shows up as an album result, presumably because of the distance weighting given to
+DONE 4: When searching for "Pub", "Sgt, Pepper's Lonely Hearts Club Band" shows up as an album result, presumably because of the distance weighting given to
 "Club".  Eliminate, or refine the weighting, so this does not show up in the album results.
 
 5: For Edit Album, allow the user to enter in text for Release Date and Record Label without having to do a search first, and when either/both of these fields
@@ -295,6 +295,7 @@ are non-empty, then enable the "Update Metadata" button
 
 DONE 10: Remove song does not work from AdminPanel, nor from SongQueuePanel
 
+11: Investigate and eliminate duplicate artists in Hot Here, some of it may be due to case and/or spelling, as artist names are coming from songs too now
 
 
  

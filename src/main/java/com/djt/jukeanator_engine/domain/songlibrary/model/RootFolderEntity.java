@@ -187,10 +187,17 @@ public class RootFolderEntity extends FolderEntity {
         }
       }
 
+      // For compilation albums, the song artist's will
+      // be in this collection, so there's no need to
+      // add the "Compilations" artist itself, as any of these
+      // albums will be retrievable via the song artist.
       ArtistFolderEntity artist = album.getParentArtist();
-      Integer artistId = artist.getPersistentIdentity();
-      if (!this.artistsMap.containsKey(artistId)) {
-        this.artistsMap.put(artistId, artist);
+      if (!artist.getName().equals("Compilations")) {
+
+        Integer artistId = artist.getPersistentIdentity();
+        if (!this.artistsMap.containsKey(artistId)) {
+          this.artistsMap.put(artistId, artist);
+        }
       }
 
       Integer albumId = album.getPersistentIdentity();

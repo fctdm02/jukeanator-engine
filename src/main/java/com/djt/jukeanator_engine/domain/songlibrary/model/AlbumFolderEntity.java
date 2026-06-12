@@ -183,12 +183,8 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
     return this.coverArt.getNaturalIdentity();
   }
 
-  public Boolean getIsCompilation() {
+  public Boolean isCompilation() {
     return this.isCompilation;
-  }
-
-  public void setIsCompilation(Boolean isCompilation) {
-    this.isCompilation = isCompilation;
   }
 
   /**

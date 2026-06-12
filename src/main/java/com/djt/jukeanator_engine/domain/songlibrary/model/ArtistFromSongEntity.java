@@ -50,9 +50,15 @@ public final class ArtistFromSongEntity extends ArtistFolderEntity {
     }
 
     int numPlays = 0;
+    String thisName = getName();
     for (AlbumFolderEntity album : albums) {
+      for (SongFileEntity song : album.getChildSongs()) {
 
-      numPlays = numPlays + album.getNumPlays();
+        if (song.getArtistName().equals(thisName)) {
+
+          numPlays = numPlays + song.getNumPlays();
+        }
+      }
     }
     return Integer.valueOf(numPlays);
   }
