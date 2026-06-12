@@ -139,8 +139,32 @@ public class RootFolderEntity extends FolderEntity {
     return albumsByGenreMap.get(genre);
   }
 
+  /*
+   * public Collection<ArtistFolderEntity> getArtists() { return artistsMap.values(); }
+   */
   public Collection<ArtistFolderEntity> getArtists() {
-    return artistsMap.values();
+
+    Map<String, ArtistFolderEntity> uniqueArtists = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+
+    for (ArtistFolderEntity artist : artistsMap.values()) {
+
+      String artistName = artist.getName();
+      ArtistFolderEntity existing = uniqueArtists.get(artistName);
+
+      if (existing == null) {
+        uniqueArtists.put(artistName, artist);
+        continue;
+      }
+
+      // Prefer ArtistFromSongEntity over ArtistFolderEntity
+      if (existing instanceof ArtistFromSongEntity == false
+          && artist instanceof ArtistFromSongEntity) {
+
+        uniqueArtists.put(artistName, artist);
+      }
+    }
+
+    return uniqueArtists.values();
   }
 
   public Collection<AlbumFolderEntity> getAlbums() {
