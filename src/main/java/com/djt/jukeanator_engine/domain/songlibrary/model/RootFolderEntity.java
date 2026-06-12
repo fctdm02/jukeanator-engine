@@ -15,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
@@ -50,7 +51,7 @@ public class RootFolderEntity extends FolderEntity {
   public ArtistFromSongEntity getArtistFromSong(String songArtistName) {
 
     if (this.artistsFromSongsMap == null) {
-      this.artistsFromSongsMap = new HashMap<>();
+      this.artistsFromSongsMap = new TreeMap<>();
     }
 
     return this.artistsFromSongsMap.get(songArtistName);
@@ -152,11 +153,11 @@ public class RootFolderEntity extends FolderEntity {
 
   public void initialize() {
 
-    this.genresMap = new HashMap<>();
-    this.albumsByGenreMap = new HashMap<>();
-    this.artistsMap = new HashMap<>();
-    this.albumsMap = new HashMap<>();
-    this.songsMap = new HashMap<>();
+    this.genresMap = new TreeMap<>();
+    this.albumsByGenreMap = new TreeMap<>();
+    this.artistsMap = new TreeMap<>();
+    this.albumsMap = new TreeMap<>();
+    this.songsMap = new TreeMap<>();
 
     // Iterate over artistsFromSongs and add to artistsMap
     for (ArtistFromSongEntity artistFromSong : this.artistsFromSongs) {

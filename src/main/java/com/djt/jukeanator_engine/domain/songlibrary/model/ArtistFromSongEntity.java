@@ -73,20 +73,21 @@ public final class ArtistFromSongEntity extends ArtistFolderEntity {
       }
 
       Map<GenreFolderEntity, Integer> genreMap = new HashMap<>();
+
       for (AlbumFolderEntity album : albums) {
 
-        genre = album.getParentGenre();
-        if (!genreMap.containsKey(genre)) {
-          genreMap.put(genre, Integer.valueOf(1));
-        } else {
-          Integer count = genreMap.get(genre);
-          genreMap.put(genre, Integer.valueOf(count.intValue() + 1));
+        GenreFolderEntity albumGenre = album.getParentGenre();
+        if (albumGenre == null) {
+          continue;
         }
+
+        genreMap.merge(albumGenre, 1, Integer::sum);
       }
 
-      // TODO: Iterate through the genre map and set/return the one with the highest count
-
+      genre = genreMap.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey)
+          .orElse(null);
     }
+
     return genre;
   }
 

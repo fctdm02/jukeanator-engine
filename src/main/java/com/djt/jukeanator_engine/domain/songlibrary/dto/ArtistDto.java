@@ -4,21 +4,18 @@ import java.util.List;
 import java.util.Objects;
 
 public class ArtistDto {
-  
+
   private Integer artistId;
   private String artistName;
   private List<AlbumDto> albums;
-  
-  public ArtistDto(
-      Integer artistId,
-      String artistName, 
-      List<AlbumDto> albums) {
+
+  public ArtistDto(Integer artistId, String artistName, List<AlbumDto> albums) {
     super();
     this.artistId = artistId;
     this.artistName = artistName;
     this.albums = albums;
   }
-  
+
   public Integer getArtistId() {
     return artistId;
   }
@@ -30,7 +27,7 @@ public class ArtistDto {
   public List<AlbumDto> getAlbums() {
     return albums;
   }
-  
+
   @Override
   public int hashCode() {
     return Objects.hash(artistId);
@@ -50,46 +47,60 @@ public class ArtistDto {
 
   @Override
   public String toString() {
-    return "ArtistDto []";
+    return "ArtistDto [" + this.artistName + "]";
   }
 
   public String getCoverArtPath() {
-    
-    if (!albums.isEmpty()) {
-      return albums.get(0).getCoverArtPath();
+
+    String coverArtPath = "";
+
+    // Return the first, most popular album that is not a compilation
+    // If all are compilations, then return t
+    int maxAlbumNumPlays = 0;
+    for (AlbumDto album : albums) {
+      if (!album.isCompilation() && album.getNumPlays() > maxAlbumNumPlays) {
+        coverArtPath = album.getCoverArtPath();
+      }
     }
-    return "";
+
+    // As a failsafe, if coverArtPath is still empty, then
+    // set it to be from the first album: NOTE: All artists
+    // are going to have at least one album.
+    if (coverArtPath.equals("")) {
+      coverArtPath = albums.get(0).getCoverArtPath();
+    }
+    return coverArtPath;
   }
 
   public Integer getAlbumCount() {
     return Integer.valueOf(albums.size());
   }
-  
+
   public Integer getSongCount() {
-    
+
     int songCount = 0;
-    for (AlbumDto album: albums) {
-      
+    for (AlbumDto album : albums) {
+
       if (!album.isCompilation()) {
-        songCount = songCount + album.getSongs().size();  
+        songCount = songCount + album.getSongs().size();
       } else {
-        for (SongDto song: album.getSongs()) {
+        for (SongDto song : album.getSongs()) {
           if (song.getArtistName().equals(artistName)) {
-            songCount = songCount + 1;    
-          }          
-        }        
-      }      
+            songCount = songCount + 1;
+          }
+        }
+      }
     }
     return Integer.valueOf(songCount);
   }
-  
+
   public Integer getNumPlays() {
-    
+
     int numPlays = 0;
-    for (AlbumDto album: albums) {
+    for (AlbumDto album : albums) {
 
       numPlays = numPlays + album.getNumPlays();
     }
     return Integer.valueOf(numPlays);
-  }  
+  }
 }
