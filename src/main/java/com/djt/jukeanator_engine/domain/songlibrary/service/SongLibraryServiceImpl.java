@@ -200,100 +200,155 @@ public final class SongLibraryServiceImpl
         SongLibraryMapper.toArtistDtoList(artists), SongLibraryMapper.toAlbumDtoList(albums));
   }
 
-  /**
-   * Calculates a heuristic fuzzy match weight for a library item title against a search query.
-   * Includes structural word boundary recognition (separator_bonus logic) to ensure inner word
-   * matches are prioritized over unaligned character prefixes.
-   */
   private int calculateSearchResultWeight(String value, String normalizedSearch) {
 
-    if (value == null || normalizedSearch == null || normalizedSearch.isEmpty()) {
+    if (value == null || normalizedSearch == null || normalizedSearch.isBlank()) {
       return 0;
     }
 
     String normalizedValue = value.toLowerCase().strip();
 
-
-    // Complete Match Bonus (+1000)
+    //
+    // Exact Match (+1000)
+    //
     if (normalizedValue.equals(normalizedSearch)) {
       return 1000;
     }
 
-
-    // Substring Match Bonus (+750)
-    if (normalizedValue.contains(normalizedSearch)) {
-      return 750;
+    //
+    // Starts With (+900)
+    //
+    if (normalizedValue.startsWith(normalizedSearch)) {
+      return 900;
     }
 
+    //
+    // Word Starts With (+800)
+    //
+    for (String word : normalizedValue.split("\\s+")) {
+      if (word.startsWith(normalizedSearch)) {
+        return 800;
+      }
+    }
 
-    // Full Words Match (+500)
+    //
+    // Contains (+700)
+    //
+    if (normalizedValue.contains(normalizedSearch)) {
+      return 700;
+    }
+
+    //
+    // Full Word Match (+500)
+    //
+    String[] searchWords = normalizedSearch.split("\\s+");
     boolean foundAllWords = true;
-    String[] normalizedSearchWords = normalizedSearch.split(" ");
-    for (String normalizedSearchWord : normalizedSearchWords) {
 
-      if (!normalizedValue.contains(normalizedSearchWord)) {
+    for (String searchWord : searchWords) {
+      if (!normalizedValue.contains(searchWord)) {
         foundAllWords = false;
         break;
       }
     }
+
     if (foundAllWords) {
       return 500;
     }
 
-
-    // Levenshtein search algorithm
+    //
+    // Fuzzy Subsequence Matching
+    //
     int score = 0;
+
     int valueIdx = 0;
     int searchIdx = 0;
-    int valLen = normalizedValue.length();
+
+    int valueLen = normalizedValue.length();
     int searchLen = normalizedSearch.length();
 
-    int lastMatchedValueIdx = -2;
+    int firstMatchIdx = -1;
+    int lastMatchIdx = -1;
 
-    // Linear Alignment Scanning
-    while (searchIdx < searchLen && valueIdx < valLen) {
-      char searchChar = normalizedSearch.charAt(searchIdx);
+    while (valueIdx < valueLen && searchIdx < searchLen) {
+
       char valueChar = normalizedValue.charAt(valueIdx);
+      char searchChar = normalizedSearch.charAt(searchIdx);
 
-      if (searchChar == valueChar) {
+      if (valueChar == searchChar) {
 
-        // Matched Leading Letter (+10)
-        if (searchIdx == 0 && valueIdx == 0) {
-          score += 10;
+        if (firstMatchIdx < 0) {
+          firstMatchIdx = valueIdx;
         }
 
-        // Word Boundary Bonus (+30) - Tracks spaces separating keywords
-        if (searchIdx == 0 && valueIdx > 0) {
-          char previousChar = normalizedValue.charAt(valueIdx - 1);
-          if (previousChar == ' ') {
-            score += 30;
+        //
+        // Leading match bonus
+        //
+        if (searchIdx == 0) {
+
+          if (valueIdx == 0) {
+            score += 20;
+          } else if (normalizedValue.charAt(valueIdx - 1) == ' ') {
+            score += 15;
           }
         }
 
-        // Consecutive Match (+5)
-        if (valueIdx == lastMatchedValueIdx + 1) {
-          score += 5;
+        //
+        // Consecutive character bonus
+        //
+        if (lastMatchIdx >= 0) {
+
+          int gap = valueIdx - lastMatchIdx - 1;
+
+          if (gap == 0) {
+            score += 10;
+          } else {
+            //
+            // Gap penalty
+            //
+            score -= gap * 5;
+          }
         }
 
-        lastMatchedValueIdx = valueIdx;
+        score += 5;
+
+        lastMatchIdx = valueIdx;
         searchIdx++;
-      } else {
-        // Unmatched Letter Penalty (-1)
-        score -= 1;
       }
+
       valueIdx++;
     }
 
-    // Guard: Query string was not fully sequentially matched
+    //
+    // Search term not fully matched
+    //
     if (searchIdx < searchLen) {
       return 0;
     }
 
-    // Trailing unmatched character truncation penalty
-    int remainingUnmatched = valLen - valueIdx;
-    score -= remainingUnmatched;
+    //
+    // Density Check
+    //
+    int spanLength = lastMatchIdx - firstMatchIdx + 1;
 
-    return Math.max(0, score);
+    double density = (double) searchLen / spanLength;
+
+    if (density < 0.70d) {
+      return 0;
+    }
+
+    //
+    // Penalize trailing unmatched characters
+    //
+    score -= (valueLen - lastMatchIdx - 1);
+
+    //
+    // Minimum fuzzy threshold
+    //
+    if (score < 25) {
+      return 0;
+    }
+
+    return score;
   }
 
   @Override
