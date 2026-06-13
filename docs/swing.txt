@@ -351,16 +351,16 @@ DONE 12: For ArtistFromSong entities, do not count songs from different artists 
 
 DONE 13: Add play count to AlbumViewCard
 
-14: When viewing an AlbumViewCard from the Artists detail panel, from either Search, Hot Here or Genre, when the user clicks on the back button, they
+DONE 14: When viewing an AlbumViewCard from the Artists detail panel, from either Search, Hot Here or Genre, when the user clicks on the back button, they
 are returned to the search results panel for Search, Hot Here or Genre, rather than the Artists detail panel where they started from, please correct this behavior
 
-15: When viewing albums for an artist, the albums should be sorted by popularity
+DONE 15: When viewing albums for an artist, the albums should be sorted by popularity
 
-16: The cover art image for an artist, doesn't show the most popular album for Search, Hot Here and Genre panels
+DONE 16: The cover art image for an artist, doesn't show the most popular album for Search, Hot Here and Genre panels
 
 17: For Hot Here, the artists results have not been de-duplicated
  
-18: Remove any looping logic in the song library DTOs, that may be performed every time the DTO is instantiated, to the initialization of the song library root on
+DONE 18: Remove any looping logic in the song library DTOs, that may be performed every time the DTO is instantiated, to the initialization of the song library root on
 the entities themselves.  For example, there is "getCoverArtPath()" logic in the ArtistDto that could be eliminated by adding a coverArtPath attribute to ArtistDto
 and then having initialization logic set the same transient attribute on the ArtistFolderEntity.
 

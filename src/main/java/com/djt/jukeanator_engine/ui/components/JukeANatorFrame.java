@@ -90,7 +90,32 @@ public class JukeANatorFrame extends JFrame {
   private static final String CARD_EDIT_ALBUM = "EDIT_ALBUM";
 
   private final CardLayout overlayCardLayout = new CardLayout();
-  private final JPanel overlayRoot = new JPanel(overlayCardLayout);
+  private final JPanel overlayRoot = new JPanel(overlayCardLayout) {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    protected void paintComponent(Graphics g) {
+      Graphics2D g2 = (Graphics2D) g.create();
+      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+      int w = getWidth();
+      int h = getHeight();
+
+      g2.setColor(new Color(10, 10, 10));
+      g2.fillRect(0, 0, w, h);
+
+      float[] fractions = {0.0f, 0.20f, 0.42f, 0.62f, 0.82f, 1.0f};
+      Color[] colors =
+          {new Color(140, 50, 50, 90), new Color(140, 90, 30, 80), new Color(80, 110, 40, 70),
+              new Color(30, 100, 110, 70), new Color(40, 60, 140, 80), new Color(100, 30, 140, 90)};
+      g2.setPaint(new LinearGradientPaint(new Point2D.Float(0, 0), new Point2D.Float(w, h),
+          fractions, colors));
+      g2.fillRect(0, 0, w, h);
+
+      g2.dispose();
+      // Do NOT call super — we own the background entirely
+    }
+  };
   private JTabbedPane contentPanelTabs;
 
   private AddSongToQueueCard addSongToQueueCard;
@@ -203,7 +228,6 @@ public class JukeANatorFrame extends JFrame {
     //
     contentPanelTabs = buildContentPanelTabs();
 
-    overlayRoot.setOpaque(false);
     overlayRoot.add(contentPanelTabs, CARD_TABS);
     overlayRoot.add(placeholder(), CARD_ADD_SONG);
     overlayRoot.add(placeholder(), CARD_SONG_QUEUE);
@@ -315,13 +339,27 @@ public class JukeANatorFrame extends JFrame {
 
       @Override
       protected void paintContentBorder(Graphics g, int tabPlacement, int selectedIndex) {
-        // Explicitly clear the content border area to fully transparent
-        // so the JFrame gradient shows through
+        // Paint the same screen gradient into the content border area so that
+        // both the tabs view and the overlay cards share a consistent background.
         Graphics2D g2 = (Graphics2D) g.create();
-        g2.setComposite(java.awt.AlphaComposite.Clear);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         int tabAreaHeight = calculateTabAreaHeight(tabPlacement, runCount, maxTabHeight);
         int contentH = tabPane.getHeight() - tabAreaHeight;
-        g2.fillRect(0, 0, tabPane.getWidth(), contentH);
+        int w = tabPane.getWidth();
+
+        g2.setColor(new Color(10, 10, 10));
+        g2.fillRect(0, 0, w, contentH);
+
+        float[] fractions = {0.0f, 0.20f, 0.42f, 0.62f, 0.82f, 1.0f};
+        Color[] colors = {new Color(140, 50, 50, 90), new Color(140, 90, 30, 80),
+            new Color(80, 110, 40, 70), new Color(30, 100, 110, 70), new Color(40, 60, 140, 80),
+            new Color(100, 30, 140, 90)};
+        // Use the full pane dimensions for the gradient so it matches the
+        // frame-level gradient exactly (same diagonal, same colour stops).
+        g2.setPaint(new LinearGradientPaint(new Point2D.Float(0, 0),
+            new Point2D.Float(w, tabPane.getHeight()), fractions, colors));
+        g2.fillRect(0, 0, w, contentH);
+
         g2.dispose();
       }
 
@@ -795,6 +833,8 @@ public class JukeANatorFrame extends JFrame {
     addSongToQueueCard = new AddSongToQueueCard(song, imageLoader, priorityCostMultiplier,
         songQueueService, creditManager, incrementCreditsKey, this::hideOverlay);
 
+    addSongToQueueCard.setOpaque(false);
+
     replaceOverlayCard(CARD_ADD_SONG, addSongToQueueCard);
     overlayCardLayout.show(overlayRoot, CARD_ADD_SONG);
     addSongToQueueCard.onShown();
@@ -816,6 +856,8 @@ public class JukeANatorFrame extends JFrame {
           POPULARITY_THRESHOLD_3, incrementCreditsKey, this::hideOverlay);
       replaceOverlayCard(CARD_SONG_QUEUE, songQueueCard);
     }
+
+    songQueueCard.setOpaque(false);
 
     songQueueCard.setQueue(currentQueue);
     overlayCardLayout.show(overlayRoot, CARD_SONG_QUEUE);

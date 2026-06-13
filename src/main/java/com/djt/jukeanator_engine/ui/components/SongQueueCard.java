@@ -56,7 +56,6 @@ public class SongQueueCard extends JPanel {
   }
 
   // ── Colours ───────────────────────────────────────────────────────────────
-  private static final Color BG_DARK = new Color(10, 10, 10);
   private static final Color BG_PANEL = new Color(22, 22, 28);
   private static final Color ACCENT_BLUE = new Color(0, 210, 255);
   private static final Color ACCENT_GOLD = new Color(255, 200, 0);
@@ -167,13 +166,7 @@ public class SongQueueCard extends JPanel {
     requestFocusInWindow();
   }
 
-  @Override
-  protected void paintComponent(Graphics g) {
-    // Dim the underlying tab content so this overlay reads as modal
-    g.setColor(new Color(0, 0, 0, 160));
-    g.fillRect(0, 0, getWidth(), getHeight());
-    super.paintComponent(g);
-  }
+  // Background is painted by overlayRoot in JukeANatorFrame — no paintComponent override needed.
 
   // ── Layout ────────────────────────────────────────────────────────────────
 
@@ -191,7 +184,7 @@ public class SongQueueCard extends JPanel {
         g2.dispose();
       }
     };
-    border.setBackground(BG_DARK);
+    border.setOpaque(false);
     border.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
     border.add(buildMainPanel());
     return border;

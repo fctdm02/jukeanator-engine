@@ -125,13 +125,7 @@ public class AddSongToQueueCard extends JPanel {
     });
   }
 
-  @Override
-  protected void paintComponent(Graphics g) {
-    // Dim the underlying tab content so this overlay reads as modal
-    g.setColor(new Color(0, 0, 0, 160));
-    g.fillRect(0, 0, getWidth(), getHeight());
-    super.paintComponent(g);
-  }
+  // Background is painted by overlayRoot in JukeANatorFrame — no paintComponent override needed.
 
   /** Called whenever this card is shown — restarts the countdown and resets focus. */
   public void onShown() {
@@ -165,7 +159,7 @@ public class AddSongToQueueCard extends JPanel {
 
   private JPanel buildMainPanel() {
     JPanel main = new JPanel(new BorderLayout(0, 0));
-    main.setOpaque(false);
+    main.setBackground(new Color(22, 22, 28));
     main.setBorder(BorderFactory.createEmptyBorder(24, 28, 20, 28));
 
     main.add(buildInfoRow(song, imageLoader), BorderLayout.NORTH);
