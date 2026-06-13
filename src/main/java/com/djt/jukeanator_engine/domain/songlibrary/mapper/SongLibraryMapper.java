@@ -44,7 +44,8 @@ public final class SongLibraryMapper {
         .toList();
 
     return new ArtistDto(artistEntity.getPersistentIdentity(), artistEntity.getName(),
-        SongLibraryMapper.toAlbumDtoList(artistEntity, albums));
+        artistEntity.getCoverArtPath(), artistEntity.getAlbumCount(), artistEntity.getSongCount(),
+        artistEntity.getNumPlays(), SongLibraryMapper.toAlbumDtoList(artistEntity, albums));
   }
 
   public static List<AlbumDto> toAlbumDtoList(Collection<AlbumFolderEntity> albumEntities) {

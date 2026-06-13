@@ -111,7 +111,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     try {
       this.results = songLibraryService.getMusicByPopularity();
     } catch (Exception e) {
-      this.results = new SearchResultDto();
+      throw new RuntimeException("Could not get music by popularity, error: " + e.getMessage(), e);
     }
 
     rebuildColumnsPanel();

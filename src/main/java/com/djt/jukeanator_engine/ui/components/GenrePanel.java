@@ -44,21 +44,15 @@ public class GenrePanel extends JPanel implements TabNavigator {
   // ── Grid layout ───────────────────────────────────────────────────────────
   private static final int GENRES_PER_PAGE = 12; // 2 rows × 6 cols
 
-  // ── Outer card names ──────────────────────────────────────────────────────
+  // ── Card names ────────────────────────────────────────────────────────────
   private static final String CARD_GENRES = "GENRES";
+  private static final String CARD_ALBUMS = "ALBUMS";
+  private static final String CARD_ARTIST = "ARTIST";
   private static final String CARD_DETAIL = "DETAIL";
 
-  // ── Inner card names (genre sub-navigation) ───────────────────────────────
-  private static final String INNER_GRID = "GENRE_GRID";
-  private static final String INNER_ALBUMS = "GENRE_ALBUMS";
-
-  // ── Outer layout ──────────────────────────────────────────────────────────
-  private final CardLayout outerCardLayout = new CardLayout();
-  private final JPanel outerRoot = new JPanel(outerCardLayout);
-
-  // ── Inner layout (genre grid ↔ genre album list) ──────────────────────────
-  private final CardLayout innerCardLayout = new CardLayout();
-  private final JPanel innerRoot = new JPanel(innerCardLayout);
+  // ── Layout ────────────────────────────────────────────────────────────────
+  private final CardLayout cardLayout = new CardLayout();
+  private final JPanel rootPanel = new JPanel(cardLayout);
   private final JPanel genresGridPanel = new JPanel(new GridLayout(2, 6, 20, 20));
   private final JPanel genreAlbumsSlot = new JPanel(new BorderLayout());
 
@@ -74,8 +68,10 @@ public class GenrePanel extends JPanel implements TabNavigator {
   // ── Active detail card ────────────────────────────────────────────────────
   private AlbumDetailCard currentDetailCard;
 
-  // ── The genre whose albums are currently shown (used by popToRoot) ─────────
-  private GenreDto activeGenre;
+  // ── Tracks which card to return to when the detail card's BACK button is
+  // pressed — CARD_ALBUMS if the album was opened from the genre album list,
+  // CARD_ARTIST if it was opened from the artist detail panel. ────────────────
+  private String detailReturnCard = CARD_GENRES;
 
   // ── Dependencies ──────────────────────────────────────────────────────────
   private final char incrementCreditsKey;
@@ -117,27 +113,28 @@ public class GenrePanel extends JPanel implements TabNavigator {
     setLayout(new BorderLayout());
     setOpaque(false);
 
-    // ── Inner: genre grid ↔ genre album list ──────────────────────────────
     genresGridPanel.setOpaque(false);
     genreAlbumsSlot.setOpaque(false);
-    innerRoot.setOpaque(false);
 
-    innerRoot.add(buildGenreGridCard(), INNER_GRID);
-    innerRoot.add(genreAlbumsSlot, INNER_ALBUMS);
-    innerCardLayout.show(innerRoot, INNER_GRID);
+    rootPanel.setOpaque(false);
+    add(rootPanel, BorderLayout.CENTER);
 
-    // ── Outer: full genres view ↔ album detail ─────────────────────────────
-    outerRoot.setOpaque(false);
+    JPanel genresCard = buildGenreGridCard();
+    genresCard.setName(CARD_GENRES);
+    rootPanel.add(genresCard, CARD_GENRES);
 
-    innerRoot.setName(CARD_GENRES);
-    JPanel initialPlaceholder = placeholder();
-    initialPlaceholder.setName(CARD_DETAIL);
+    genreAlbumsSlot.setName(CARD_ALBUMS);
+    rootPanel.add(genreAlbumsSlot, CARD_ALBUMS);
 
-    outerRoot.add(innerRoot, CARD_GENRES);
-    outerRoot.add(initialPlaceholder, CARD_DETAIL);
-    outerCardLayout.show(outerRoot, CARD_GENRES);
+    JPanel artistPlaceholder = placeholder();
+    artistPlaceholder.setName(CARD_ARTIST);
+    rootPanel.add(artistPlaceholder, CARD_ARTIST);
 
-    add(outerRoot, BorderLayout.CENTER);
+    JPanel detailPlaceholder = placeholder();
+    detailPlaceholder.setName(CARD_DETAIL);
+    rootPanel.add(detailPlaceholder, CARD_DETAIL);
+
+    cardLayout.show(rootPanel, CARD_GENRES);
 
     refreshGenresUI();
   }
@@ -165,6 +162,11 @@ public class GenrePanel extends JPanel implements TabNavigator {
     Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
     AlbumDto full = fetchFull(album);
 
+    // Remember which card was visible before navigating to the detail card so
+    // the BACK button can return the user to the correct screen (the genre
+    // album list or the artist detail panel).
+    detailReturnCard = currentVisibleCard();
+
     if (currentDetailCard != null) {
       currentDetailCard.dismiss();
     }
@@ -173,8 +175,8 @@ public class GenrePanel extends JPanel implements TabNavigator {
         new AlbumDetailCard(owner, full, imageLoader, songQueueService, priorityCostMultiplier,
             popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey);
 
-    replaceOuterCard(CARD_DETAIL, currentDetailCard);
-    outerCardLayout.show(outerRoot, CARD_DETAIL);
+    replaceCard(CARD_DETAIL, currentDetailCard);
+    cardLayout.show(rootPanel, CARD_DETAIL);
   }
 
   @Override
@@ -183,8 +185,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
       currentDetailCard.dismiss();
       currentDetailCard = null;
     }
-    outerCardLayout.show(outerRoot, CARD_GENRES);
-    innerCardLayout.show(innerRoot, activeGenre != null ? INNER_ALBUMS : INNER_GRID);
+    cardLayout.show(rootPanel, detailReturnCard);
   }
 
   /**
@@ -196,11 +197,10 @@ public class GenrePanel extends JPanel implements TabNavigator {
       currentDetailCard.dismiss();
       currentDetailCard = null;
     }
-    activeGenre = null;
-    outerCardLayout.show(outerRoot, CARD_GENRES);
-    innerCardLayout.show(innerRoot, INNER_GRID);
+    detailReturnCard = CARD_GENRES;
     currentPage = 0;
     refreshGenresUI();
+    cardLayout.show(rootPanel, CARD_GENRES);
   }
 
   private JPanel buildGenreGridCard() {
@@ -403,7 +403,6 @@ public class GenrePanel extends JPanel implements TabNavigator {
   }
 
   private void showGenreAlbums(GenreDto genre) {
-    activeGenre = genre;
 
     SearchResultDto results;
     try {
@@ -414,8 +413,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     GenreDetailPanel detailPanel = new GenreDetailPanel(genre, results, imageLoader,
         songQueueService, priorityCostMultiplier, "← BACK", () -> {
-          activeGenre = null;
-          innerCardLayout.show(innerRoot, INNER_GRID);
+          cardLayout.show(rootPanel, CARD_GENRES);
         }, album -> pushAlbumDetail(album), artist -> pushArtistFromGenre(artist),
         songLibraryService, creditManager, incrementCreditsKey);
 
@@ -424,13 +422,14 @@ public class GenrePanel extends JPanel implements TabNavigator {
     genreAlbumsSlot.revalidate();
     genreAlbumsSlot.repaint();
 
-    innerCardLayout.show(innerRoot, INNER_ALBUMS);
+    detailReturnCard = CARD_ALBUMS;
+    cardLayout.show(rootPanel, CARD_ALBUMS);
   }
 
   /**
-   * Navigates to an artist detail view launched from within the genre detail page. The outer DETAIL
-   * card slot is reused so the back button on AlbumDetailCard routes correctly back through
-   * popToRoot → INNER_ALBUMS.
+   * Navigates to an artist detail view launched from within the genre detail page. Reuses the
+   * CARD_ARTIST slot so the AlbumDetailCard's BACK button (via popToRoot → detailReturnCard) can
+   * return here correctly.
    */
   private void pushArtistFromGenre(ArtistDto artist) {
     ArtistDto full;
@@ -442,10 +441,23 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     ArtistDetailPanel panel =
         new ArtistDetailPanel(full, imageLoader, gridCols, gridRows, artW, artH, "← BACK",
-            () -> outerCardLayout.show(outerRoot, CARD_GENRES), album -> pushAlbumDetail(album));
+            () -> cardLayout.show(rootPanel, CARD_ALBUMS), album -> pushAlbumDetail(album));
 
-    replaceOuterCard(CARD_DETAIL, panel);
-    outerCardLayout.show(outerRoot, CARD_DETAIL);
+    replaceCard(CARD_ARTIST, panel);
+    cardLayout.show(rootPanel, CARD_ARTIST);
+  }
+
+  /**
+   * Returns the name of the card currently visible in {@code rootPanel}, falling back to
+   * {@code CARD_GENRES} if none is marked visible (e.g. before the first layout pass).
+   */
+  private String currentVisibleCard() {
+    for (java.awt.Component c : rootPanel.getComponents()) {
+      if (c.isVisible()) {
+        return c.getName();
+      }
+    }
+    return CARD_GENRES;
   }
 
   private AlbumDto fetchFull(AlbumDto album) {
@@ -456,18 +468,17 @@ public class GenrePanel extends JPanel implements TabNavigator {
     }
   }
 
-  private void replaceOuterCard(String name, JPanel newPanel) {
-    for (int i = outerRoot.getComponentCount() - 1; i >= 0; i--) {
-      java.awt.Component comp = outerRoot.getComponent(i);
-      if (comp != null && name.equals(comp.getName())) {
-        outerRoot.remove(i);
+  private void replaceCard(String name, JPanel newPanel) {
+    for (int i = rootPanel.getComponentCount() - 1; i >= 0; i--) {
+      if (name.equals(rootPanel.getComponent(i).getName())) {
+        rootPanel.remove(i);
         break;
       }
     }
     newPanel.setName(name);
-    outerRoot.add(newPanel, name);
-    outerRoot.revalidate();
-    outerRoot.repaint();
+    rootPanel.add(newPanel, name);
+    rootPanel.revalidate();
+    rootPanel.repaint();
   }
 
   private JPanel placeholder() {

@@ -5,14 +5,23 @@ import java.util.Objects;
 
 public class ArtistDto {
 
-  private Integer artistId;
-  private String artistName;
-  private List<AlbumDto> albums;
+  private final Integer artistId;
+  private final String artistName;
+  private final String coverArtPath;
+  private final Integer albumCount;
+  private final Integer songCount;
+  private final Integer numPlays;
+  private final List<AlbumDto> albums;
 
-  public ArtistDto(Integer artistId, String artistName, List<AlbumDto> albums) {
+  public ArtistDto(Integer artistId, String artistName, String coverArtPath, Integer albumCount,
+      Integer songCount, Integer numPlays, List<AlbumDto> albums) {
     super();
     this.artistId = artistId;
     this.artistName = artistName;
+    this.coverArtPath = coverArtPath;
+    this.albumCount = albumCount;
+    this.songCount = songCount;
+    this.numPlays = numPlays;
     this.albums = albums;
   }
 
@@ -22,6 +31,22 @@ public class ArtistDto {
 
   public String getArtistName() {
     return artistName;
+  }
+
+  public String getCoverArtPath() {
+    return coverArtPath;
+  }
+
+  public Integer getAlbumCount() {
+    return albumCount;
+  }
+
+  public Integer getSongCount() {
+    return songCount;
+  }
+
+  public Integer getNumPlays() {
+    return numPlays;
   }
 
   public List<AlbumDto> getAlbums() {
@@ -48,63 +73,5 @@ public class ArtistDto {
   @Override
   public String toString() {
     return "ArtistDto [" + this.artistName + "]";
-  }
-
-  public String getCoverArtPath() {
-
-    String coverArtPath = "";
-
-    // Return the first, most popular album that is not a compilation
-    // If all are compilations, then return t
-    int maxAlbumNumPlays = 0;
-    for (AlbumDto album : albums) {
-
-      int albumNumPlays = album.getNumPlays();
-      if (!album.isCompilation() && albumNumPlays > maxAlbumNumPlays) {
-
-        maxAlbumNumPlays = album.getNumPlays();
-        coverArtPath = album.getCoverArtPath();
-      }
-    }
-
-    // As a failsafe, if coverArtPath is still empty, then
-    // set it to be from the first album: NOTE: All artists
-    // are going to have at least one album.
-    if (coverArtPath.equals("")) {
-      coverArtPath = albums.get(0).getCoverArtPath();
-    }
-    return coverArtPath;
-  }
-
-  public Integer getAlbumCount() {
-    return Integer.valueOf(albums.size());
-  }
-
-  public Integer getSongCount() {
-
-    int songCount = 0;
-    for (AlbumDto album : albums) {
-
-      if (!album.isCompilation()) {
-        songCount = songCount + album.getSongs().size();
-      } else {
-        for (SongDto song : album.getSongs()) {
-          if (song.getArtistName().equals(artistName)) {
-            songCount = songCount + 1;
-          }
-        }
-      }
-    }
-    return Integer.valueOf(songCount);
-  }
-
-  public Integer getNumPlays() {
-
-    int numPlays = 0;
-    for (AlbumDto album : albums) {
-
-      numPlays = numPlays + album.getNumPlays();
-    }
-    return Integer.valueOf(numPlays);
   }
 }
