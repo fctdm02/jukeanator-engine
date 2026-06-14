@@ -223,43 +223,42 @@ public final class SongLibraryServiceImpl
     }
 
     //
-    // Starts With (+900)
-    //
-    if (normalizedValue.startsWith(normalizedSearch)) {
-      return 900;
-    }
-
-    //
-    // Word Starts With (+800)
-    //
-    for (String word : normalizedValue.split("\\s+")) {
-      if (word.startsWith(normalizedSearch)) {
-        return 800;
-      }
-    }
-
-    //
-    // Contains (+700)
-    //
-    if (normalizedValue.contains(normalizedSearch)) {
-      return 700;
-    }
-
-    //
-    // Full Word Match (+500)
+    // Full Word Match (+900)
     //
     String[] searchWords = normalizedSearch.split("\\s+");
     boolean foundAllWords = true;
 
     for (String searchWord : searchWords) {
-      if (!normalizedValue.contains(searchWord)) {
+      if (!normalizedValue.equals(searchWord)) {
         foundAllWords = false;
         break;
       }
     }
-
     if (foundAllWords) {
+      return 900;
+    }
+    
+    //
+    // Starts With (+500)
+    //
+    if (normalizedValue.startsWith(normalizedSearch)) {
       return 500;
+    }
+
+    //
+    // Word Starts With (+400)
+    //
+    for (String word : normalizedValue.split("\\s+")) {
+      if (word.startsWith(normalizedSearch)) {
+        return 400;
+      }
+    }
+
+    //
+    // Contains (+300)
+    //
+    if (normalizedValue.contains(normalizedSearch)) {
+      return 300;
     }
 
     //

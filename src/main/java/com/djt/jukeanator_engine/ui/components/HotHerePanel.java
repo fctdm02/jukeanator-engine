@@ -115,7 +115,14 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     }
 
     rebuildColumnsPanel();
-    cardLayout.show(rootPanel, CARD_CONTENT);
+
+    // Only navigate to the content card if the user is already there.
+    // If they are mid-navigation (e.g. viewing an artist or album detail),
+    // leave the current card in place so a background popularity refresh
+    // does not disrupt their session.
+    if (CARD_CONTENT.equals(currentVisibleCard())) {
+      cardLayout.show(rootPanel, CARD_CONTENT);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -162,6 +169,13 @@ public class HotHerePanel extends JPanel implements TabNavigator {
    * refreshed data.
    */
   public void resetToDefaultView() {
+    // Stop any active album-detail countdown timer before clearing state so it
+    // cannot fire popToRoot() after the tab has already been reset (mirrors
+    // GenrePanel.resetToDefaultView()).
+    if (currentDetailCard != null) {
+      currentDetailCard.dismiss();
+      currentDetailCard = null;
+    }
     artistsOffset = 0;
     albumsOffset = 0;
     songsOffset = 0;
