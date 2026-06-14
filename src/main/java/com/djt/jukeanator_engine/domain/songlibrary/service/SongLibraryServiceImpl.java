@@ -225,17 +225,10 @@ public final class SongLibraryServiceImpl
     //
     // Full Word Match (+900)
     //
-    String[] searchWords = normalizedSearch.split("\\s+");
-    boolean foundAllWords = true;
-
-    for (String searchWord : searchWords) {
-      if (!normalizedValue.equals(searchWord)) {
-        foundAllWords = false;
-        break;
+    for (String word : normalizedValue.split("\\s+")) {
+      if (word.equals(normalizedSearch)) {
+        return 900;
       }
-    }
-    if (foundAllWords) {
-      return 900;
     }
     
     //
