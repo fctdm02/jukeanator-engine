@@ -426,8 +426,9 @@ public class JukeANatorFrame extends JFrame {
     queuePanel = buildQueuePanel();
     tabs.addTab("QUEUE", queuePanel); // index 5
 
-    adminPanel = buildAdminPanel();
-    tabs.addTab("ADMIN", adminPanel); // index 6
+    // AdminPanel is lazy — the placeholder is swapped out on first successful login.
+    // Do NOT call buildAdminPanel() here; it triggers a slow album-library load.
+    tabs.addTab("ADMIN", new JPanel()); // index 6 (placeholder — replaced on first login)
 
     // Invisible zero-size header for the left dummy tab (index 0)
     JPanel dummyTabHeader = new JPanel();
@@ -845,7 +846,10 @@ public class JukeANatorFrame extends JFrame {
 
     SwingUtilities.invokeLater(() -> {
       currentQueue = queue != null ? queue : new java.util.ArrayList<>();
-      adminPanel.setQueue(queue);
+      // adminPanel is lazy — only push the queue if it has already been instantiated.
+      if (adminPanel != null) {
+        adminPanel.setQueue(queue);
+      }
       queuePanel.setQueue(currentQueue);
     });
   }
@@ -942,7 +946,7 @@ public class JukeANatorFrame extends JFrame {
    */
   public void showSongQueueCard() {
 
-    if (contentPanelTabs.getSelectedComponent() == adminPanel
+    if ((adminPanel != null && contentPanelTabs.getSelectedComponent() == adminPanel)
         || contentPanelTabs.getSelectedComponent() == queuePanel) {
       return; // disabled on Admin and Queue tabs (Queue tab has its own embedded view)
     }
@@ -1001,6 +1005,18 @@ public class JukeANatorFrame extends JFrame {
     loginToAdminPanelCard = new LoginToAdminPanelCard(songLibraryService,
         /* onSuccess */ () -> SwingUtilities.invokeLater(() -> {
           hideOverlay();
+
+          // ── Lazy initialisation ───────────────────────────────────────────
+          // AdminPanel is expensive to construct (loads the full album library).
+          // We defer that cost until the admin actually logs in for the first time.
+          if (adminPanel == null) {
+            adminPanel = buildAdminPanel();
+            // Swap the lightweight placeholder out for the real panel.
+            contentPanelTabs.setComponentAt(6, adminPanel);
+            // Push any queue updates that arrived before the panel existed.
+            adminPanel.setQueue(currentQueue);
+          }
+
           // Switch to the Admin panel without making the tab visible or enabled —
           // the tab header stays permanently hidden so it cannot be clicked directly.
           contentPanelTabs.setSelectedIndex(6);
