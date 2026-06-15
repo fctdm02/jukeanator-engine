@@ -94,6 +94,10 @@ public class SongQueueCard extends JPanel {
   private final DefaultListModel<SongQueueEntryDto> queueListModel = new DefaultListModel<>();
   private final JList<SongQueueEntryDto> queueList = new JList<>(queueListModel);
 
+  // ── Now-playing dynamic area ───────────────────────────────────────────────
+  /** The CENTER slot of the now-playing section — replaced on every {@link #onShown()} call. */
+  private JPanel nowPlayingSection;
+
   // ── Action buttons ────────────────────────────────────────────────────────
   private JButton moveUpButton;
   private JButton moveDownButton;
@@ -162,8 +166,34 @@ public class SongQueueCard extends JPanel {
     if (!countdownTimer.isRunning()) {
       countdownTimer.start();
     }
+    refreshNowPlaying();
     refreshQueueListModel();
     requestFocusInWindow();
+  }
+
+  /**
+   * Replaces the now-playing content area with a fresh snapshot from
+   * {@link SongPlayerService#getNowPlayingSong()}. Safe to call on the EDT at any time.
+   */
+  private void refreshNowPlaying() {
+    if (nowPlayingSection == null)
+      return;
+
+    // Remove whatever is currently in the CENTER slot
+    nowPlayingSection.removeAll();
+
+    SongDto nowPlayingSong = songPlayerService.getNowPlayingSong();
+    if (nowPlayingSong != null) {
+      nowPlayingSection.add(buildNowPlayingCard(nowPlayingSong), BorderLayout.CENTER);
+    } else {
+      JLabel none = new JLabel("Nothing is currently playing.");
+      none.setForeground(TEXT_SECONDARY);
+      none.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
+      nowPlayingSection.add(none, BorderLayout.CENTER);
+    }
+
+    nowPlayingSection.revalidate();
+    nowPlayingSection.repaint();
   }
 
   // Background is painted by overlayRoot in JukeANatorFrame — no paintComponent override needed.
@@ -205,29 +235,21 @@ public class SongQueueCard extends JPanel {
   // ── Now-Playing section ───────────────────────────────────────────────────
 
   private JPanel buildNowPlayingSection() {
-    JPanel section = new JPanel(new BorderLayout(0, 8));
-    section.setOpaque(false);
+    nowPlayingSection = new JPanel(new BorderLayout(0, 8));
+    nowPlayingSection.setOpaque(false);
 
     // Header
     JLabel header = new JLabel("NOW PLAYING");
     header.setForeground(ACCENT_BLUE);
     header.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
     header.setBorder(new EmptyBorder(0, 0, 6, 0));
-    section.add(header, BorderLayout.NORTH);
+    nowPlayingSection.add(header, BorderLayout.NORTH);
 
-    // Resolve current song via SongPlayerService at dialog-open time
-    SongDto nowPlayingSong = songPlayerService.getNowPlayingSong();
+    // Content is populated dynamically; refreshNowPlaying() fills the CENTER slot.
+    // We call it once here so the section is populated at construction time.
+    refreshNowPlaying();
 
-    if (nowPlayingSong != null) {
-      section.add(buildNowPlayingCard(nowPlayingSong), BorderLayout.CENTER);
-    } else {
-      JLabel none = new JLabel("Nothing is currently playing.");
-      none.setForeground(TEXT_SECONDARY);
-      none.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
-      section.add(none, BorderLayout.CENTER);
-    }
-
-    return section;
+    return nowPlayingSection;
   }
 
   private JPanel buildNowPlayingCard(SongDto song) {
