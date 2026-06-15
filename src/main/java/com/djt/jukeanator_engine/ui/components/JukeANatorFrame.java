@@ -631,7 +631,7 @@ public class JukeANatorFrame extends JFrame {
   private AdminPanel buildAdminPanel() {
 
     return new AdminPanel(this, songLibraryService, songQueueService, songPlayerService,
-        creditManager, incrementCreditsKey, imageLoader);
+        creditManager, imageLoader);
   }
 
   // ============================================================
@@ -967,7 +967,7 @@ public class JukeANatorFrame extends JFrame {
     }
 
     addSongToQueueCard = new AddSongToQueueCard(song, imageLoader, priorityCostMultiplier,
-        songQueueService, creditManager, incrementCreditsKey, this::hideOverlay);
+        songQueueService, creditManager, this::hideOverlay);
 
     addSongToQueueCard.setOpaque(false);
 

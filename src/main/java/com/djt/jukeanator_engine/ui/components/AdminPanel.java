@@ -78,7 +78,6 @@ public class AdminPanel extends JPanel {
   private final CreditManager creditManager;
   private final ImageLoader imageLoader;
   private final Frame ownerFrame;
-  private final char incrementCreditsKey;
 
   // ── Album list ────────────────────────────────────────────────────────────
   private final DefaultListModel<AlbumDto> albumListModel = new DefaultListModel<>();
@@ -104,7 +103,7 @@ public class AdminPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   public AdminPanel(Frame ownerFrame, SongLibraryService songLibraryService,
       SongQueueService songQueueService, SongPlayerService songPlayerService,
-      CreditManager creditManager, char incrementCreditsKey, ImageLoader imageLoader) {
+      CreditManager creditManager, ImageLoader imageLoader) {
 
     this.ownerFrame = ownerFrame;
     this.songLibraryService = songLibraryService;
@@ -112,7 +111,6 @@ public class AdminPanel extends JPanel {
     this.songPlayerService = songPlayerService;
     this.creditManager = creditManager;
     this.imageLoader = imageLoader;
-    this.incrementCreditsKey = incrementCreditsKey;
 
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
@@ -122,26 +120,8 @@ public class AdminPanel extends JPanel {
     add(buildListsCenter(), BorderLayout.CENTER);
     add(buildQueueButtons(), BorderLayout.EAST);
 
-    // Keep the header credit counter live
-    creditManager.addListener(() -> SwingUtilities.invokeLater(() -> {
-      if (creditCountLabel != null) {
-        creditCountLabel.setText(String.valueOf(creditManager.getCredits()));
-      }
-    }));
-
     refreshAlbumList();
     setQueue(songQueueService.getQueuedSongs());
-
-    // Hardware Bill Acceptor Key Bindings
-    this.setFocusable(true);
-    this.addKeyListener(new java.awt.event.KeyAdapter() {
-      @Override
-      public void keyTyped(java.awt.event.KeyEvent e) {
-        if (e.getKeyChar() == incrementCreditsKey) {
-          creditManager.addDollar();
-        }
-      }
-    });
 
     requestFocusInWindow();
   }
@@ -208,18 +188,6 @@ public class AdminPanel extends JPanel {
     albumList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
     albumList.setCellRenderer(new AlbumCellRenderer());
 
-    // Intercept the hardware bill-acceptor key on the album list so focus
-    // on the list doesn't swallow it before the panel's own KeyListener fires.
-    albumList.addKeyListener(new java.awt.event.KeyAdapter() {
-      @Override
-      public void keyTyped(java.awt.event.KeyEvent e) {
-        if (e.getKeyChar() == incrementCreditsKey) {
-          creditManager.addDollar();
-          e.consume(); // prevent list from using it for type-ahead navigation
-        }
-      }
-    });
-
     JPanel albumPane = new JPanel(new BorderLayout(0, 4));
     albumPane.setOpaque(false);
     albumPane.add(buildAlbumSectionHeader(), BorderLayout.NORTH);
@@ -233,17 +201,6 @@ public class AdminPanel extends JPanel {
     queueList.setSelectionForeground(Color.WHITE);
     queueList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
     SongTrackCellRenderer.install(queueList, popularityT1, popularityT2, popularityT3);
-
-    // Same credit-key intercept for when focus is on the queue list
-    queueList.addKeyListener(new java.awt.event.KeyAdapter() {
-      @Override
-      public void keyTyped(java.awt.event.KeyEvent e) {
-        if (e.getKeyChar() == incrementCreditsKey) {
-          creditManager.addDollar();
-          e.consume();
-        }
-      }
-    });
 
     JPanel queuePane = new JPanel(new BorderLayout(0, 4));
     queuePane.setOpaque(false);
@@ -801,17 +758,6 @@ public class AdminPanel extends JPanel {
       @Override
       public void changedUpdate(javax.swing.event.DocumentEvent e) {
         jumpToMatch();
-      }
-    });
-
-    // Intercept the credit key so it is not consumed as typed text
-    filterField.addKeyListener(new java.awt.event.KeyAdapter() {
-      @Override
-      public void keyTyped(java.awt.event.KeyEvent e) {
-        if (e.getKeyChar() == incrementCreditsKey) {
-          creditManager.addDollar();
-          e.consume();
-        }
       }
     });
 

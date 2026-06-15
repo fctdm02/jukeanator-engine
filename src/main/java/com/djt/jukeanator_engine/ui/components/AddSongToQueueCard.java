@@ -87,8 +87,7 @@ public class AddSongToQueueCard extends JPanel {
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
   public AddSongToQueueCard(SongDto song, ImageLoader imageLoader, int priorityCostMultiplier,
-      SongQueueService songQueueService, CreditManager creditManager, char incrementCreditsKey,
-      Runnable onDismiss) {
+      SongQueueService songQueueService, CreditManager creditManager, Runnable onDismiss) {
 
     this.imageLoader = imageLoader;
     this.song = song;
@@ -111,18 +110,6 @@ public class AddSongToQueueCard extends JPanel {
       }
     });
     countdownTimer.start();
-
-    // Hardware Bill Acceptor Key Bindings — kept for parity, though the frame-level
-    // key listener already handles credit increments globally.
-    this.setFocusable(true);
-    this.addKeyListener(new java.awt.event.KeyAdapter() {
-      @Override
-      public void keyTyped(java.awt.event.KeyEvent e) {
-        if (e.getKeyChar() == incrementCreditsKey) {
-          creditManager.addDollar();
-        }
-      }
-    });
   }
 
   // Background is painted by overlayRoot in JukeANatorFrame — no paintComponent override needed.
