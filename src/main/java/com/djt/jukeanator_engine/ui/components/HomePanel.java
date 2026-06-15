@@ -4,7 +4,11 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Font;
 import java.awt.Frame;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -180,12 +184,27 @@ public class HomePanel extends JPanel implements TabNavigator {
     JPanel card = new JPanel(new BorderLayout());
     card.setOpaque(false);
 
-    List<AlbumDto> allAlbums;
+    List<AlbumDto> rawAlbums;
     try {
-      allAlbums = songLibraryService.getAlbums();
+      rawAlbums = songLibraryService.getAlbums();
     } catch (Exception e) {
-      allAlbums = List.of();
+      rawAlbums = List.of();
     }
+
+    // ── Item #1: Sort albums alphabetically by name, symbols/numbers first ──
+    List<AlbumDto> allAlbums = new ArrayList<>(rawAlbums);
+    allAlbums.sort(Comparator.comparing(a -> {
+      String name = a.getAlbumName();
+      if (name == null || name.isBlank())
+        return "\uFFFF"; // push blanks to end
+      char first = Character.toUpperCase(name.charAt(0));
+      // Letters sort after symbols/digits by prefixing letters with '~'
+      // so that symbol/digit names sort before A–Z naturally.
+      return Character.isLetter(first) ? ("~" + name.toUpperCase()) : name.toUpperCase();
+    }));
+
+    // ── Item #2: Build ordered letter→albums map (#, A–Z) ───────────────────
+    Map<String, List<AlbumDto>> letterMap = buildLetterMap(allAlbums);
 
     // Use a smaller icon (48×48 instead of 72×72) so the header occupies less
     // vertical space and gives the album grid more room.
@@ -206,12 +225,48 @@ public class HomePanel extends JPanel implements TabNavigator {
       return card;
     }
 
-    AlbumGridPanel grid = new AlbumGridPanel(allAlbums, imageLoader, gridCols, gridRows, artW, artH,
-        album -> pushAlbumDetail(album)); // TabNavigator path
+    AlbumGridPanel grid = new AlbumGridPanel(allAlbums, letterMap, imageLoader, gridCols, gridRows,
+        artW, artH, album -> pushAlbumDetail(album)); // TabNavigator path
 
     card.add(header, BorderLayout.NORTH);
     card.add(grid, BorderLayout.CENTER);
     return card;
+  }
+
+  /**
+   * Builds an ordered map whose keys are "#" (numbers/symbols) followed by "A"–"Z", and whose
+   * values are the albums whose names start with that key. Keys with no matching albums are
+   * omitted.
+   *
+   * <p>
+   * The input list must already be sorted in the desired display order.
+   */
+  private Map<String, List<AlbumDto>> buildLetterMap(List<AlbumDto> sortedAlbums) {
+
+    // Pre-seed all keys in order so iteration order is always #, A, B, …, Z.
+    Map<String, List<AlbumDto>> map = new LinkedHashMap<>();
+    map.put("#", new ArrayList<>());
+    for (char c = 'A'; c <= 'Z'; c++) {
+      map.put(String.valueOf(c), new ArrayList<>());
+    }
+
+    for (AlbumDto album : sortedAlbums) {
+      String name = album.getAlbumName();
+      if (name == null || name.isBlank()) {
+        map.get("#").add(album);
+        continue;
+      }
+      char first = Character.toUpperCase(name.charAt(0));
+      if (Character.isLetter(first)) {
+        map.get(String.valueOf(first)).add(album);
+      } else {
+        map.get("#").add(album);
+      }
+    }
+
+    // Remove any bucket that ended up empty so the nav bar only shows real letters.
+    map.entrySet().removeIf(e -> e.getValue().isEmpty());
+    return map;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
