@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
@@ -42,6 +41,7 @@ public class ScreenSaverWindow extends JWindow {
   private final SongLibraryService songLibraryService;
   private final int numAlbums;
   private final ImageIcon logo;
+  private final ImageIcon textImage;
 
   public ScreenSaverWindow(javax.swing.JFrame owner, ImageLoader imageLoader, int screenWidth,
       int screenHeight, int numAlbums, SongPlayerService songPlayerService,
@@ -61,6 +61,13 @@ public class ScreenSaverWindow extends JWindow {
     ImageIcon icon = imageLoader.loadImage("JukeANatorLogo.png", (int) (screenWidth * 0.30), 120);
     Image transparentStrippedImage = ImageLoader.createTransparentImage(icon.getImage(), false, 15);
     this.logo = new ImageIcon(transparentStrippedImage);
+
+    // Load and process "ScreenSaverText.png" exactly the same as the logo
+    ImageIcon textIcon =
+        imageLoader.loadImage("ScreenSaverText.png", (int) (screenWidth * 0.30), 120);
+    Image transparentStrippedText =
+        ImageLoader.createTransparentImage(textIcon.getImage(), false, 15);
+    this.textImage = new ImageIcon(transparentStrippedText);
 
     setAlwaysOnTop(true);
 
@@ -117,10 +124,9 @@ public class ScreenSaverWindow extends JWindow {
     coverArtLabel = new JLabel();
     coverArtLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-    touchLabel = new JLabel("TOUCH SCREEN TO START");
+    // Changed to an empty label slated to hold the new text image icon
+    touchLabel = new JLabel();
     touchLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-    touchLabel.setForeground(Color.WHITE);
-    touchLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 34));
 
     floatingPanel.add(logoLabel);
     floatingPanel.add(Box.createVerticalStrut(20));
@@ -158,6 +164,7 @@ public class ScreenSaverWindow extends JWindow {
   public void updateContent() {
 
     logoLabel.setIcon(logo);
+    touchLabel.setIcon(textImage);
 
     ImageIcon coverArt = null;
     SongDto currentSong = this.songPlayerService.getNowPlayingSong();
