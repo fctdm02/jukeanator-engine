@@ -12,13 +12,6 @@ import javax.swing.JButton;
 
 public final class ButtonFactory {
 
-  // Navigation buttons
-  private static final Color NB_ACCENT_BLUE = new Color(0, 210, 255);
-  private static final Color NB_GRAD_TOP = new Color(0, 160, 210);
-  private static final Color NB_GRAD_BOTTOM = new Color(0, 80, 130);
-  private static final Color NB_HOVER_TOP = new Color(0, 190, 240);
-  private static final Color NB_HOVER_BOTTOM = new Color(0, 100, 160);
-
   public static JButton createNavigationButton(String text) {
 
     JButton button = new JButton(text) {
@@ -49,13 +42,13 @@ public final class ButtonFactory {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         // Gradient fill — brighter on hover
-        Color top = hovered ? NB_HOVER_TOP : NB_GRAD_TOP;
-        Color bottom = hovered ? NB_HOVER_BOTTOM : NB_GRAD_BOTTOM;
+        Color top = hovered ? ColorTheme.get().navBtnHoverTop : ColorTheme.get().navBtnGradTop;
+        Color bottom = hovered ? ColorTheme.get().navBtnHoverBottom : ColorTheme.get().navBtnGradBottom;
         g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
         g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
 
         // Accent border
-        g2.setColor(NB_ACCENT_BLUE);
+        g2.setColor(ColorTheme.get().accentBlue);
         g2.setStroke(new java.awt.BasicStroke(1.5f));
         g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
 
