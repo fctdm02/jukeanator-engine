@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.client;
 
 import java.util.List;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.client.RestClient;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
@@ -29,6 +30,7 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
     this.restClient = RestClient.builder().baseUrl(baseUrl).build();
   }
 
+  // USER ROLE METHODS
   @Override
   public SearchResultDto getMusicByPopularity() {
 
@@ -113,6 +115,16 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
         .body(new ParameterizedTypeReference<>() {});
   }
 
+  @Override
+  @GetMapping("/songs/random")
+  public SongDto getRandomSongFromBackgroundMusicPlaylist() {
+
+    return restClient.get().uri("/api/song-library/songs/random").retrieve()
+        .body(SongDto.class);
+  }
+  
+  
+  // ADMIN ROLE METHODS
   @Override
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 

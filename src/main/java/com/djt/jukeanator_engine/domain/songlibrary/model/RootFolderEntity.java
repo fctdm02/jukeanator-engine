@@ -20,6 +20,7 @@ import java.util.TreeSet;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 
 public class RootFolderEntity extends FolderEntity {
   private static final long serialVersionUID = 2L;
@@ -233,6 +234,95 @@ public class RootFolderEntity extends FolderEntity {
     }
   }
 
+  public void resetSongStatistics() {
+    if (this.songsMap == null) {
+      initialize();
+    }
+    for (SongFileEntity song : this.songsMap.values()) {
+      song.setNumPlays(0);
+    }
+  }
+
+  public GenreFolderEntity getGenreById(Integer id) throws EntityDoesNotExistException {
+    GenreFolderEntity entity = genresMap.get(id);
+    if (entity != null) {
+      return entity;
+    }
+    throw new EntityDoesNotExistException("Genre with id: [" + id + "] not found.");
+  }
+
+  public ArtistFolderEntity getArtistByName(String artistName) throws EntityDoesNotExistException {
+    ArtistFolderEntity entity = artistsMap.get(artistName);
+    if (entity != null) {
+      return entity;
+    }
+    throw new EntityDoesNotExistException("Artist with name: [" + artistName + "] not found.");
+  }
+
+  public AlbumFolderEntity getAlbumById(Integer id) throws EntityDoesNotExistException {
+    AlbumFolderEntity entity = albumsMap.get(id);
+    if (entity != null) {
+      return entity;
+    }
+    throw new EntityDoesNotExistException("Album with id: [" + id + "] not found.");
+  }
+
+  public SongFileEntity getSongById(Integer albumId, Integer songId)
+      throws EntityDoesNotExistException {
+
+    String songKey = buildSongKey(albumId, songId);
+    SongFileEntity entity = songsMap.get(songKey);
+    if (entity != null) {
+      return entity;
+    }
+    throw new EntityDoesNotExistException(
+        "Song with songId: [" + songId + "] and albumId: [" + albumId + "] not found.");
+  }
+
+  public SongFileEntity getSongByPath(String songPathname) throws EntityDoesNotExistException {
+
+    if (songsByPathMap == null) {
+      initializeSongsByPathMap();
+    }
+
+    SongFileEntity entity = songsByPathMap.get(songPathname);
+    if (entity != null) {
+      return entity;
+    }
+    throw new EntityDoesNotExistException("Song with path: [" + songPathname + "] not found.");
+  }
+
+  private void initializeSongsByPathMap() {
+    this.songsByPathMap = new HashMap<>();
+    for (SongFileEntity song : this.songsMap.values()) {
+      String songPathname = song.getNaturalIdentity();
+      if (songPathname != null && !this.songsByPathMap.containsKey(songPathname)) {
+        this.songsByPathMap.put(songPathname, song);
+      }
+    }
+  }
+
+  private String buildSongKey(Integer albumId, Integer songId) {
+
+    return albumId.toString() + "__" + songId.toString();
+  }
+
+  private String buildCdStatsPathname(String scanPath) {
+
+    String cdStatsPathName = null;
+    OSType osType = OperatingSystemDetector.getOperatingSystem();
+    if (osType == OSType.WINDOWS) {
+      cdStatsPathName = scanPath + File.separator + CD_STATS_FILE_PREFIX + CD_STATS_FILE_SUFFIX;
+    } else if (osType == OSType.MACOS) {
+      cdStatsPathName =
+          scanPath + File.separator + CD_STATS_FILE_PREFIX + "_mac" + CD_STATS_FILE_SUFFIX;
+    } else {
+      cdStatsPathName =
+          scanPath + File.separator + CD_STATS_FILE_PREFIX + "_linux" + CD_STATS_FILE_SUFFIX;
+    }
+    return cdStatsPathName;
+  }
+
   public void restoreSongNumPlays(String scanPath) {
 
     String cdStatsPathName = buildCdStatsPathname(scanPath);
@@ -345,92 +435,8 @@ public class RootFolderEntity extends FolderEntity {
     }
   }
 
-  private String buildCdStatsPathname(String scanPath) {
+  public SongDto getRandomSongFromBackgroundMusicPlaylist() {
 
-    String cdStatsPathName = null;
-    OSType osType = OperatingSystemDetector.getOperatingSystem();
-    if (osType == OSType.WINDOWS) {
-      cdStatsPathName = scanPath + File.separator + CD_STATS_FILE_PREFIX + CD_STATS_FILE_SUFFIX;
-    } else if (osType == OSType.MACOS) {
-      cdStatsPathName =
-          scanPath + File.separator + CD_STATS_FILE_PREFIX + "_mac" + CD_STATS_FILE_SUFFIX;
-    } else {
-      cdStatsPathName =
-          scanPath + File.separator + CD_STATS_FILE_PREFIX + "_linux" + CD_STATS_FILE_SUFFIX;
-    }
-    return cdStatsPathName;
-  }
-
-  public void resetSongStatistics() {
-    if (this.songsMap == null) {
-      initialize();
-    }
-    for (SongFileEntity song : this.songsMap.values()) {
-      song.setNumPlays(0);
-    }
-  }
-
-  public GenreFolderEntity getGenreById(Integer id) throws EntityDoesNotExistException {
-    GenreFolderEntity entity = genresMap.get(id);
-    if (entity != null) {
-      return entity;
-    }
-    throw new EntityDoesNotExistException("Genre with id: [" + id + "] not found.");
-  }
-
-  public ArtistFolderEntity getArtistByName(String artistName) throws EntityDoesNotExistException {
-    ArtistFolderEntity entity = artistsMap.get(artistName);
-    if (entity != null) {
-      return entity;
-    }
-    throw new EntityDoesNotExistException("Artist with name: [" + artistName + "] not found.");
-  }
-
-  public AlbumFolderEntity getAlbumById(Integer id) throws EntityDoesNotExistException {
-    AlbumFolderEntity entity = albumsMap.get(id);
-    if (entity != null) {
-      return entity;
-    }
-    throw new EntityDoesNotExistException("Album with id: [" + id + "] not found.");
-  }
-
-  public SongFileEntity getSongById(Integer albumId, Integer songId)
-      throws EntityDoesNotExistException {
-
-    String songKey = buildSongKey(albumId, songId);
-    SongFileEntity entity = songsMap.get(songKey);
-    if (entity != null) {
-      return entity;
-    }
-    throw new EntityDoesNotExistException(
-        "Song with songId: [" + songId + "] and albumId: [" + albumId + "] not found.");
-  }
-
-  public SongFileEntity getSongByPath(String songPathname) throws EntityDoesNotExistException {
-
-    if (songsByPathMap == null) {
-      initializeSongsByPathMap();
-    }
-
-    SongFileEntity entity = songsByPathMap.get(songPathname);
-    if (entity != null) {
-      return entity;
-    }
-    throw new EntityDoesNotExistException("Song with path: [" + songPathname + "] not found.");
-  }
-
-  private void initializeSongsByPathMap() {
-    this.songsByPathMap = new HashMap<>();
-    for (SongFileEntity song : this.songsMap.values()) {
-      String songPathname = song.getNaturalIdentity();
-      if (songPathname != null && !this.songsByPathMap.containsKey(songPathname)) {
-        this.songsByPathMap.put(songPathname, song);
-      }
-    }
-  }
-
-  private String buildSongKey(Integer albumId, Integer songId) {
-
-    return albumId.toString() + "__" + songId.toString();
+    throw new RuntimeException("Not implemented yet!");
   }
 }

@@ -38,6 +38,7 @@ public class SongLibraryController implements SongLibraryService {
     this.songLibraryService = songLibraryService;
   }
 
+  // USER ROLE METHODS
   @Override
   @GetMapping("/popular")
   public SearchResultDto getMusicByPopularity() {
@@ -110,6 +111,14 @@ public class SongLibraryController implements SongLibraryService {
     return songLibraryService.getSongById(albumId, songId);
   }
 
+  @Override
+  @GetMapping("/songs/random")
+  public SongDto getRandomSongFromBackgroundMusicPlaylist() {
+    return songLibraryService.getRandomSongFromBackgroundMusicPlaylist();
+  }
+  
+  
+  // ADMIN ROLE METHODS
   @Override
   @PostMapping("/scanNoPath")
   public Integer scanFileSystemForSongs() throws SongScanFailedException {

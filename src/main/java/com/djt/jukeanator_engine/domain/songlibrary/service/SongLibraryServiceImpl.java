@@ -90,6 +90,7 @@ public final class SongLibraryServiceImpl
   }
 
   // Service methods
+  // USER ROLE METHODS
   @Override
   public SearchResultDto getMusicByPopularity() {
 
@@ -456,7 +457,15 @@ public final class SongLibraryServiceImpl
       return null;
     }
   }
+  
+  @Override
+  public SongDto getRandomSongFromBackgroundMusicPlaylist() {
+    
+    return this.root.getRandomSongFromBackgroundMusicPlaylist();
+  }
 
+  
+  // ADMIN ROLE METHODS
   @Override
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 

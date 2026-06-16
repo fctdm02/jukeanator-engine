@@ -17,6 +17,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedExce
  */
 public interface SongLibraryService {
 
+  // USER ROLE METHODS
   /**
    * 
    * @return
@@ -92,7 +93,15 @@ public interface SongLibraryService {
    * @return
    */
   SongDto getSongById(Integer albumId, Integer songId);
-
+  
+  /**
+   * 
+   * @return
+   */
+  SongDto getRandomSongFromBackgroundMusicPlaylist();
+  
+  
+  // ADMIN ROLE METHODS
   /**
    * 
    * @param scanRequest
