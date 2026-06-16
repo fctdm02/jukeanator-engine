@@ -450,4 +450,59 @@ public final class ColorTheme {
 
   /** AlbumViewCard — cover-art area / sidebar placeholder. */
   public final Color sidebarPlaceholderFg = new Color(80, 80, 100);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FRAME-LEVEL PALETTE (JukeANatorFrame)
+  // Colors that are specific to the top-level application frame and its tab
+  // bar — not shared with any card or panel component.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Background of the location-logo label in the credits panel (top-left corner). Origin:
+   * JukeANatorFrame#buildTopPanel — locationLogo.setBackground
+   */
+  public final Color frameLocationLogoBg = new Color(20, 20, 28);
+
+  /**
+   * Foreground color of the "CREDITS: N" title label. Origin: JukeANatorFrame#buildTopPanel —
+   * creditsTitle.setForeground
+   */
+  public final Color frameCreditsTitleColor = Color.YELLOW;
+
+  /**
+   * Fully-transparent black used for the JTabbedPane background and the two UIManager transparency
+   * keys so the frame gradient shows through the tab area. Origin:
+   * JukeANatorFrame#buildContentPanelTabs — tabs.setBackground and UIManager puts
+   */
+  public final Color frameTabsTransparent = new Color(0, 0, 0, 0);
+
+  /**
+   * Semi-transparent black fill painted behind unselected tab headers. Origin:
+   * JukeANatorFrame.JukeboxTabComponent#paintTabBackground (isSelected == false)
+   */
+  public final Color frameTabBgUnselected = new Color(0, 0, 0, 120);
+
+  /**
+   * Accent color for the HOME tab icon and label. Origin: JukeANatorFrame#buildContentPanelTabs —
+   * JukeboxTabComponent("HOME", ...)
+   */
+  public final Color frameTabAccentHome = new Color(255, 120, 120);
+
+  /**
+   * Accent color for the SEARCH tab icon and label. Origin: JukeANatorFrame#buildContentPanelTabs —
+   * JukeboxTabComponent("SEARCH", ...)
+   */
+  public final Color frameTabAccentSearch = new Color(0, 220, 255);
+
+  /**
+   * Accent color for the HOT HERE tab icon and label. Origin: JukeANatorFrame#buildContentPanelTabs
+   * — JukeboxTabComponent("HOT HERE", ...)
+   */
+  public final Color frameTabAccentHotHere = new Color(255, 80, 120);
+
+  /**
+   * Accent color for the QUEUE tab icon and label. Origin: JukeANatorFrame#buildContentPanelTabs —
+   * JukeboxTabComponent("QUEUE", ...)
+   */
+  public final Color frameTabAccentQueue = new Color(140, 255, 140);
 }

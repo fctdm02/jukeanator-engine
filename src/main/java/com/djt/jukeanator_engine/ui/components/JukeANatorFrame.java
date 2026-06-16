@@ -54,9 +54,7 @@ public class JukeANatorFrame extends JFrame {
   private static final int POPULARITY_THRESHOLD_2 = 25;
   private static final int POPULARITY_THRESHOLD_3 = 50;
 
-  // COLORS
-  private static final Color TEXT_PRIMARY = Color.WHITE;
-  private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
+  // COLORS — all sourced from ColorTheme.get()
 
   // TOP PANEL
   private final CreditManager creditManager;
@@ -106,13 +104,11 @@ public class JukeANatorFrame extends JFrame {
       int w = getWidth();
       int h = getHeight();
 
-      g2.setColor(new Color(10, 10, 10));
+      g2.setColor(ColorTheme.get().appBgBase);
       g2.fillRect(0, 0, w, h);
 
-      float[] fractions = {0.0f, 0.20f, 0.42f, 0.62f, 0.82f, 1.0f};
-      Color[] colors =
-          {new Color(140, 50, 50, 90), new Color(140, 90, 30, 80), new Color(80, 110, 40, 70),
-              new Color(30, 100, 110, 70), new Color(40, 60, 140, 80), new Color(100, 30, 140, 90)};
+      float[] fractions = ColorTheme.get().appGradFractions();
+      Color[] colors = ColorTheme.get().appGradColors();
       g2.setPaint(new LinearGradientPaint(new Point2D.Float(0, 0), new Point2D.Float(w, h),
           fractions, colors));
       g2.fillRect(0, 0, w, h);
@@ -195,7 +191,7 @@ public class JukeANatorFrame extends JFrame {
 
     setTitle("JukeANator");
     setUndecorated(true);
-    setBackground(Color.BLACK);
+    setBackground(ColorTheme.get().bgFieldDark);
 
     JPanel contentPane = new JPanel(new BorderLayout()) {
       private static final long serialVersionUID = 1L;
@@ -209,19 +205,13 @@ public class JukeANatorFrame extends JFrame {
         int h = getHeight();
 
         // Base dark fill first
-        g2.setColor(new Color(10, 10, 10));
+        g2.setColor(ColorTheme.get().appBgBase);
         g2.fillRect(0, 0, w, h);
 
         // Diagonal rainbow overlay — top-left to bottom-right,
         // matching the AMI screenshot's warm-left / cool-right spread
-        float[] fractions = {0.0f, 0.20f, 0.42f, 0.62f, 0.82f, 1.0f};
-        Color[] colors = {new Color(140, 50, 50, 90), // deep red, top-left
-            new Color(140, 90, 30, 80), // amber
-            new Color(80, 110, 40, 70), // olive
-            new Color(30, 100, 110, 70), // teal
-            new Color(40, 60, 140, 80), // blue
-            new Color(100, 30, 140, 90), // violet, bottom-right
-        };
+        float[] fractions = ColorTheme.get().appGradFractions();
+        Color[] colors = ColorTheme.get().appGradColors();
         g2.setPaint(new LinearGradientPaint(new Point2D.Float(0, 0), new Point2D.Float(w, h), // diagonal:
                                                                                               // top-left
                                                                                               // →
@@ -360,8 +350,8 @@ public class JukeANatorFrame extends JFrame {
     UIManager.put("TabbedPane.contentOpaque", Boolean.FALSE);
 
     // Some Swing Look and Feels require setting transparent colors explicitly
-    UIManager.put("TabbedPane.unselectedBackground", new Color(0, 0, 0, 0));
-    UIManager.put("TabbedPane.background", new Color(0, 0, 0, 0));
+    UIManager.put("TabbedPane.unselectedBackground", ColorTheme.get().frameTabsTransparent);
+    UIManager.put("TabbedPane.background", ColorTheme.get().frameTabsTransparent);
 
     JTabbedPane tabs = new JTabbedPane(JTabbedPane.BOTTOM) {
       private static final long serialVersionUID = 1L;
@@ -408,9 +398,9 @@ public class JukeANatorFrame extends JFrame {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setComposite(java.awt.AlphaComposite.SrcOver);
         if (isSelected) {
-          g2.setColor(new Color(255, 255, 255, 35));
+          g2.setColor(ColorTheme.get().bgFrostedGlassRing);
         } else {
-          g2.setColor(new Color(0, 0, 0, 120));
+          g2.setColor(ColorTheme.get().frameTabBgUnselected);
         }
         g2.fillRect(x, y, w, h);
         g2.dispose();
@@ -438,13 +428,11 @@ public class JukeANatorFrame extends JFrame {
         int contentH = tabPane.getHeight() - tabAreaHeight;
         int w = tabPane.getWidth();
 
-        g2.setColor(new Color(10, 10, 10));
+        g2.setColor(ColorTheme.get().appBgBase);
         g2.fillRect(0, 0, w, contentH);
 
-        float[] fractions = {0.0f, 0.20f, 0.42f, 0.62f, 0.82f, 1.0f};
-        Color[] colors = {new Color(140, 50, 50, 90), new Color(140, 90, 30, 80),
-            new Color(80, 110, 40, 70), new Color(30, 100, 110, 70), new Color(40, 60, 140, 80),
-            new Color(100, 30, 140, 90)};
+        float[] fractions = ColorTheme.get().appGradFractions();
+        Color[] colors = ColorTheme.get().appGradColors();
         // Use the full pane dimensions for the gradient so it matches the
         // frame-level gradient exactly (same diagonal, same colour stops).
         g2.setPaint(new LinearGradientPaint(new Point2D.Float(0, 0),
@@ -463,15 +451,15 @@ public class JukeANatorFrame extends JFrame {
         super.paint(g, c);
         int tabAreaHeight = calculateTabAreaHeight(JTabbedPane.BOTTOM, runCount, maxTabHeight);
         int separatorY = tabPane.getHeight() - tabAreaHeight - SEPARATOR_HEIGHT;
-        g.setColor(new Color(180, 180, 180));
+        g.setColor(ColorTheme.get().textSecondary);
         g.fillRect(0, separatorY, tabPane.getWidth(), SEPARATOR_HEIGHT);
       }
     });
 
-    tabs.setForeground(Color.WHITE);
+    tabs.setForeground(ColorTheme.get().textPrimary);
     tabs.setBorder(null);
     tabs.setOpaque(false);
-    tabs.setBackground(new Color(0, 0, 0, 0));
+    tabs.setBackground(ColorTheme.get().frameTabsTransparent);
 
     // ── Tab index layout ──────────────────────────────────────────────────────
     // Index 0 : DUMMY (invisible, 0-size — balances hidden ADMIN on the right)
@@ -517,11 +505,15 @@ public class JukeANatorFrame extends JFrame {
     tabs.setEnabledAt(0, false);
     tabs.setTabComponentAt(0, dummyTabHeader);
 
-    tabs.setTabComponentAt(1, new JukeboxTabComponent("HOME", "⌂", new Color(255, 120, 120)));
-    tabs.setTabComponentAt(2, new JukeboxTabComponent("SEARCH", "🔍", new Color(0, 220, 255)));
-    tabs.setTabComponentAt(3, new JukeboxTabComponent("HOT HERE", "🔥", new Color(255, 80, 120)));
-    tabs.setTabComponentAt(4, new JukeboxTabComponent("GENRES", "▣", Color.WHITE));
-    tabs.setTabComponentAt(5, new JukeboxTabComponent("QUEUE", "♫", new Color(140, 255, 140)));
+    tabs.setTabComponentAt(1,
+        new JukeboxTabComponent("HOME", "⌂", ColorTheme.get().frameTabAccentHome));
+    tabs.setTabComponentAt(2,
+        new JukeboxTabComponent("SEARCH", "🔍", ColorTheme.get().frameTabAccentSearch));
+    tabs.setTabComponentAt(3,
+        new JukeboxTabComponent("HOT HERE", "🔥", ColorTheme.get().frameTabAccentHotHere));
+    tabs.setTabComponentAt(4, new JukeboxTabComponent("GENRES", "▣", ColorTheme.get().textPrimary));
+    tabs.setTabComponentAt(5,
+        new JukeboxTabComponent("QUEUE", "♫", ColorTheme.get().frameTabAccentQueue));
 
     // Admin tab is invisible by default — access is gated by LoginToAdminPanelCard.
     // A zero-size transparent component keeps the tab structure intact while hiding it visually.
@@ -709,8 +701,9 @@ public class JukeANatorFrame extends JFrame {
     //
     JPanel creditsPanel = new JPanel(new BorderLayout(10, 0));
     creditsPanel.setOpaque(true);
-    creditsPanel.setBackground(Color.BLACK);
-    creditsPanel.setBorder(BorderFactory.createMatteBorder(2, 1, 1, 1, Color.WHITE));
+    creditsPanel.setBackground(ColorTheme.get().bgFieldDark);
+    creditsPanel
+        .setBorder(BorderFactory.createMatteBorder(2, 1, 1, 1, ColorTheme.get().textPrimary));
     Dimension sidePanelSize = new Dimension(485, 100);
     creditsPanel.setPreferredSize(sidePanelSize);
     creditsPanel.setMinimumSize(sidePanelSize);
@@ -723,9 +716,9 @@ public class JukeANatorFrame extends JFrame {
     locationLogo.setHorizontalAlignment(SwingConstants.CENTER);
     locationLogo.setVerticalAlignment(SwingConstants.CENTER);
     locationLogo.setOpaque(true);
-    locationLogo.setBackground(new Color(20, 20, 28));
+    locationLogo.setBackground(ColorTheme.get().frameLocationLogoBg);
     locationLogo.setPreferredSize(new Dimension(96, 96));
-    locationLogo.setBorder(BorderFactory.createLineBorder(new Color(80, 80, 90), 1));
+    locationLogo.setBorder(BorderFactory.createLineBorder(ColorTheme.get().coverArtBorder, 1));
 
     // Try JPG first
     ImageIcon logoIcon = imageLoader.loadImage("locationLogo.jpg", 96, 96);
@@ -740,7 +733,7 @@ public class JukeANatorFrame extends JFrame {
     } else {
       // Fallback text
       locationLogo.setText("★");
-      locationLogo.setForeground(Color.WHITE);
+      locationLogo.setForeground(ColorTheme.get().textPrimary);
       locationLogo.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
     }
 
@@ -748,16 +741,16 @@ public class JukeANatorFrame extends JFrame {
     // CREDITS TEXT (stacked labels, same as before)
     //
     JPanel creditsTextPanel = new JPanel();
-    creditsTextPanel.setBackground(Color.BLACK);
+    creditsTextPanel.setBackground(ColorTheme.get().bgFieldDark);
     creditsTextPanel.setOpaque(true);
     creditsTextPanel.setLayout(new BoxLayout(creditsTextPanel, BoxLayout.Y_AXIS));
 
     creditsTitle = new JLabel("CREDITS: " + numCredits);
-    creditsTitle.setForeground(Color.YELLOW);
+    creditsTitle.setForeground(ColorTheme.get().frameCreditsTitleColor);
     creditsTitle.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
 
     JLabel creditDescription = new JLabel(buildCreditsDescription());
-    creditDescription.setForeground(Color.WHITE);
+    creditDescription.setForeground(ColorTheme.get().textPrimary);
     creditDescription.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
 
     creditsTextPanel.add(creditsTitle);
@@ -828,8 +821,8 @@ public class JukeANatorFrame extends JFrame {
 
     JPanel panel = new JPanel(new BorderLayout(10, 0));
     panel.setOpaque(true);
-    panel.setBackground(Color.BLACK);
-    panel.setBorder(BorderFactory.createMatteBorder(2, 1, 1, 1, Color.WHITE));
+    panel.setBackground(ColorTheme.get().bgFieldDark);
+    panel.setBorder(BorderFactory.createMatteBorder(2, 1, 1, 1, ColorTheme.get().textPrimary));
 
     // Fixed size — always the same whether a song is playing or not.
     // Sized to match the "song playing" state so the center logo never shifts.
@@ -856,13 +849,13 @@ public class JukeANatorFrame extends JFrame {
     // Add a little top padding so the text sits centred vertically
     textPanel.setBorder(new EmptyBorder(8, 0, 8, 0));
 
-    songLabel.setForeground(TEXT_PRIMARY);
+    songLabel.setForeground(ColorTheme.get().textPrimary);
     songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
 
-    artistLabel.setForeground(TEXT_PRIMARY);
+    artistLabel.setForeground(ColorTheme.get().textPrimary);
     artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
 
-    albumLabel.setForeground(TEXT_SECONDARY);
+    albumLabel.setForeground(ColorTheme.get().textSecondary);
     albumLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
 
     textPanel.add(Box.createVerticalGlue());
