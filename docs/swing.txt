@@ -496,6 +496,46 @@ DONE 19: For Edit Album, change artist from Compilations to Various Artists
 
 33: Need to implement exception handling for controller endpoints
  
+34: Move over the most relevant features from:
+
+PlayerVolume=75
+MasterVolume=80
+UseLowPrioritySongVolume=false
+LowPrioritySongVolume=45
+WaveVolume=80
+LineInVolume=60
+BetweenSongsDelaySeconds=0
+LineInDelaySeconds=30
+-----------------------
+MaximumConsecutiveSongPlaysByArtist=1000
+MinimumMinutesBetweenSongPlays=0
+UseGenreSongPlayRestrictions=false
+SongPlayLimitOverridePattern=L,L,R,L,L
+-----------------------
+PlayExplicitSongs=true
+AllowExplicitLyricsBegin=5
+AllowExplicitLyricsEnd=5
+MaxQueueSize=1000
+MaxPauseMinutes=30
+RemoveDuplicatesFromPlaylists=false
+PerformFlushUponHibernation=true
+SavePlayedSongsToFile=false
+----------------------
+NumberToQueue=0
+RandomPlay=false
+RandomPlayInterval=20
+EnableRandomPlayDuration=false
+RandomPlayDurationBegin=8
+RandomPlayDurationEnd=17
+PerformExcludesOnSongQueue=false
+RandomSongExcludedGenres=
+RandomSongExcludedArtists=
+RandomByPlayList=false
+UseRandomSongPlayThreshold=false
+RandomByPlayListThreshold=1
+RandomPlayListFilePath=Top50Songs.PL
+RandomByGenre=false
+RandomByCD=false
  
  
  
