@@ -497,6 +497,20 @@ after 50 attempts to find an eligible song, then abandon the effort.  Also, when
 
 
 
+Right now, when dequeueNextSong() is invoked to remove a song from the queue (to be played by the SongPlayerService), then if enableBackgroundMusic is true, 
+then when the number of songs in the song queue is below the number specified by minimumNumberSongsToKeepInQueue, then a call to 
+SongLibraryService.getRandomSongFromBackgroundMusicPlaylist(), which returns a SongDto, will be made in which the returned SongDto is added to the song queue, 
+provided that a call isSongEligibleForQueue() is true.  If false, then skip the song, and repeat until a song is found that is eligible.  Add a fail safe in that 
+after 50 attempts to find an eligible song, then abandon the effort.  Also, when queueing a random/background music song, the priority should always be 0.
+
+The problem with this approach is that upon startup, if there are no persisted songs in the song queue, there's nothing to trigger the queue to be auto-populated
+with random songs.  There needs to be a way for the song queue service to know that it needs to auto-populate the queue without having to rely upon dequeue()
+being called by the SongPlayerService. 
+
+
+
+
+
 
 TODO:
 DONE 1: Albums with songs with duplicate track numbers, no track numbers, use song index in album childSongs list as track number.  Do this at scan time
@@ -561,23 +575,23 @@ DONE 19: For Edit Album, change artist from Compilations to Various Artists
 
 26: Need to explore Stripe APIs and/or payment systems with mobile
 
-27: Need to develop a screensaver
+DONE 27: Need to develop a screensaver
 
 28: Need to implement authentication for service calls
 
-29: Need to define User entity (name, email address, credits, play history, playlists), Swing UI will have singleton LocalUser
+DONE 29: Need to define User entity (name, email address, credits, play history, playlists), Swing UI will have singleton LocalUser
 
 30: Need to enhance root folder entity to have location name, coordinates, logo, etc.
 
 31: Need to implement logging for service endpoints
 
-32: Need to implement song queue addition constraint checks and appropriate isEligileForSongQueueAddition(song)
+DONE 32: Need to implement song queue addition constraint checks and appropriate isEligileForSongQueueAddition(song)
 
 33: Need to implement exception handling for controller endpoints
  
-34: Implement enableBackgroundMusic with another property called minimumNumberSongsToKeepInQueue 
+DONE 34: Implement enableBackgroundMusic with another property called minimumNumberSongsToKeepInQueue 
  
-35: Add ability to enable/disable screensaver and random background music. 
+DONE 35: Add ability to enable/disable screensaver and random background music. 
  
 36: Move over the most relevant features from:
 

@@ -87,12 +87,16 @@ public class AdminPanel extends JPanel {
   // ── Invalid Metadata Tracking Cache (Item #1) ─────────────────────────────
   private final List<AlbumDto> albumsWithInvalidMetadata = new ArrayList<>();
 
+  // ── Album list loading placeholder ────────────────────────────────────────
+  private JLabel albumLoadingLabel;
+
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
   public AdminPanel(Frame ownerFrame, SongLibraryService songLibraryService,
       SongQueueService songQueueService, SongPlayerService songPlayerService,
-      CreditManager creditManager, ImageLoader imageLoader) {
+      CreditManager creditManager, ImageLoader imageLoader,
+      CompletableFuture<List<AlbumDto>> prefetchedAlbums) {
 
     this.ownerFrame = ownerFrame;
     this.songLibraryService = songLibraryService;
@@ -109,7 +113,7 @@ public class AdminPanel extends JPanel {
     add(buildListsCenter(), BorderLayout.CENTER);
     add(buildQueueButtons(), BorderLayout.EAST);
 
-    refreshAlbumList();
+    populateAlbumListFrom(prefetchedAlbums);
     setQueue(songQueueService.getQueuedSongs());
 
     requestFocusInWindow();
@@ -180,7 +184,19 @@ public class AdminPanel extends JPanel {
     JPanel albumPane = new JPanel(new BorderLayout(0, 4));
     albumPane.setOpaque(false);
     albumPane.add(buildAlbumSectionHeader(), BorderLayout.NORTH);
-    albumPane.add(darkScrollPane(albumList), BorderLayout.CENTER);
+
+    // Placeholder shown while the async album load is in-flight
+    albumLoadingLabel = new JLabel("Loading library…", SwingConstants.CENTER);
+    albumLoadingLabel.setForeground(ColorTheme.get().textMuted);
+    albumLoadingLabel.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, 14));
+    albumLoadingLabel.setVisible(false);
+
+    JPanel albumListWrapper = new JPanel(new BorderLayout());
+    albumListWrapper.setOpaque(false);
+    albumListWrapper.add(darkScrollPane(albumList), BorderLayout.CENTER);
+    albumListWrapper.add(albumLoadingLabel, BorderLayout.NORTH);
+
+    albumPane.add(albumListWrapper, BorderLayout.CENTER);
 
     // ── Queue list ────────────────────────────────────────────────────────
     queueList.setOpaque(true);
@@ -538,28 +554,50 @@ public class AdminPanel extends JPanel {
     });
   }
 
-  public void refreshAlbumList() {
+  /**
+   * Primary entry point for loading the album list. Chains off {@code prefetchedAlbums} when one is
+   * provided (the future was started in {@code JukeANatorFrame} as soon as the login overlay
+   * appeared, so the data is usually already available or nearly so by the time the panel is
+   * visible). Falls back to a fresh {@code CompletableFuture.runAsync} call when no pre-fetch
+   * future is supplied (e.g. after a library rescan).
+   */
+  private void populateAlbumListFrom(CompletableFuture<List<AlbumDto>> prefetchedAlbums) {
 
-    CompletableFuture.runAsync(() -> {
-      try {
-        List<AlbumDto> albums = songLibraryService.getAlbums();
-        SwingUtilities.invokeLater(() -> {
-          albumListModel.clear();
-          albumsWithInvalidMetadata.clear();
+    if (albumLoadingLabel != null) {
+      albumLoadingLabel.setVisible(true);
+    }
 
-          if (albums != null) {
-            for (AlbumDto album : albums) {
-              albumListModel.addElement(album);
-              if (isMetadataInvalid(album)) {
-                albumsWithInvalidMetadata.add(album);
-              }
-            }
-          }
-        });
-      } catch (Exception ex) {
-        ex.printStackTrace();
+    CompletableFuture<List<AlbumDto>> source = (prefetchedAlbums != null) ? prefetchedAlbums
+        : CompletableFuture.supplyAsync(() -> songLibraryService.getAlbums());
+
+    source.thenAccept(albums -> SwingUtilities.invokeLater(() -> {
+      if (albumLoadingLabel != null) {
+        albumLoadingLabel.setVisible(false);
       }
+      albumListModel.clear();
+      albumsWithInvalidMetadata.clear();
+      if (albums != null) {
+        for (AlbumDto album : albums) {
+          albumListModel.addElement(album);
+          if (isMetadataInvalid(album)) {
+            albumsWithInvalidMetadata.add(album);
+          }
+        }
+      }
+    })).exceptionally(ex -> {
+      ex.printStackTrace();
+      SwingUtilities.invokeLater(() -> {
+        if (albumLoadingLabel != null) {
+          albumLoadingLabel.setVisible(false);
+        }
+      });
+      return null;
     });
+  }
+
+  /** Triggers a fresh reload of the album list (used after a library rescan). */
+  public void refreshAlbumList() {
+    populateAlbumListFrom(null);
   }
 
   private boolean isMetadataInvalid(AlbumDto album) {
