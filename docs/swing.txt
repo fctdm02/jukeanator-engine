@@ -599,9 +599,18 @@ DONE 34: Implement enableBackgroundMusic with another property called minimumNum
  
 DONE 35: Add ability to enable/disable screensaver and random background music. 
 
+- Change cost on SongQueueCard to be double what it is now
+
 - Change Song Queue to render song name by priority (0: gray, 1: white, 2: yellow, 3: orange, 4: red, 5+, purple
 
 - On Startup, do not flip to a letter button if there aren't enough albums to fill up the number of album tiles for the screen
+
+- Refactor all services:
+    + service methods to take in an authentication principle for all methods
+    + create logging interceptor to log auth principle, method name as well as any parameters
+    + deal with exception handling
+    
+- For Song Queue methods that add to the queue, create checked exception if an ineligible song was passed in    
  
 36: Move over the most relevant features from:
 

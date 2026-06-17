@@ -122,33 +122,57 @@ public final class SongQueueServiceImpl
     songQueueRoot.removeSongFromQueue(nextSong);
     songQueueRepository.storeAggregateRoot(songQueueRoot);
 
-    // If background music is enabled, maintain the minimum required songs in the queue
     if (enableBackgroundMusic) {
-      
-      int attempts = 0;
-      int songCount = songQueueRoot.getSongs().size();
-      while (songCount < minimumNumberSongsToKeepInQueue && attempts < 50) {
 
-        attempts++;
-        SongFileEntity randomSong = this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(this.rootPath);
-        if (randomSong != null) {
-
-          Integer albumId = randomSong.getAlbum().getPersistentIdentity();
-          Integer songId = randomSong.getPersistentIdentity();
-
-          if (isSongEligibleForQueue(albumId, songId, 0)) {
-            
-            addSongToQueue("BACKGROUND_MUSIC", albumId, songId, 0);
-            songCount = songQueueRoot.getSongs().size();
-          }
-        }
-      }
+      autoPopulateQueue();
     }
 
     eventPublisher
         .publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
 
     return SongQueueMapper.toDto(nextSong);
+  }
+
+  /**
+   * When background music is enabled, fills the queue up to {@code minimumNumberSongsToKeepInQueue}
+   * by drawing random songs from the background-music playlist. Each candidate is checked with
+   * {@link #isSongEligibleForQueue}; ineligible songs are skipped. A hard cap of 50 attempts
+   * prevents an infinite loop when the eligible pool is exhausted.
+   *
+   * <p>
+   * This method is called both after a song is dequeued (steady-state top-up) <em>and</em> during
+   * {@link #initialize()} so that the queue is seeded on startup even when no prior persisted songs
+   * exist.
+   *
+   * <p>
+   * Must be called while holding {@code this} monitor (i.e. from a {@code synchronized} context).
+   */
+  private void autoPopulateQueue() {
+
+    int attempts = 0;
+    while (songQueueRoot.getSongs().size() < minimumNumberSongsToKeepInQueue && attempts < 50) {
+
+      attempts++;
+      SongFileEntity randomSong =
+          this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(this.rootPath);
+
+      if (randomSong == null) {
+        break; // Background-music playlist is empty; nothing more we can do.
+      }
+
+      Integer albumId = randomSong.getAlbum().getPersistentIdentity();
+      Integer songId = randomSong.getPersistentIdentity();
+
+      if (isSongEligibleForQueue(albumId, songId, 0)) {
+        addSongToQueue("BACKGROUND_MUSIC", albumId, songId, 0);
+      }
+    }
+
+    if (attempts == 50 && songQueueRoot.getSongs().size() < minimumNumberSongsToKeepInQueue) {
+      log.warn(
+          "autoPopulateQueue: reached 50-attempt limit; could only fill queue to {} of {} required songs",
+          songQueueRoot.getSongs().size(), minimumNumberSongsToKeepInQueue);
+    }
   }
 
   @Override
@@ -167,7 +191,7 @@ public final class SongQueueServiceImpl
 
   @Override
   public boolean isSongEligibleForQueue(Integer albumId, Integer songId, Integer priority) {
-    
+
     Instant now = Instant.now();
 
     try {
@@ -503,7 +527,7 @@ public final class SongQueueServiceImpl
     initialize();
   }
 
-  private void initialize() {
+  private synchronized void initialize() {
     try {
       this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(rootPath);
     } catch (EntityDoesNotExistException ednee) {
@@ -519,6 +543,14 @@ public final class SongQueueServiceImpl
       log.error("Could not load song queue from: " + rootPath
           + ", using empty song library root for now, error: " + ednee.getMessage());
       this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
+    }
+
+    // Seed the queue with background music if it is below the minimum threshold.
+    // This handles the cold-start case where there are no persisted songs in the queue,
+    // so playback can begin immediately without waiting for dequeueNextSong() to be called first.
+    if (enableBackgroundMusic) {
+
+      autoPopulateQueue();
     }
   }
 
