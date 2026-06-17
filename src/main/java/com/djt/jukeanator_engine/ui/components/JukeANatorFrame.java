@@ -156,6 +156,7 @@ public class JukeANatorFrame extends JFrame {
 
   private final int screenWidth = screenSize.width;
   private final int screenHeight = screenSize.height;
+  private final boolean enableScreenSaver;
   private ScreenSaverWindow screenSaverWindow;
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -182,6 +183,8 @@ public class JukeANatorFrame extends JFrame {
 
     this.creditManager = new CreditManager(numCredits, creditsPerDollar, fiveDollarBonusCredits,
         tenDollarBonusCredits);
+
+    this.enableScreenSaver = this.jukeANatorUserInterfaceProperties.isEnableScreenSaver();
 
     initialize();
   }
@@ -313,28 +316,31 @@ public class JukeANatorFrame extends JFrame {
       }
     });
 
-    this.screenSaverWindow = new ScreenSaverWindow(this, this.imageLoader, this.screenWidth,
-        this.screenHeight, this.songLibraryService.getAlbums().size(), this.songPlayerService,
-        this.songLibraryService);
+    if (this.enableScreenSaver) {
 
-    new IdleMonitor(
+      this.screenSaverWindow = new ScreenSaverWindow(this, this.imageLoader, this.screenWidth,
+          this.screenHeight, this.songLibraryService.getAlbums().size(), this.songPlayerService,
+          this.songLibraryService);
 
-        () -> SwingUtilities.invokeLater(() -> {
+      new IdleMonitor(
 
-          if (!this.screenSaverWindow.isVisible()) {
+          () -> SwingUtilities.invokeLater(() -> {
 
-            this.screenSaverWindow.updateContent();
+            if (!this.screenSaverWindow.isVisible()) {
 
-            this.screenSaverWindow.setVisible(true);
-          }
-        }),
+              this.screenSaverWindow.updateContent();
 
-        () -> SwingUtilities.invokeLater(() -> {
+              this.screenSaverWindow.setVisible(true);
+            }
+          }),
 
-          if (screenSaverWindow.isVisible()) {
-            screenSaverWindow.setVisible(false);
-          }
-        }));
+          () -> SwingUtilities.invokeLater(() -> {
+
+            if (screenSaverWindow.isVisible()) {
+              screenSaverWindow.setVisible(false);
+            }
+          }));
+    }
 
     requestFocusInWindow();
   }

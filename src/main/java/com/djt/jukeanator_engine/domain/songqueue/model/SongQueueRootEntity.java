@@ -43,9 +43,10 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
    * @param priority
    * @return
    */
-  public SongQueueEntryEntity addSongToQueue(SongFileEntity song, Integer priority) {
+  public SongQueueEntryEntity addSongToQueue(String username, SongFileEntity song,
+      Integer priority) {
 
-    SongQueueEntryEntity entry = new SongQueueEntryEntity(song, priority);
+    SongQueueEntryEntity entry = new SongQueueEntryEntity(username, song, priority);
 
     // Insert AFTER all songs with the same or higher priority, and BEFORE any song with a
     // strictly lower priority. Walk forward until we find the first entry whose priority
@@ -143,7 +144,7 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
     }
     return Integer.valueOf(0);
   }
-  
+
   /**
    * 
    * @param songQueueEntry
@@ -152,7 +153,7 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
   public boolean removeSongFromQueue(SongQueueEntryEntity songQueueEntry) {
 
     return this.songs.remove(songQueueEntry);
-  }  
+  }
 
   private int getIndexForSongQueueEntry(SongFileEntity song) {
 

@@ -5,12 +5,19 @@ import java.util.Objects;
 
 public class AddMultipleSongsToQueueRequest {
 
+  private String username;
   private List<SongIdentifier> songIdentifiers;
   private Integer priority;
 
-  public AddMultipleSongsToQueueRequest(List<SongIdentifier> songIdentifiers, Integer priority) {
+  public AddMultipleSongsToQueueRequest(String username, List<SongIdentifier> songIdentifiers,
+      Integer priority) {
+    this.username = username;
     this.songIdentifiers = songIdentifiers;
     this.priority = priority;
+  }
+
+  public String getUsername() {
+    return username;
   }
 
   public List<SongIdentifier> getSongIdentifiers() {
@@ -23,7 +30,7 @@ public class AddMultipleSongsToQueueRequest {
 
   @Override
   public int hashCode() {
-    return Objects.hash(priority, songIdentifiers);
+    return Objects.hash(username, priority, songIdentifiers);
   }
 
   @Override
@@ -35,14 +42,14 @@ public class AddMultipleSongsToQueueRequest {
     if (getClass() != obj.getClass())
       return false;
     AddMultipleSongsToQueueRequest other = (AddMultipleSongsToQueueRequest) obj;
-    return Objects.equals(priority, other.priority)
+    return Objects.equals(priority, other.priority) && Objects.equals(username, other.username)
         && Objects.equals(songIdentifiers, other.songIdentifiers);
   }
 
   @Override
   public String toString() {
-    return "AddMultipleSongsToQueueRequest [songIdentifiers=" + songIdentifiers + ", priority="
-        + priority + "]";
+    return "AddMultipleSongsToQueueRequest [username=" + username + ", songIdentifiers="
+        + songIdentifiers + ", priority=" + priority + "]";
   }
 
 }

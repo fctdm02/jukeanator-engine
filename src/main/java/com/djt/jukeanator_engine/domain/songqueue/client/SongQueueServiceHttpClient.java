@@ -7,6 +7,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 
@@ -44,6 +45,16 @@ public class SongQueueServiceHttpClient implements SongQueueService {
 
     return restClient.get().uri("/api/song-queue/queuedSongs").retrieve()
         .body(new ParameterizedTypeReference<>() {});
+  }
+
+  @Override
+  public boolean isSongEligibleForQueue(Integer albumId, Integer songId, Integer priority) {
+
+    return restClient.get()
+        .uri(uriBuilder -> uriBuilder.path("/api/song-queue/isSongEligibleForQueue")
+            .queryParam("albumId", albumId).queryParam("songId", songId)
+            .queryParam("priority", priority).build())
+        .retrieve().body(Boolean.class);
   }
 
   @Override
@@ -110,9 +121,9 @@ public class SongQueueServiceHttpClient implements SongQueueService {
   }
 
   @Override
-  public Integer loadPlaylistIntoQueue(String filename) {
+  public Integer loadPlaylistIntoQueue(LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest) {
 
-    return restClient.post().uri("/api/song-queue/loadPlaylistIntoQueue").body(filename).retrieve()
-        .body(Integer.class);
+    return restClient.post().uri("/api/song-queue/loadPlaylistIntoQueue")
+        .body(loadPlaylistIntoQueueRequest).retrieve().body(Integer.class);
   }
 }

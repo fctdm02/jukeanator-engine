@@ -82,7 +82,7 @@ public class SongQueueServiceTest {
     Integer albumId = album.getAlbumId();
     Integer songId = song.getSongId();
     Integer priority = Integer.valueOf(1);
-    AddSongToQueueRequest addSongToQueueRequest = new AddSongToQueueRequest(albumId, songId, priority);
+    AddSongToQueueRequest addSongToQueueRequest = new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, albumId, songId, priority);
     SongQueueEntryDto queueEntry = songQueueService.addSongToQueue(addSongToQueueRequest);
     assertNotNull(queueEntry, "queueEntry should not be null");
     

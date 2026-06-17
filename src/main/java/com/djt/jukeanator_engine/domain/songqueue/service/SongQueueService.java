@@ -5,12 +5,18 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 
 /**
  * @author tmyers
  */
 public interface SongQueueService {
+  
+  /**
+   * 
+   */
+  String LOCAL_USERNAME = "LOCAL";
 
   /**
    * NOTE: This method should only be involved by SongPlayerService when playing the next song
@@ -36,11 +42,20 @@ public interface SongQueueService {
   List<SongQueueEntryDto> getQueuedSongs();
 
   /**
+   * 
+   * @param albumId
+   * @param songId
+   * @param priority
+   * @return
+   */
+  boolean isSongEligibleForQueue(Integer albumId, Integer songId, Integer priority);
+  
+  /**
    * @param addSongToQueueRequest
    * @return
    */
   SongQueueEntryDto addSongToQueue(AddSongToQueueRequest addSongToQueueRequest);
-
+  
   /**
    * 
    * @param addAlbumToQueueRequest
@@ -96,8 +111,8 @@ public interface SongQueueService {
 
   /**
    * 
-   * @param filename
+   * @param loadPlaylistIntoQueueRequest
    * @return
    */
-  Integer loadPlaylistIntoQueue(String filename);
+  Integer loadPlaylistIntoQueue(LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest);
 }

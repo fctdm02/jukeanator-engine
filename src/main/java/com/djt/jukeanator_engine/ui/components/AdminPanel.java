@@ -42,6 +42,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
@@ -281,7 +282,8 @@ public class AdminPanel extends JPanel {
         AlbumDto full = songLibraryService.getAlbumById(albumId);
 
         // 2. Submit to the queue engine (Fires events, updates data models)
-        songQueueService.addAlbumToQueue(new AddAlbumToQueueRequest(full.getAlbumId(), 1));
+        songQueueService.addAlbumToQueue(
+            new AddAlbumToQueueRequest(SongQueueService.LOCAL_USERNAME, full.getAlbumId(), 1));
 
         // 3. Explicitly request the fresh queue list from the service layer
         // WHILE STILL on the background thread.
@@ -496,7 +498,9 @@ public class AdminPanel extends JPanel {
     CompletableFuture.runAsync(() -> {
       try {
 
-        this.songQueueService.loadPlaylistIntoQueue(filename);
+        LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest =
+            new LoadPlaylistIntoQueueRequest(SongQueueService.LOCAL_USERNAME, filename);
+        this.songQueueService.loadPlaylistIntoQueue(loadPlaylistIntoQueueRequest);
 
         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Loaded " + filename,
             " playlist", JOptionPane.INFORMATION_MESSAGE));

@@ -57,6 +57,10 @@ public class SongFileEntity extends AbstractFileEntity implements LibraryItem {
     return parentGenre;
   }
 
+  public boolean hasExplicit() {
+    return getAlbum().hasExplicit();
+  }
+
   @Override
   public String getTitle() {
     return getSongName();

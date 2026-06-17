@@ -179,7 +179,7 @@ public class ApplicationConfig {
       ApplicationEventPublisher eventPublisher) {
     
     return new SongQueueServiceImpl(
-        songQueueProperties.getRootPath(), 
+        songQueueProperties, 
         songLibraryRepository, 
         songQueueRepository,
         eventPublisher);

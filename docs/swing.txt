@@ -461,6 +461,39 @@ re-load using this newly created BackgroundMusic.TXT file
 
 
 
+Refactor SongQueueServiceImpl as follows:
+
+OVERVIEW:
+ONE: isSongEligibleForQueue(): Enforce song play constraints for min. minutes between song plays, max. num. of consecutive song plays by artist and
+allowing songs with explicit lyrics to be within the allowExplicitSongsBegin to allowExplicitSongsEnd time range (24 hour format).
+
+TWO: dequeueNextSong(): If enableBackgroundMusic is true, then minimumNumberSongsToKeepInQueue specifies the minimum number of songs to keep in the queue.
+
+IMPLEMENTATION STRATEGY
+Item #1: In SongQueueServiceImpl, implement the method boolean isSongEligibleForQueue(Integer albumId, Integer songId, Integer priority) as follows:
+
+a. When a SongQueueEntryEntity is created, it has a property called "queuedAtTime" that is an instance of Instant and represents the time when the song
+was queued.  If an incoming song, identified by albumId and songId when isSongEligibleForQueue() is invoked at time Instant.now(), if the time 
+between the existing song's (in the queue) queuedAtTime and Instant.now() is less than minimumMinutesBetweenSongPlays, which is in Minutes, then return false
+
+b. Keep track of the artist names for songs are queued, in what sequence when they are queued and when they are queued.  Return false if the incoming song
+has an artist, which can be retrieved by calling getArtistName() on SongFileEntity, that, when added at the given priority, will result in the number of songs
+with the same artist being greater than maximumConsecutiveSongPlaysByArtist.  Maintain this this data structure when this method is invoked for any entries greater
+than 2 hours old.
+
+c. If allowExplicitSongsAtAllTimes=true, then disregard this property for eligibility.  Otherwise, when allowExplicitSongsAtAllTimes=false, then only allow the
+song to be eligible if the current Instant is between allowExplicitSongsBegin and allowExplicitSongsEnd.  Both properties integers that represent the hour of the
+day in 24 hour format.  For example, 21, represents 9:00PM and 5 represents 5:00AM for the next day.  So, if an explicit song is attempted to be queued
+between 5:00AM and 9:00PM (exclusive) on the same day, then return false.  Likewise, if an explicit song is queued betweem 9:00PM and 5:00AM the next day (inclusive)
+then the song is eligibile.
+
+
+Item #2: When dequeueNextSong() is invoked to remove a song from the queue (to be played by the SongPlayerService), then if enableBackgroundMusic is true, 
+then when the number of songs in the song queue is below the number specified by minimumNumberSongsToKeepInQueue, then a call to 
+SongLibraryService.getRandomSongFromBackgroundMusicPlaylist(), which returns a SongDto, will be made in which the returned SongDto is added to the song queue, 
+provided that a call isSongEligibleForQueue() is true.  If false, then skip the song, and repeat until a song is found that is eligible.  Add a fail safe in that 
+after 50 attempts to find an eligible song, then abandon the effort.  Also, when queueing a random/background music song, the priority should always be 0.
+
 
 
 
@@ -542,7 +575,11 @@ DONE 19: For Edit Album, change artist from Compilations to Various Artists
 
 33: Need to implement exception handling for controller endpoints
  
-34: Move over the most relevant features from:
+34: Implement enableBackgroundMusic with another property called minimumNumberSongsToKeepInQueue 
+ 
+35: Add ability to enable/disable screensaver and random background music. 
+ 
+36: Move over the most relevant features from:
 
 PlayerVolume=75
 MasterVolume=80

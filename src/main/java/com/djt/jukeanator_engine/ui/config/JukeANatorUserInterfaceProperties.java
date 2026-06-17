@@ -9,6 +9,8 @@ public class JukeANatorUserInterfaceProperties {
 
   private boolean enabled = false; // if true, a JFC/Swing UI is launched, otherwise, a headless
                                    // backend
+  
+  private boolean enableScreenSaver = true;
 
   //
   // CREDIT CONFIGURATION
@@ -31,6 +33,14 @@ public class JukeANatorUserInterfaceProperties {
 
   public void setEnabled(boolean enabled) {
     this.enabled = enabled;
+  }
+
+  public boolean isEnableScreenSaver() {
+    return enableScreenSaver;
+  }
+
+  public void setEnableScreenSaver(boolean enableScreenSaver) {
+    this.enableScreenSaver = enableScreenSaver;
   }
 
   public char getIncrementCreditsKey() {

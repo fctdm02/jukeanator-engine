@@ -4,12 +4,18 @@ import java.util.Objects;
 
 public class AddAlbumToQueueRequest {
 
+  private String username;
   private Integer albumId;
   private Integer priority;
 
-  public AddAlbumToQueueRequest(Integer albumId, Integer priority) {
+  public AddAlbumToQueueRequest(String username, Integer albumId, Integer priority) {
+    this.username = username;
     this.albumId = albumId;
     this.priority = priority;
+  }
+
+  public String getUsername() {
+    return username;
   }
 
   public Integer getAlbumId() {
@@ -22,7 +28,7 @@ public class AddAlbumToQueueRequest {
 
   @Override
   public int hashCode() {
-    return Objects.hash(albumId, priority);
+    return Objects.hash(albumId, priority, username);
   }
 
   @Override
@@ -34,11 +40,13 @@ public class AddAlbumToQueueRequest {
     if (getClass() != obj.getClass())
       return false;
     AddAlbumToQueueRequest other = (AddAlbumToQueueRequest) obj;
-    return Objects.equals(albumId, other.albumId) && Objects.equals(priority, other.priority);
+    return Objects.equals(albumId, other.albumId) && Objects.equals(priority, other.priority)
+        && Objects.equals(username, other.username);
   }
 
   @Override
   public String toString() {
-    return "AddAlbumToQueueRequest [albumId=" + albumId + ", priority=" + priority + "]";
+    return "AddAlbumToQueueRequest [username=" + username + ", albumId=" + albumId + ", priority="
+        + priority + "]";
   }
 }

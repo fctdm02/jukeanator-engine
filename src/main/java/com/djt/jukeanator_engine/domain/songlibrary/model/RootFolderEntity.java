@@ -381,20 +381,49 @@ public class RootFolderEntity extends FolderEntity {
 
     String pathname = buildBackgroundMusicYetToBePlayedPathname(scanPath);
     Path file = Path.of(pathname);
+    Path primaryPlaylistFile = Path.of(buildBackgroundMusicPathname(scanPath));
 
     try {
 
-      if (!Files.exists(file)) {
-        copyBackgroundMusicPlaylist(scanPath);
+      if (!Files.exists(primaryPlaylistFile)) {
+        createBackgroundMusicPlaylistFromTopSongs(scanPath);
       }
 
-      List<String> songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream()
-          .map(String::trim).filter(line -> !line.isEmpty()).toList();
+      if (!Files.exists(file)) {
+        try {
+          copyBackgroundMusicPlaylist(scanPath);
+        } catch (Exception e) {
+          createBackgroundMusicPlaylistFromTopSongs(scanPath);
+          copyBackgroundMusicPlaylist(scanPath);
+        }
+      }
 
-      if (songs.isEmpty()) {
+      List<String> songs = new ArrayList<>();
+      try {
+        songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
+            .filter(line -> !line.isEmpty()).toList();
+      } catch (IOException e) {
+        createBackgroundMusicPlaylistFromTopSongs(scanPath);
         copyBackgroundMusicPlaylist(scanPath);
         songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
             .filter(line -> !line.isEmpty()).toList();
+      }
+
+      if (songs.isEmpty()) {
+        try {
+          copyBackgroundMusicPlaylist(scanPath);
+          songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
+              .filter(line -> !line.isEmpty()).toList();
+        } catch (Exception e) {
+          // Keep try-catch standalone block logic matching original intent
+        }
+
+        if (songs.isEmpty()) {
+          createBackgroundMusicPlaylistFromTopSongs(scanPath);
+          copyBackgroundMusicPlaylist(scanPath);
+          songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
+              .filter(line -> !line.isEmpty()).toList();
+        }
       }
 
       this.backgroundSongsYetToBePlayedList = new ArrayList<>(songs);
@@ -564,6 +593,51 @@ public class RootFolderEntity extends FolderEntity {
     } catch (EntityDoesNotExistException e) {
       throw new IllegalStateException("Background music song not found in library: " + songPathname,
           e);
+    }
+  }
+
+  private void createBackgroundMusicPlaylistFromTopSongs(String scanPath) {
+
+    if (this.songsMap == null) {
+      initialize();
+    }
+
+    String backgroundMusicPathname = buildBackgroundMusicPathname(scanPath);
+
+    List<SongFileEntity> songs = new ArrayList<>(this.songsMap.values());
+
+    songs.sort((s1, s2) -> Integer.compare(s2.getNumPlays() == null ? 0 : s2.getNumPlays(),
+        s1.getNumPlays() == null ? 0 : s1.getNumPlays()));
+
+    try (BufferedWriter writer =
+        Files.newBufferedWriter(Path.of(backgroundMusicPathname), StandardCharsets.UTF_8)) {
+
+      int count = 0;
+
+      for (SongFileEntity song : songs) {
+
+        String songPath = song.getNaturalIdentity();
+
+        if (songPath == null || songPath.isBlank()) {
+          continue;
+        }
+
+        writer.write(songPath);
+        writer.newLine();
+
+        count++;
+
+        if (count >= 500) {
+          break;
+        }
+      }
+
+      System.out.println("Created background music playlist containing " + count + " songs: "
+          + backgroundMusicPathname);
+
+    } catch (IOException e) {
+      throw new IllegalStateException(
+          "Failed to create background music playlist: " + backgroundMusicPathname, e);
     }
   }
 }

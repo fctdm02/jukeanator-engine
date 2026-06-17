@@ -216,8 +216,9 @@ public class AddSongToQueueCard extends JPanel {
         createQueueButton("Play Song", normalPlayCost, ColorTheme.get().accentBlue, e -> {
           if (creditManager.deductCredits(normalPlayCost)) {
 
-            CompletableFuture.runAsync(() -> songQueueService
-                .addSongToQueue(new AddSongToQueueRequest(song.getAlbumId(), song.getSongId(), 1)));
+            CompletableFuture
+                .runAsync(() -> songQueueService.addSongToQueue(new AddSongToQueueRequest(
+                    SongQueueService.LOCAL_USERNAME, song.getAlbumId(), song.getSongId(), 1)));
 
             dismiss();
           }
@@ -227,8 +228,9 @@ public class AddSongToQueueCard extends JPanel {
         createQueueButton("Priority Play Song", priorityCost, ColorTheme.get().accentGold, e -> {
           if (creditManager.deductCredits(priorityCost)) {
 
-            CompletableFuture.runAsync(() -> songQueueService.addSongToQueue(
-                new AddSongToQueueRequest(song.getAlbumId(), song.getSongId(), highestPriority)));
+            CompletableFuture.runAsync(() -> songQueueService
+                .addSongToQueue(new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME,
+                    song.getAlbumId(), song.getSongId(), highestPriority)));
 
             dismiss();
           }
