@@ -652,10 +652,39 @@ HibernateBegin=3
 HibernateEnd=14
 
 - Need to render explicit albums with a red border and normal albums with a white border
- 
--- Add ASCAP/BMI/SESAC license info screen
 
--- Move Up / Move Down on SongQueueCard is not working correctly
+- Doing a search for "Buck" then clicking on Buckcherry, does not bring up their album (only the compilations are shown) 
+ 
+- Add ASCAP/BMI/SESAC license info screen
+
+- Move Up / Move Down on SongQueueCard is not working correctly
+
+- Investigate issue with artist results for Buckcherry, make sure either type of Artist has all albums
+
+- Make git repo for installer that contains demo music with 30 second song clips
+
+- When AddSongToQueueCard is dismissed, especially froma constraint warning, the PREVIOUS panel that was showing before
+  the card was showing needs to be displayed.
+  
+- Investigate Winamp DLL for Windows that does song player
+
+- Investigate issues with startup on a fresh machine (song library root not found, throws exceptions now)
+
+- Possibly add Sort By title or release date for Search and Genre screens
+
+- Possibly add a "addedOn" date to when the album was added to the jukebox, this would be stored in the album metadata file.
+  Default everything now to, say 01-01-2020.  Going forward, whenever a new metadata file is written (so it would be a
+  required file regardless of commercial vs. non-commercial), the addedOn date would be the current timestamp.
+  
+- Add a copy protection / license renewal screen that is equivalent to what is in place now (JukeANator.CTL and License.CTL)  
+
+- Refactor services so that they all use the same rootPath property from the main application config
+
+- Refine song constraint warnings to give specific details
+
+- Disable button grid panel when showing albums from artist view, show all albums
+
+- Verify that random songs are added with priority 0 and that normal songs by user are priority 1.  Verify that priority sorting works
   
 36: Move over the most relevant features from:
 

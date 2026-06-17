@@ -232,7 +232,7 @@ public final class SongQueueServiceImpl
           long minutesBetween = Duration.between(queuedEntry.getQueuedAtTime(), now).toMinutes();
           if (minutesBetween < minimumMinutesBetweenSongPlays) {
             
-            return "the minimum minutes between song plays has not been met";
+            return "the minimum minutes between song plays has not been met.  Try again in " + minutesBetween + "minutes";
           }
         }
       }
@@ -261,7 +261,8 @@ public final class SongQueueServiceImpl
         int incomingIdx = merged.indexOf(incoming);
 
         if (incomingIdx >= 0) {
-          int consecutiveCount = 1; // the incoming song itself
+          
+          int consecutiveCount = 0;
 
           // Walk backwards — songs that play before the new one
           for (int i = incomingIdx - 1; i >= 0; i--) {
@@ -282,7 +283,7 @@ public final class SongQueueServiceImpl
           }
 
           if (consecutiveCount > maximumConsecutiveSongPlaysByArtist) {
-            return "the consecutive play count by artist has been exceeded";
+            return "the consecutive play count for '" + incomingArtist + "' has been exceeded";
           }
         }
       } // end synchronized
@@ -320,7 +321,7 @@ public final class SongQueueServiceImpl
           }
 
           if (!withinWindow) {
-            return "the song has explicit lyrics";
+            return "you must wait until " + currentHour + ":00PM to play songs with explicit lyrics";
           }
         }
       }

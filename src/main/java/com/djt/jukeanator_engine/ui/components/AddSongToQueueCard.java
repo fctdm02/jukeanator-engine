@@ -58,9 +58,8 @@ public class AddSongToQueueCard extends JPanel {
   /** Card name for the song-constraint / ineligible view. */
   private static final String INNER_CARD_CONSTRAINT = "CONSTRAINT";
   private JLabel constraintLabel;
-  private String constraintLabelText = 
-      "<html><div style='text-align:center;'>" + "This song cannot be played at this time because [REASON].<br>"
-          + "Please try again later." + "</div></html>";
+  private String constraintLabelText =
+      "<html><div style='text-align:center;'>This song cannot be played at this time because [REASON].</div></html>";
 
   /** Inner card layout that switches between the main panel and the constraint panel. */
   private final CardLayout innerCardLayout = new CardLayout();
@@ -226,9 +225,9 @@ public class AddSongToQueueCard extends JPanel {
    * @param reason
    */
   public void showConstraintPanel(String reason) {
-    
+
     this.constraintLabelText = this.constraintLabelText.replace("[REASON]", reason);
-    this.constraintLabel.setText(this.constraintLabelText);    
+    this.constraintLabel.setText(this.constraintLabelText);
     innerCardLayout.show(innerCardRoot, INNER_CARD_CONSTRAINT);
   }
 

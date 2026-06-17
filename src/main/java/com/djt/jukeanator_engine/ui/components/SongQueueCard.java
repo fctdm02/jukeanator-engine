@@ -484,10 +484,10 @@ public class SongQueueCard extends JPanel {
     return success;
   }
 
-  /** Cost = 2 × entry's priority (minimum 1). */
+  /** Cost = 3 × entry's priority (minimum 1). */
   private static int computeCost(SongQueueEntryDto entry) {
     int priority = entry.getPriority() == null ? 0 : entry.getPriority();
-    return Math.max(1, priority * 2);
+    return Math.max(1, priority * 3);
   }
 
   // ── Button state / label refresh ─────────────────────────────────────────
