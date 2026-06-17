@@ -159,14 +159,14 @@ public class JukeANatorFrame extends JFrame {
   private final int screenHeight = screenSize.height;
   private final boolean enableScreenSaver;
   private ScreenSaverWindow screenSaverWindow;
-  
-  
+
+
   // HIBERNATION
   private final boolean enableHibernation;
   private final int hibernateBegin;
-  private final int hibernateEnd;  
+  private final int hibernateEnd;
 
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
@@ -193,10 +193,10 @@ public class JukeANatorFrame extends JFrame {
         tenDollarBonusCredits);
 
     this.enableScreenSaver = this.jukeANatorUserInterfaceProperties.isEnableScreenSaver();
-    
+
     this.enableHibernation = this.jukeANatorUserInterfaceProperties.isEnableHibernation();
     this.hibernateBegin = this.jukeANatorUserInterfaceProperties.getHibernateBegin();
-    this.hibernateEnd = this.jukeANatorUserInterfaceProperties.getHibernateEnd();  
+    this.hibernateEnd = this.jukeANatorUserInterfaceProperties.getHibernateEnd();
 
     initialize();
   }
@@ -1016,16 +1016,37 @@ public class JukeANatorFrame extends JFrame {
    * Shows the "Add Song to Queue" overlay for the given song. Available from Home, Search, Hot
    * Here, and Genres.
    */
+  /**
+   * Shows the "Add Song to Queue" overlay for the given song. Available from Home, Search, Hot
+   * Here, and Genres.
+   *
+   * <p>
+   * Before displaying the card the service is consulted via
+   * {@link SongQueueService#isSongEligibleForQueue}. If the song is currently ineligible the card
+   * is still shown, but it opens on its built-in "Song Constraint" panel rather than the normal
+   * play-selection panel.
+   */
   public void showAddSongToQueueCard(SongDto song) {
 
     if (addSongToQueueCard != null) {
       addSongToQueueCard.teardown();
     }
 
+    // ── Eligibility check (normal play = priority 1) ──────────────────────
+    // getHighestPriority() returns the next available priority; normal plays
+    // always use priority 1, so we pass 1 here as a representative value.
+    boolean eligible =
+        songQueueService.isSongEligibleForQueue(song.getAlbumId(), song.getSongId(), 1);
+
     addSongToQueueCard = new AddSongToQueueCard(song, imageLoader, priorityCostMultiplier,
         songQueueService, creditManager, this::hideOverlay);
 
     addSongToQueueCard.setOpaque(false);
+
+    // ── Show constraint panel immediately when the song is ineligible ─────
+    if (!eligible) {
+      addSongToQueueCard.showConstraintPanel();
+    }
 
     replaceOverlayCard(CARD_ADD_SONG, addSongToQueueCard);
     overlayTransitionInProgress = true;

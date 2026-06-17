@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -36,8 +37,6 @@ public class AddSongToQueueCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
-  // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
-
   // ── Timeout ───────────────────────────────────────────────────────────────
   private static final int TIMEOUT_SECONDS = 120;
 
@@ -53,6 +52,17 @@ public class AddSongToQueueCard extends JPanel {
   private JButton priorityButton;
   private Runnable creditListener;
 
+  /** Card name for the normal play-selection view. */
+  private static final String INNER_CARD_MAIN = "MAIN";
+
+  /** Card name for the song-constraint / ineligible view. */
+  private static final String INNER_CARD_CONSTRAINT = "CONSTRAINT";
+
+  /** Inner card layout that switches between the main panel and the constraint panel. */
+  private final CardLayout innerCardLayout = new CardLayout();
+
+  /** Container that holds both inner cards. */
+  private JPanel innerCardRoot; // assigned in buildBorderPanel()
   private final Timer countdownTimer;
   private int secondsRemaining = TIMEOUT_SECONDS;
   private final JLabel timeoutLabel = new JLabel();
@@ -115,8 +125,105 @@ public class AddSongToQueueCard extends JPanel {
     };
     border.setOpaque(false);
     border.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
-    border.add(buildMainPanel());
+
+    // ── Inner card root ───────────────────────────────────────────────────
+    innerCardRoot = new JPanel(innerCardLayout);
+    innerCardRoot.setOpaque(false);
+    innerCardRoot.add(buildMainPanel(), INNER_CARD_MAIN);
+    innerCardRoot.add(buildConstraintPanel(), INNER_CARD_CONSTRAINT);
+    // Default: show the normal play panel
+    innerCardLayout.show(innerCardRoot, INNER_CARD_MAIN);
+
+    border.add(innerCardRoot);
     return border;
+  }
+
+  /**
+   * Builds the "song cannot be played at this time" panel.
+   *
+   * <p>
+   * Layout mirrors the main panel dimensions so the card swap is seamless: same background, same
+   * rounded border managed by the outer border panel, same 900 × 420 preferred size. The OK button
+   * is produced by {@link #createCancelButton(String)} so it is visually identical to Cancel.
+   */
+  private JPanel buildConstraintPanel() {
+
+    JPanel panel = new JPanel(new BorderLayout(0, 0));
+    panel.setBackground(ColorTheme.get().bgOverlayCard);
+    panel.setBorder(BorderFactory.createEmptyBorder(24, 28, 20, 28));
+
+    // ── Icon row (top) ────────────────────────────────────────────────────
+    JLabel iconLabel = new JLabel("\u26A0", SwingConstants.CENTER); // ⚠ warning sign
+    iconLabel.setForeground(ColorTheme.get().accentGold);
+    iconLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 64));
+    iconLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+
+    // ── Message (centre) ─────────────────────────────────────────────────
+    JPanel messagePanel = new JPanel();
+    messagePanel.setOpaque(false);
+    messagePanel.setLayout(new BoxLayout(messagePanel, BoxLayout.Y_AXIS));
+
+    JLabel headingLabel = new JLabel("Song Unavailable", SwingConstants.CENTER);
+    headingLabel.setAlignmentX(CENTER_ALIGNMENT);
+    headingLabel.setForeground(ColorTheme.get().textPrimary);
+    headingLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
+
+    JLabel songNameLabel =
+        new JLabel(song.getSongName() != null ? "\u201C" + song.getSongName() + "\u201D" : "",
+            SwingConstants.CENTER);
+    songNameLabel.setAlignmentX(CENTER_ALIGNMENT);
+    songNameLabel.setForeground(ColorTheme.get().accentGold);
+    songNameLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+
+    JLabel bodyLabel = new JLabel(
+        "<html><div style='text-align:center;'>" + "This song cannot be played at this time.<br>"
+            + "Please try again later." + "</div></html>",
+        SwingConstants.CENTER);
+    bodyLabel.setAlignmentX(CENTER_ALIGNMENT);
+    bodyLabel.setForeground(ColorTheme.get().textSecondary);
+    bodyLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 18));
+
+    messagePanel.add(Box.createVerticalGlue());
+    messagePanel.add(headingLabel);
+    messagePanel.add(Box.createVerticalStrut(6));
+    messagePanel.add(songNameLabel);
+    messagePanel.add(Box.createVerticalStrut(14));
+    messagePanel.add(bodyLabel);
+    messagePanel.add(Box.createVerticalGlue());
+
+    // ── OK button (bottom) ───────────────────────────────────────────────
+    // createCancelButton() renders identically to the Cancel button; the
+    // action still calls dismiss() so the overlay is closed on tap.
+    JButton okButton = createCancelButton("OK");
+
+    JPanel okRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
+    okRow.setOpaque(false);
+    okRow.add(okButton);
+
+    // ── Timeout row ───────────────────────────────────────────────────────
+    // Re-use the shared timeout widgets so the countdown runs on the
+    // constraint panel exactly as it does on the main panel.
+    JComponent timeoutRow = buildTimeoutRow();
+
+    JPanel bottomSection = new JPanel(new BorderLayout(0, 8));
+    bottomSection.setOpaque(false);
+    bottomSection.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+    bottomSection.add(okRow, BorderLayout.CENTER);
+    bottomSection.add(timeoutRow, BorderLayout.SOUTH);
+
+    panel.add(iconLabel, BorderLayout.NORTH);
+    panel.add(messagePanel, BorderLayout.CENTER);
+    panel.add(bottomSection, BorderLayout.SOUTH);
+
+    return panel;
+  }
+
+  /**
+   * Flips the inner card to the song-constraint view. Safe to call before or after the component is
+   * added to the hierarchy.
+   */
+  public void showConstraintPanel() {
+    innerCardLayout.show(innerCardRoot, INNER_CARD_CONSTRAINT);
   }
 
   private JPanel buildMainPanel() {

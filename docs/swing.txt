@@ -650,9 +650,13 @@ DONE 35: Add ability to enable/disable screensaver and random background music.
 EnableHibernation=false
 HibernateBegin=3
 HibernateEnd=14
+
+- Need to render explicit albums with a red border and normal albums with a white border
  
- 
- 
+-- Add ASCAP/BMI/SESAC license info screen
+
+-- Move Up / Move Down on SongQueueCard is not working correctly
+  
 36: Move over the most relevant features from:
 
 PlayerVolume=75
@@ -704,4 +708,18 @@ RandomByCD=false
  
  
  
+   // HIBERNATION
+  private final boolean enableHibernation;
+  private final int hibernateBegin;
+  private final int hibernateEnd;  
+ 
+ 
+ 
+    this.enableScreenSaver = this.jukeANatorUserInterfaceProperties.isEnableScreenSaver();
+    
+    this.enableHibernation = this.jukeANatorUserInterfaceProperties.isEnableHibernation();
+    this.hibernateBegin = this.jukeANatorUserInterfaceProperties.getHibernateBegin();
+    this.hibernateEnd = this.jukeANatorUserInterfaceProperties.getHibernateEnd();  
+
+    initialize();
  
