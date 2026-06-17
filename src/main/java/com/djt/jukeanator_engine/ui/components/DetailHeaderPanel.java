@@ -23,7 +23,7 @@ public class DetailHeaderPanel extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
-  private static final Color COLOR_BORDER = new Color(60, 60, 80);
+  // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -40,7 +40,7 @@ public class DetailHeaderPanel extends JPanel {
     setOpaque(false);
 
     setBorder(BorderFactory.createCompoundBorder(
-        BorderFactory.createMatteBorder(0, 0, 1, 0, COLOR_BORDER),
+        BorderFactory.createMatteBorder(0, 0, 1, 0, ColorTheme.get().detailHeaderBorder),
         new EmptyBorder(12, 16, 12, 16)));
 
     //
@@ -62,8 +62,8 @@ public class DetailHeaderPanel extends JPanel {
     imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
     imageLabel.setVerticalAlignment(SwingConstants.CENTER);
     imageLabel.setOpaque(true);
-    imageLabel.setBackground(new Color(20, 20, 32));
-    imageLabel.setBorder(BorderFactory.createLineBorder(COLOR_BORDER, 1));
+    imageLabel.setBackground(ColorTheme.get().detailHeaderImageBg);
+    imageLabel.setBorder(BorderFactory.createLineBorder(ColorTheme.get().detailHeaderBorder, 1));
 
     if (image != null) {
 
@@ -72,7 +72,7 @@ public class DetailHeaderPanel extends JPanel {
     } else {
 
       imageLabel.setText(fallbackText);
-      imageLabel.setForeground(new Color(100, 100, 120));
+      imageLabel.setForeground(ColorTheme.get().detailHeaderImageFg);
       imageLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32));
     }
 
@@ -114,12 +114,6 @@ public class DetailHeaderPanel extends JPanel {
 
   private JButton createBackButton(String text) {
 
-    // Idle and hover fill colours mirror the sort button's active gradient
-    final Color GRAD_TOP = new Color(0, 160, 210);
-    final Color GRAD_BOTTOM = new Color(0, 80, 130);
-    final Color HOVER_TOP = new Color(0, 190, 240);
-    final Color HOVER_BOTTOM = new Color(0, 100, 160);
-
     JButton button = new JButton(text) {
 
       private static final long serialVersionUID = 1L;
@@ -148,8 +142,9 @@ public class DetailHeaderPanel extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         // Gradient fill — brighter on hover
-        Color top = hovered ? HOVER_TOP : GRAD_TOP;
-        Color bottom = hovered ? HOVER_BOTTOM : GRAD_BOTTOM;
+        Color top = hovered ? ColorTheme.get().navBtnHoverTop : ColorTheme.get().navBtnGradTop;
+        Color bottom =
+            hovered ? ColorTheme.get().navBtnHoverBottom : ColorTheme.get().navBtnGradBottom;
         g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
         g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
 
@@ -164,7 +159,7 @@ public class DetailHeaderPanel extends JPanel {
     };
 
     button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
-    button.setForeground(Color.WHITE);
+    button.setForeground(ColorTheme.get().textPrimary);
     button.setContentAreaFilled(false);
     button.setBorderPainted(false);
     button.setFocusPainted(false);
@@ -181,11 +176,11 @@ public class DetailHeaderPanel extends JPanel {
     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
     // Frosted-glass backing plate matching GenrePanel genre tile resting state
-    g2.setColor(new Color(255, 255, 255, 15));
+    g2.setColor(ColorTheme.get().bgFrostedGlassRest);
     g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
 
     // Subtle perimeter highlight ring
-    g2.setColor(new Color(255, 255, 255, 35));
+    g2.setColor(ColorTheme.get().bgFrostedGlassRing);
     g2.setStroke(new java.awt.BasicStroke(1.0f));
     g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
 

@@ -491,6 +491,125 @@ public final class ColorTheme {
    */
   public final Color trackNavDisabledTint = new Color(255, 255, 255, 40);
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DETAIL HEADER PANEL PALETTE (DetailHeaderPanel)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Matte border line drawn below DetailHeaderPanel and used as the idle/rest border on sort
+   * buttons in GenreDetailPanel. Origin: DetailHeaderPanel COLOR_BORDER; GenreDetailPanel
+   * SORT_BTN_BORDER_IDLE
+   */
+  public final Color detailHeaderBorder = new Color(60, 60, 80);
+
+  /**
+   * Background fill of the image/icon label inside DetailHeaderPanel when no image has been loaded
+   * yet. Origin: DetailHeaderPanel — imageLabel.setBackground
+   */
+  public final Color detailHeaderImageBg = new Color(20, 20, 32);
+
+  /**
+   * Foreground color of the fallback text label shown inside the image slot of DetailHeaderPanel
+   * when no icon is available. Origin: DetailHeaderPanel — imageLabel.setForeground (fallback
+   * branch)
+   */
+  public final Color detailHeaderFallbackFg = new Color(100, 100, 120);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SORT BUTTON PALETTE (GenreDetailPanel)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EDIT ALBUM CARD PALETTE (EditAlbumCard)
+  // Colors used exclusively by the admin-facing album metadata editing overlay.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Main panel background — darkest layer of the edit card. Origin: EditAlbumCard BG_DARK
+   */
+  public final Color editAlbumBgDark = new Color(26, 26, 36);
+
+  /**
+   * Left / right sub-panel background — slightly lighter than the main bg. Origin: EditAlbumCard
+   * CARD_BG
+   */
+  public final Color editAlbumCardBg = new Color(36, 36, 50);
+
+  /**
+   * Primary label / form text color inside the edit card. Origin: EditAlbumCard TEXT_LIGHT
+   */
+  public final Color editAlbumTextLight = new Color(230, 230, 240);
+
+  /**
+   * Accent blue used for button borders and titled-border outlines inside the edit card. NOTE:
+   * intentionally different from the main UI accentBlue (0,210,255) — this is a softer, more muted
+   * blue suited to the dense admin form layout. Origin: EditAlbumCard ACCENT_BLUE = new Color(52,
+   * 152, 219)
+   */
+  public final Color editAlbumAccentBlue = new Color(52, 152, 219);
+
+  /**
+   * Top color of the styled button gradient inside the edit card (idle state). Origin:
+   * EditAlbumCard GRAD_TOP
+   */
+  public final Color editAlbumGradTop = new Color(44, 62, 80);
+
+  /**
+   * Bottom color of the styled button gradient inside the edit card (idle state). Origin:
+   * EditAlbumCard GRAD_BOTTOM
+   */
+  public final Color editAlbumGradBottom = new Color(22, 32, 43);
+
+  /**
+   * Semi-transparent black overlay painted by EditAlbumCard over the underlying tab content to
+   * produce a modal-dimming effect. Origin: EditAlbumCard paintComponent — new Color(0, 0, 0, 160)
+   */
+  public final Color editAlbumModalDim = new Color(0, 0, 0, 160);
+
+  /**
+   * Status banner color — informational message. Origin: EditAlbumCard STATUS_INFO
+   */
+  public final Color editAlbumStatusInfo = new Color(120, 200, 255);
+
+  /**
+   * Status banner color — warning message. Origin: EditAlbumCard STATUS_WARN
+   */
+  public final Color editAlbumStatusWarn = new Color(255, 190, 60);
+
+  /**
+   * Status banner color — error message. Origin: EditAlbumCard STATUS_ERROR
+   */
+  public final Color editAlbumStatusError = new Color(230, 90, 90);
+
+  /**
+   * Status banner color — success message. Origin: EditAlbumCard STATUS_SUCCESS
+   */
+  public final Color editAlbumStatusSuccess = new Color(110, 220, 130);
+
+  /**
+   * Border color of text fields inside the edit card (maps to Color.GRAY). Origin: EditAlbumCard
+   * setupTextField — createLineBorder(Color.GRAY, 1)
+   */
+  public final Color editAlbumFieldBorder = Color.GRAY;
+
+  /**
+   * Foreground of the "No search performed" / result count label (maps to Color.LIGHT_GRAY).
+   * Origin: EditAlbumCard lblSearchStatus.setForeground(Color.LIGHT_GRAY)
+   */
+  public final Color editAlbumSearchStatusFg = Color.LIGHT_GRAY;
+
+  /**
+   * Border stroke color of a disabled styled button (maps to Color.DARK_GRAY). Origin:
+   * EditAlbumCard createStyledButton paintComponent — disabled branch border
+   */
+  public final Color editAlbumBtnDisabledBorder = Color.DARK_GRAY;
+
+  /**
+   * Text color of a disabled styled button (maps to Color.GRAY). Origin: EditAlbumCard
+   * createStyledButton paintComponent — disabled branch text
+   */
+  public final Color editAlbumBtnDisabledText = Color.GRAY;
+
   /** DetailHeaderPanel image placeholder background. */
   public final Color headerImagePlaceholderBg = new Color(20, 20, 32);
 
@@ -551,4 +670,16 @@ public final class ColorTheme {
    * JukeboxTabComponent("QUEUE", ...)
    */
   public final Color frameTabAccentQueue = new Color(140, 255, 140);
+
+  /**
+   * Foreground of the fallback text label in DetailHeaderPanel when no image is loaded. Origin:
+   * DetailHeaderPanel — imageLabel.setForeground (fallback text)
+   */
+  public final Color detailHeaderImageFg = new Color(100, 100, 120);
+  
+  /**
+   * Gray border used on cover art preview labels in EditAlbumCard.
+   * Origin: EditAlbumCard — lblCurrentCoverArt and lblCoverArtCanvas BorderFactory.createLineBorder(Color.GRAY)
+   */
+  public final Color editAlbumBorderGray = Color.GRAY;  
 }

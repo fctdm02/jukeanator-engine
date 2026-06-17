@@ -51,13 +51,7 @@ public class EditAlbumCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
-  // ── Palette ───────────────────────────────────────────────────────────────
-  private static final Color BG_DARK = new Color(26, 26, 36);
-  private static final Color CARD_BG = new Color(36, 36, 50);
-  private static final Color TEXT_LIGHT = new Color(230, 230, 240);
-  private static final Color ACCENT_BLUE = new Color(52, 152, 219);
-  private static final Color GRAD_TOP = new Color(44, 62, 80);
-  private static final Color GRAD_BOTTOM = new Color(22, 32, 43);
+  // ── Palette — sourced from ColorTheme.get() ──────────────────────────────
 
   private final SongLibraryService songLibraryService;
   private List<AlbumDto> invalidAlbumsList;
@@ -103,10 +97,6 @@ public class EditAlbumCard extends JPanel {
 
   // Inline status banner (replaces JOptionPane popups)
   private JLabel lblGlobalStatus;
-  private static final Color STATUS_INFO = new Color(120, 200, 255);
-  private static final Color STATUS_WARN = new Color(255, 190, 60);
-  private static final Color STATUS_ERROR = new Color(230, 90, 90);
-  private static final Color STATUS_SUCCESS = new Color(110, 220, 130);
 
   // Called when the Cancel button is pressed — pops back to the AdminPanel.
   private final Runnable onDismiss;
@@ -143,14 +133,14 @@ public class EditAlbumCard extends JPanel {
     } else {
       this.currentAlbumIndex = -1;
     }
-    setStatus(null, STATUS_INFO);
+    setStatus(null, ColorTheme.get().editAlbumStatusInfo);
     populateAlbumData();
   }
 
   @Override
   protected void paintComponent(Graphics g) {
     // Dim the underlying tab content so this overlay reads as modal
-    g.setColor(new Color(0, 0, 0, 160));
+    g.setColor(ColorTheme.get().editAlbumModalDim);
     g.fillRect(0, 0, getWidth(), getHeight());
     super.paintComponent(g);
   }
@@ -181,7 +171,7 @@ public class EditAlbumCard extends JPanel {
 
   private void initLayout() {
     JPanel mainPanel = new JPanel(new BorderLayout());
-    mainPanel.setBackground(BG_DARK);
+    mainPanel.setBackground(ColorTheme.get().editAlbumBgDark);
     mainPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
 
     // 1. Header & Album Master Navigation Block
@@ -191,7 +181,7 @@ public class EditAlbumCard extends JPanel {
 
     lblTopHeader = new JLabel("Editing Album Metadata", SwingConstants.CENTER);
     lblTopHeader.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
-    lblTopHeader.setForeground(TEXT_LIGHT);
+    lblTopHeader.setForeground(ColorTheme.get().editAlbumTextLight);
     topContainer.add(lblTopHeader, BorderLayout.CENTER);
 
     JPanel albumNavPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
@@ -213,9 +203,10 @@ public class EditAlbumCard extends JPanel {
     // ==========================================
     JPanel leftPanel = new JPanel();
     leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
-    leftPanel.setBackground(CARD_BG);
+    leftPanel.setBackground(ColorTheme.get().editAlbumCardBg);
     leftPanel.setBorder(BorderFactory.createTitledBorder(
-        BorderFactory.createLineBorder(ACCENT_BLUE), "Current Properties", 0, 0, null, TEXT_LIGHT));
+        BorderFactory.createLineBorder(ColorTheme.get().editAlbumAccentBlue), "Current Properties",
+        0, 0, null, ColorTheme.get().editAlbumTextLight));
 
     // Symmetric alignment offset padding
     leftPanel.add(Box.createVerticalStrut(51));
@@ -226,8 +217,9 @@ public class EditAlbumCard extends JPanel {
     lblCurrentCoverArt.setMinimumSize(new Dimension(250, 250));
     lblCurrentCoverArt.setMaximumSize(new Dimension(250, 250));
     lblCurrentCoverArt.setHorizontalAlignment(SwingConstants.CENTER);
-    lblCurrentCoverArt.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
-    lblCurrentCoverArt.setBackground(Color.BLACK);
+    lblCurrentCoverArt
+        .setBorder(BorderFactory.createLineBorder(ColorTheme.get().editAlbumBorderGray, 1));
+    lblCurrentCoverArt.setBackground(ColorTheme.get().bgFieldDark);
     lblCurrentCoverArt.setOpaque(true);
     lblCurrentCoverArt.setAlignmentX(CENTER_ALIGNMENT);
     leftPanel.add(lblCurrentCoverArt);
@@ -276,9 +268,10 @@ public class EditAlbumCard extends JPanel {
     // RIGHT PANEL: INTERNET SEARCH ENGINE (Editable)
     // ==========================================
     JPanel rightPanel = new JPanel(new BorderLayout(5, 5));
-    rightPanel.setBackground(CARD_BG);
+    rightPanel.setBackground(ColorTheme.get().editAlbumCardBg);
     rightPanel.setBorder(BorderFactory.createTitledBorder(
-        BorderFactory.createLineBorder(ACCENT_BLUE), "Internet Search", 0, 0, null, TEXT_LIGHT));
+        BorderFactory.createLineBorder(ColorTheme.get().editAlbumAccentBlue), "Internet Search", 0,
+        0, null, ColorTheme.get().editAlbumTextLight));
 
     // Input row parameters
     JPanel searchInputsPanel = new JPanel(new GridBagLayout());
@@ -326,8 +319,9 @@ public class EditAlbumCard extends JPanel {
     lblCoverArtCanvas.setMinimumSize(new Dimension(250, 250));
     lblCoverArtCanvas.setMaximumSize(new Dimension(250, 250));
     lblCoverArtCanvas.setHorizontalAlignment(SwingConstants.CENTER);
-    lblCoverArtCanvas.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
-    lblCoverArtCanvas.setBackground(Color.BLACK);
+    lblCoverArtCanvas
+        .setBorder(BorderFactory.createLineBorder(ColorTheme.get().editAlbumBorderGray, 1));
+    lblCoverArtCanvas.setBackground(ColorTheme.get().bgFieldDark);
     lblCoverArtCanvas.setOpaque(true);
     lblCoverArtCanvas.setAlignmentX(CENTER_ALIGNMENT);
     rightCenterContainer.add(lblCoverArtCanvas);
@@ -445,7 +439,7 @@ public class EditAlbumCard extends JPanel {
     btnNextResult = createStyledButton("Next Result >", e -> navigateSearchResult(1));
 
     lblSearchStatus = new JLabel("No search performed", SwingConstants.CENTER);
-    lblSearchStatus.setForeground(Color.LIGHT_GRAY);
+    lblSearchStatus.setForeground(ColorTheme.get().editAlbumSearchStatusFg);
     lblSearchStatus.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
 
     searchControlPanel.add(btnPrevResult);
@@ -479,7 +473,7 @@ public class EditAlbumCard extends JPanel {
 
     lblGlobalStatus = new JLabel(" ", SwingConstants.CENTER);
     lblGlobalStatus.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
-    lblGlobalStatus.setForeground(STATUS_INFO);
+    lblGlobalStatus.setForeground(ColorTheme.get().editAlbumStatusInfo);
 
     footerOuter.add(footerPanel, BorderLayout.CENTER);
     footerOuter.add(lblGlobalStatus, BorderLayout.SOUTH);
@@ -637,11 +631,12 @@ public class EditAlbumCard extends JPanel {
     String albumQuery = tfSearchAlbum.getText().trim();
 
     if (artistQuery.isEmpty() || albumQuery.isEmpty()) {
-      setStatus("Artist and Album text fields are required fields to query.", STATUS_WARN);
+      setStatus("Artist and Album text fields are required fields to query.",
+          ColorTheme.get().editAlbumStatusWarn);
       return;
     }
 
-    setStatus(null, STATUS_INFO);
+    setStatus(null, ColorTheme.get().editAlbumStatusInfo);
     lblSearchStatus.setText("Searching...");
 
     new Thread(() -> {
@@ -656,14 +651,15 @@ public class EditAlbumCard extends JPanel {
             this.currentResultIndex = 0;
           } else {
             this.currentResultIndex = -1;
-            setStatus("No matches found on the web.", STATUS_INFO);
+            setStatus("No matches found on the web.", ColorTheme.get().editAlbumStatusInfo);
           }
           updateSearchResultUI();
         });
       } catch (Exception ex) {
         SwingUtilities.invokeLater(() -> {
           lblSearchStatus.setText("Search failed.");
-          setStatus("Error executing lookup: " + ex.getMessage(), STATUS_ERROR);
+          setStatus("Error executing lookup: " + ex.getMessage(),
+              ColorTheme.get().editAlbumStatusError);
         });
       }
     }).start();
@@ -688,10 +684,11 @@ public class EditAlbumCard extends JPanel {
       String messageDetails = String.format("Updated — Year: %s | Label: %s | Explicit: %b",
           updatedYear, updatedLabel, updatedExplicit);
 
-      setStatus(messageDetails, STATUS_SUCCESS);
+      setStatus(messageDetails, ColorTheme.get().editAlbumStatusSuccess);
 
     } catch (Exception e) {
-      setStatus("Failed updating record metadata: " + e.getMessage(), STATUS_ERROR);
+      setStatus("Failed updating record metadata: " + e.getMessage(),
+          ColorTheme.get().editAlbumStatusError);
     }
   }
 
@@ -705,7 +702,7 @@ public class EditAlbumCard extends JPanel {
     String liveArtUrlStr = tfCoverArtUrl.getText().trim();
     if (liveArtUrlStr.isEmpty()) {
       setStatus("No Cover Art URL specified. Enter or paste a URL in the Cover Art URL field.",
-          STATUS_WARN);
+          ColorTheme.get().editAlbumStatusWarn);
       return;
     }
 
@@ -717,10 +714,12 @@ public class EditAlbumCard extends JPanel {
 
       songLibraryService.downloadAlbumCoverArt(downloadAlbumCoverArtRequest);
 
-      setStatus("Cover art download requested via: " + liveArtUrlStr, STATUS_SUCCESS);
+      setStatus("Cover art download requested via: " + liveArtUrlStr,
+          ColorTheme.get().editAlbumStatusSuccess);
 
     } catch (Exception e) {
-      setStatus("Failed downloading art asset payload: " + e.getMessage(), STATUS_ERROR);
+      setStatus("Failed downloading art asset payload: " + e.getMessage(),
+          ColorTheme.get().editAlbumStatusError);
     }
   }
 
@@ -730,7 +729,8 @@ public class EditAlbumCard extends JPanel {
     String albumQuery = tfSearchAlbum.getText().trim();
 
     if (artistQuery.isEmpty() && albumQuery.isEmpty()) {
-      setStatus("Enter an Artist and/or Album name before opening Google.", STATUS_WARN);
+      setStatus("Enter an Artist and/or Album name before opening Google.",
+          ColorTheme.get().editAlbumStatusWarn);
       return;
     }
 
@@ -742,27 +742,29 @@ public class EditAlbumCard extends JPanel {
 
       if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
         Desktop.getDesktop().browse(googleUri);
-        setStatus("Opened Google search for: " + searchTerms, STATUS_INFO);
+        setStatus("Opened Google search for: " + searchTerms, ColorTheme.get().editAlbumStatusInfo);
       } else {
-        setStatus("System browser launch is not supported on this platform.", STATUS_WARN);
+        setStatus("System browser launch is not supported on this platform.",
+            ColorTheme.get().editAlbumStatusWarn);
       }
 
     } catch (Exception ex) {
-      setStatus("Failed to open browser: " + ex.getMessage(), STATUS_ERROR);
+      setStatus("Failed to open browser: " + ex.getMessage(),
+          ColorTheme.get().editAlbumStatusError);
     }
   }
 
   private void doBrowseCoverArt() {
 
     if (currentAlbum == null) {
-      setStatus("No album selected.", STATUS_WARN);
+      setStatus("No album selected.", ColorTheme.get().editAlbumStatusWarn);
       return;
     }
 
     String coverArtPath = currentAlbum.getCoverArtPath();
     if (coverArtPath == null || coverArtPath.isBlank()) {
       setStatus("Current album has no cover art path defined — cannot write cover.jpg.",
-          STATUS_WARN);
+          ColorTheme.get().editAlbumStatusWarn);
       return;
     }
 
@@ -783,8 +785,8 @@ public class EditAlbumCard extends JPanel {
 
         BufferedImage sourceImage = ImageIO.read(selectedFile);
         if (sourceImage == null) {
-          SwingUtilities
-              .invokeLater(() -> setStatus("Could not read selected image file.", STATUS_ERROR));
+          SwingUtilities.invokeLater(() -> setStatus("Could not read selected image file.",
+              ColorTheme.get().editAlbumStatusError));
           return;
         }
 
@@ -809,12 +811,13 @@ public class EditAlbumCard extends JPanel {
         SwingUtilities.invokeLater(() -> {
           lblCurrentCoverArt.setIcon(icon);
           lblCurrentCoverArt.setText("");
-          setStatus("Cover art saved to: " + destFile.getAbsolutePath(), STATUS_SUCCESS);
+          setStatus("Cover art saved to: " + destFile.getAbsolutePath(),
+              ColorTheme.get().editAlbumStatusSuccess);
         });
 
       } catch (Exception ex) {
-        SwingUtilities.invokeLater(
-            () -> setStatus("Failed writing cover art: " + ex.getMessage(), STATUS_ERROR));
+        SwingUtilities.invokeLater(() -> setStatus("Failed writing cover art: " + ex.getMessage(),
+            ColorTheme.get().editAlbumStatusError));
       }
     }).start();
   }
@@ -822,22 +825,23 @@ public class EditAlbumCard extends JPanel {
   // ── Helper UI Styling Methods ──────────────────────────────────────────────
   private JLabel createLabel(String text) {
     JLabel lbl = new JLabel(text);
-    lbl.setForeground(TEXT_LIGHT);
+    lbl.setForeground(ColorTheme.get().editAlbumTextLight);
     lbl.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
     return lbl;
   }
 
   private void setupTextField(JTextField tf) {
-    tf.setBackground(BG_DARK);
-    tf.setForeground(Color.WHITE);
-    tf.setCaretColor(Color.WHITE);
-    tf.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Color.GRAY, 1),
+    tf.setBackground(ColorTheme.get().editAlbumBgDark);
+    tf.setForeground(ColorTheme.get().textPrimary);
+    tf.setCaretColor(ColorTheme.get().textPrimary);
+    tf.setBorder(BorderFactory.createCompoundBorder(
+        BorderFactory.createLineBorder(ColorTheme.get().editAlbumBorderGray, 1),
         BorderFactory.createEmptyBorder(4, 4, 4, 4)));
   }
 
   private void setupCheckBox(JCheckBox cb) {
     cb.setOpaque(false);
-    cb.setForeground(TEXT_LIGHT);
+    cb.setForeground(ColorTheme.get().editAlbumTextLight);
     cb.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
   }
 
@@ -866,12 +870,12 @@ public class EditAlbumCard extends JPanel {
         int w = getWidth(), h = getHeight();
 
         if (!isEnabled()) {
-          g2.setColor(CARD_BG.brighter());
+          g2.setColor(ColorTheme.get().editAlbumCardBg.brighter());
           g2.fillRoundRect(0, 0, w, h, 8, 8);
-          g2.setColor(Color.DARK_GRAY);
+          g2.setColor(ColorTheme.get().editAlbumBtnDisabledBorder);
           g2.drawRoundRect(1, 1, w - 3, h - 3, 8, 8);
           g2.setFont(getFont());
-          g2.setColor(Color.GRAY);
+          g2.setColor(ColorTheme.get().editAlbumBorderGray);
           java.awt.FontMetrics fm = g2.getFontMetrics();
           g2.drawString(getText(), (w - fm.stringWidth(getText())) / 2,
               (h - fm.getHeight()) / 2 + fm.getAscent());
@@ -879,15 +883,17 @@ public class EditAlbumCard extends JPanel {
           return;
         }
 
-        Color top = hovered ? GRAD_TOP.brighter() : GRAD_TOP;
-        Color bot = hovered ? GRAD_BOTTOM.brighter() : GRAD_BOTTOM;
+        Color top = hovered ? ColorTheme.get().editAlbumGradTop.brighter()
+            : ColorTheme.get().editAlbumGradTop;
+        Color bot = hovered ? ColorTheme.get().editAlbumGradBottom.brighter()
+            : ColorTheme.get().editAlbumGradBottom;
         g2.setPaint(new GradientPaint(0, 0, top, 0, h, bot));
         g2.fillRoundRect(0, 0, w, h, 8, 8);
-        g2.setColor(ACCENT_BLUE);
+        g2.setColor(ColorTheme.get().editAlbumAccentBlue);
         g2.setStroke(new java.awt.BasicStroke(1.2f));
         g2.drawRoundRect(1, 1, w - 3, h - 3, 8, 8);
         g2.setFont(getFont());
-        g2.setColor(Color.WHITE);
+        g2.setColor(ColorTheme.get().textPrimary);
         java.awt.FontMetrics fm = g2.getFontMetrics();
         g2.drawString(getText(), (w - fm.stringWidth(getText())) / 2,
             (h - fm.getHeight()) / 2 + fm.getAscent());
@@ -895,7 +901,7 @@ public class EditAlbumCard extends JPanel {
       }
     };
     btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
-    btn.setForeground(Color.WHITE);
+    btn.setForeground(ColorTheme.get().textPrimary);
     btn.setContentAreaFilled(false);
     btn.setBorderPainted(false);
     btn.setFocusPainted(false);

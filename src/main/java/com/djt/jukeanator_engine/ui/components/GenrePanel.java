@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
-import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -36,9 +35,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
   private static final long serialVersionUID = 1L;
 
-  // ── Palette ───────────────────────────────────────────────────────────────
-  private static final Color ACCENT_BLUE = new Color(0, 210, 255);
-  private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
+  // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
 
 
   // ── Grid layout ───────────────────────────────────────────────────────────
@@ -271,7 +268,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     nextBtn.setVisible(currentPage < totalPages - 1);
 
     JLabel pageLabel = new JLabel((currentPage + 1) + " / " + totalPages, SwingConstants.CENTER);
-    pageLabel.setForeground(TEXT_SECONDARY);
+    pageLabel.setForeground(ColorTheme.get().textSecondary);
     pageLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
 
     // Use a wrapper with a phantom button on each side so the label stays
@@ -336,19 +333,19 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
         // Match SearchPanel Hero: Frosted glass backing plate translucent metrics
         if (isHovered) {
-          g2.setColor(new Color(255, 255, 255, 30)); // Brightened backdrop glow
+          g2.setColor(ColorTheme.get().bgFrostedGlassHover); // Brightened backdrop glow
         } else {
-          g2.setColor(new Color(255, 255, 255, 15)); // Soft resting backdrop mesh
+          g2.setColor(ColorTheme.get().bgFrostedGlassRest); // Soft resting backdrop mesh
         }
         g2.fillRoundRect(0, 0, w, h, 16, 16);
 
         // Match SearchPanel Hero: Perimeter highlight rings
         if (isHovered) {
-          g2.setColor(ACCENT_BLUE);
+          g2.setColor(ColorTheme.get().accentBlue);
           g2.setStroke(new java.awt.BasicStroke(2.0f));
           g2.drawRoundRect(1, 1, w - 2, h - 2, 16, 16);
         } else {
-          g2.setColor(new Color(255, 255, 255, 35));
+          g2.setColor(ColorTheme.get().bgFrostedGlassRing);
           g2.setStroke(new java.awt.BasicStroke(1.0f));
           g2.drawRoundRect(0, 0, w - 1, h - 1, 16, 16);
         }
@@ -391,7 +388,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     }
 
     JLabel textLabel = new JLabel(name.toUpperCase(), SwingConstants.CENTER);
-    textLabel.setForeground(Color.WHITE);
+    textLabel.setForeground(ColorTheme.get().textPrimary);
     textLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 24));
     textLabel.setBorder(new EmptyBorder(10, 0, 10, 0));
     textLabel.setOpaque(false);

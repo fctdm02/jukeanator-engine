@@ -1,7 +1,6 @@
 package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -34,14 +33,7 @@ public class GenreDetailPanel extends JPanel {
     POPULARITY, TITLE, RELEASE_DATE
   }
 
-  // ── Sort-button palette ───────────────────────────────────────────────────
-  private static final Color SORT_BTN_ACTIVE_TOP = new Color(0, 160, 210);
-  private static final Color SORT_BTN_ACTIVE_BOTTOM = new Color(0, 80, 130);
-  private static final Color SORT_BTN_IDLE_BG = new Color(28, 28, 42);
-  private static final Color SORT_BTN_BORDER_ACTIVE = new Color(0, 210, 255);
-  private static final Color SORT_BTN_BORDER_IDLE = new Color(60, 60, 80);
-  private static final Color SORT_TEXT_ACTIVE = Color.WHITE;
-  private static final Color SORT_TEXT_IDLE = new Color(160, 165, 180);
+  // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
 
   // ── Preview row count (matches HotHerePanel) ──────────────────────────────
   // Number of result rows visible at one time in each column.
@@ -177,15 +169,15 @@ public class GenreDetailPanel extends JPanel {
 
         if (active) {
           // Blue gradient fill matching the column panel gradient accent
-          g2.setPaint(
-              new GradientPaint(0, 0, SORT_BTN_ACTIVE_TOP, 0, getHeight(), SORT_BTN_ACTIVE_BOTTOM));
+          g2.setPaint(new GradientPaint(0, 0, ColorTheme.get().navBtnGradTop, 0, getHeight(),
+              ColorTheme.get().navBtnGradBottom));
         } else {
-          g2.setColor(SORT_BTN_IDLE_BG);
+          g2.setColor(ColorTheme.get().sortBtnIdleBg);
         }
         g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
 
         // Border
-        g2.setColor(active ? SORT_BTN_BORDER_ACTIVE : SORT_BTN_BORDER_IDLE);
+        g2.setColor(active ? ColorTheme.get().accentBlue : ColorTheme.get().detailHeaderBorder);
         g2.setStroke(new java.awt.BasicStroke(active ? 1.5f : 1.0f));
         g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
 
@@ -195,7 +187,8 @@ public class GenreDetailPanel extends JPanel {
     };
 
     btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
-    btn.setForeground(currentSort == mode ? SORT_TEXT_ACTIVE : SORT_TEXT_IDLE);
+    btn.setForeground(
+        currentSort == mode ? ColorTheme.get().textPrimary : ColorTheme.get().textMuted);
     btn.setContentAreaFilled(false);
     btn.setBorderPainted(false);
     btn.setFocusPainted(false);
@@ -248,7 +241,7 @@ public class GenreDetailPanel extends JPanel {
     // Refresh active-state colours on the three toggle buttons
     for (JButton btn : new JButton[] {btnPopularity, btnTitle, btnReleaseDate}) {
       if (btn != null) {
-        btn.setForeground(SORT_TEXT_IDLE);
+        btn.setForeground(ColorTheme.get().textMuted);
         btn.repaint();
       }
     }
@@ -258,7 +251,7 @@ public class GenreDetailPanel extends JPanel {
       case RELEASE_DATE -> btnReleaseDate;
     };
     if (activeBtn != null) {
-      activeBtn.setForeground(SORT_TEXT_ACTIVE);
+      activeBtn.setForeground(ColorTheme.get().textPrimary);
       activeBtn.repaint();
     }
 

@@ -46,7 +46,7 @@ user:
   
 user-interface:
   enabled: false   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
-  enable-screen-saver: true
+  enable-screen-saver: false
   #
   # CREDIT CONFIGURATION
   #
