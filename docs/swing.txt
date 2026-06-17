@@ -485,7 +485,7 @@ c. If allowExplicitSongsAtAllTimes=true, then disregard this property for eligib
 song to be eligible if the current Instant is between allowExplicitSongsBegin and allowExplicitSongsEnd.  Both properties integers that represent the hour of the
 day in 24 hour format.  For example, 21, represents 9:00PM and 5 represents 5:00AM for the next day.  So, if an explicit song is attempted to be queued
 between 5:00AM and 9:00PM (exclusive) on the same day, then return false.  Likewise, if an explicit song is queued betweem 9:00PM and 5:00AM the next day (inclusive)
-then the song is eligibile.
+then the song is eligible.
 
 
 Item #2: When dequeueNextSong() is invoked to remove a song from the queue (to be played by the SongPlayerService), then if enableBackgroundMusic is true, 
@@ -513,6 +513,40 @@ being called by the SongPlayerService.
 
 For this Java 21 Spring Boot project, add getVolume() and setVolume() to the Player interface and implement them in VlcMediaPlayer and VideoVlcMediaPlayer.  
 NOTE: This application is meant to run on either Windows, Linux Mint or MacOSX, so whatever solution should be portable and limited to the usage of the VLCJ library
+
+
+
+
+
+OVERVIEW:
+Given the following about SongQueueServiceImpl:
+Item #1: In SongQueueServiceImpl, implement the method boolean isSongEligibleForQueue(Integer albumId, Integer songId, Integer priority) as follows:
+
+a. When a SongQueueEntryEntity is created, it has a property called "queuedAtTime" that is an instance of Instant and represents the time when the song
+was queued.  If an incoming song, identified by albumId and songId when isSongEligibleForQueue() is invoked at time Instant.now(), if the time 
+between the existing song's (in the queue) queuedAtTime and Instant.now() is less than minimumMinutesBetweenSongPlays, which is in Minutes, then return false
+
+b. Keep track of the artist names for songs are queued, in what sequence when they are queued and when they are queued.  Return false if the incoming song
+has an artist, which can be retrieved by calling getArtistName() on SongFileEntity, that, when added at the given priority, will result in the number of songs
+with the same artist being greater than maximumConsecutiveSongPlaysByArtist.  Maintain this this data structure when this method is invoked for any entries greater
+than 2 hours old.
+
+c. If allowExplicitSongsAtAllTimes=true, then disregard this property for eligibility.  Otherwise, when allowExplicitSongsAtAllTimes=false, then only allow the
+song to be eligible if the current Instant is between allowExplicitSongsBegin and allowExplicitSongsEnd.  Both properties integers that represent the hour of the
+day in 24 hour format.  For example, 21, represents 9:00PM and 5 represents 5:00AM for the next day.  So, if an explicit song is attempted to be queued
+between 5:00AM and 9:00PM (exclusive) on the same day, then return false.  Likewise, if an explicit song is queued betweem 9:00PM and 5:00AM the next day (inclusive)
+then the song is eligible.
+
+REQUIREMENTS:
+Prior to showing AddSongToQueueCard, in JukeANatorFrame.showAddSongToQueueCard(), a call to SongQueueService should be made for this method:
+     boolean isSongEligibleForQueue(Integer albumId, Integer songId, Integer priority);
+     
+If the given song that the user wants to play is ineligible, then present the user with a new Song Constraint Panel that the given song cannot be played at this time and
+to try again later.  This song constraint panel should draw onto the AddSongToQueueCard itself (maybe have a card layout that switches to this constraint panel for this
+condition.  The user is then presented with an OK button, rendered the same as the Cancel button, that dismisses the dialog)
+
+
+     
 
 
 
@@ -601,7 +635,7 @@ DONE 35: Add ability to enable/disable screensaver and random background music.
 
 - Change cost on SongQueueCard to be double what it is now
 
-- Change Song Queue to render song name by priority (0: gray, 1: white, 2: yellow, 3: orange, 4: red, 5+, purple
+- Change Song Queue to render song name by priority (0: gray, 1: white, 2: yellow, 3: orange, 4: red, 5+, purple)
 
 - On Startup, do not flip to a letter button if there aren't enough albums to fill up the number of album tiles for the screen
 
@@ -611,6 +645,13 @@ DONE 35: Add ability to enable/disable screensaver and random background music.
     + deal with exception handling
     
 - For Song Queue methods that add to the queue, create checked exception if an ineligible song was passed in    
+ 
+ - Implement hibernation with the following properties:
+EnableHibernation=false
+HibernateBegin=3
+HibernateEnd=14
+ 
+ 
  
 36: Move over the most relevant features from:
 

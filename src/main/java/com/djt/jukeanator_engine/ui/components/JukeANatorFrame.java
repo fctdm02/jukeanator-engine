@@ -159,7 +159,14 @@ public class JukeANatorFrame extends JFrame {
   private final int screenHeight = screenSize.height;
   private final boolean enableScreenSaver;
   private ScreenSaverWindow screenSaverWindow;
+  
+  
+  // HIBERNATION
+  private final boolean enableHibernation;
+  private final int hibernateBegin;
+  private final int hibernateEnd;  
 
+  
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
@@ -186,6 +193,10 @@ public class JukeANatorFrame extends JFrame {
         tenDollarBonusCredits);
 
     this.enableScreenSaver = this.jukeANatorUserInterfaceProperties.isEnableScreenSaver();
+    
+    this.enableHibernation = this.jukeANatorUserInterfaceProperties.isEnableHibernation();
+    this.hibernateBegin = this.jukeANatorUserInterfaceProperties.getHibernateBegin();
+    this.hibernateEnd = this.jukeANatorUserInterfaceProperties.getHibernateEnd();  
 
     initialize();
   }

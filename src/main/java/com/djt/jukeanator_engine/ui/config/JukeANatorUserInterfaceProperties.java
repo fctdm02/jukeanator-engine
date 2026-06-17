@@ -11,6 +11,9 @@ public class JukeANatorUserInterfaceProperties {
                                    // backend
   
   private boolean enableScreenSaver = true;
+  private boolean enableHibernation = false;
+  private int hibernateBegin = 3; // In 24 hour/military time (e.g. 3:00 hours is 3:00AM) Only used when enableHibernation is true
+  private int hibernateEnd = 10; // In 24 hour/military time (e.g. 10:00 hours is 10:00AM) Only used when enableHibernation is true  
 
   //
   // CREDIT CONFIGURATION
@@ -35,6 +38,9 @@ public class JukeANatorUserInterfaceProperties {
     this.enabled = enabled;
   }
 
+  //
+  // SCREEN SAVER
+  //  
   public boolean isEnableScreenSaver() {
     return enableScreenSaver;
   }
@@ -43,6 +49,36 @@ public class JukeANatorUserInterfaceProperties {
     this.enableScreenSaver = enableScreenSaver;
   }
 
+  //
+  // HIBERNATION
+  //  
+  public boolean isEnableHibernation() {
+    return enableHibernation;
+  }
+
+  public void setEnableHibernation(boolean enableHibernation) {
+    this.enableHibernation = enableHibernation;
+  }
+
+  public int getHibernateBegin() {
+    return hibernateBegin;
+  }
+
+  public void setHibernateBegin(int hibernateBegin) {
+    this.hibernateBegin = hibernateBegin;
+  }
+
+  public int getHibernateEnd() {
+    return hibernateEnd;
+  }
+
+  public void setHibernateEnd(int hibernateEnd) {
+    this.hibernateEnd = hibernateEnd;
+  }
+
+  //
+  // CREDIT CONFIGURATION  
+  //
   public char getIncrementCreditsKey() {
     return incrementCreditsKey;
   }
@@ -91,6 +127,9 @@ public class JukeANatorUserInterfaceProperties {
     this.tenDollarBonusCredits = tenDollarBonusCredits;
   }
 
+  //
+  // SEARCH
+  //
   public boolean isEnableTypeAheadSearch() {
     return enableTypeAheadSearch;
   }
