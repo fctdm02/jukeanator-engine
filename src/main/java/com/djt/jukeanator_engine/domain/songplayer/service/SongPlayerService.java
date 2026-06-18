@@ -13,13 +13,13 @@ public interface SongPlayerService {
    * @return
    */
   SongDto getNowPlayingSong();
-  
+
   /**
    * 
    * @return
    */
   SongPlaybackStatusDto getPlaybackStatus();
-  
+
   /**
    * 
    */
@@ -33,5 +33,17 @@ public interface SongPlayerService {
   /**
    * 
    */
-  void stop();  
+  void stop();
+
+  /**
+   * Prevents the player from dequeuing and playing any further songs. Any song currently playing is
+   * stopped immediately. Has no effect if the queue is already locked.
+   */
+  void lockQueue();
+
+  /**
+   * Releases a previous {@link #lockQueue()} and resumes normal queue processing. Has no effect if
+   * the queue is not currently locked.
+   */
+  void unlockQueue();
 }

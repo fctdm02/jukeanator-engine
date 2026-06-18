@@ -749,6 +749,69 @@ of the song queue car.  When they dismiss the card, or it times out, have it go
 
 
 
+Implement Hibernation, if enabled, as follows:
+
+
+
+Between the hours of hibernation:
+
+  enable-screen-saver: false
+
+  enable-hibernation: true
+
+  hibernate-begin: 3 # In 24 hour/military time (e.g. 3:00 hours is 3:00AM) Only used when enableHibernation is true
+
+  hibernate-end: 10 # In 24 hour/military time (e.g. 10:00 hours is 10:00AM) Only used when enableHibernation is true
+
+
+
+Have a blank screen that is non-responsive to the user and this blank that is BLACK screen takes up the ENTIRE SCREEN, with a floating label that says "HIBERNATION  MODE" but this label moves to a random location on the screen every 30 seconds, so as not to burn any pixels on the monitor.
+
+
+
+The properties are already there in JukeANatorFrame and I have attached ScreenSaver as inspiration for this Hibernation Mode behavior.
+
+
+
+I decided it would be better to have lockQueue/unlockQueue in SongPlayerService.  Please implement these two methods in SongPlayerServiceImpl as follows:
+
+
+
+  /**
+
+   * Will not play any more music until queue is unlocked
+
+   */
+
+  void lockQueue();
+
+
+
+  /**
+
+   * Will resume playing music from the queue
+
+   */
+
+  void unlockQueue();
+
+
+
+The  song player service impl should not issue a call to the SongQueueService to deque the next song with a flag called lockOnQueue=true
+
+
+
+Also, make the corresponding changes to the Controller and Client classes, as they also implement the SongPlayerService interface.
+
+
+
+Change the hibernation window so that when the user presses the 'Esc' key on the physical keyboard, the hibernation window will be dismissed.
+
+
+
+The reason is that, normally, no one will have access to the physical keyboard.  In the event of service maintenance, if the owner/operator of the software opens the jukebox enclosure and wants to work on the jukebox PC, but the application is in hibernation mode, then they will want this hibernation window to be dismissed, so like pressing the 'Esc' key on the physical keyboard to gain quick access to the AdminPanel, doing the same thing while in hibernation mode would be desired.
+
+
 
 
 

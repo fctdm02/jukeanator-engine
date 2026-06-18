@@ -51,4 +51,16 @@ public class SongPlayerServiceHttpClient implements SongPlayerService {
 
     restClient.post().uri("/api/song-player/stop").retrieve().toBodilessEntity();
   }
+
+  @Override
+  public void lockQueue() {
+
+    restClient.post().uri("/api/song-player/lockQueue").retrieve().toBodilessEntity();
+  }
+
+  @Override
+  public void unlockQueue() {
+
+    restClient.post().uri("/api/song-player/unlockQueue").retrieve().toBodilessEntity();
+  }
 }

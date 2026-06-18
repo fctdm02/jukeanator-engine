@@ -168,6 +168,8 @@ public class JukeANatorFrame extends JFrame {
   private final boolean enableHibernation;
   private final int hibernateBegin;
   private final int hibernateEnd;
+  private HibernationWindow hibernationWindow;
+  private boolean hibernationActive = false;
 
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -362,7 +364,78 @@ public class JukeANatorFrame extends JFrame {
           }));
     }
 
+    // ── HIBERNATION ────────────────────────────────────────────────────
+    if (this.enableHibernation) {
+
+      this.hibernationWindow = new HibernationWindow(this, this.screenWidth, this.screenHeight, this.hibernateEnd,
+          // onDismiss: Esc key pressed by service technician —
+          // force-exit hibernation immediately regardless of the clock.
+          () -> SwingUtilities.invokeLater(() -> {
+            if (hibernationActive) {
+              hibernationActive = false;
+              hibernationWindow.setVisible(false);
+              songPlayerService.unlockQueue();
+            }
+          }));
+
+      // Poll once per minute to enter / exit hibernation.
+      javax.swing.Timer hibernationTimer = new javax.swing.Timer(60_000,
+          e -> SwingUtilities.invokeLater(this::updateHibernationState));
+      hibernationTimer.setInitialDelay(0); // check immediately on startup
+      hibernationTimer.start();
+    }
     requestFocusInWindow();
+  }
+
+  /**
+   * Shows or hides the hibernation overlay depending on whether the current wall-clock hour falls
+   * within [hibernateBegin, hibernateEnd).
+   *
+   * <p>
+   * On entry: locks the song queue and stops playback so music does not run unattended overnight.
+   * <p>
+   * On exit: unlocks the queue so normal operation resumes.
+   * <p>
+   * The screen-saver is also hidden on entry so the two overlays never compete for the same screen
+   * real-estate.
+   */
+  private void updateHibernationState() {
+
+    int hour = java.time.LocalTime.now().getHour();
+
+    boolean inWindow;
+    if (hibernateBegin < hibernateEnd) {
+      // Normal span — e.g. 03:00 → 10:00
+      inWindow = hour >= hibernateBegin && hour < hibernateEnd;
+    } else {
+      // Overnight span — e.g. 22:00 → 06:00
+      inWindow = hour >= hibernateBegin || hour < hibernateEnd;
+    }
+
+    if (inWindow && !hibernationActive) {
+      // ── ENTERING hibernation ──────────────────────────────────────
+      hibernationActive = true;
+
+      // Stop the screen-saver so only the hibernation overlay is shown.
+      if (screenSaverWindow != null && screenSaverWindow.isVisible()) {
+        screenSaverWindow.setVisible(false);
+      }
+
+      // lockQueue() stops the current song AND prevents the next one from
+      // being dequeued — a single call replaces the previous two-step pattern.
+      songPlayerService.lockQueue();
+
+      hibernationWindow.setVisible(true);
+
+    } else if (!inWindow && hibernationActive) {
+      // ── EXITING hibernation ───────────────────────────────────────
+      hibernationActive = false;
+
+      hibernationWindow.setVisible(false);
+
+      // Re-enable the queue so patrons can queue songs again.
+      songPlayerService.unlockQueue();
+    }
   }
 
   // ============================================================

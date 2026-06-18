@@ -58,4 +58,18 @@ public class SongPlayerController implements SongPlayerService {
 
     songPlayerService.stop();
   }
+
+  @Override
+  @PostMapping("/lockQueue")
+  public void lockQueue() {
+
+    songPlayerService.lockQueue();
+  }
+
+  @Override
+  @PostMapping("/unlockQueue")
+  public void unlockQueue() {
+
+    songPlayerService.unlockQueue();
+  }
 }

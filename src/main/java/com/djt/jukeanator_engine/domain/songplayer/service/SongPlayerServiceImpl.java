@@ -51,11 +51,19 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
   private final Player player;
 
   /**
-   * Everything below is confined to the queueExecutor thread.
+   * Everything below is confined to the queueExecutor thread, with the exception of
+   * {@code queueLocked}, which is written from external callers (e.g. the hibernation timer on the
+   * Swing EDT) and read on the queue executor thread, so it must be volatile.
    */
   private RootFolderEntity songLibraryRoot;
   private SongQueueEntryDto nowPlayingSong;
   private SongPlayerStatus songPlayerStatus;
+
+  /**
+   * When {@code true}, {@link #processQueue()} will not dequeue or start any new song. Set via
+   * {@link #lockQueue()} / {@link #unlockQueue()}.
+   */
+  private volatile boolean queueLocked = false;
 
   public SongPlayerServiceImpl(SongPlayerProperties songPlayerProperties,
       SongQueueService songQueueService, ApplicationEventPublisher eventPublisher) {
@@ -158,6 +166,35 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
     }
   }
 
+  @Override
+  public void lockQueue() {
+
+    queueLocked = true;
+    log.info("Queue locked — no further songs will be dequeued until unlocked");
+
+    // Stop whatever is currently playing so music does not continue
+    // unattended while the lock is held.
+    songPlayerStatus = player.getStatus();
+    if (songPlayerStatus == SongPlayerStatus.PLAYING
+        || songPlayerStatus == SongPlayerStatus.PAUSED) {
+
+      player.stop();
+      songPlayerStatus = SongPlayerStatus.STOPPED;
+      eventPublisher.publishEvent(new SongPlaybackStoppedEvent(nowPlayingSong));
+    }
+  }
+
+  @Override
+  public void unlockQueue() {
+
+    queueLocked = false;
+    log.info("Queue unlocked — resuming normal queue processing");
+
+    // Re-kick queue processing so the next song starts automatically if the
+    // queue is non-empty and nothing else is playing.
+    submitQueueProcessing();
+  }
+
   @PreDestroy
   public void shutdown() {
 
@@ -239,6 +276,16 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
 
         playbackHistory.push(nowPlayingSong);
         eventPublisher.publishEvent(new SongPlaybackFinishedEvent(nowPlayingSong));
+      }
+
+      /*
+       * If the queue has been locked (e.g. during hibernation), do not dequeue or start any new
+       * song. The player has already been stopped by lockQueue(), so we simply return and wait for
+       * unlockQueue() to re-submit processing.
+       */
+      if (queueLocked) {
+        log.debug("Queue is locked — skipping dequeue");
+        return;
       }
 
       /*
