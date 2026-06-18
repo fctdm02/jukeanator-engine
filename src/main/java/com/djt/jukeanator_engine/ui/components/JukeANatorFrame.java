@@ -92,6 +92,7 @@ public class JukeANatorFrame extends JFrame {
   private static final String CARD_SONG_QUEUE = "SONG_QUEUE";
   private static final String CARD_EDIT_ALBUM = "EDIT_ALBUM";
   private static final String CARD_LOGIN = "LOGIN";
+  private static final String CARD_NOW_PLAYING_ALBUM = "NOW_PLAYING_ALBUM";
 
   private final CardLayout overlayCardLayout = new CardLayout();
   private final JPanel overlayRoot = new JPanel(overlayCardLayout) {
@@ -129,11 +130,13 @@ public class JukeANatorFrame extends JFrame {
   private SongQueueCard songQueueCard;
   private EditAlbumCard editAlbumCard;
   private LoginToAdminPanelCard loginToAdminPanelCard;
+  private AlbumDetailCard nowPlayingAlbumCard;
 
 
 
   // NOW PLAYING
   private List<SongQueueEntryDto> currentQueue = new java.util.ArrayList<>();
+  private SongDto currentNowPlayingSong; // tracked so the panel click knows which album to show
   private final JLabel albumArtLabel = new JLabel();
   private final JLabel songLabel = new JLabel("", SwingConstants.LEFT);
   private final JLabel artistLabel = new JLabel("", SwingConstants.LEFT);
@@ -257,6 +260,7 @@ public class JukeANatorFrame extends JFrame {
     overlayRoot.add(placeholder(), CARD_SONG_QUEUE);
     overlayRoot.add(placeholder(), CARD_EDIT_ALBUM);
     overlayRoot.add(placeholder(), CARD_LOGIN);
+    overlayRoot.add(placeholder(), CARD_NOW_PLAYING_ALBUM);
     overlayCardLayout.show(overlayRoot, CARD_TABS);
 
     getContentPane().add(overlayRoot, BorderLayout.CENTER);
@@ -901,12 +905,13 @@ public class JukeANatorFrame extends JFrame {
 
     panel.setVisible(false); // hidden until a song starts
 
-    // Clicking anywhere on the Now Playing panel opens the Song Queue dialog
+    // Clicking anywhere on the Now Playing panel opens the album detail card
+    // for the currently-playing song, showing the full track listing.
     panel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     panel.addMouseListener(new java.awt.event.MouseAdapter() {
       @Override
       public void mouseClicked(java.awt.event.MouseEvent e) {
-        showSongQueueCard();
+        showNowPlayingAlbumCard();
       }
     });
 
@@ -961,6 +966,7 @@ public class JukeANatorFrame extends JFrame {
       artistLabel.setText(songDto.getArtistName());
       albumLabel.setText(songDto.getAlbumName());
       albumArtLabel.setIcon(imageLoader.loadFilesystemImage(songDto.getCoverArtPath(), 96, 96));
+      currentNowPlayingSong = songDto;
 
       musicPaused = false;
       playStatus.setIcon(
@@ -978,6 +984,7 @@ public class JukeANatorFrame extends JFrame {
     albumArtLabel.setIcon(null);
     playStatus.setIcon(null);
     musicPaused = false;
+    currentNowPlayingSong = null;
 
     nowPlayingPanel.setVisible(false);
   }
@@ -996,6 +1003,31 @@ public class JukeANatorFrame extends JFrame {
   private void hideOverlay() {
     overlayTransitionInProgress = true;
     overlayCardLayout.show(overlayRoot, CARD_TABS);
+    overlayTransitionInProgress = false;
+    requestFocusInWindow();
+  }
+
+  /**
+   * Returns the name of the overlay card currently visible in {@code overlayRoot}, falling back to
+   * {@code CARD_TABS} if none is marked visible (e.g. before the first layout pass).
+   */
+  private String currentVisibleOverlayCard() {
+    for (java.awt.Component c : overlayRoot.getComponents()) {
+      if (c.isVisible()) {
+        String name = c.getName();
+        return name != null ? name : CARD_TABS;
+      }
+    }
+    return CARD_TABS;
+  }
+
+  /**
+   * Shows the named overlay card. Used to return to a specific overlay (e.g. the now-playing album
+   * detail) after a nested overlay such as {@code CARD_ADD_SONG} is dismissed.
+   */
+  private void showOverlayCard(String cardName) {
+    overlayTransitionInProgress = true;
+    overlayCardLayout.show(overlayRoot, cardName);
     overlayTransitionInProgress = false;
     requestFocusInWindow();
   }
@@ -1032,14 +1064,21 @@ public class JukeANatorFrame extends JFrame {
       addSongToQueueCard.teardown();
     }
 
+    // ── Capture caller so dismiss returns here, not always to TABS ────────
+    // If the song was opened from a nested overlay (e.g. the now-playing album
+    // detail card) we want to go back to that overlay when the user closes the
+    // add-song card, not all the way back to the tab content area.
+    final String callerCard = currentVisibleOverlayCard();
+    Runnable onDismiss =
+        CARD_TABS.equals(callerCard) ? this::hideOverlay : () -> showOverlayCard(callerCard);
+
     // ── Eligibility check (normal play = priority 1) ──────────────────────
     // getHighestPriority() returns the next available priority; normal plays
     // always use priority 1, so we pass 1 here as a representative value.
-    String reason =
-        songQueueService.isSongEligibleForQueue(song.getAlbumId(), song.getSongId(), 1);
+    String reason = songQueueService.isSongEligibleForQueue(song.getAlbumId(), song.getSongId(), 1);
 
     addSongToQueueCard = new AddSongToQueueCard(song, imageLoader, priorityCostMultiplier,
-        songQueueService, creditManager, this::hideOverlay);
+        songQueueService, creditManager, onDismiss);
 
     addSongToQueueCard.setOpaque(false);
 
@@ -1080,6 +1119,68 @@ public class JukeANatorFrame extends JFrame {
     overlayCardLayout.show(overlayRoot, CARD_SONG_QUEUE);
     overlayTransitionInProgress = false;
     songQueueCard.onShown();
+  }
+
+  /**
+   * Shows the album detail card (track listing) for the currently-playing song's album. Triggered
+   * when the user clicks the Now Playing panel in the top-right corner.
+   *
+   * <p>
+   * The tab index that was active at the moment of the click is captured so that dismissing or
+   * timing out the card restores the exact tab the user was on, rather than jumping to a fixed tab.
+   */
+  private void showNowPlayingAlbumCard() {
+
+    if (currentNowPlayingSong == null)
+      return;
+
+    // Fetch the full album (with track listing) for the now-playing song
+    AlbumDto full;
+    try {
+      full = songLibraryService.getAlbumById(currentNowPlayingSong.getAlbumId());
+    } catch (Exception e) {
+      return; // cannot show detail without album data
+    }
+
+    // Capture the tab index to restore when the card is dismissed or times out
+    final int returnTabIndex = contentPanelTabs.getSelectedIndex();
+
+    // Stop any previously active now-playing album card timer before replacing it
+    if (nowPlayingAlbumCard != null) {
+      nowPlayingAlbumCard.dismiss();
+    }
+
+    // TabNavigator whose popToRoot restores the previously-active tab
+    TabNavigator navigator = new TabNavigator() {
+      @Override
+      public void popToRoot() {
+        if (nowPlayingAlbumCard != null) {
+          nowPlayingAlbumCard.dismiss();
+          nowPlayingAlbumCard = null;
+        }
+        hideOverlay();
+        overlayTransitionInProgress = true;
+        contentPanelTabs.setSelectedIndex(returnTabIndex);
+        lastSelectedTabIndex = returnTabIndex;
+        overlayTransitionInProgress = false;
+      }
+
+      @Override
+      public void pushAlbumDetail(AlbumDto album) {
+        // Not reachable from this card — songs within the album open the
+        // AddSongToQueue card directly via JukeANatorFrame#showAddSongToQueueCard.
+      }
+    };
+
+    nowPlayingAlbumCard = new AlbumDetailCard(JukeANatorFrame.this, full, imageLoader,
+        songQueueService, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
+        POPULARITY_THRESHOLD_3, navigator, creditManager, incrementCreditsKey);
+    nowPlayingAlbumCard.setOpaque(false);
+
+    replaceOverlayCard(CARD_NOW_PLAYING_ALBUM, nowPlayingAlbumCard);
+    overlayTransitionInProgress = true;
+    overlayCardLayout.show(overlayRoot, CARD_NOW_PLAYING_ALBUM);
+    overlayTransitionInProgress = false;
   }
 
   /**
