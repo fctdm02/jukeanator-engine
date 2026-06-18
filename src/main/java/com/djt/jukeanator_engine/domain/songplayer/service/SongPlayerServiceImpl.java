@@ -182,6 +182,12 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
       songPlayerStatus = SongPlayerStatus.STOPPED;
       eventPublisher.publishEvent(new SongPlaybackStoppedEvent(nowPlayingSong));
     }
+
+    // Clear nowPlayingSong so that when unlockQueue() re-kicks processQueue(),
+    // it does not mistake the hibernation-interrupted song for one that finished
+    // naturally — which would push it into songPlayHistory and incorrectly trip
+    // the "played in last N minutes" rule on the very next auto-populate cycle.
+    nowPlayingSong = null;
   }
 
   @Override

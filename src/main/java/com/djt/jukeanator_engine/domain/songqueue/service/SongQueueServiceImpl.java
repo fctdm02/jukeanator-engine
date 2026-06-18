@@ -483,7 +483,8 @@ public final class SongQueueServiceImpl
   }
 
   @Override
-  public Integer removeSongDownFromQueue(ChangeSongQueueRequest changeSongQueueRequest) {
+  public synchronized Integer removeSongDownFromQueue(
+      ChangeSongQueueRequest changeSongQueueRequest) {
     int albumId = changeSongQueueRequest.getAlbumId();
     int songId = changeSongQueueRequest.getSongId();
 
@@ -495,6 +496,14 @@ public final class SongQueueServiceImpl
           Integer numSongsRemoved = songQueueRoot.removeSongFromQueue(song);
           if (numSongsRemoved.intValue() > 0) {
             songQueueRepository.storeAggregateRoot(songQueueRoot);
+
+            // Top the queue back up to minimumNumberSongsToKeepInQueue — the
+            // same top-up that dequeueNextSong() performs — so a patron
+            // manually removing songs never drains the queue below the minimum.
+            if (enableBackgroundMusic) {
+              autoPopulateQueue();
+            }
+
             eventPublisher.publishEvent(
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }

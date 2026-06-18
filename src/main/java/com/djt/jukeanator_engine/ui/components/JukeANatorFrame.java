@@ -367,21 +367,26 @@ public class JukeANatorFrame extends JFrame {
     // ── HIBERNATION ────────────────────────────────────────────────────
     if (this.enableHibernation) {
 
-      this.hibernationWindow = new HibernationWindow(this, this.screenWidth, this.screenHeight, this.hibernateEnd,
-          // onDismiss: Esc key pressed by service technician —
-          // force-exit hibernation immediately regardless of the clock.
-          () -> SwingUtilities.invokeLater(() -> {
-            if (hibernationActive) {
-              hibernationActive = false;
-              hibernationWindow.setVisible(false);
-              songPlayerService.unlockQueue();
-            }
-          }));
+      this.hibernationWindow =
+          new HibernationWindow(this, this.screenWidth, this.screenHeight, this.hibernateEnd,
+              // onDismiss: Esc key pressed by service technician —
+              // force-exit hibernation immediately regardless of the clock.
+              () -> SwingUtilities.invokeLater(() -> {
+                if (hibernationActive) {
+                  hibernationActive = false;
+                  hibernationWindow.setVisible(false);
+                  songPlayerService.unlockQueue();
+                }
+              }));
 
       // Poll once per minute to enter / exit hibernation.
+      // Initial delay of 5 s gives SongPlayerServiceImpl.initialize() time to
+      // submit its first processQueue() task before the hibernation check can
+      // set queueLocked=true — preventing the startup race that caused the
+      // queue to never auto-populate when the app started inside a hibernate window.
       javax.swing.Timer hibernationTimer = new javax.swing.Timer(60_000,
           e -> SwingUtilities.invokeLater(this::updateHibernationState));
-      hibernationTimer.setInitialDelay(0); // check immediately on startup
+      hibernationTimer.setInitialDelay(5_000);
       hibernationTimer.start();
     }
     requestFocusInWindow();
@@ -1023,6 +1028,12 @@ public class JukeANatorFrame extends JFrame {
         adminPanel.setQueue(queue);
       }
       queuePanel.setQueue(currentQueue);
+      // Keep the overlay SongQueueCard's reference in sync even when it is not
+      // currently visible. Without this, the card would show a stale list
+      // (including the now-playing song) until the user closed and reopened it.
+      if (songQueueCard != null) {
+        songQueueCard.setQueue(currentQueue);
+      }
     });
   }
 

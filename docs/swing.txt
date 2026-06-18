@@ -995,26 +995,14 @@ RandomByCD=false
  
  
  
- 
- 
- 
- 
- 
- 
- 
- 
-   // HIBERNATION
-  private final boolean enableHibernation;
-  private final int hibernateBegin;
-  private final int hibernateEnd;  
- 
- 
- 
-    this.enableScreenSaver = this.jukeANatorUserInterfaceProperties.isEnableScreenSaver();
-    
-    this.enableHibernation = this.jukeANatorUserInterfaceProperties.isEnableHibernation();
-    this.hibernateBegin = this.jukeANatorUserInterfaceProperties.getHibernateBegin();
-    this.hibernateEnd = this.jukeANatorUserInterfaceProperties.getHibernateEnd();  
+ISSUE #1: I keep on getting warnings that songs have already been played in last 60 minutes, even though the app just started
 
-    initialize();
- 
+ISSUE #2: The song queue is not auto-populating on startup, nor on dequeue()
+
+ISSUE #3: The SongQueueueCard is still displaying the currently playing song in the song queue
+
+I think these regressions might be related to the changes made in oder to support Hibernation Mode, in that the song player will
+lock the queue when hibernating, then unlock it, and resume playing/auto-populating the queue when it wakes up.
+
+Please investigate and resolve.
+
