@@ -55,7 +55,7 @@ public class AlbumGridPanel extends JPanel {
   private final boolean showLetterNav; // true only for the full "All Albums" grid in HomePanel
 
   private int startIndex = 0; // index of the album in the upper-left corner of the grid
-  private String selectedLetter = null; // which letter button is highlighted
+  private String selectedLetter = "#"; // which letter button is highlighted
 
   // ── Panels rebuilt on each page turn ──────────────────────────────────────
   private final JPanel gridPanel = new JPanel();
