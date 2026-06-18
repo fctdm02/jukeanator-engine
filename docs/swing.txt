@@ -901,7 +901,7 @@ DONE - Change cost on SongQueueCard to be double what it is now
 
 DONE - Change Song Queue to render song name by priority (0: gray, 1: white, 2: yellow, 3: orange, 4: red, 5+, purple)
 
-- On Startup, do not flip to a letter button if there aren't enough albums to fill up the number of album tiles for the screen
+DONE - On startup for JukeANatorFrame, do not flip to a letter button if there aren't enough albums to fill up the number of album tiles for the screen
 
 - Refactor all services:
     + service methods to take in an authentication principle for all methods
@@ -948,9 +948,9 @@ DONE Disable button grid panel when showing albums from artist view, show all al
 
 DONE Verify that random songs are added with priority 0 and that normal songs by user are priority 1.  Verify that priority sorting works
   
-- When the user clicks on the now playing song in the upper right hand corner, display the album for that song instead of the song queue  
+DONE When the user clicks on the now playing song in the upper right hand corner, display the album for that song instead of the song queue  
 
-- When the user cancels on add song to queue card, they should be taken back to the screen/panel that they were looking at before
+DONE When the user cancels on add song to queue card, they should be taken back to the screen/panel that they were looking at before
   
 36: Move over the most relevant features from:
 
@@ -1006,11 +1006,11 @@ lock the queue when hibernating, then unlock it, and resume playing/auto-populat
 
 Please investigate and resolve.
 
-TODO: Add event handling for song queue card for when the queue changes
+DONE: Add event handling for song queue card for when the queue changes
 
 
 
-1: Whenever the song queue is changed by SongQueueServiceImpl, a SongQueueChangedEvent is published.  
+DONE: Whenever the song queue is changed by SongQueueServiceImpl, a SongQueueChangedEvent is published.  
 
 
 

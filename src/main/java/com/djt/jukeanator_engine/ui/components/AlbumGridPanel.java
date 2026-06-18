@@ -84,7 +84,8 @@ public class AlbumGridPanel extends JPanel {
     this.showLetterNav = showLetterNav;
 
     // Pick a random letter from the available buckets at startup (only when letter nav is shown)
-    if (showLetterNav && !this.letterMap.isEmpty()) {
+    if (showLetterNav && !this.letterMap.isEmpty() && this.albums.size() > cols * rows) {
+      
       List<String> keys = new java.util.ArrayList<>(this.letterMap.keySet());
       selectedLetter = keys.get(new java.util.Random().nextInt(keys.size()));
       startIndex = letterStartIndex(selectedLetter);
