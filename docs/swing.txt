@@ -546,8 +546,158 @@ to try again later.  This song constraint panel should draw onto the AddSongToQu
 condition.  The user is then presented with an OK button, rendered the same as the Cancel button, that dismisses the dialog)
 
 
-     
 
+
+
+Change SongQueueCard and AdminPanelto render songs in the queue by color according to their priority as follows
+priority 0: gray
+priority 1: white
+priority 2: yellow
+priority 3: orange
+priority 4: red
+priority 5, and higher: purple
+
+Only perform this render by color for songs/tracks on the SongQueueCard and AdminPanel, display them as-is for every other view.
+
+Add a legend with color boxes that says this as well.  Add this just to the right of the "SONG QUEUE" label and have it be aligned to the right/EAST
+
+
+
+
+
+Given Rule B:
+
+
+
+      // ─────────────────────────────────────────────────────────────────────
+
+      // Rule B — maximum consecutive songs by the same artist
+
+      // ─────────────────────────────────────────────────────────────────────
+
+      String incomingArtist = targetSong.getArtistName();
+
+      synchronized (this) {
+
+
+
+        // 1. Purge entries older than 2 hours
+
+        Instant twoHoursAgo = now.minus(Duration.ofHours(2));
+
+        artistSequenceLog.removeIf(e -> e.queuedAt().isBefore(twoHoursAgo));
+
+
+
+        // 2. Build a merged, priority-sorted view:
+
+        List<ArtistQueueEntry> merged = new ArrayList<>(artistSequenceLog);
+
+        ArtistQueueEntry incoming = new ArtistQueueEntry(incomingArtist, priority, now);
+
+        merged.add(incoming);
+
+        merged.sort(Comparator.comparingInt(ArtistQueueEntry::priority));
+
+
+
+        // 3. Locate the incoming entry in the sorted list
+
+        int incomingIdx = merged.indexOf(incoming);
+
+
+
+        if (incomingIdx >= 0) {
+
+
+
+          // Start count at 1 because the incoming song itself counts as 1 play!
+
+          int consecutiveCount = 1;
+
+
+
+          // Walk backwards — songs that play before the new one
+
+          for (int i = incomingIdx - 1; i >= 0; i--) {
+
+            if (merged.get(i).artistName().equals(incomingArtist)) {
+
+              consecutiveCount++;
+
+            } else {
+
+              break;
+
+            }
+
+          }
+
+
+
+          // Walk forwards — songs that play after the new one
+
+          for (int i = incomingIdx + 1; i < merged.size(); i++) {
+
+            if (merged.get(i).artistName().equals(incomingArtist)) {
+
+              consecutiveCount++;
+
+            } else {
+
+              break;
+
+            }
+
+          }
+
+
+
+          // If the TOTAL consecutive plays exceeds the maximum allowed, block it.
+
+          if (consecutiveCount > maximumConsecutiveSongPlaysByArtist) {
+
+            return "the consecutive play count for '" + incomingArtist + "' has been exceeded";
+
+          }
+
+        }
+
+      } // end synchronized
+
+
+
+Analyze the screenshot
+
+
+
+The current song is Working Man by Rush
+
+The first song in the queue is Walk This Way by Aerosmith
+
+The second song in the queue is Remember (walking in the sand) by Aerosmith
+
+The third song in the queue is Tennessee by Arrested Development
+
+The fourth song in the queue is Same Old Song and Dance by Aerosmith
+
+The fifth song in the queue is Talk Dirty to Me by Poison
+
+
+
+Even though Aerosmith is in the queue 3 times, there are not 3 CONSECUTIVE songs in the queue by Aerosmith.  There is another Aerosmith song in the queue, but there is a non-Aerosmith song between them, which is Tennessee by Arrested Development.
+
+
+
+According to the rule, as I meant it to be, the user should be able to add any number of Aerosmith songs in the queue, but NOT if they appear in the queue together.
+
+
+
+Here is a potential solution: Have a "mirror" song queue list in SongQueueRootEntity that is a copy of the current queue, but with the  difference being is that the incoming candidate song is added with the given priority, and is sorted according to the prioritization rules.  IF the end result is that there are more than 3 consecutive Aerosmith songs in a row, then that song is ineligible.
+
+
+
+I have attached SongQueueRootEntity, SongQueueServiceImpl, so please come up with a plan and if you can make the changes, make only the needed changes, keeping the same formatting, spacing and comments that are already in place.  Only change that which is absolutely needed.
 
 
 
@@ -685,6 +835,8 @@ HibernateEnd=14
 - Disable button grid panel when showing albums from artist view, show all albums
 
 - Verify that random songs are added with priority 0 and that normal songs by user are priority 1.  Verify that priority sorting works
+  
+- When the user clicks on the now playing song in the upper right hand corner, display the album for that song instead of the song queue  
   
 36: Move over the most relevant features from:
 

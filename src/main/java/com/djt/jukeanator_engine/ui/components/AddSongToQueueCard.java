@@ -59,7 +59,7 @@ public class AddSongToQueueCard extends JPanel {
   private static final String INNER_CARD_CONSTRAINT = "CONSTRAINT";
   private JLabel constraintLabel;
   private String constraintLabelText =
-      "<html><div style='text-align:center;'>This song cannot be played at this time because [REASON].</div></html>";
+      "<html><div style='text-align:center;'>This song cannot be played at this time because<br>[REASON].</div></html>";
 
   /** Inner card layout that switches between the main panel and the constraint panel. */
   private final CardLayout innerCardLayout = new CardLayout();
@@ -166,14 +166,14 @@ public class AddSongToQueueCard extends JPanel {
     messagePanel.setOpaque(false);
     messagePanel.setLayout(new BoxLayout(messagePanel, BoxLayout.Y_AXIS));
 
-    JLabel headingLabel = new JLabel("Song Unavailable", SwingConstants.CENTER);
+    JLabel headingLabel = new JLabel("Song Unavailable to Play", SwingConstants.CENTER);
     headingLabel.setAlignmentX(CENTER_ALIGNMENT);
     headingLabel.setForeground(ColorTheme.get().textPrimary);
     headingLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
 
-    JLabel songNameLabel =
-        new JLabel(song.getSongName() != null ? "\u201C" + song.getSongName() + "\u201D" : "",
-            SwingConstants.CENTER);
+    JLabel songNameLabel = new JLabel(song.getSongName() != null
+        ? "\u201C" + song.getSongName() + "\u201D by " + song.getArtistName() + ""
+        : "", SwingConstants.CENTER);
     songNameLabel.setAlignmentX(CENTER_ALIGNMENT);
     songNameLabel.setForeground(ColorTheme.get().accentGold);
     songNameLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));

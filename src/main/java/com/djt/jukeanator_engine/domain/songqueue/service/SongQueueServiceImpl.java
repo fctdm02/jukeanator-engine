@@ -224,15 +224,21 @@ public final class SongQueueServiceImpl
         String queuedSongArtistName = queuedSong.getArtistName();
         String queuedSongAlbumArtistName = queuedSong.getAlbum().getParentArtist().getName();
 
-        if (targetSongName.equals(queuedSongName)
+        boolean isSameSong = (targetSongName.equals(queuedSongName)
             && (targetSongArtistName.equals(queuedSongArtistName)
-                || targetAlbumArtistName.equals(queuedSongAlbumArtistName))
-            || targetSong.equals(queuedSong)) {
+                || targetAlbumArtistName.equals(queuedSongAlbumArtistName)))
+            || (targetSong.getPersistentIdentity() != null
+                && targetSong.getPersistentIdentity().equals(queuedSong.getPersistentIdentity()));
+
+        if (isSameSong) {
 
           long minutesBetween = Duration.between(queuedEntry.getQueuedAtTime(), now).toMinutes();
           if (minutesBetween < minimumMinutesBetweenSongPlays) {
-            
-            return "the minimum minutes between song plays has not been met.  Try again in " + minutesBetween + "minutes";
+
+            long minutesRemaining = minimumMinutesBetweenSongPlays - minutesBetween;
+
+            return "has already been played in the last " + minimumMinutesBetweenSongPlays + " min. Try again in "
+                + minutesRemaining + " min";
           }
         }
       }
@@ -249,20 +255,18 @@ public final class SongQueueServiceImpl
         artistSequenceLog.removeIf(e -> e.queuedAt().isBefore(twoHoursAgo));
 
         // 2. Build a merged, priority-sorted view:
-        // current log entries + the hypothetical incoming entry.
-        // Sorted ascending by priority so index 0 plays first.
         List<ArtistQueueEntry> merged = new ArrayList<>(artistSequenceLog);
         ArtistQueueEntry incoming = new ArtistQueueEntry(incomingArtist, priority, now);
         merged.add(incoming);
         merged.sort(Comparator.comparingInt(ArtistQueueEntry::priority));
 
-        // 3. Locate the incoming entry in the sorted list and measure
-        // the consecutive same-artist run that includes it.
+        // 3. Locate the incoming entry in the sorted list
         int incomingIdx = merged.indexOf(incoming);
 
         if (incomingIdx >= 0) {
-          
-          int consecutiveCount = 0;
+
+          // Start count at 1 because the incoming song itself counts as 1 play!
+          int consecutiveCount = 1;
 
           // Walk backwards — songs that play before the new one
           for (int i = incomingIdx - 1; i >= 0; i--) {
@@ -282,6 +286,7 @@ public final class SongQueueServiceImpl
             }
           }
 
+          // If the TOTAL consecutive plays exceeds the maximum allowed, block it.
           if (consecutiveCount > maximumConsecutiveSongPlaysByArtist) {
             return "the consecutive play count for '" + incomingArtist + "' has been exceeded";
           }
@@ -321,10 +326,19 @@ public final class SongQueueServiceImpl
           }
 
           if (!withinWindow) {
-            return "you must wait until " + currentHour + ":00PM to play songs with explicit lyrics";
+
+            String period = (allowExplicitSongsBegin >= 12) ? "PM" : "AM";
+            int displayHour = allowExplicitSongsBegin % 12;
+            if (displayHour == 0) {
+              displayHour = 12;
+            }
+
+            return "you must wait until " + displayHour + ":00" + period
+                + " to play songs with explicit lyrics";
           }
         }
       }
+
 
       // ─────────────────────────────────────────────────────────────────────
       // All rules passed — record the entry in the artist-sequence log and

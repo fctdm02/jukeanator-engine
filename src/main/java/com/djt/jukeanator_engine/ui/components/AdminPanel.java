@@ -205,11 +205,11 @@ public class AdminPanel extends JPanel {
     queueList.setSelectionBackground(ColorTheme.get().bgListSelected);
     queueList.setSelectionForeground(ColorTheme.get().textPrimary);
     queueList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-    SongTrackCellRenderer.install(queueList, popularityT1, popularityT2, popularityT3);
+    SongTrackCellRenderer.installWithPriority(queueList, popularityT1, popularityT2, popularityT3);
 
     JPanel queuePane = new JPanel(new BorderLayout(0, 4));
     queuePane.setOpaque(false);
-    queuePane.add(sectionHeader("SONG QUEUE", ColorTheme.get().accentGreen), BorderLayout.NORTH);
+    queuePane.add(buildQueueSectionHeader(), BorderLayout.NORTH);
     queuePane.add(darkScrollPane(queueList), BorderLayout.CENTER);
 
     center.add(albumPane);
@@ -739,6 +739,38 @@ public class AdminPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
+   * Builds the "SONG QUEUE" section header with a priority-colour legend panel aligned to the
+   * right/EAST — identical in chrome to {@link #buildAlbumSectionHeader()} but without a filter
+   * field and with the legend in its place.
+   */
+  private JPanel buildQueueSectionHeader() {
+    Color accent = ColorTheme.get().accentGreen;
+    JPanel header = new JPanel(new BorderLayout(8, 0)) {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      protected void paintComponent(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setColor(ColorTheme.get().bgAdminHeader);
+        g2.fillRect(0, 0, getWidth(), getHeight());
+        g2.setColor(accent);
+        g2.fillRect(0, getHeight() - 2, getWidth(), 2);
+        g2.dispose();
+        super.paintComponent(g);
+      }
+    };
+    header.setOpaque(false);
+    header.setBorder(new EmptyBorder(6, 10, 6, 10));
+
+    JLabel lbl = new JLabel("SONG QUEUE");
+    lbl.setForeground(accent);
+    lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    header.add(lbl, BorderLayout.WEST);
+    header.add(SongTrackCellRenderer.buildPriorityLegend(), BorderLayout.EAST);
+    return header;
+  }
+
+  /**
    * Builds the "JUKEBOX LIST" section header that includes a compact filter text field on the
    * right. Typing in the field scrolls the album list to the first entry whose display name starts
    * with the entered text (case-insensitive).
@@ -839,30 +871,6 @@ public class AdminPanel extends JPanel {
   /** Thin vertical spacer for visual grouping inside a button strip. */
   private static javax.swing.Box.Filler verticalSpacer(int height) {
     return (javax.swing.Box.Filler) Box.createRigidArea(new Dimension(0, height));
-  }
-
-  private static JPanel sectionHeader(String text, Color accent) {
-    JPanel header = new JPanel(new BorderLayout()) {
-      private static final long serialVersionUID = 1L;
-
-      @Override
-      protected void paintComponent(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setColor(ColorTheme.get().bgAdminHeader);
-        g2.fillRect(0, 0, getWidth(), getHeight());
-        g2.setColor(accent);
-        g2.fillRect(0, getHeight() - 2, getWidth(), 2);
-        g2.dispose();
-        super.paintComponent(g);
-      }
-    };
-    header.setOpaque(false);
-    header.setBorder(new EmptyBorder(6, 10, 6, 10));
-    JLabel lbl = new JLabel(text);
-    lbl.setForeground(accent);
-    lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
-    header.add(lbl, BorderLayout.WEST);
-    return header;
   }
 
   /**

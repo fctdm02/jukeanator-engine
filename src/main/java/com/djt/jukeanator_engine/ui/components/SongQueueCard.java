@@ -318,17 +318,23 @@ public class SongQueueCard extends JPanel {
     // Extra top margin separates this section visually from Now Playing
     section.setBorder(new EmptyBorder(15, 0, 0, 0));
 
-    // Header
+    // Header row: label on the left, priority legend aligned to the right
+    JPanel headerRow = new JPanel(new BorderLayout(8, 0));
+    headerRow.setOpaque(false);
+    headerRow.setBorder(new EmptyBorder(0, 0, 4, 0));
+
     JLabel header = new JLabel("QUEUED SONGS");
     header.setForeground(ACCENT_GREEN);
     header.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
-    header.setBorder(new EmptyBorder(0, 0, 4, 0));
-    section.add(header, BorderLayout.NORTH);
+    headerRow.add(header, BorderLayout.WEST);
+    headerRow.add(SongTrackCellRenderer.buildPriorityLegend(), BorderLayout.EAST);
+
+    section.add(headerRow, BorderLayout.NORTH);
 
     // Populate model (up to MAX_QUEUE_VISIBLE entries)
     refreshQueueListModel();
 
-    SongTrackCellRenderer.install(queueList, popularityT1, popularityT2, popularityT3);
+    SongTrackCellRenderer.installWithPriority(queueList, popularityT1, popularityT2, popularityT3);
     queueList.setOpaque(true);
     queueList.setBackground(LIST_BG);
     queueList.setForeground(TEXT_PRIMARY);

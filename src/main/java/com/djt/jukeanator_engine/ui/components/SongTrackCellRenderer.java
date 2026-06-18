@@ -33,10 +33,26 @@ public class SongTrackCellRenderer extends JPanel
 
   // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
 
+  // ── Priority-based row colours (queue views only) ─────────────────────────
+  /** Row background colours keyed by queue priority (index = priority level). */
+  public static final Color[] PRIORITY_COLORS = {new Color(90, 90, 90), // 0 — gray
+      new Color(220, 220, 220), // 1 — white
+      new Color(200, 170, 0), // 2 — yellow
+      new Color(200, 100, 0), // 3 — orange
+      new Color(180, 30, 30), // 4 — red
+      new Color(120, 0, 180), // 5+ — purple
+  };
+
+  /** Human-readable labels for the priority legend (parallel to {@link #PRIORITY_COLORS}). */
+  public static final String[] PRIORITY_LABELS = {"0", "1", "2", "3", "4", "5+"};
+
   // ── Popularity thresholds (configurable per use-site) ─────────────────────
   private final int t1;
   private final int t2;
   private final int t3;
+
+  /** When {@code true}, row background is driven by queue-entry priority instead of alternating. */
+  private final boolean usePriorityColor;
 
   // ── Sub-widgets ───────────────────────────────────────────────────────────
   private final PopularityBarsPanel barsPanel;
@@ -50,11 +66,13 @@ public class SongTrackCellRenderer extends JPanel
    * @param t1 Minimum plays for 1 bar.
    * @param t2 Minimum plays for 2 bars.
    * @param t3 Minimum plays for 3 bars.
+   * @param usePriorityColor When {@code true}, row background is coloured by queue-entry priority.
    */
-  public SongTrackCellRenderer(int t1, int t2, int t3) {
+  public SongTrackCellRenderer(int t1, int t2, int t3, boolean usePriorityColor) {
     this.t1 = t1;
     this.t2 = t2;
     this.t3 = t3;
+    this.usePriorityColor = usePriorityColor;
 
     barsPanel = new PopularityBarsPanel(0);
 
@@ -77,6 +95,11 @@ public class SongTrackCellRenderer extends JPanel
     add(text, BorderLayout.CENTER);
   }
 
+  /** Backward-compatible overload — no priority colouring (used by non-queue views). */
+  public SongTrackCellRenderer(int t1, int t2, int t3) {
+    this(t1, t2, t3, false);
+  }
+
   @Override
   public java.awt.Component getListCellRendererComponent(JList<? extends SongQueueEntryDto> list,
       SongQueueEntryDto entry, int index, boolean isSelected, boolean cellHasFocus) {
@@ -90,15 +113,22 @@ public class SongTrackCellRenderer extends JPanel
     song.setText(entry.getSong().getSongName());
     sub.setText(entry.getSong().getArtistName() + "  •  " + entry.getSong().getAlbumName());
 
+    // Background and sub-label foreground are always the standard theme colours.
+    // Only the song-name foreground is tinted by priority when the flag is set.
     if (isSelected) {
       setBackground(ColorTheme.get().bgListSelected);
       song.setForeground(ColorTheme.get().accentBlue);
-      sub.setForeground(ColorTheme.get().textPrimary);
     } else {
       setBackground(index % 2 == 0 ? ColorTheme.get().bgList : ColorTheme.get().bgListRowAlt);
-      song.setForeground(ColorTheme.get().textPrimary);
-      sub.setForeground(ColorTheme.get().textMuted);
+      if (usePriorityColor) {
+        int priority = entry.getPriority() == null ? 0 : entry.getPriority();
+        int slot = Math.min(priority, PRIORITY_COLORS.length - 1);
+        song.setForeground(PRIORITY_COLORS[slot]);
+      } else {
+        song.setForeground(ColorTheme.get().textPrimary);
+      }
     }
+    sub.setForeground(ColorTheme.get().textMuted);
     setOpaque(true);
     return this;
   }
@@ -171,5 +201,71 @@ public class SongTrackCellRenderer extends JPanel
   public static void install(JList<SongQueueEntryDto> list, int t1, int t2, int t3) {
     list.setCellRenderer(new SongTrackCellRenderer(t1, t2, t3));
     list.setFixedCellHeight(CELL_HEIGHT);
+  }
+
+  /**
+   * Like {@link #install} but enables priority-based row colouring — intended for
+   * {@code SongQueueCard} and {@code AdminPanel} queue lists.
+   */
+  public static void installWithPriority(JList<SongQueueEntryDto> list, int t1, int t2, int t3) {
+    list.setCellRenderer(new SongTrackCellRenderer(t1, t2, t3, true));
+    list.setFixedCellHeight(CELL_HEIGHT);
+  }
+
+  // ── Priority legend builder ────────────────────────────────────────────────
+  /**
+   * Builds a compact horizontal legend panel. A "PRIORITY LEGEND" title (styled like the section
+   * header labels) sits on the left, followed by one swatch+number entry per priority level.
+   *
+   * <p>
+   * Background is transparent so it inherits whatever the parent section header paints.
+   */
+  public static JPanel buildPriorityLegend() {
+    JPanel legend = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
+    legend.setOpaque(false);
+
+    // "PRIORITY LEGEND" title — styled to match the section header labels
+    JLabel title = new JLabel("PRIORITY LEGEND");
+    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    title.setForeground(ColorTheme.get().accentGreen);
+    legend.add(title);
+
+    // One swatch + number per priority level
+    for (int i = 0; i < PRIORITY_COLORS.length; i++) {
+      final Color swatchColor = PRIORITY_COLORS[i];
+      final String numLabel = PRIORITY_LABELS[i];
+
+      // Colour swatch — rounded rectangle filled with the priority colour
+      JPanel swatch = new JPanel() {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        protected void paintComponent(Graphics g) {
+          Graphics2D g2 = (Graphics2D) g.create();
+          g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+          g2.setColor(swatchColor);
+          g2.fillRoundRect(0, 0, getWidth(), getHeight(), 4, 4);
+          g2.setColor(new Color(0, 0, 0, 80));
+          g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 4, 4);
+          g2.dispose();
+        }
+      };
+      swatch.setOpaque(false);
+      swatch.setPreferredSize(new Dimension(12, 12));
+
+      // Number label — muted but visible on the dark header background
+      JLabel lbl = new JLabel(numLabel);
+      lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 11));
+      lbl.setForeground(new Color(200, 200, 200));
+
+      // Wrapper keeps swatch and number snug and vertically centred
+      JPanel entry = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 3, 0));
+      entry.setOpaque(false);
+      entry.add(swatch);
+      entry.add(lbl);
+
+      legend.add(entry);
+    }
+    return legend;
   }
 }
