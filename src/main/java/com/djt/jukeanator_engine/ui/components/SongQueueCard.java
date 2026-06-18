@@ -146,6 +146,10 @@ public class SongQueueCard extends JPanel {
   /** Updates the live queue reference — call before {@link #onShown()} if it may have changed. */
   public void setQueue(List<SongQueueEntryDto> queue) {
     this.queue = queue;
+    SwingUtilities.invokeLater(() -> {
+      refreshQueueListModel();
+      refreshNowPlaying();
+    });
   }
 
   /** Called whenever this card is shown — rebuilds the queue list, restarts the countdown. */
