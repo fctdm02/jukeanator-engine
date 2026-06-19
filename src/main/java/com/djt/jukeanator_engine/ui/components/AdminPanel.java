@@ -766,7 +766,7 @@ public class AdminPanel extends JPanel {
     header.setOpaque(false);
     header.setBorder(new EmptyBorder(6, 10, 6, 10));
 
-    JLabel lbl = new JLabel("SONG QUEUE");
+    JLabel lbl = new JLabel("SONG QUEUE:");
     lbl.setForeground(accent);
     lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
     header.add(lbl, BorderLayout.WEST);
@@ -797,7 +797,7 @@ public class AdminPanel extends JPanel {
     header.setOpaque(false);
     header.setBorder(new EmptyBorder(6, 10, 6, 10));
 
-    JLabel lbl = new JLabel("JUKEBOX LIST");
+    JLabel lbl = new JLabel("JUKEBOX LIST:");
     lbl.setForeground(ColorTheme.get().accentBlue);
     lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
     header.add(lbl, BorderLayout.WEST);

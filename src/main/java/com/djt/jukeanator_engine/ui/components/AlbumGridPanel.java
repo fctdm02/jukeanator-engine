@@ -91,7 +91,8 @@ public class AlbumGridPanel extends JPanel {
 
         if (albumList != null && !albumList.isEmpty()) {
           String upperKey = key.toUpperCase();
-          if (!upperKey.startsWith("X") && !upperKey.startsWith("Y") && !upperKey.startsWith("Z")) {
+          if (!upperKey.startsWith("W") && !upperKey.startsWith("X") && !upperKey.startsWith("Y")
+              && !upperKey.startsWith("Z")) {
             filteredLetterMap.put(key, albumList);
           }
         }
