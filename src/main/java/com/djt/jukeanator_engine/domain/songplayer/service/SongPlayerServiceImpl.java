@@ -9,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
+import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
+import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songplayer.config.SongPlayerProperties;
@@ -24,6 +26,7 @@ import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStoppedEven
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.Player;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.VideoVlcMediaPlayer;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.VlcMediaPlayer;
+import com.djt.jukeanator_engine.domain.songplayer.service.utils.WinampMediaPlayer;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
@@ -77,10 +80,19 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
     this.songQueueService = songQueueService;
     this.eventPublisher = eventPublisher;
 
-    if (this.playerType.equals("vlc")) {
+    OSType osType = OperatingSystemDetector.getOperatingSystem();
+    if (this.playerType.equals("winamp") && osType == OSType.WINDOWS) {
+
+      this.player = new WinampMediaPlayer(this.volume);
+
+    } else if (this.playerType.equals("vlc")) {
+
       this.player = new VlcMediaPlayer(this.volume);
+
     } else {
+
       this.player = new VideoVlcMediaPlayer(this.volume);
+
     }
 
     log.info("Using song library root: " + this.songLibraryRoot);
