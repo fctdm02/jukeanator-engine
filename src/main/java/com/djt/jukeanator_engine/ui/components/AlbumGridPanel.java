@@ -84,9 +84,28 @@ public class AlbumGridPanel extends JPanel {
     this.showLetterNav = showLetterNav;
 
     // Pick a random letter from the available buckets at startup (only when letter nav is shown)
-    if (showLetterNav && !this.letterMap.isEmpty() && this.albums.size() > cols * rows) {
-      
-      List<String> keys = new java.util.ArrayList<>(this.letterMap.keySet());
+    if (showLetterNav && !this.letterMap.isEmpty()) {
+
+      // Build a temporary map filtering out empty lists and keys starting with X, Y, or Z
+      java.util.Map<String, List<AlbumDto>> filteredLetterMap = new java.util.HashMap<>();
+      for (java.util.Map.Entry<String, List<AlbumDto>> entry : this.letterMap.entrySet()) {
+
+        String key = entry.getKey();
+        List<AlbumDto> albumList = entry.getValue();
+
+        if (albumList != null && !albumList.isEmpty()) {
+          String upperKey = key.toUpperCase();
+          if (!upperKey.startsWith("X") && !upperKey.startsWith("Y") && !upperKey.startsWith("Z")) {
+            filteredLetterMap.put(key, albumList);
+          }
+        }
+      }
+
+      // Fall back to the original map if the filtered map ends up entirely empty
+      java.util.Map<String, List<AlbumDto>> selectionMap =
+          filteredLetterMap.isEmpty() ? this.letterMap : filteredLetterMap;
+
+      List<String> keys = new java.util.ArrayList<>(selectionMap.keySet());
       selectedLetter = keys.get(new java.util.Random().nextInt(keys.size()));
       startIndex = letterStartIndex(selectedLetter);
     }
