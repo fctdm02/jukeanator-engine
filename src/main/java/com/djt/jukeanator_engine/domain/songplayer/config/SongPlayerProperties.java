@@ -11,6 +11,8 @@ public class SongPlayerProperties {
    * VLC: All operating systems Winamp: Windows only
    */
   private String playerType = "vlc";
+  
+  private String winampExePath = "C:\\\\Program Files (x86)\\\\Winamp\\\\winamp.exe";
 
   /*
    * 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software
@@ -24,6 +26,14 @@ public class SongPlayerProperties {
 
   public void setPlayerType(String playerType) {
     this.playerType = playerType;
+  }
+
+  public String getWinampExePath() {
+    return winampExePath;
+  }
+
+  public void setWinampExePath(String winampExePath) {
+    this.winampExePath = winampExePath;
   }
 
   public int getVolume() {

@@ -83,7 +83,7 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
     OSType osType = OperatingSystemDetector.getOperatingSystem();
     if (this.playerType.equals("winamp") && osType == OSType.WINDOWS) {
 
-      this.player = new WinampMediaPlayer(this.volume);
+      this.player = new WinampMediaPlayer(songPlayerProperties.getWinampExePath(), this.volume);
 
     } else if (this.playerType.equals("vlc")) {
 

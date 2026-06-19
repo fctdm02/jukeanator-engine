@@ -38,6 +38,7 @@ song-queue:
 
 song-player:  
   player-type: vlc   # vlc or detached-vlc (all operating systems) | winamp (windows only)
+  winamp-exe-path: C:\\Program Files (x86)\\Winamp\\winamp.exe
   volume: 100 # 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software amplification)
   
 user:

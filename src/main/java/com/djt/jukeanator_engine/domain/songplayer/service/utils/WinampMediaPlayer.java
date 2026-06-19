@@ -54,6 +54,8 @@ import com.sun.jna.win32.W32APIOptions;
 public class WinampMediaPlayer implements Player {
 
   private static final Logger LOG = Logger.getLogger(WinampMediaPlayer.class.getName());
+  
+  private static final String DEFAULT_WINAMP_EXE_PATH = "C:\\Program Files (x86)\\Winamp\\winamp.exe";
 
   // -----------------------------------------------------------------------
   // Winamp window class name (unchanged across all 2.x / 5.x releases)
@@ -122,26 +124,24 @@ public class WinampMediaPlayer implements Player {
   }
 
   // -----------------------------------------------------------------------
-  // Constructors
+  // Constructor
   // -----------------------------------------------------------------------
-
-  /** Uses the default Winamp installation path and 100 % volume. */
-  public WinampMediaPlayer() {
-    this(100);
-  }
-
-  /** Uses the default Winamp installation path with the given initial volume (0-200). */
-  public WinampMediaPlayer(int initialVolume) {
-    this("C:\\Program Files (x86)\\Winamp\\winamp.exe", initialVolume);
-  }
-
   /**
-   * Full constructor.
    *
    * @param winampExePath absolute path to winamp.exe
    * @param initialVolume initial volume in the Player 0-200 scale
    */
   public WinampMediaPlayer(String winampExePath, int initialVolume) {
+    
+    File file = new File(winampExePath);
+    if (!file.exists()) {
+      file = new File(DEFAULT_WINAMP_EXE_PATH);
+      if (!file.exists()) {
+        
+        throw new RuntimeException("Cannot find winamp.exe at configured location: [" + winampExePath +"], nor at default location: [" + DEFAULT_WINAMP_EXE_PATH + "].  Please install Winamp and specify location in application.yml");
+      }
+    }
+    
     this.winampExePath = winampExePath;
     this.currentVolume = clampVolume(initialVolume);
   }
