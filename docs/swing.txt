@@ -952,6 +952,17 @@ DONE When the user clicks on the now playing song in the upper right hand corner
 
 DONE When the user cancels on add song to queue card, they should be taken back to the screen/panel that they were looking at before
   
+- Change SongQueueRoot to have song play history (and artist consecutive play history) be transient, so they are not persisted
+
+- Change album listing on AdminPanel to be text only (so it renders faster)
+
+- Albums are not sorted by popularity for artist detail panel
+
+- Random songs that should be excluded are not being excluded (Crazy Bitch)
+
+- Song queue is still not being auto-populated correctly
+
+  
 36: Move over the most relevant features from:
 
 PlayerVolume=75

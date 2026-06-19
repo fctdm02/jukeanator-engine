@@ -35,11 +35,6 @@ public class GenreDetailPanel extends JPanel {
 
   // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
 
-  // ── Preview row count (matches HotHerePanel) ──────────────────────────────
-  // Number of result rows visible at one time in each column.
-  // Tune this value if the screen resolution changes the visible row count.
-  private static final int PREVIEW_COUNT = 9;
-
   // ── Offset state per column ───────────────────────────────────────────────
   private int artistsOffset = 0;
   private int albumsOffset = 0;
@@ -100,7 +95,6 @@ public class GenreDetailPanel extends JPanel {
     } catch (Exception ignored) {
     }
 
-    // Subtitle: total counts across all three categories
     String subtitle =
         artists.size() + " artists  •  " + albums.size() + " albums  •  " + songs.size() + " songs";
 
@@ -126,7 +120,7 @@ public class GenreDetailPanel extends JPanel {
   private JButton btnReleaseDate;
 
   private JPanel buildSortButtonPanel() {
-    // Row of label + buttons, sized to its natural height
+
     JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
     row.setOpaque(false);
     row.setBorder(BorderFactory.createEmptyBorder(0, 16, 0, 8));
@@ -144,8 +138,6 @@ public class GenreDetailPanel extends JPanel {
     row.add(btnTitle);
     row.add(btnReleaseDate);
 
-    // BoxLayout Y_AXIS wrapper with glue above and below pushes the row
-    // to the vertical centre regardless of how tall the EAST slot grows.
     JPanel wrapper = new JPanel();
     wrapper.setLayout(new javax.swing.BoxLayout(wrapper, javax.swing.BoxLayout.Y_AXIS));
     wrapper.setOpaque(false);
@@ -157,6 +149,7 @@ public class GenreDetailPanel extends JPanel {
   }
 
   private JButton sortButton(String label, SortMode mode) {
+
     JButton btn = new JButton(label) {
       private static final long serialVersionUID = 1L;
 
@@ -168,7 +161,6 @@ public class GenreDetailPanel extends JPanel {
         boolean active = (currentSort == mode);
 
         if (active) {
-          // Blue gradient fill matching the column panel gradient accent
           g2.setPaint(new GradientPaint(0, 0, ColorTheme.get().navBtnGradTop, 0, getHeight(),
               ColorTheme.get().navBtnGradBottom));
         } else {
@@ -176,7 +168,6 @@ public class GenreDetailPanel extends JPanel {
         }
         g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
 
-        // Border
         g2.setColor(active ? ColorTheme.get().accentBlue : ColorTheme.get().detailHeaderBorder);
         g2.setStroke(new java.awt.BasicStroke(active ? 1.5f : 1.0f));
         g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
@@ -186,14 +177,16 @@ public class GenreDetailPanel extends JPanel {
       }
     };
 
-    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSortBtn));
     btn.setForeground(
         currentSort == mode ? ColorTheme.get().textPrimary : ColorTheme.get().textMuted);
     btn.setContentAreaFilled(false);
     btn.setBorderPainted(false);
     btn.setFocusPainted(false);
     btn.setOpaque(false);
-    btn.setPreferredSize(new Dimension(170, 42));
+    // Previously: new Dimension(170, 42) — hard-coded.
+    // Now sourced from LayoutTheme so a scaled theme can adjust button proportions.
+    btn.setPreferredSize(new Dimension(LayoutTheme.get().sortBtnW, LayoutTheme.get().sortBtnH));
     btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     btn.addActionListener(e -> applySortMode(mode));
@@ -214,11 +207,11 @@ public class GenreDetailPanel extends JPanel {
   }
 
   private void applySortMode(SortMode mode) {
+
     if (mode == currentSort)
       return;
     currentSort = mode;
 
-    // Reload data from service
     try {
       SearchResultDto fresh = switch (mode) {
         case POPULARITY -> songLibraryService.getGenreMusicByPopularity(genre.getGenreName());
@@ -233,12 +226,10 @@ public class GenreDetailPanel extends JPanel {
     } catch (Exception ignored) {
     }
 
-    // Reset offsets so we start at the top of the new ordering
     artistsOffset = 0;
     albumsOffset = 0;
     songsOffset = 0;
 
-    // Refresh active-state colours on the three toggle buttons
     for (JButton btn : new JButton[] {btnPopularity, btnTitle, btnReleaseDate}) {
       if (btn != null) {
         btn.setForeground(ColorTheme.get().textMuted);
@@ -259,25 +250,30 @@ public class GenreDetailPanel extends JPanel {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // COLUMN RENDERING (mirrors HotHerePanel#rebuildColumnsPanel)
+  // COLUMN RENDERING
   // ─────────────────────────────────────────────────────────────────────────
   private void rebuildColumns() {
 
+    // Previously: PREVIEW_COUNT was a local static constant (9).
+    // Now: sourced from LayoutTheme.get().genreDetailPreviewCount so it can be
+    // tuned per resolution (more rows fit on a taller / higher-DPI screen).
+    final int previewCount = LayoutTheme.get().genreDetailPreviewCount;
+
     columnsPanel.removeAll();
 
-    columnsPanel.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, PREVIEW_COUNT,
+    columnsPanel.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, previewCount,
         imageLoader, newOffset -> {
           artistsOffset = newOffset;
           rebuildColumns();
         }, item -> handleRowClick("ARTISTS", item)));
 
-    columnsPanel.add(ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, PREVIEW_COUNT,
+    columnsPanel.add(ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, previewCount,
         imageLoader, newOffset -> {
           albumsOffset = newOffset;
           rebuildColumns();
         }, item -> handleRowClick("ALBUMS", item)));
 
-    columnsPanel.add(ResultsColumnPanel.build("SONGS", songs, songsOffset, PREVIEW_COUNT,
+    columnsPanel.add(ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount,
         imageLoader, newOffset -> {
           songsOffset = newOffset;
           rebuildColumns();
@@ -288,7 +284,7 @@ public class GenreDetailPanel extends JPanel {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // ROW CLICK DISPATCH (mirrors HotHerePanel#handleRowClick)
+  // ROW CLICK DISPATCH
   // ─────────────────────────────────────────────────────────────────────────
   private <T> void handleRowClick(String category, T item) {
     switch (category) {

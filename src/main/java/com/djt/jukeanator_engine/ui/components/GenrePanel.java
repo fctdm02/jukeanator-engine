@@ -35,12 +35,6 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
   private static final long serialVersionUID = 1L;
 
-  // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
-
-
-  // ── Grid layout ───────────────────────────────────────────────────────────
-  private static final int GENRES_PER_PAGE = 12; // 2 rows × 6 cols
-
   // ── Card names ────────────────────────────────────────────────────────────
   private static final String CARD_GENRES = "GENRES";
   private static final String CARD_ALBUMS = "ALBUMS";
@@ -50,7 +44,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
   // ── Layout ────────────────────────────────────────────────────────────────
   private final CardLayout cardLayout = new CardLayout();
   private final JPanel rootPanel = new JPanel(cardLayout);
-  private final JPanel genresGridPanel = new JPanel(new GridLayout(2, 6, 20, 20));
+  private final JPanel genresGridPanel; // initialised from genreProfile in constructor
   private final JPanel genreAlbumsSlot = new JPanel(new BorderLayout());
 
   // ── Pagination ────────────────────────────────────────────────────────────
@@ -80,18 +74,26 @@ public class GenrePanel extends JPanel implements TabNavigator {
   private final int popularityT1;
   private final int popularityT2;
   private final int popularityT3;
-  private final int gridCols;
-  private final int gridRows;
-  private final int artW;
-  private final int artH;
+
+  // ── Resolution-aware grid profile for the album sub-grid (artist detail) ──
+  private final LayoutTheme.GridProfile albumGridProfile;
+
+  // ── Resolution-aware genre-tile grid profile ───────────────────────────────
+  private final LayoutTheme.GenreGridProfile genreProfile;
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
+  //
+  // The four raw grid parameters (gridCols, gridRows, artW, artH) that were
+  // previously passed in from JukeANatorFrame have been replaced by two
+  // pre-computed profile objects so that all pixel arithmetic stays inside
+  // LayoutTheme rather than leaking into the frame.
   // ─────────────────────────────────────────────────────────────────────────
   public GenrePanel(char incrementCreditsKey, CreditManager creditManager,
       SongLibraryService songLibraryService, SongQueueService songQueueService,
       ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
-      int popularityT3, int gridCols, int gridRows, int artW, int artH) {
+      int popularityT3, LayoutTheme.GridProfile albumGridProfile,
+      LayoutTheme.GenreGridProfile genreProfile) {
 
     this.incrementCreditsKey = incrementCreditsKey;
     this.creditManager = creditManager;
@@ -102,10 +104,14 @@ public class GenrePanel extends JPanel implements TabNavigator {
     this.popularityT1 = popularityT1;
     this.popularityT2 = popularityT2;
     this.popularityT3 = popularityT3;
-    this.gridCols = gridCols;
-    this.gridRows = gridRows;
-    this.artW = artW;
-    this.artH = artH;
+    this.albumGridProfile = albumGridProfile;
+    this.genreProfile = genreProfile;
+
+    // Build the genre tile grid with the profile-derived dimensions.
+    // Previously: new JPanel(new GridLayout(2, 6, 20, 20)) — hard-coded 2 rows, 6 cols.
+    // Now: rows and cols come from LayoutTheme.genreGridProfile(), gaps from LayoutTheme fields.
+    genresGridPanel = new JPanel(new GridLayout(genreProfile.rows(), genreProfile.cols(),
+        LayoutTheme.get().genreGridGapH, LayoutTheme.get().genreGridGapV));
 
     setLayout(new BorderLayout());
     setOpaque(false);
@@ -145,8 +151,9 @@ public class GenrePanel extends JPanel implements TabNavigator {
       if (genres != null)
         genres.forEach(genresListModel::addElement);
 
+      int tilesPerPage = genreProfile.tilesPerPage();
       int maxPage =
-          Math.max(0, (int) Math.ceil(genresListModel.size() / (double) GENRES_PER_PAGE) - 1);
+          Math.max(0, (int) Math.ceil(genresListModel.size() / (double) tilesPerPage) - 1);
       if (currentPage > maxPage)
         currentPage = maxPage;
 
@@ -204,7 +211,13 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     JPanel pageWrapper = new JPanel(new BorderLayout());
     pageWrapper.setOpaque(false);
-    pageWrapper.setBorder(new EmptyBorder(30, 60, 20, 60));
+    // Previously: new EmptyBorder(30, 60, 20, 60) — hard-coded pixels.
+    // Now sourced from LayoutTheme so portrait / small-screen themes can override them.
+    pageWrapper.setBorder(new EmptyBorder(LayoutTheme.get().genrePagePadV,
+        LayoutTheme.get().genrePagePadH, LayoutTheme.get().genrePagePadV / 2, // tighter bottom
+                                                                              // matches original
+                                                                              // 20px vs 30px ratio
+        LayoutTheme.get().genrePagePadH));
     pageWrapper.add(genresGridPanel, BorderLayout.CENTER);
 
     genresPaginationPanel.setBorder(new EmptyBorder(4, 16, 4, 16));
@@ -223,16 +236,19 @@ public class GenrePanel extends JPanel implements TabNavigator {
   }
 
   private void refreshGenresPage() {
+
     genresGridPanel.removeAll();
 
-    int start = currentPage * GENRES_PER_PAGE;
-    int end = Math.min(start + GENRES_PER_PAGE, genresListModel.size());
+    int tilesPerPage = genreProfile.tilesPerPage();
+    int start = currentPage * tilesPerPage;
+    int end = Math.min(start + tilesPerPage, genresListModel.size());
 
     for (int i = start; i < end; i++) {
       genresGridPanel.add(buildGenreTile(genresListModel.get(i)));
     }
 
-    for (int i = end; i < start + GENRES_PER_PAGE; i++) {
+    // Fill remaining slots with invisible placeholders to keep the grid uniform
+    for (int i = end; i < start + tilesPerPage; i++) {
       JPanel emptyPlaceholder = new JPanel();
       emptyPlaceholder.setOpaque(false);
       genresGridPanel.add(emptyPlaceholder);
@@ -246,8 +262,8 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     genresPaginationPanel.removeAll();
 
-    int totalPages =
-        Math.max(1, (int) Math.ceil(genresListModel.size() / (double) GENRES_PER_PAGE));
+    int tilesPerPage = genreProfile.tilesPerPage();
+    int totalPages = Math.max(1, (int) Math.ceil(genresListModel.size() / (double) tilesPerPage));
 
     JButton prevBtn = ButtonFactory.createNavigationButton("❮");
     prevBtn.addActionListener(e -> {
@@ -269,18 +285,21 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     JLabel pageLabel = new JLabel((currentPage + 1) + " / " + totalPages, SwingConstants.CENTER);
     pageLabel.setForeground(ColorTheme.get().textSecondary);
-    pageLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
+    pageLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizePageLabel));
 
     // Use a wrapper with a phantom button on each side so the label stays
     // centred even when only one navigation button is visible.
+    int btnW = LayoutTheme.get().genrePaginationBtnW;
+    int btnH = LayoutTheme.get().genrePaginationBtnH;
+
     JPanel prevWrapper = new JPanel(new BorderLayout());
     prevWrapper.setOpaque(false);
-    prevWrapper.setPreferredSize(new Dimension(140, 36)); // same as button preferred size
+    prevWrapper.setPreferredSize(new Dimension(btnW, btnH));
     prevWrapper.add(prevBtn, BorderLayout.CENTER);
 
     JPanel nextWrapper = new JPanel(new BorderLayout());
     nextWrapper.setOpaque(false);
-    nextWrapper.setPreferredSize(new Dimension(140, 36));
+    nextWrapper.setPreferredSize(new Dimension(btnW, btnH));
     nextWrapper.add(nextBtn, BorderLayout.CENTER);
 
     genresPaginationPanel.add(prevWrapper, BorderLayout.WEST);
@@ -302,7 +321,6 @@ public class GenrePanel extends JPanel implements TabNavigator {
       private boolean isHovered = false;
 
       {
-        // Attach lighting focus adapter properties locally
         addMouseListener(new java.awt.event.MouseAdapter() {
           @Override
           public void mouseEntered(java.awt.event.MouseEvent e) {
@@ -331,15 +349,13 @@ public class GenrePanel extends JPanel implements TabNavigator {
         int w = getWidth();
         int h = getHeight();
 
-        // Match SearchPanel Hero: Frosted glass backing plate translucent metrics
         if (isHovered) {
-          g2.setColor(ColorTheme.get().bgFrostedGlassHover); // Brightened backdrop glow
+          g2.setColor(ColorTheme.get().bgFrostedGlassHover);
         } else {
-          g2.setColor(ColorTheme.get().bgFrostedGlassRest); // Soft resting backdrop mesh
+          g2.setColor(ColorTheme.get().bgFrostedGlassRest);
         }
         g2.fillRoundRect(0, 0, w, h, 16, 16);
 
-        // Match SearchPanel Hero: Perimeter highlight rings
         if (isHovered) {
           g2.setColor(ColorTheme.get().accentBlue);
           g2.setStroke(new java.awt.BasicStroke(2.0f));
@@ -356,13 +372,19 @@ public class GenrePanel extends JPanel implements TabNavigator {
     };
 
     panel.setOpaque(false);
-    panel.setBorder(new EmptyBorder(16, 16, 16, 16)); // Internal component buffer clearance padding
+    // Previously: new EmptyBorder(16, 16, 16, 16) — hard-coded.
+    // Now sourced from LayoutTheme so all-sides padding scales with the theme.
+    int tilePad = LayoutTheme.get().genreTileInnerPad;
+    panel.setBorder(new EmptyBorder(tilePad, tilePad, tilePad, tilePad));
     panel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     JLabel imageLabel = new JLabel();
     imageLabel.setOpaque(false);
     imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
+    // Previously: imageLoader.loadImage(resource, 240, 240) — hard-coded 240px.
+    // Now: genreProfile.imageSize() supplies the resolution-scaled pixel size.
+    int imgSize = genreProfile.imageSize();
     String name = genre.getGenreName();
     try {
       ImageIcon cached = genreIconCache.get(name);
@@ -371,7 +393,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
       } else {
         String resource = name + ".png";
         if (getClass().getResource(resource) != null) {
-          ImageIcon icon = imageLoader.loadImage(resource, 240, 240);
+          ImageIcon icon = imageLoader.loadImage(resource, imgSize, imgSize);
           if (icon != null) {
             Image transparentStrippedImage =
                 ImageLoader.createTransparentImage(icon.getImage(), true, 245);
@@ -389,7 +411,8 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     JLabel textLabel = new JLabel(name.toUpperCase(), SwingConstants.CENTER);
     textLabel.setForeground(ColorTheme.get().textPrimary);
-    textLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 24));
+    textLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeGenreTileLabel));
     textLabel.setBorder(new EmptyBorder(10, 0, 10, 0));
     textLabel.setOpaque(false);
 
@@ -437,9 +460,10 @@ public class GenrePanel extends JPanel implements TabNavigator {
       throw new IllegalStateException("Could not get artist: [" + artistName + "]", e);
     }
 
-    ArtistDetailPanel panel =
-        new ArtistDetailPanel(full, imageLoader, gridCols, gridRows, artW, artH, "← BACK",
-            () -> cardLayout.show(rootPanel, CARD_ALBUMS), album -> pushAlbumDetail(album));
+    // Pass the albumGridProfile directly — ArtistDetailPanel now accepts a GridProfile
+    // instead of four raw ints, keeping the call-site clean.
+    ArtistDetailPanel panel = new ArtistDetailPanel(full, imageLoader, albumGridProfile, "← BACK",
+        () -> cardLayout.show(rootPanel, CARD_ALBUMS), album -> pushAlbumDetail(album));
 
     replaceCard(CARD_ARTIST, panel);
     cardLayout.show(rootPanel, CARD_ARTIST);

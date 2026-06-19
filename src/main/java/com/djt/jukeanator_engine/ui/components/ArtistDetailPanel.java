@@ -18,8 +18,8 @@ public class ArtistDetailPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
-  public ArtistDetailPanel(ArtistDto artist, ImageLoader imageLoader, int gridCols, int gridRows,
-      int artW, int artH, String backLabel, Runnable onBack,
+  public ArtistDetailPanel(ArtistDto artist, ImageLoader imageLoader,
+      LayoutTheme.GridProfile albumGridProfile, String backLabel, Runnable onBack,
       AlbumGridPanel.AlbumClickListener onAlbumClicked) {
 
     setLayout(new BorderLayout(0, 0));
@@ -74,7 +74,9 @@ public class ArtistDetailPanel extends JPanel {
     add(new DetailHeaderPanel(backLabel, onBack, artistImage, "♪", artist.getArtistName(),
         subtitle), BorderLayout.NORTH);
 
-    add(new AlbumGridPanel(albums, null, imageLoader, gridCols, gridRows, artW, artH,
-        onAlbumClicked, false), BorderLayout.CENTER);
+    // Unpack the profile here — AlbumGridPanel still receives four ints so its
+    // own API is unchanged. Only the call-site (ArtistDetailPanel) simplifies.
+    add(new AlbumGridPanel(albums, null, imageLoader, albumGridProfile, onAlbumClicked, false),
+        BorderLayout.CENTER);
   }
 }

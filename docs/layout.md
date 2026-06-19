@@ -261,3 +261,118 @@ All of the tuning values are named constants at the top of the private methods i
 | `GRID_MAX_ROWS_LANDSCAPE` | 5 | Hard cap on rows in landscape |
 | `GRID_MAX_COLS_PORTRAIT` | 4 | Hard cap on cols in portrait |
 | `GRID_MAX_ROWS_PORTRAIT` | 8 | Hard cap on rows in portrait |
+
+
+
+
+
+CLAUDE PROMPT:
+==============
+Now perform this layout refactoring for the Genres related screens/code
+
+
+
+
+CLAUDE RESPONSE:
+===============
+Let me read all the uploaded files carefully before touching anything.Good. Now I have the full picture. Let me map out every hardcoded value across all four files before writing a single line of output.Now I have a complete audit. Let me also check what `JukeANatorFrame` passes to `GenrePanel` and `buildGenresPanel`:Now I have everything. The pattern is identical to the Home screen change — `buildGenresPanel()` also passes the raw `HOME_GRID_*` constants instead of the grid profile. Here's the full plan before writing output:
+
+**`LayoutTheme.java`** — add a `genreGridProfile()` method and a `GenreGridProfile` record (mirroring `GridProfile`/`homeGridProfile`), plus expose the genre-tile grid constants that are currently hardcoded inside `GenrePanel`.
+
+**`JukeANatorFrame_GenrePanel_diff.java`** — show the one-line swap in `buildGenresPanel()`.
+
+**`GenrePanel.java`** — replace the local `GENRES_PER_PAGE` constant and the hardcoded `GridLayout(2, 6, 20, 20)` / image-size literals with `LayoutTheme` values; receive a `GenreGridProfile` instead of raw grid ints.
+
+**`GenreDetailPanel.java`** — replace the local `PREVIEW_COUNT = 9` constant and the hardcoded sort-button `Dimension(170, 42)` with `LayoutTheme` values.
+
+**`ArtistDetailPanel.java`** — already receives `gridCols/gridRows/artW/artH` as parameters; the only change is renaming those parameters to accept a `GridProfile` directly.
+
+**`ResultsColumnPanel.java`** — `previewCount` is already a parameter (good); the hardcoded row/thumb/navBtn pixel values (`72`, `56`, `36`, `75`, `45`) need to pull from `LayoutTheme`.All constants are already in `LayoutTheme`. Now I need to add `GenreGridProfile` and `genreGridProfile()` to `LayoutTheme`, then update the four component files. Let me update `LayoutTheme` first:Now write the four updated component files:Now the `JukeANatorFrame` diff for the Genres panel:Here's a full walkthrough of every decision made.
+
+---
+
+## What changed and why — file by file
+
+### `LayoutTheme.java` — one new profile type added
+
+`GenreGridProfile(cols, rows, imageSize)` and `genreGridProfile(screenW, screenH)` were added, directly mirroring the `GridProfile`/`homeGridProfile` pattern from the previous pass. The genre grid has structurally different fixed chrome than the album grid (no letter-nav strip, no per-tile text panel — those are baked into the tile itself), so it gets its own tuning constants:
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `GENRE_LABEL_H` | 44px | Text label + padding below each tile |
+| `GENRE_PORTRAIT_IMG_REDUCTION` | 0.80× | Extra shrink on portrait short axis |
+| `GENRE_MAX_COLS_LANDSCAPE` | 8 | Cap for very wide / 4K screens |
+| `GENRE_MAX_ROWS_LANDSCAPE` | 4 | Genres rarely need more than 4 rows |
+| `GENRE_MAX_COLS_PORTRAIT` | 2 | Narrow portrait widths |
+| `GENRE_MAX_ROWS_PORTRAIT` | 6 | More rows available in tall portrait |
+
+All existing fields (`genreGridCols`, `genreGridRows`, `genreImageSize`, `genreDetailPreviewCount`, `sortBtnW/H`, `resultRowMaxH`, `resultThumbSize`, `resultNumLabelW`, `resultNavBtnW/H`) were already present — no new fields needed.
+
+---
+
+### `GenrePanel.java` — two profiles replace four raw ints
+
+**Constructor signature** changed from `(... int gridCols, int gridRows, int artW, int artH)` to `(... LayoutTheme.GridProfile albumGridProfile, LayoutTheme.GenreGridProfile genreProfile)`. This is the same consolidation done for `HomePanel` — callers no longer unpack four related ints separately.
+
+**Three hardcoded values replaced:**
+
+| Was | Now |
+|---|---|
+| `new GridLayout(2, 6, 20, 20)` field initialiser | `new GridLayout(genreProfile.rows(), genreProfile.cols(), lt.genreGridGapH, lt.genreGridGapV)` — moved into constructor so the profile is available |
+| `GENRES_PER_PAGE = 12` local constant | `genreProfile.tilesPerPage()` — derived from cols × rows |
+| `imageLoader.loadImage(resource, 240, 240)` | `imageLoader.loadImage(resource, imgSize, imgSize)` where `imgSize = genreProfile.imageSize()` |
+| `new EmptyBorder(30, 60, 20, 60)` page wrapper | `LayoutTheme.get().genrePagePadV / genrePagePadH` |
+| `new Dimension(140, 36)` pagination wrappers | `lt.genrePaginationBtnW / H` |
+
+The `genresGridPanel` field moved from a field initialiser (`= new JPanel(new GridLayout(2,6,...))`) to being assigned in the constructor, because the profile isn't available until the constructor runs. This is the only structural change to the class.
+
+---
+
+### `ArtistDetailPanel.java` — four ints collapsed to one profile
+
+The constructor now accepts `LayoutTheme.GridProfile gridProfile` instead of `(int gridCols, int gridRows, int artW, int artH)`. Internally it unpacks into the four ints when calling `AlbumGridPanel` so `AlbumGridPanel`'s own API is completely unchanged. The only callers are `GenrePanel.pushArtistFromGenre()` (updated) and `HomePanel.showArtist()` — that one is noted in the diff as a follow-up touch.
+
+---
+
+### `GenreDetailPanel.java` — one constant, one Dimension
+
+| Was | Now |
+|---|---|
+| `private static final int PREVIEW_COUNT = 9` | `final int previewCount = LayoutTheme.get().genreDetailPreviewCount` read at the top of `rebuildColumns()` |
+| `btn.setPreferredSize(new Dimension(170, 42))` | `new Dimension(lt.sortBtnW, lt.sortBtnH)` |
+
+The `PREVIEW_COUNT` was a local constant that duplicated `LayoutTheme.genreDetailPreviewCount`. It's now read at call-time so a portrait theme (with more vertical space available) can increase it without touching the panel.
+
+---
+
+### `ResultsColumnPanel.java` — all hardcoded pixel sizes eliminated
+
+This class is shared by Genres, Hot Here, and Search, so cleaning it here benefits all three tabs at once. Every previously hardcoded dimension is now sourced from a `LayoutTheme lt` snapshot taken at the top of `build()`:
+
+| Was | Now |
+|---|---|
+| `new EmptyBorder(0, 10, 0, 10)` outer column | `lt.resultColumnPadH` |
+| `row.setMaximumSize(..., 72)` | `lt.resultRowMaxH` |
+| `numLabel.setPreferredSize(36, 56)` | `lt.resultNumLabelW × lt.resultThumbSize` |
+| `thumb.setPreferredSize(56, 56)` | `lt.resultThumbSize` (square) |
+| `imageLoader.loadFilesystemImage(path, 56, 56)` | `lt.resultThumbSize` |
+| `btn.setPreferredSize(75, 45)` nav button | `lt.resultNavBtnW × lt.resultNavBtnH` |
+| `buildEmptyRow` maxSize 72 | `lt.resultRowMaxH` |
+
+The `LayoutTheme lt` reference is passed through the private helpers (`buildItemRow`, `buildEmptyRow`, `navButton`) as a parameter rather than calling `LayoutTheme.get()` on every row — one singleton lookup per `build()` call instead of one per row.
+
+---
+
+### `JukeANatorFrame` diff — two additions, one replacement
+
+```
+// ADD field
+private LayoutTheme.GenreGridProfile genreGridProfile;
+
+// ADD in initialize(), after homeGridProfile line
+genreGridProfile = LayoutTheme.get().genreGridProfile(screenWidth, screenHeight);
+
+// REPLACE buildGenresPanel() last two arguments
+homeGridProfile,    // album sub-grid used by ArtistDetailPanel
+genreGridProfile    // genre-tile grid
+```

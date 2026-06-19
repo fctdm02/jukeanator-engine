@@ -47,10 +47,6 @@ public class AlbumGridPanel extends JPanel {
   private final List<AlbumDto> albums;
   private final Map<String, List<AlbumDto>> letterMap; // "#", "A"–"Z" → albums
   private final ImageLoader imageLoader;
-  private final int cols;
-  private final int rows;
-  private final int artW;
-  private final int artH;
   private final AlbumClickListener listener;
   private final boolean showLetterNav; // true only for the full "All Albums" grid in HomePanel
 
@@ -61,6 +57,9 @@ public class AlbumGridPanel extends JPanel {
   private final JPanel gridPanel = new JPanel();
   private final JPanel navPanel = new JPanel(new BorderLayout(8, 0));
 
+  // ── Resolution-aware grid profile for the album sub-grid (artist detail) ──
+  private final LayoutTheme.GridProfile albumGridProfile;
+
   // ── Callback ──────────────────────────────────────────────────────────────
   public interface AlbumClickListener {
     void onAlbumClicked(AlbumDto album);
@@ -70,16 +69,13 @@ public class AlbumGridPanel extends JPanel {
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
   public AlbumGridPanel(List<AlbumDto> albums, Map<String, List<AlbumDto>> letterMap,
-      ImageLoader imageLoader, int cols, int rows, int artW, int artH, AlbumClickListener listener,
-      boolean showLetterNav) {
+      ImageLoader imageLoader, LayoutTheme.GridProfile albumGridProfile,
+      AlbumClickListener listener, boolean showLetterNav) {
 
     this.albums = albums != null ? albums : List.of();
     this.letterMap = letterMap != null ? letterMap : Map.of();
     this.imageLoader = imageLoader;
-    this.cols = cols;
-    this.rows = rows;
-    this.artW = artW;
-    this.artH = artH;
+    this.albumGridProfile = albumGridProfile;
     this.listener = listener;
     this.showLetterNav = showLetterNav;
 
@@ -145,7 +141,7 @@ public class AlbumGridPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   private void refresh() {
 
-    int pageSize = cols * rows;
+    int pageSize = albumGridProfile.cols() * albumGridProfile.rows();
     int total = albums.size();
 
     // Clamp startIndex to valid range
@@ -159,7 +155,7 @@ public class AlbumGridPanel extends JPanel {
 
     // ── Grid ──────────────────────────────────────────────────────────────
     gridPanel.removeAll();
-    gridPanel.setLayout(new GridLayout(rows, cols, 10, 10));
+    gridPanel.setLayout(new GridLayout(albumGridProfile.rows(), albumGridProfile.cols(), 10, 10));
     gridPanel.setBorder(new EmptyBorder(8, 12, 4, 12));
 
     for (int i = start; i < end; i++) {
@@ -478,7 +474,8 @@ public class AlbumGridPanel extends JPanel {
 
     if (album.getCoverArtPath() != null) {
       try {
-        ImageIcon icon = imageLoader.loadFilesystemImage(album.getCoverArtPath(), artW, artH);
+        ImageIcon icon = imageLoader.loadFilesystemImage(album.getCoverArtPath(),
+            albumGridProfile.artW(), albumGridProfile.artH());
         if (icon != null)
           artLabel.setIcon(icon);
       } catch (Exception ignored) {
@@ -488,9 +485,9 @@ public class AlbumGridPanel extends JPanel {
     if (artLabel.getIcon() == null) {
       // Fallback: fix a size so the musical note placeholder occupies the right space
       artLabel.setText("♫");
-      artLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, artH / 3));
+      artLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, albumGridProfile.artH() / 3));
       artLabel.setForeground(ColorTheme.get().sidebarPlaceholderFg);
-      artLabel.setPreferredSize(new Dimension(artW, artH));
+      artLabel.setPreferredSize(new Dimension(albumGridProfile.artW(), albumGridProfile.artH()));
     }
 
     artWrapper.add(artLabel);

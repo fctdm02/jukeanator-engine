@@ -58,10 +58,9 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   private final int popularityT1;
   private final int popularityT2;
   private final int popularityT3;
-  private final int gridCols;
-  private final int gridRows;
-  private final int artW;
-  private final int artH;
+
+  // ── Resolution-aware grid profile for the album sub-grid (artist detail) ──
+  private final LayoutTheme.GridProfile albumGridProfile;
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -69,7 +68,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   public HotHerePanel(char incrementCreditsKey, CreditManager creditManager,
       SongLibraryService songLibraryService, SongQueueService songQueueService,
       ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
-      int popularityT3, int gridCols, int gridRows, int artW, int artH) {
+      int popularityT3, LayoutTheme.GridProfile albumGridProfile) {
 
     this.incrementCreditsKey = incrementCreditsKey;
     this.creditManager = creditManager;
@@ -80,10 +79,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     this.popularityT1 = popularityT1;
     this.popularityT2 = popularityT2;
     this.popularityT3 = popularityT3;
-    this.gridCols = gridCols;
-    this.gridRows = gridRows;
-    this.artW = artW;
-    this.artH = artH;
+    this.albumGridProfile = albumGridProfile;
 
     setLayout(new BorderLayout());
     setOpaque(false);
@@ -260,9 +256,8 @@ public class HotHerePanel extends JPanel implements TabNavigator {
       throw new IllegalStateException("Could not get artist: [" + artistName + "]", e);
     }
 
-    ArtistDetailPanel panel =
-        new ArtistDetailPanel(full, imageLoader, gridCols, gridRows, artW, artH, "← BACK",
-            () -> cardLayout.show(rootPanel, CARD_CONTENT), album -> pushAlbumDetail(album));
+    ArtistDetailPanel panel = new ArtistDetailPanel(full, imageLoader, albumGridProfile, "← BACK",
+        () -> cardLayout.show(rootPanel, CARD_CONTENT), album -> pushAlbumDetail(album));
 
     replaceCard(CARD_ARTIST, panel);
     cardLayout.show(rootPanel, CARD_ARTIST);

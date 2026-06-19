@@ -54,8 +54,6 @@ public class JukeANatorFrame extends JFrame {
   private static final int POPULARITY_THRESHOLD_2 = 25;
   private static final int POPULARITY_THRESHOLD_3 = 50;
 
-  // COLORS — all sourced from ColorTheme.get()
-
   // TOP PANEL
   private final CreditManager creditManager;
   private JLabel creditsTitle;
@@ -71,7 +69,7 @@ public class JukeANatorFrame extends JFrame {
    * <em>before</em> {@link #buildHomePanel()} is called, so the value is always available when the
    * panel is constructed.
    */
-  private LayoutTheme.GridProfile homeGridProfile;
+  private LayoutTheme.GridProfile albumGridProfile;
   private HomePanel homePanel;
 
   // SEARCH TAB
@@ -82,6 +80,13 @@ public class JukeANatorFrame extends JFrame {
   private HotHerePanel hotHerePanel;
 
   // GENRE TAB
+  /**
+   * Genre-tile grid profile for the Genres screen, computed once from the
+   * actual screen dimensions.  Passed to GenrePanel instead of the raw
+   * HOME_GRID_* constants.
+   */
+  private LayoutTheme.GenreGridProfile genreGridProfile;
+  
   private GenrePanel genrePanel;
 
   // QUEUE TAB
@@ -254,7 +259,8 @@ public class JukeANatorFrame extends JFrame {
     // ── Compute the Home grid profile for the actual screen dimensions ────────
     // screenWidth / screenHeight are already populated from GraphicsEnvironment
     // at field-initialisation time (lines 158-162 in the original).
-    homeGridProfile = LayoutTheme.get().homeGridProfile(screenWidth, screenHeight);
+    albumGridProfile = LayoutTheme.get().homeGridProfile(screenWidth, screenHeight);
+    genreGridProfile = LayoutTheme.get().genreGridProfile(screenWidth, screenHeight);
 
     //
     // TOP 10%
@@ -738,8 +744,7 @@ public class JukeANatorFrame extends JFrame {
 
     return new HomePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
         imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3, homeGridProfile.cols(), homeGridProfile.rows(),
-        homeGridProfile.artW(), homeGridProfile.artH());
+        POPULARITY_THRESHOLD_3, albumGridProfile);
   }
 
   // ============================================================
@@ -749,8 +754,7 @@ public class JukeANatorFrame extends JFrame {
 
     return new SearchPanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
         imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3, enableTypeAheadSearch, homeGridProfile.cols(),
-        homeGridProfile.rows(), homeGridProfile.artW(), homeGridProfile.artH());
+        POPULARITY_THRESHOLD_3, enableTypeAheadSearch, albumGridProfile);
   }
 
   // ============================================================
@@ -760,8 +764,7 @@ public class JukeANatorFrame extends JFrame {
 
     return new HotHerePanel(incrementCreditsKey, creditManager, songLibraryService,
         songQueueService, imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1,
-        POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, homeGridProfile.cols(),
-        homeGridProfile.rows(), homeGridProfile.artW(), homeGridProfile.artH());
+        POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, albumGridProfile);
   }
 
   // ============================================================
@@ -769,11 +772,19 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private GenrePanel buildGenresPanel() {
 
-    return new GenrePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
-        imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3, homeGridProfile.cols(), homeGridProfile.rows(),
-        homeGridProfile.artW(), homeGridProfile.artH());
-  }
+    return new GenrePanel(
+        incrementCreditsKey,
+        creditManager,
+        songLibraryService,
+        songQueueService,
+        imageLoader,
+        priorityCostMultiplier,
+        POPULARITY_THRESHOLD_1,
+        POPULARITY_THRESHOLD_2,
+        POPULARITY_THRESHOLD_3,
+        albumGridProfile,      // album sub-grid (artist detail within Genres tab)
+        genreGridProfile);    // genre-tile grid (top-level genre picker)
+  }  
 
   // ============================================================
   // ADMIN PANEL

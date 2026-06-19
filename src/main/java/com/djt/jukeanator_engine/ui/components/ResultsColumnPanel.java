@@ -26,7 +26,12 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 
 /**
- * Shared factory for the "ARTISTS / ALBUMS / SONGS" three-column result layout
+ * Shared factory for the "ARTISTS / ALBUMS / SONGS" three-column result layout.
+ *
+ * <p>
+ * All pixel dimensions are sourced from {@link LayoutTheme} so that a different-resolution or
+ * portrait-mode theme automatically adjusts every row height, thumbnail size, and navigation button
+ * size without touching this class.
  */
 public final class ResultsColumnPanel {
 
@@ -37,16 +42,25 @@ public final class ResultsColumnPanel {
   // ─────────────────────────────────────────────────────────────────────────
   // FACTORY METHOD
   // ─────────────────────────────────────────────────────────────────────────
+
   /**
-   * Builds a paginated column view panel. * @param onOffsetChanged Callback accepting the newly
-   * calculated integer offset when navigating pages.
+   * Builds a paginated column view panel.
+   *
+   * @param onOffsetChanged callback accepting the newly calculated integer offset when navigating
+   *        pages
    */
   public static <T> JPanel build(String header, List<T> items, int offset, int previewCount,
       ImageLoader imageLoader, Consumer<Integer> onOffsetChanged, Consumer<T> onItemClick) {
 
+    // Snapshot the LayoutTheme once per build call so we read a consistent set
+    // of values even if the singleton were to change between calls.
+    final LayoutTheme lt = LayoutTheme.get();
+
     JPanel outerColumn = new JPanel(new BorderLayout());
     outerColumn.setOpaque(false);
-    outerColumn.setBorder(new EmptyBorder(0, 10, 0, 10));
+    // Previously: new EmptyBorder(0, 10, 0, 10) — hard-coded 10px.
+    // Now: lt.resultColumnPadH so it scales with the theme.
+    outerColumn.setBorder(new EmptyBorder(0, lt.resultColumnPadH, 0, lt.resultColumnPadH));
 
     String displayTitle = header.substring(0, 1).toUpperCase() + header.substring(1).toLowerCase();
     int total = items.size();
@@ -57,7 +71,7 @@ public final class ResultsColumnPanel {
 
     JLabel headerLabel = new JLabel(displayTitle + " (" + total + ")");
     headerLabel.setForeground(ColorTheme.get().textPrimary);
-    headerLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+    headerLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, lt.fontSizeResultHeader));
     headerPanel.add(headerLabel, BorderLayout.WEST);
 
     JPanel innerColumnBody = new JPanel(new BorderLayout()) {
@@ -86,9 +100,9 @@ public final class ResultsColumnPanel {
 
     for (int slot = 0; slot < previewCount; slot++) {
       int idx = offset + slot;
-      JPanel row =
-          (idx < total) ? buildItemRow(idx + 1, items.get(idx), header, imageLoader, onItemClick)
-              : buildEmptyRow();
+      JPanel row = (idx < total)
+          ? buildItemRow(idx + 1, items.get(idx), header, imageLoader, onItemClick, lt)
+          : buildEmptyRow(lt);
       rowsPanel.add(row);
       if (slot < previewCount - 1) {
         JSeparator sep = new JSeparator();
@@ -98,12 +112,11 @@ public final class ResultsColumnPanel {
       }
     }
 
-    // Navigation Layout container (Made transparent to allow background column gradient through)
     JPanel navPanel = new JPanel(new BorderLayout(8, 0));
     navPanel.setBackground(ColorTheme.get().bgFieldDark);
     navPanel.setBorder(new EmptyBorder(8, 12, 12, 12));
 
-    JButton upBtn = navButton(true);
+    JButton upBtn = navButton(true, lt);
     upBtn.setEnabled(offset > 0);
     upBtn.addActionListener(e -> {
       if (onOffsetChanged != null) {
@@ -112,7 +125,7 @@ public final class ResultsColumnPanel {
       }
     });
 
-    JButton downBtn = navButton(false);
+    JButton downBtn = navButton(false, lt);
     downBtn.setEnabled(offset + previewCount < total);
     downBtn.addActionListener(e -> {
       if (onOffsetChanged != null) {
@@ -138,31 +151,37 @@ public final class ResultsColumnPanel {
   // ─────────────────────────────────────────────────────────────────────────
 
   private static <T> JPanel buildItemRow(int rowNum, T item, String category,
-      ImageLoader imageLoader, Consumer<T> onItemClick) {
+      ImageLoader imageLoader, Consumer<T> onItemClick, LayoutTheme lt) {
 
     JPanel row = new JPanel(new BorderLayout(10, 0));
     row.setOpaque(false);
     row.setBackground(ColorTheme.get().bgRowTransparent);
     row.setBorder(new EmptyBorder(8, 14, 8, 14));
-    row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
+    // Previously: new Dimension(Integer.MAX_VALUE, 72) — hard-coded 72px max height.
+    // Now: lt.resultRowMaxH so a scaled theme can increase row height proportionally.
+    row.setMaximumSize(new Dimension(Integer.MAX_VALUE, lt.resultRowMaxH));
     row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
+    // Previously: new Dimension(36, 56) — hard-coded.
+    // Now: lt.resultNumLabelW × lt.resultThumbSize.
     JLabel numLabel = new JLabel(String.format("%02d", rowNum));
     numLabel.setForeground(ColorTheme.get().textResultsSecondary);
-    numLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
-    numLabel.setPreferredSize(new Dimension(36, 56));
+    numLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, lt.fontSizeResultNum));
+    numLabel.setPreferredSize(new Dimension(lt.resultNumLabelW, lt.resultThumbSize));
     numLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
+    // Previously: new Dimension(56, 56) — hard-coded.
+    // Now: lt.resultThumbSize (square).
     JLabel thumb = new JLabel();
-    thumb.setPreferredSize(new Dimension(56, 56));
+    thumb.setPreferredSize(new Dimension(lt.resultThumbSize, lt.resultThumbSize));
     thumb.setHorizontalAlignment(SwingConstants.CENTER);
     thumb.setOpaque(true);
     thumb.setBackground(ColorTheme.get().bgThumb);
 
     JLabel line1 = new JLabel();
     JLabel line2 = new JLabel();
-    line1.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 17));
-    line2.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
+    line1.setFont(new Font(Font.SANS_SERIF, Font.BOLD, lt.fontSizeResultLine1));
+    line2.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, lt.fontSizeResultLine2));
     line1.setForeground(ColorTheme.get().textPrimary);
     line2.setForeground(ColorTheme.get().textResultsSecondary);
 
@@ -170,7 +189,8 @@ public final class ResultsColumnPanel {
 
     if (coverPath != null && imageLoader != null) {
       try {
-        ImageIcon icon = imageLoader.loadFilesystemImage(coverPath, 56, 56);
+        ImageIcon icon =
+            imageLoader.loadFilesystemImage(coverPath, lt.resultThumbSize, lt.resultThumbSize);
         if (icon != null)
           thumb.setIcon(icon);
       } catch (Exception ignored) {
@@ -244,11 +264,12 @@ public final class ResultsColumnPanel {
     return null;
   }
 
-  private static JPanel buildEmptyRow() {
+  private static JPanel buildEmptyRow(LayoutTheme lt) {
     JPanel row = new JPanel(new BorderLayout());
     row.setOpaque(false);
     row.setBorder(new EmptyBorder(8, 10, 8, 10));
-    row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
+    // Previously: new Dimension(Integer.MAX_VALUE, 72) — hard-coded.
+    row.setMaximumSize(new Dimension(Integer.MAX_VALUE, lt.resultRowMaxH));
     return row;
   }
 
@@ -256,7 +277,8 @@ public final class ResultsColumnPanel {
   // FIXED NAV BUTTON: ISOSCELES GEOMETRY VECTOR ENGINE & GLASS OVERLAY
   // ─────────────────────────────────────────────────────────────────────────
 
-  private static JButton navButton(final boolean isUpDirection) {
+  private static JButton navButton(final boolean isUpDirection, LayoutTheme lt) {
+
     JButton btn = new JButton() {
       private static final long serialVersionUID = 1L;
 
@@ -311,7 +333,9 @@ public final class ResultsColumnPanel {
     btn.setBorderPainted(false);
     btn.setFocusPainted(false);
 
-    btn.setPreferredSize(new Dimension(75, 45));
+    // Previously: new Dimension(75, 45) — hard-coded.
+    // Now: lt.resultNavBtnW × lt.resultNavBtnH.
+    btn.setPreferredSize(new Dimension(lt.resultNavBtnW, lt.resultNavBtnH));
     btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     btn.setForeground(ColorTheme.get().textPrimary);

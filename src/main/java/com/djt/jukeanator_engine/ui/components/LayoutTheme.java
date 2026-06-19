@@ -299,6 +299,141 @@ public final class LayoutTheme {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // GENRE GRID PROFILE — resolution- and orientation-aware genre-tile grid
+  //
+  // Mirrors the homeGridProfile() design. The genre grid is structurally
+  // different from the album grid (no letter-nav strip, no per-tile text
+  // panel, fixed square image tiles) so it gets its own profile type and
+  // its own scaling method.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Immutable value-object that bundles the genre-tile grid dimensions.
+   *
+   * <p>
+   * Obtain instances via {@link LayoutTheme#genreGridProfile(int, int)}.
+   *
+   * @param cols number of genre tile columns per page
+   * @param rows number of genre tile rows per page
+   * @param imageSize pixel size (square) of each genre tile image
+   */
+  public record GenreGridProfile(int cols, int rows, int imageSize) {
+
+    /** Total tiles visible on one page ({@code cols × rows}). */
+    public int tilesPerPage() {
+      return cols * rows;
+    }
+  }
+
+  /**
+   * Computes a {@link GenreGridProfile} for the given screen dimensions.
+   *
+   * <h3>Algorithm</h3>
+   * <ol>
+   * <li><b>Orientation check</b> — portrait when {@code screenH > screenW}.</li>
+   * <li><b>Scale factor</b> — {@code min(screenW/1920, screenH/1080)}, clamped to
+   * [{@value #GENRE_SCALE_MIN}, {@value #GENRE_SCALE_MAX}].</li>
+   * <li><b>Image size</b> — the canonical {@value #genreImageSize}px image is scaled and rounded to
+   * an even integer.</li>
+   * <li><b>Grid dimensions</b> — available content area (screen minus fixed top-panel, tab bar,
+   * genre page padding, and label height below each tile) divided by the scaled tile size.</li>
+   * </ol>
+   *
+   * <h3>Portrait mode</h3> Fewer columns (default cap 2), more rows (default cap 6), with a further
+   * {@value #GENRE_PORTRAIT_IMG_REDUCTION}× image reduction to keep tiles comfortable on the
+   * narrower short axis.
+   *
+   * @param screenW current screen width in pixels
+   * @param screenH current screen height in pixels
+   * @return a {@link GenreGridProfile} ready to pass to {@link GenrePanel}
+   */
+  public GenreGridProfile genreGridProfile(int screenW, int screenH) {
+
+    boolean portrait = screenH > screenW;
+    return portrait ? computePortraitGenreProfile(screenW, screenH)
+        : computeLandscapeGenreProfile(screenW, screenH);
+  }
+
+  // ── Landscape ─────────────────────────────────────────────────────────────
+
+  private GenreGridProfile computeLandscapeGenreProfile(int screenW, int screenH) {
+
+    double scaleX = (double) screenW / CANONICAL_W;
+    double scaleY = (double) screenH / CANONICAL_H;
+    double scale = Math.min(scaleX, scaleY);
+    scale = Math.max(GENRE_SCALE_MIN, Math.min(scale, GENRE_SCALE_MAX));
+
+    int imageSize = roundEven((int) Math.round(genreImageSize * scale));
+
+    // Available height: subtract top panel, tab bar, vertical page padding (top+bottom),
+    // and the genre label height below each tile (~40px incl. EmptyBorder(10,0,10,0)).
+    int availH = screenH - topPanelHeight - tabHeight - (genrePagePadV * 2) - GENRE_LABEL_H;
+
+    // Available width: subtract horizontal page padding (left+right).
+    int availW = screenW - (genrePagePadH * 2);
+
+    // Tile size includes the inter-tile gap.
+    int tileW = imageSize + genreGridGapH;
+    int tileH = imageSize + genreGridGapV + GENRE_LABEL_H;
+
+    int cols = Math.max(1, availW / tileW);
+    int rows = Math.max(1, availH / tileH);
+
+    cols = Math.min(cols, GENRE_MAX_COLS_LANDSCAPE);
+    rows = Math.min(rows, GENRE_MAX_ROWS_LANDSCAPE);
+
+    return new GenreGridProfile(cols, rows, imageSize);
+  }
+
+  // ── Portrait ──────────────────────────────────────────────────────────────
+
+  private GenreGridProfile computePortraitGenreProfile(int screenW, int screenH) {
+
+    double scale = (double) screenW / CANONICAL_W;
+    scale = Math.max(GENRE_SCALE_MIN, Math.min(scale, GENRE_SCALE_MAX));
+
+    int imageSize =
+        roundEven((int) Math.round(genreImageSize * scale * GENRE_PORTRAIT_IMG_REDUCTION));
+
+    int availH = screenH - topPanelHeight - tabHeight - (genrePagePadV * 2) - GENRE_LABEL_H;
+    int availW = screenW - (genrePagePadH * 2);
+
+    int tileW = imageSize + genreGridGapH;
+    int tileH = imageSize + genreGridGapV + GENRE_LABEL_H;
+
+    int cols = Math.max(1, availW / tileW);
+    int rows = Math.max(1, availH / tileH);
+
+    cols = Math.min(cols, GENRE_MAX_COLS_PORTRAIT);
+    rows = Math.min(rows, GENRE_MAX_ROWS_PORTRAIT);
+
+    return new GenreGridProfile(cols, rows, imageSize);
+  }
+
+  // ── Genre grid-profile tuning constants ───────────────────────────────────
+
+  /** Minimum allowed scale factor for the genre grid. */
+  private static final double GENRE_SCALE_MIN = 0.40;
+
+  /** Maximum allowed scale factor for the genre grid. */
+  private static final double GENRE_SCALE_MAX = 1.50;
+
+  /**
+   * Approximate height of the genre text label below each tile image (font 24px +
+   * EmptyBorder(10,0,10,0) top+bottom = ~44px).
+   */
+  private static final int GENRE_LABEL_H = 44;
+
+  /** Extra art reduction applied in portrait mode. */
+  private static final double GENRE_PORTRAIT_IMG_REDUCTION = 0.80;
+
+  // Maximum genre grid dimensions
+  private static final int GENRE_MAX_COLS_LANDSCAPE = 8;
+  private static final int GENRE_MAX_ROWS_LANDSCAPE = 4;
+  private static final int GENRE_MAX_COLS_PORTRAIT = 2;
+  private static final int GENRE_MAX_ROWS_PORTRAIT = 6;
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // FRAME / TOP-PANEL
   // Origin: JukeANatorFrame#buildTopPanel
   // ═══════════════════════════════════════════════════════════════════════════
