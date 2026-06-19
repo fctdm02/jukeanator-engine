@@ -62,10 +62,16 @@ public class JukeANatorFrame extends JFrame {
   private JPanel nowPlayingPanel;
 
   // HOME TAB
-  private static final int HOME_GRID_COLS = 4;
-  private static final int HOME_GRID_ROWS = 3;
-  private static final int HOME_TILE_ART_W = 190;
-  private static final int HOME_TILE_ART_H = 190;
+  /**
+   * Grid layout profile for the Home screen, computed once from the actual screen dimensions so
+   * that the album grid fills the available space correctly on any resolution or orientation.
+   *
+   * <p>
+   * Initialised in {@link #initialize()} (which runs on the AWT thread via the constructor)
+   * <em>before</em> {@link #buildHomePanel()} is called, so the value is always available when the
+   * panel is constructed.
+   */
+  private LayoutTheme.GridProfile homeGridProfile;
   private HomePanel homePanel;
 
   // SEARCH TAB
@@ -244,6 +250,11 @@ public class JukeANatorFrame extends JFrame {
     };
     contentPane.setOpaque(false);
     setContentPane(contentPane);
+
+    // ── Compute the Home grid profile for the actual screen dimensions ────────
+    // screenWidth / screenHeight are already populated from GraphicsEnvironment
+    // at field-initialisation time (lines 158-162 in the original).
+    homeGridProfile = LayoutTheme.get().homeGridProfile(screenWidth, screenHeight);
 
     //
     // TOP 10%
@@ -727,7 +738,8 @@ public class JukeANatorFrame extends JFrame {
 
     return new HomePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
         imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3, HOME_GRID_COLS, HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
+        POPULARITY_THRESHOLD_3, homeGridProfile.cols(), homeGridProfile.rows(),
+        homeGridProfile.artW(), homeGridProfile.artH());
   }
 
   // ============================================================
@@ -737,8 +749,8 @@ public class JukeANatorFrame extends JFrame {
 
     return new SearchPanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
         imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3, enableTypeAheadSearch, HOME_GRID_COLS, HOME_GRID_ROWS,
-        HOME_TILE_ART_W, HOME_TILE_ART_H);
+        POPULARITY_THRESHOLD_3, enableTypeAheadSearch, homeGridProfile.cols(),
+        homeGridProfile.rows(), homeGridProfile.artW(), homeGridProfile.artH());
   }
 
   // ============================================================
@@ -748,8 +760,8 @@ public class JukeANatorFrame extends JFrame {
 
     return new HotHerePanel(incrementCreditsKey, creditManager, songLibraryService,
         songQueueService, imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1,
-        POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, HOME_GRID_COLS, HOME_GRID_ROWS,
-        HOME_TILE_ART_W, HOME_TILE_ART_H);
+        POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, homeGridProfile.cols(),
+        homeGridProfile.rows(), homeGridProfile.artW(), homeGridProfile.artH());
   }
 
   // ============================================================
@@ -759,7 +771,8 @@ public class JukeANatorFrame extends JFrame {
 
     return new GenrePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
         imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3, HOME_GRID_COLS, HOME_GRID_ROWS, HOME_TILE_ART_W, HOME_TILE_ART_H);
+        POPULARITY_THRESHOLD_3, homeGridProfile.cols(), homeGridProfile.rows(),
+        homeGridProfile.artW(), homeGridProfile.artH());
   }
 
   // ============================================================

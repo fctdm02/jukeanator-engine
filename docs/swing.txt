@@ -1011,3 +1011,24 @@ DONE: Add event handling for song queue card for when the queue changes
 - Auto-populate picked a song for the queue that should not have been eligible, Crazy Bitch by Buckcherry, because it has explicit lyrics
 
 
+
+
+
+
+Right now, the application has been developed for a screen resolution of 1920 x 1080 pixels (i.e. Landscape mode with a 16:9 aspect ratio).
+
+If the physical monitor was rotated 90 degrees and the operating system was set to be in "Portrait Mode", we would have a screen resolution of
+1080 × 1920 pixels with a 9:16 aspect ratio.
+
+What would it take to develop a layout system that:
+
+1: Handles screen resolutions different than 1920 x 1080 pixels for Landscape mode, such as 1024 x 768 for old 15" touchscreen monitors?
+For example, if 1920 x 1080 is the canonical screen resolution, then that could be used to scale to higher/lower resolutions.
+
+2: Handle portrait mode, where the screen height is greater than the screen width?
+In general, you would think that with border layout system, some panels would be a fixed size, whereas the "content" panels would take up the gap.
+
+
+
+
+

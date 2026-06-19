@@ -18,6 +18,13 @@ import java.awt.Dimension;
  * <pre>
  * int cols = LayoutTheme.get().homeGridCols;
  * Dimension sz = LayoutTheme.get().navBtnSize;
+ *
+ * // Resolution- and orientation-aware grid dimensions for the Home screen:
+ * LayoutTheme.GridProfile gp = LayoutTheme.get().homeGridProfile(screenW, screenH);
+ * int cols = gp.cols();
+ * int rows = gp.rows();
+ * int artW = gp.artW();
+ * int artH = gp.artH();
  * </pre>
  *
  * <p>
@@ -87,6 +94,211 @@ public final class LayoutTheme {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // CANONICAL RESOLUTION
+  // The grid-profile calculations below are expressed in terms of this
+  // reference resolution so that all derived values stay consistent even as
+  // the design evolves.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Canonical screen width on which all base layout constants were designed. */
+  public static final int CANONICAL_W = 1920;
+
+  /** Canonical screen height on which all base layout constants were designed. */
+  public static final int CANONICAL_H = 1080;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GRID PROFILE — resolution- and orientation-aware album grid parameters
+  //
+  // A GridProfile captures the four values that control the album grid
+  // (cols, rows, artW, artH) for a specific (screenW, screenH) combination.
+  // Call LayoutTheme.get().homeGridProfile(screenW, screenH) once at startup
+  // (or whenever the display configuration changes) and pass the result to
+  // HomePanel / AlbumGridPanel instead of the static constants.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Immutable value-object that bundles the four album-grid dimensions.
+   *
+   * <p>
+   * Obtain instances via {@link LayoutTheme#homeGridProfile(int, int)} rather than constructing
+   * directly.
+   */
+  public record GridProfile(int cols, int rows, int artW, int artH) {
+
+    /** Total albums visible on one page ({@code cols × rows}). */
+    public int pageSize() {
+      return cols * rows;
+    }
+  }
+
+  /**
+   * Computes a {@link GridProfile} for the given screen dimensions, scaling relative to the
+   * canonical 1920 × 1080 landscape resolution.
+   *
+   * <h3>Algorithm</h3>
+   * <ol>
+   * <li><b>Orientation check</b> — portrait mode is detected when {@code screenH > screenW}.</li>
+   * <li><b>Scale factor</b> — {@code scale = min(screenW / 1920.0, screenH / 1080.0)}, clamped to
+   * [{@value #GRID_SCALE_MIN}, {@value #GRID_SCALE_MAX}] to prevent comically small or large tiles
+   * on extreme displays.</li>
+   * <li><b>Art size</b> — the base art dimensions ({@value #homeArtW} × {@value #homeArtH} px) are
+   * multiplied by {@code scale} and rounded to the nearest even integer so images scale
+   * cleanly.</li>
+   * <li><b>Grid dimensions</b> — the available content area (screen minus the fixed top panel, tab
+   * bar, letter-nav strip, and album-text area below each tile) is divided by the scaled tile size
+   * to derive cols/rows. In portrait mode the tile size is further reduced so that more rows fit
+   * vertically.</li>
+   * </ol>
+   *
+   * <h3>Portrait-mode layout strategy</h3> In portrait mode ({@code screenH > screenW}):
+   * <ul>
+   * <li>The art size is scaled against the portrait "short axis" (the width), so tiles are always
+   * smaller than in landscape — this is correct because the short-axis constraint is tighter in
+   * portrait.</li>
+   * <li>Columns are reduced (default 2) so wide album names still fit horizontally.</li>
+   * <li>Rows are increased (default 5) to fill the tall content area.</li>
+   * </ul>
+   *
+   * @param screenW current screen width in pixels
+   * @param screenH current screen height in pixels
+   * @return a {@link GridProfile} ready to pass to {@link HomePanel} / {@link AlbumGridPanel}
+   */
+  public GridProfile homeGridProfile(int screenW, int screenH) {
+
+    boolean portrait = screenH > screenW;
+
+    if (portrait) {
+      return computePortraitProfile(screenW, screenH);
+    } else {
+      return computeLandscapeProfile(screenW, screenH);
+    }
+  }
+
+  // ── Landscape ─────────────────────────────────────────────────────────────
+
+  private GridProfile computeLandscapeProfile(int screenW, int screenH) {
+
+    // Scale relative to the canonical 1920 × 1080 resolution.
+    // Use the smaller of the two axes so the grid always fits without clipping.
+    double scaleX = (double) screenW / CANONICAL_W;
+    double scaleY = (double) screenH / CANONICAL_H;
+    double scale = Math.min(scaleX, scaleY);
+    scale = Math.max(GRID_SCALE_MIN, Math.min(scale, GRID_SCALE_MAX));
+
+    // Scale the canonical art dimensions and round to an even number of pixels.
+    int artW = roundEven((int) Math.round(homeArtW * scale));
+    int artH = roundEven((int) Math.round(homeArtH * scale));
+
+    // Available content height after fixed chrome is removed.
+    // topPanelHeight — credits / now-playing strip
+    // tabHeight — bottom JTabbedPane tab bar
+    // LETTER_NAV_H — letter-navigation strip in AlbumGridPanel (36px + 8px padding)
+    // TILE_TEXT_H — album + artist labels below each tile (≈ 40px)
+    // GRID_PADDING_V — top + bottom padding of the grid panel (≈ 16px)
+    int availH = screenH - topPanelHeight - tabHeight - LETTER_NAV_H - TILE_TEXT_H - GRID_PADDING_V;
+
+    // Available content width after left + right grid panel padding.
+    int availW = screenW - GRID_PADDING_H;
+
+    // Derive cols and rows from available space ÷ tile size (plus inter-tile gap).
+    int tileW = artW + albumGridGapH;
+    int tileH = artH + albumGridGapV;
+
+    int cols = Math.max(1, availW / tileW);
+    int rows = Math.max(1, availH / tileH);
+
+    // Cap at the canonical maximums so very large screens don't produce huge pages.
+    cols = Math.min(cols, GRID_MAX_COLS_LANDSCAPE);
+    rows = Math.min(rows, GRID_MAX_ROWS_LANDSCAPE);
+
+    return new GridProfile(cols, rows, artW, artH);
+  }
+
+  // ── Portrait ──────────────────────────────────────────────────────────────
+
+  private GridProfile computePortraitProfile(int screenW, int screenH) {
+
+    // In portrait mode the short axis is screenW; scale the art relative to that.
+    // We still compare against CANONICAL_W so "the same 1920-wide monitor rotated
+    // to 1080-wide portrait" produces a tile roughly the same absolute pixel size
+    // as the landscape version, just fewer cols and more rows.
+    double scale = (double) screenW / CANONICAL_W;
+    scale = Math.max(GRID_SCALE_MIN, Math.min(scale, GRID_SCALE_MAX));
+
+    // In portrait the art is a bit smaller than in landscape so more rows fit.
+    int artW = roundEven((int) Math.round(homeArtW * scale * PORTRAIT_ART_REDUCTION));
+    int artH = artW; // keep square thumbnails
+
+    // Available area — same fixed-chrome deductions as landscape.
+    // In portrait mode the top panel and tab bar heights may eventually be
+    // different, but for now we reuse the same constants; override in a
+    // portrait-specific LayoutTheme subclass if they differ.
+    int availH = screenH - topPanelHeight - tabHeight - LETTER_NAV_H - TILE_TEXT_H - GRID_PADDING_V;
+    int availW = screenW - GRID_PADDING_H;
+
+    int tileW = artW + albumGridGapH;
+    int tileH = artH + albumGridGapV;
+
+    int cols = Math.max(1, availW / tileW);
+    int rows = Math.max(1, availH / tileH);
+
+    cols = Math.min(cols, GRID_MAX_COLS_PORTRAIT);
+    rows = Math.min(rows, GRID_MAX_ROWS_PORTRAIT);
+
+    return new GridProfile(cols, rows, artW, artH);
+  }
+
+  // ── Grid-profile tuning constants ─────────────────────────────────────────
+  // Adjust these if the fixed-chrome heights change or the aesthetics need tuning.
+
+  /** Minimum allowed scale factor — prevents tiles becoming unusably tiny. */
+  private static final double GRID_SCALE_MIN = 0.40;
+
+  /** Maximum allowed scale factor — prevents tiles becoming comically large. */
+  private static final double GRID_SCALE_MAX = 1.50;
+
+  /**
+   * Height consumed by the AlbumGridPanel letter-navigation strip (nav buttons + padding). Matches
+   * the 36px button height + 4px top + 4px bottom padding in AlbumGridPanel.
+   */
+  private static final int LETTER_NAV_H = 44;
+
+  /**
+   * Approximate height of the album-name + artist-name text panel below each tile. Two lines ×
+   * ~16px each, plus 6px top/bottom padding = ~44px.
+   */
+  private static final int TILE_TEXT_H = 44;
+
+  /**
+   * Total vertical padding of the grid panel ({@code EmptyBorder(8,12,4,12)} = 12px top+bottom).
+   */
+  private static final int GRID_PADDING_V = 12;
+
+  /**
+   * Total horizontal padding of the grid panel ({@code EmptyBorder(8,12,4,12)} = 24px left+right).
+   */
+  private static final int GRID_PADDING_H = 24;
+
+  /**
+   * Additional art-size reduction factor applied in portrait mode so that tiles are proportionally
+   * narrower to match the shorter portrait width.
+   */
+  private static final double PORTRAIT_ART_REDUCTION = 0.85;
+
+  // Maximum grid dimensions (prevents absurdly large pages on 4 K+ or portrait 4 K displays)
+  private static final int GRID_MAX_COLS_LANDSCAPE = 8;
+  private static final int GRID_MAX_ROWS_LANDSCAPE = 5;
+  private static final int GRID_MAX_COLS_PORTRAIT = 4;
+  private static final int GRID_MAX_ROWS_PORTRAIT = 8;
+
+  // ── Utility ───────────────────────────────────────────────────────────────
+
+  /** Rounds {@code v} to the nearest even integer (keeps image scaling clean). */
+  private static int roundEven(int v) {
+    return (v % 2 == 0) ? v : v + 1;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // FRAME / TOP-PANEL
   // Origin: JukeANatorFrame#buildTopPanel
   // ═══════════════════════════════════════════════════════════════════════════
@@ -147,18 +359,22 @@ public final class LayoutTheme {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HOME / ALBUM GRID (JukeANatorFrame → HomePanel → AlbumGridPanel)
+  //
+  // NOTE: These are the CANONICAL (1920 × 1080 landscape) base values.
+  // Use homeGridProfile(screenW, screenH) to get the actual values for
+  // the current display; do NOT pass these directly to HomePanel any more.
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /** Number of columns in the main album grid. */
+  /** Canonical number of columns in the main album grid (1920 × 1080 landscape). */
   public final int homeGridCols = 4;
 
-  /** Number of rows in the main album grid. */
+  /** Canonical number of rows in the main album grid (1920 × 1080 landscape). */
   public final int homeGridRows = 3;
 
-  /** Width of each album cover-art thumbnail in the main grid. */
+  /** Canonical width of each album cover-art thumbnail in the main grid. */
   public final int homeArtW = 190;
 
-  /** Height of each album cover-art thumbnail in the main grid. */
+  /** Canonical height of each album cover-art thumbnail in the main grid. */
   public final int homeArtH = 190;
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -430,7 +646,6 @@ public final class LayoutTheme {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ADD SONG TO QUEUE CARD (AddSongToQueueCard)
-  // Origin: AddSongToQueueCard
   // ═══════════════════════════════════════════════════════════════════════════
 
   /** Preferred width of the AddSongToQueueCard panel. */
