@@ -45,10 +45,8 @@ public class LoginToAdminPanelCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
-  // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
-
-  // ── Timeout ───────────────────────────────────────────────────────────────
-  private static final int TIMEOUT_SECONDS = 120;
+  // ── Timeout — sourced from LayoutTheme ───────────────────────────────────
+  // Previously: private static final int TIMEOUT_SECONDS = 120;
 
   // ── Field focus ───────────────────────────────────────────────────────────
   private enum ActiveField {
@@ -65,10 +63,11 @@ public class LoginToAdminPanelCard extends JPanel {
   private JLabel passwordLabel;
   private JLabel errorLabel;
 
-  private int secondsRemaining = TIMEOUT_SECONDS;
+  private int secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
   private Timer countdownTimer;
   private final JLabel timeoutLabel = new JLabel();
-  private final JProgressBar timeoutBar = new JProgressBar(0, TIMEOUT_SECONDS);
+  private final JProgressBar timeoutBar =
+      new JProgressBar(0, LayoutTheme.get().overlayTimeoutSeconds);
 
   // ── Dependencies ──────────────────────────────────────────────────────────
   private final SongLibraryService songLibraryService;
@@ -151,7 +150,7 @@ public class LoginToAdminPanelCard extends JPanel {
 
   /** Called whenever this card is shown — restarts the countdown. */
   public void onShown() {
-    secondsRemaining = TIMEOUT_SECONDS;
+    secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
     updateTimeout();
     if (!countdownTimer.isRunning())
       countdownTimer.start();
@@ -181,7 +180,8 @@ public class LoginToAdminPanelCard extends JPanel {
         g2.dispose();
       }
     };
-    panel.setPreferredSize(new Dimension(700, 340));
+    panel.setPreferredSize(
+        new Dimension(LayoutTheme.get().loginPanelW, LayoutTheme.get().loginPanelH));
     panel.setBackground(ColorTheme.get().bgOverlayCard);
     panel.setOpaque(true);
     panel.setBorder(BorderFactory.createEmptyBorder(24, 32, 20, 32));
@@ -189,7 +189,7 @@ public class LoginToAdminPanelCard extends JPanel {
     // Title
     JLabel title = new JLabel("ADMIN LOGIN", SwingConstants.CENTER);
     title.setForeground(ColorTheme.get().loginTitleColor);
-    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 26));
+    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeLoginTitle));
     title.setBorder(new EmptyBorder(0, 0, 16, 0));
     panel.add(title, BorderLayout.NORTH);
 
@@ -239,19 +239,20 @@ public class LoginToAdminPanelCard extends JPanel {
 
     JLabel caption = new JLabel(labelText);
     caption.setForeground(ColorTheme.get().textSecondary);
-    caption.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
-    caption.setPreferredSize(new Dimension(140, 48));
+    caption.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeLoginCaption));
+    caption.setPreferredSize(
+        new Dimension(LayoutTheme.get().loginCaptionW, LayoutTheme.get().loginFieldH));
     caption.setHorizontalAlignment(SwingConstants.RIGHT);
 
     JLabel field = new JLabel();
-    field.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 22));
+    field.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeLoginField));
     field.setForeground(ColorTheme.get().textPrimary);
     field.setBackground(ColorTheme.get().bgFieldDark);
     field.setOpaque(true);
     field.setBorder(BorderFactory.createCompoundBorder(
         BorderFactory.createMatteBorder(2, 1, 1, 1, ColorTheme.get().textPrimary),
         BorderFactory.createEmptyBorder(8, 12, 8, 12)));
-    field.setPreferredSize(new Dimension(100, 48));
+    field.setPreferredSize(new Dimension(100, LayoutTheme.get().loginFieldH));
 
     // Tap the field to switch keyboard focus to it
     field.setCursor(Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR));
@@ -261,7 +262,7 @@ public class LoginToAdminPanelCard extends JPanel {
         activeField = isPassword ? ActiveField.PASSWORD : ActiveField.USERNAME;
         refreshFieldBorders();
         // Reset timeout on interaction
-        secondsRemaining = TIMEOUT_SECONDS;
+        secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
         updateTimeout();
       }
     });
@@ -287,7 +288,8 @@ public class LoginToAdminPanelCard extends JPanel {
     // Error / feedback label
     errorLabel = new JLabel(" ", SwingConstants.CENTER);
     errorLabel.setForeground(ColorTheme.get().loginError);
-    errorLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    errorLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
 
     JButton loginBtn = createActionButton("LOGIN", () -> attemptLogin());
     JButton cancelBtn = createActionButton("CANCEL", onDismiss);
@@ -311,14 +313,15 @@ public class LoginToAdminPanelCard extends JPanel {
     strip.setOpaque(false);
     strip.setBorder(new EmptyBorder(10, 0, 0, 0));
 
-    timeoutBar.setValue(TIMEOUT_SECONDS);
+    timeoutBar.setValue(LayoutTheme.get().overlayTimeoutSeconds);
     timeoutBar.setForeground(ColorTheme.get().accentBlue);
     timeoutBar.setOpaque(false);
     timeoutBar.setBorderPainted(false);
     timeoutBar.setStringPainted(false);
 
     timeoutLabel.setForeground(ColorTheme.get().textSecondary);
-    timeoutLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
+    timeoutLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTimeoutLabel));
 
     updateTimeout();
 
@@ -373,13 +376,14 @@ public class LoginToAdminPanelCard extends JPanel {
       }
     };
 
-    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeLoginBtn));
     button.setForeground(ColorTheme.get().textPrimary);
     button.setContentAreaFilled(false);
     button.setBorderPainted(false);
     button.setFocusPainted(false);
     button.setOpaque(false);
-    button.setPreferredSize(new Dimension(160, 52));
+    button.setPreferredSize(
+        new Dimension(LayoutTheme.get().loginActionBtnW, LayoutTheme.get().loginActionBtnH));
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     button.addActionListener(e -> action.run());
     return button;
@@ -391,7 +395,7 @@ public class LoginToAdminPanelCard extends JPanel {
 
   private void attemptLogin() {
     // Reset timeout on explicit login attempt
-    secondsRemaining = TIMEOUT_SECONDS;
+    secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
     updateTimeout();
 
     String username = usernameBuffer.toString();

@@ -232,7 +232,7 @@ public class SongTrackCellRenderer extends JPanel
     legend.setOpaque(false);
 
     // "PRIORITY LEGEND" title — styled to match the section header labels
-    JLabel title = new JLabel("PRIORITY LEGEND");
+    JLabel title = new JLabel("PRIORITY LEGEND: ");
     title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
     title.setForeground(ColorTheme.get().accentGreen);
     legend.add(title);

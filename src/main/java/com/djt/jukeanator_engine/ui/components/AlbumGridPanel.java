@@ -112,9 +112,8 @@ public class AlbumGridPanel extends JPanel {
     gridPanel.setOpaque(false);
     navPanel.setBorder(new EmptyBorder(4, 16, 4, 16));
     navPanel.setOpaque(false);
-    // Lock the nav panel to exactly the navigation-button height (36px) plus
-    // the top/bottom padding (4px each) so the letter strip never stretches taller.
-    int navH = 36 + 4 + 4;
+    // Lock nav panel height to nav-button height + top/bottom padding
+    int navH = LayoutTheme.get().navBtnH + 4 + 4;
     navPanel.setPreferredSize(new Dimension(0, navH));
     navPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, navH));
 
@@ -197,12 +196,14 @@ public class AlbumGridPanel extends JPanel {
     // Prev/next wrappers keep the strip centred even when one arrow is hidden
     JPanel prevWrapper = new JPanel(new BorderLayout());
     prevWrapper.setOpaque(false);
-    prevWrapper.setPreferredSize(new Dimension(140, 36));
+    prevWrapper
+        .setPreferredSize(new Dimension(LayoutTheme.get().navBtnW, LayoutTheme.get().navBtnH));
     prevWrapper.add(prevBtn, BorderLayout.CENTER);
 
     JPanel nextWrapper = new JPanel(new BorderLayout());
     nextWrapper.setOpaque(false);
-    nextWrapper.setPreferredSize(new Dimension(140, 36));
+    nextWrapper
+        .setPreferredSize(new Dimension(LayoutTheme.get().navBtnW, LayoutTheme.get().navBtnH));
     nextWrapper.add(nextBtn, BorderLayout.CENTER);
 
     navPanel.add(prevWrapper, BorderLayout.WEST);
@@ -245,7 +246,8 @@ public class AlbumGridPanel extends JPanel {
       boolean isSelected = letter.equals(selectedLetter);
       // Pass a null size — GridLayout controls the bounds; buildLetterButton
       // uses setPreferredSize only as a hint which GridLayout ignores anyway.
-      JButton btn = buildLetterButton(letter, new Dimension(30, 36), fontSize, isSelected);
+      JButton btn = buildLetterButton(letter, new Dimension(30, LayoutTheme.get().navBtnH),
+          fontSize, isSelected);
       btn.addActionListener(e -> {
         selectedLetter = letter;
         startIndex = letterStartIndex(letter);
@@ -501,12 +503,13 @@ public class AlbumGridPanel extends JPanel {
     JLabel albumLabel = new JLabel(albumDisplayName(album.getAlbumName(), album.getGenreName()),
         SwingConstants.CENTER);
     albumLabel.setForeground(ColorTheme.get().textPrimary);
-    albumLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    albumLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAlbumLabel));
 
     JLabel artistLabel = new JLabel(album.getArtistName() != null ? album.getArtistName() : "",
         SwingConstants.CENTER);
     artistLabel.setForeground(ColorTheme.get().textSecondary);
-    artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+    artistLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeArtistLabel));
 
     textPanel.add(albumLabel);
     textPanel.add(artistLabel);

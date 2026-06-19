@@ -180,7 +180,7 @@ public class EditAlbumCard extends JPanel {
     topContainer.setBorder(new EmptyBorder(0, 0, 10, 0));
 
     lblTopHeader = new JLabel("Editing Album Metadata", SwingConstants.CENTER);
-    lblTopHeader.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+    lblTopHeader.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeNavBtn));
     lblTopHeader.setForeground(ColorTheme.get().editAlbumTextLight);
     topContainer.add(lblTopHeader, BorderLayout.CENTER);
 
@@ -213,9 +213,12 @@ public class EditAlbumCard extends JPanel {
 
     // Cover Art Box
     lblCurrentCoverArt = new JLabel();
-    lblCurrentCoverArt.setPreferredSize(new Dimension(250, 250));
-    lblCurrentCoverArt.setMinimumSize(new Dimension(250, 250));
-    lblCurrentCoverArt.setMaximumSize(new Dimension(250, 250));
+    lblCurrentCoverArt.setPreferredSize(
+        new Dimension(LayoutTheme.get().editAlbumCoverSize, LayoutTheme.get().editAlbumCoverSize));
+    lblCurrentCoverArt.setMinimumSize(
+        new Dimension(LayoutTheme.get().editAlbumCoverSize, LayoutTheme.get().editAlbumCoverSize));
+    lblCurrentCoverArt.setMaximumSize(
+        new Dimension(LayoutTheme.get().editAlbumCoverSize, LayoutTheme.get().editAlbumCoverSize));
     lblCurrentCoverArt.setHorizontalAlignment(SwingConstants.CENTER);
     lblCurrentCoverArt
         .setBorder(BorderFactory.createLineBorder(ColorTheme.get().editAlbumBorderGray, 1));
@@ -315,9 +318,12 @@ public class EditAlbumCard extends JPanel {
 
     // Found Cover Artwork Container
     lblCoverArtCanvas = new JLabel();
-    lblCoverArtCanvas.setPreferredSize(new Dimension(250, 250));
-    lblCoverArtCanvas.setMinimumSize(new Dimension(250, 250));
-    lblCoverArtCanvas.setMaximumSize(new Dimension(250, 250));
+    lblCoverArtCanvas.setPreferredSize(
+        new Dimension(LayoutTheme.get().editAlbumCoverSize, LayoutTheme.get().editAlbumCoverSize));
+    lblCoverArtCanvas.setMinimumSize(
+        new Dimension(LayoutTheme.get().editAlbumCoverSize, LayoutTheme.get().editAlbumCoverSize));
+    lblCoverArtCanvas.setMaximumSize(
+        new Dimension(LayoutTheme.get().editAlbumCoverSize, LayoutTheme.get().editAlbumCoverSize));
     lblCoverArtCanvas.setHorizontalAlignment(SwingConstants.CENTER);
     lblCoverArtCanvas
         .setBorder(BorderFactory.createLineBorder(ColorTheme.get().editAlbumBorderGray, 1));
@@ -440,7 +446,8 @@ public class EditAlbumCard extends JPanel {
 
     lblSearchStatus = new JLabel("No search performed", SwingConstants.CENTER);
     lblSearchStatus.setForeground(ColorTheme.get().editAlbumSearchStatusFg);
-    lblSearchStatus.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+    lblSearchStatus
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminArtist));
 
     searchControlPanel.add(btnPrevResult);
     searchControlPanel.add(lblSearchStatus);
@@ -472,14 +479,16 @@ public class EditAlbumCard extends JPanel {
     footerPanel.add(btnCancel);
 
     lblGlobalStatus = new JLabel(" ", SwingConstants.CENTER);
-    lblGlobalStatus.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
+    lblGlobalStatus
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminSection - 1));
     lblGlobalStatus.setForeground(ColorTheme.get().editAlbumStatusInfo);
 
     footerOuter.add(footerPanel, BorderLayout.CENTER);
     footerOuter.add(lblGlobalStatus, BorderLayout.SOUTH);
     mainPanel.add(footerOuter, BorderLayout.SOUTH);
 
-    mainPanel.setPreferredSize(new Dimension(900, 700));
+    mainPanel.setPreferredSize(
+        new Dimension(LayoutTheme.get().editAlbumCardW, LayoutTheme.get().editAlbumCardH));
     add(mainPanel);
   }
 
@@ -826,7 +835,7 @@ public class EditAlbumCard extends JPanel {
   private JLabel createLabel(String text) {
     JLabel lbl = new JLabel(text);
     lbl.setForeground(ColorTheme.get().editAlbumTextLight);
-    lbl.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+    lbl.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminArtist));
     return lbl;
   }
 
@@ -842,7 +851,7 @@ public class EditAlbumCard extends JPanel {
   private void setupCheckBox(JCheckBox cb) {
     cb.setOpaque(false);
     cb.setForeground(ColorTheme.get().editAlbumTextLight);
-    cb.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+    cb.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminArtist));
   }
 
   private JButton createStyledButton(String text, java.awt.event.ActionListener action) {
@@ -900,7 +909,7 @@ public class EditAlbumCard extends JPanel {
         g2.dispose();
       }
     };
-    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
+    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
     btn.setForeground(ColorTheme.get().textPrimary);
     btn.setContentAreaFilled(false);
     btn.setBorderPainted(false);

@@ -37,9 +37,6 @@ public class AddSongToQueueCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
-  // ── Timeout ───────────────────────────────────────────────────────────────
-  private static final int TIMEOUT_SECONDS = 120;
-
   private final ImageLoader imageLoader;
   private final SongDto song;
   private final int priorityCostMultiplier;
@@ -67,9 +64,10 @@ public class AddSongToQueueCard extends JPanel {
   /** Container that holds both inner cards. */
   private JPanel innerCardRoot; // assigned in buildBorderPanel()
   private final Timer countdownTimer;
-  private int secondsRemaining = TIMEOUT_SECONDS;
+  private int secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
   private final JLabel timeoutLabel = new JLabel();
-  private final JProgressBar timeoutBar = new JProgressBar(0, TIMEOUT_SECONDS);
+  private final JProgressBar timeoutBar =
+      new JProgressBar(0, LayoutTheme.get().overlayTimeoutSeconds);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -87,7 +85,8 @@ public class AddSongToQueueCard extends JPanel {
     setOpaque(false);
     setLayout(new java.awt.GridBagLayout());
     JPanel sized = buildBorderPanel();
-    sized.setPreferredSize(new Dimension(900, 420));
+    sized.setPreferredSize(
+        new Dimension(LayoutTheme.get().addSongCardW, LayoutTheme.get().addSongCardH));
     add(sized);
 
     countdownTimer = new Timer(1000, e -> {
@@ -104,7 +103,7 @@ public class AddSongToQueueCard extends JPanel {
 
   /** Called whenever this card is shown — restarts the countdown and resets focus. */
   public void onShown() {
-    secondsRemaining = TIMEOUT_SECONDS;
+    secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
     updateTimeout();
     if (!countdownTimer.isRunning()) {
       countdownTimer.start();
@@ -158,7 +157,8 @@ public class AddSongToQueueCard extends JPanel {
     // ── Icon row (top) ────────────────────────────────────────────────────
     JLabel iconLabel = new JLabel("\u26A0", SwingConstants.CENTER); // ⚠ warning sign
     iconLabel.setForeground(ColorTheme.get().accentGold);
-    iconLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 64));
+    iconLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().addSongCoverSize / 2)); // proportional
     iconLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 
     // ── Message (centre) ─────────────────────────────────────────────────
@@ -169,19 +169,22 @@ public class AddSongToQueueCard extends JPanel {
     JLabel headingLabel = new JLabel("Song Unavailable to Play", SwingConstants.CENTER);
     headingLabel.setAlignmentX(CENTER_ALIGNMENT);
     headingLabel.setForeground(ColorTheme.get().textPrimary);
-    headingLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
+    headingLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongTitle));
 
     JLabel songNameLabel = new JLabel(song.getSongName() != null
         ? "\u201C" + song.getSongName() + "\u201D by " + song.getArtistName() + ""
         : "", SwingConstants.CENTER);
     songNameLabel.setAlignmentX(CENTER_ALIGNMENT);
     songNameLabel.setForeground(ColorTheme.get().accentGold);
-    songNameLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+    songNameLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongArtist));
 
     constraintLabel = new JLabel(constraintLabelText, SwingConstants.CENTER);
     constraintLabel.setAlignmentX(CENTER_ALIGNMENT);
     constraintLabel.setForeground(ColorTheme.get().textSecondary);
-    constraintLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 18));
+    constraintLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeNavBtn));
 
     messagePanel.add(Box.createVerticalGlue());
     messagePanel.add(headingLabel);
@@ -249,7 +252,8 @@ public class AddSongToQueueCard extends JPanel {
     row.setBorder(new EmptyBorder(0, 0, 14, 0));
 
     JLabel cover = new JLabel();
-    cover.setPreferredSize(new Dimension(160, 160));
+    cover.setPreferredSize(
+        new Dimension(LayoutTheme.get().addSongCoverSize, LayoutTheme.get().addSongCoverSize));
     cover.setHorizontalAlignment(SwingConstants.CENTER);
     cover.setVerticalAlignment(SwingConstants.CENTER);
     cover.setOpaque(true);
@@ -272,16 +276,18 @@ public class AddSongToQueueCard extends JPanel {
 
     JLabel songName = new JLabel(song.getSongName() != null ? song.getSongName() : "");
     songName.setForeground(ColorTheme.get().textPrimary);
-    songName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32));
+    songName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongTitle));
 
     JLabel artistName = new JLabel(song.getArtistName() != null ? song.getArtistName() : "");
     artistName.setForeground(ColorTheme.get().textPrimary);
-    artistName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+    artistName
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongArtist));
 
     JLabel albumName =
         new JLabel(AlbumGridPanel.albumDisplayName(song.getAlbumName(), song.getGenreName()));
     albumName.setForeground(ColorTheme.get().textPrimary);
-    albumName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+    albumName
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongArtist));
 
     text.add(Box.createVerticalGlue());
     text.add(songName);
@@ -377,11 +383,12 @@ public class AddSongToQueueCard extends JPanel {
     row.setBorder(new EmptyBorder(6, 0, 0, 0));
 
     timeoutLabel.setForeground(ColorTheme.get().textSecondary);
-    timeoutLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
+    timeoutLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTimeoutLabel));
     timeoutLabel.setHorizontalAlignment(SwingConstants.RIGHT);
     updateTimeout();
 
-    timeoutBar.setValue(TIMEOUT_SECONDS);
+    timeoutBar.setValue(LayoutTheme.get().overlayTimeoutSeconds);
     timeoutBar.setForeground(ColorTheme.get().accentBlue);
     timeoutBar.setBackground(ColorTheme.get().timeoutBarTrack);
     timeoutBar.setBorderPainted(false);
@@ -513,8 +520,8 @@ public class AddSongToQueueCard extends JPanel {
         g2.drawRoundRect(1, 1, w - 3, visH - 2, arc, arc);
 
         // ── 7. Two-line centred label ─────────────────────────────────────
-        // Line 1: action text — white, bold 20 pt
-        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
+        // Line 1: action text
+        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeQueueCancelBtn));
         FontMetrics fm1 = g2.getFontMetrics();
         int totalTextH = fm1.getHeight() + 4 + fm1.getHeight(); // rough two-line block height
         int blockY = (faceH - totalTextH) / 2 + fm1.getAscent();
@@ -522,8 +529,8 @@ public class AddSongToQueueCard extends JPanel {
         g2.setColor(ColorTheme.get().textPrimary);
         g2.drawString(actionText, (w - fm1.stringWidth(actionText)) / 2, blockY);
 
-        // Line 2: cost or warning — gold / red, bold 18 pt
-        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+        // Line 2: cost or warning
+        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeNavBtn));
         FontMetrics fm2 = g2.getFontMetrics();
         int line2Y = blockY + fm1.getHeight() - fm1.getDescent() + 4 + fm2.getAscent();
 
@@ -547,7 +554,8 @@ public class AddSongToQueueCard extends JPanel {
     button.setBorderPainted(false);
     button.setFocusPainted(false);
     button.setOpaque(false);
-    button.setPreferredSize(new Dimension(200, 88));
+    button.setPreferredSize(
+        new Dimension(LayoutTheme.get().addSongQueueBtnW, LayoutTheme.get().addSongQueueBtnH));
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     button.addActionListener(onClick);
 
@@ -621,8 +629,7 @@ public class AddSongToQueueCard extends JPanel {
         g2.setStroke(new java.awt.BasicStroke(2f));
         g2.drawRoundRect(1, 1, w - 3, visH - 2, arc, arc);
 
-        // Label — vertically centred in faceH
-        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
+        g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeQueueCancelBtn));
         FontMetrics fm = g2.getFontMetrics();
         g2.setColor(ColorTheme.get().textPrimary);
         int tx = (w - fm.stringWidth(text)) / 2;
@@ -637,7 +644,8 @@ public class AddSongToQueueCard extends JPanel {
     button.setBorderPainted(false);
     button.setFocusPainted(false);
     button.setOpaque(false);
-    button.setPreferredSize(new Dimension(200, 62));
+    button.setPreferredSize(
+        new Dimension(LayoutTheme.get().addSongCancelBtnW, LayoutTheme.get().addSongCancelBtnH));
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     button.addActionListener(e -> dismiss());
 

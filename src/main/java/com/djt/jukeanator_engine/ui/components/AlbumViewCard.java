@@ -31,11 +31,12 @@ public class AlbumViewCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
-  private static final int LEFT_PANEL_WIDTH = 320;
-  private static final int COVER_SIZE = 320;
+  // ── Layout constants — sourced from LayoutTheme ───────────────────────────
+  private static final int LEFT_PANEL_WIDTH = LayoutTheme.get().albumViewSidebarW;
+  private static final int COVER_SIZE = LayoutTheme.get().albumViewCoverSize;
 
   // Number of track rows shown per page in the nav-paginated track listing.
-  private static final int TRACKS_PER_PAGE = 15;
+  private static final int TRACKS_PER_PAGE = LayoutTheme.get().albumViewTracksPerPage;
 
   // ── Palette ───────────────────────────────────────────────────────────────
   private static final Color BG_ROW_HOVER = new Color(255, 255, 255, 25);
@@ -50,14 +51,13 @@ public class AlbumViewCard extends JPanel {
   private static final int BAR_GAP = SongTrackCellRenderer.BAR_GAP;
   private static final int BAR_MAX_H = SongTrackCellRenderer.BAR_MAX_H;
 
-  // ── Left Columns Allocation Dimensions to prevent clipping ─────────
-  private static final int PLAYS_COLUMN_WIDTH = 64;
-  private static final int TRK_NUM_COLUMN_WIDTH = 48;
+  // ── Left Columns Allocation Dimensions — sourced from LayoutTheme ─────────
+  private static final int PLAYS_COLUMN_WIDTH = LayoutTheme.get().albumViewPlaysColW;
+  private static final int TRK_NUM_COLUMN_WIDTH = LayoutTheme.get().albumViewTrkNumColW;
 
-  // ── Compilation Grid Column Layout Allocation Widths ─────────────────────
-  // Adjusted to give the song text maximum available room for long tracks
-  private static final int COMPILATION_ARTIST_WIDTH = 260;
-  private static final int COMPILATION_SONG_WIDTH = 520;
+  // ── Compilation Grid Column Layout Widths — sourced from LayoutTheme ──────
+  private static final int COMPILATION_ARTIST_WIDTH = LayoutTheme.get().albumViewCompilationArtistW;
+  private static final int COMPILATION_SONG_WIDTH = LayoutTheme.get().albumViewCompilationSongW;
 
   // ── Track list pagination state ───────────────────────────────────────────
   private int trackOffset = 0;
@@ -127,7 +127,7 @@ public class AlbumViewCard extends JPanel {
     if (cover.getIcon() == null) {
       cover.setPreferredSize(new Dimension(COVER_SIZE, COVER_SIZE));
       cover.setText("♫");
-      cover.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 64));
+      cover.setFont(new Font(Font.SANS_SERIF, Font.BOLD, COVER_SIZE / 5)); // scales with cover size
       cover.setForeground(new Color(80, 80, 100));
     }
 
@@ -139,26 +139,30 @@ public class AlbumViewCard extends JPanel {
 
     // Album name — wraps if long
     meta.add(wrappingMetaLabel(
-        AlbumGridPanel.albumDisplayName(album.getAlbumName(), album.getGenreName()), Font.BOLD, 20,
-        TEXT_PRIMARY));
+        AlbumGridPanel.albumDisplayName(album.getAlbumName(), album.getGenreName()), Font.BOLD,
+        LayoutTheme.get().fontSizeDetailTitle, TEXT_PRIMARY));
     meta.add(Box.createVerticalStrut(6));
 
     // Artist name — wraps if long
-    meta.add(wrappingMetaLabel(album.getArtistName(), Font.BOLD, 16, ACCENT_BLUE));
+    meta.add(wrappingMetaLabel(album.getArtistName(), Font.BOLD,
+        LayoutTheme.get().fontSizeDetailSubtitle + 2, ACCENT_BLUE));
     meta.add(Box.createVerticalStrut(6));
 
     if (album.getReleaseDate() != null && !album.getReleaseDate().isBlank()) {
-      meta.add(singleLineMetaLabel(album.getReleaseDate(), Font.PLAIN, 13, TEXT_SECONDARY));
+      meta.add(singleLineMetaLabel(album.getReleaseDate(), Font.PLAIN,
+          LayoutTheme.get().fontSizeTrackArtist, TEXT_SECONDARY));
       meta.add(Box.createVerticalStrut(4));
     }
 
     if (album.getRecordLabel() != null && !album.getRecordLabel().isBlank()) {
-      meta.add(singleLineMetaLabel(album.getRecordLabel(), Font.PLAIN, 13, TEXT_SECONDARY));
+      meta.add(singleLineMetaLabel(album.getRecordLabel(), Font.PLAIN,
+          LayoutTheme.get().fontSizeTrackArtist, TEXT_SECONDARY));
       meta.add(Box.createVerticalStrut(4));
     }
 
     if (Boolean.TRUE.equals(album.getHasExplicit())) {
-      JLabel explicit = singleLineMetaLabel("EXPLICIT", Font.BOLD, 12, ACCENT_EXPLICIT);
+      JLabel explicit = singleLineMetaLabel("EXPLICIT", Font.BOLD,
+          LayoutTheme.get().fontSizeAdminArtist, ACCENT_EXPLICIT);
       explicit.setBorder(BorderFactory.createCompoundBorder(
           BorderFactory.createLineBorder(ACCENT_EXPLICIT, 1), new EmptyBorder(2, 6, 2, 6)));
       meta.add(Box.createVerticalStrut(6));
@@ -167,16 +171,15 @@ public class AlbumViewCard extends JPanel {
 
     int trackCount = album.getSongs() == null ? 0 : album.getSongs().size();
     meta.add(Box.createVerticalStrut(6));
-    meta.add(singleLineMetaLabel(trackCount + " songs", Font.PLAIN, 13, TEXT_SECONDARY));
+    meta.add(singleLineMetaLabel(trackCount + " songs", Font.PLAIN,
+        LayoutTheme.get().fontSizeTrackArtist, TEXT_SECONDARY));
 
     int playCount = album.getNumPlays() == null ? 0 : album.getNumPlays();
     String formattedPlayCount = NumberFormat.getIntegerInstance().format(playCount);
     meta.add(Box.createVerticalStrut(6));
-    meta.add(singleLineMetaLabel(formattedPlayCount + " plays",
-        Font.PLAIN,
-        13,
-        TEXT_SECONDARY));
-    
+    meta.add(singleLineMetaLabel(formattedPlayCount + " plays", Font.PLAIN,
+        LayoutTheme.get().fontSizeTrackArtist, TEXT_SECONDARY));
+
     JPanel content = new JPanel();
     content.setOpaque(false);
     content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
@@ -227,12 +230,14 @@ public class AlbumViewCard extends JPanel {
 
     JLabel popHeaderLabel = new JLabel("# Plays");
     popHeaderLabel.setForeground(TEXT_SECONDARY);
-    popHeaderLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    popHeaderLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
     popHeaderLabel.setPreferredSize(new Dimension(PLAYS_COLUMN_WIDTH, 30));
 
     JLabel trackHeaderLabel = new JLabel("Trk #");
     trackHeaderLabel.setForeground(TEXT_SECONDARY);
-    trackHeaderLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    trackHeaderLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
     trackHeaderLabel.setPreferredSize(new Dimension(TRK_NUM_COLUMN_WIDTH, 30));
     trackHeaderLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
@@ -249,12 +254,14 @@ public class AlbumViewCard extends JPanel {
 
       JLabel artistHeaderLabel = new JLabel("Artist");
       artistHeaderLabel.setForeground(TEXT_SECONDARY);
-      artistHeaderLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+      artistHeaderLabel
+          .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
       artistHeaderLabel.setPreferredSize(new Dimension(COMPILATION_ARTIST_WIDTH, 30));
 
       JLabel songHeaderLabel = new JLabel("Song");
       songHeaderLabel.setForeground(TEXT_SECONDARY);
-      songHeaderLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+      songHeaderLabel
+          .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
       songHeaderLabel.setPreferredSize(new Dimension(COMPILATION_SONG_WIDTH, 30));
 
       textCluster.add(artistHeaderLabel, BorderLayout.WEST);
@@ -265,7 +272,8 @@ public class AlbumViewCard extends JPanel {
     } else {
       JLabel songHeaderLabel = new JLabel("Song");
       songHeaderLabel.setForeground(TEXT_SECONDARY);
-      songHeaderLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+      songHeaderLabel
+          .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
       headerCenterCluster.add(songHeaderLabel, BorderLayout.CENTER);
     }
 
@@ -430,7 +438,8 @@ public class AlbumViewCard extends JPanel {
     btn.setBorderPainted(false);
     btn.setFocusPainted(false);
 
-    btn.setPreferredSize(new Dimension(75, 45));
+    btn.setPreferredSize(
+        new Dimension(LayoutTheme.get().resultNavBtnW, LayoutTheme.get().resultNavBtnH));
     btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     // Default visual color rules
@@ -469,7 +478,7 @@ public class AlbumViewCard extends JPanel {
     JPanel row = new JPanel(new BorderLayout(10, 0));
     row.setOpaque(false);
     row.setBorder(new EmptyBorder(10, 16, 10, 16));
-    row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
+    row.setMaximumSize(new Dimension(Integer.MAX_VALUE, LayoutTheme.get().resultRowMaxH));
 
     if (listener != null) {
       row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -484,7 +493,7 @@ public class AlbumViewCard extends JPanel {
     // ── Track number ──────────────────────────────────────────────────────
     JLabel numLabel = new JLabel(String.format("%02d", song.getTrackNumber()));
     numLabel.setForeground(TEXT_SECONDARY);
-    numLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
+    numLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
     numLabel.setPreferredSize(new Dimension(TRK_NUM_COLUMN_WIDTH, 30));
     numLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
@@ -514,12 +523,13 @@ public class AlbumViewCard extends JPanel {
 
       JLabel artistLabel = new JLabel(song.getArtistName());
       artistLabel.setForeground(TEXT_PRIMARY);
-      artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 17));
+      artistLabel
+          .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
       artistLabel.setPreferredSize(new Dimension(COMPILATION_ARTIST_WIDTH, 30));
 
       JLabel songLabel = new JLabel(song.getSongName());
       songLabel.setForeground(TEXT_PRIMARY);
-      songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 17));
+      songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
       songLabel.setPreferredSize(new Dimension(COMPILATION_SONG_WIDTH, 30));
 
       textCluster.add(artistLabel, BorderLayout.WEST);
@@ -530,7 +540,7 @@ public class AlbumViewCard extends JPanel {
     } else {
       JLabel songLabel = new JLabel(song.getSongName());
       songLabel.setForeground(TEXT_PRIMARY);
-      songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 17));
+      songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
       columnsPanel.add(songLabel, BorderLayout.CENTER);
     }
 

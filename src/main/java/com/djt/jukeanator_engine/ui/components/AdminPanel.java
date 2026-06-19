@@ -51,14 +51,13 @@ public class AdminPanel extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
-  // ── Palette — sourced from ColorTheme.get() ──────────────────────────────
-
   /**
    * Fixed size for every sidebar button — narrow enough to leave the lists dominant, tall enough to
    * be touch-friendly and readable. The width is intentionally capped rather than Integer.MAX_VALUE
    * so the sidebar columns stay anchored.
    */
-  private static final Dimension BTN_SIZE = new Dimension(84, 42);
+  private static final Dimension BTN_SIZE =
+      new Dimension(LayoutTheme.get().adminBtnW, LayoutTheme.get().adminBtnH);
 
   // ── Dependencies ──────────────────────────────────────────────────────────
   private final SongLibraryService songLibraryService;
@@ -143,16 +142,17 @@ public class AdminPanel extends JPanel {
 
     JLabel title = new JLabel("⚙  ADMIN PANEL");
     title.setForeground(ColorTheme.get().accentGold);
-    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminHeader));
 
     JPanel creditBadge = new JPanel(new BorderLayout(6, 0));
     creditBadge.setOpaque(false);
     JLabel crLabel = new JLabel("CREDITS:");
     crLabel.setForeground(ColorTheme.get().textMuted);
-    crLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 15));
+    crLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
     creditCountLabel = new JLabel(String.valueOf(creditManager.getCredits()));
     creditCountLabel.setForeground(ColorTheme.get().accentGold);
-    creditCountLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+    creditCountLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminHeader));
     creditBadge.add(crLabel, BorderLayout.WEST);
     creditBadge.add(creditCountLabel, BorderLayout.CENTER);
 
@@ -176,8 +176,8 @@ public class AdminPanel extends JPanel {
     albumList.setForeground(ColorTheme.get().textPrimary);
     albumList.setSelectionBackground(ColorTheme.get().bgListSelected);
     albumList.setSelectionForeground(ColorTheme.get().textPrimary);
-    albumList.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
-    albumList.setFixedCellHeight(36);
+    albumList.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+    albumList.setFixedCellHeight(LayoutTheme.get().adminAlbumCellH);
     albumList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
     albumList.setCellRenderer(new AlbumCellRenderer());
 
@@ -188,7 +188,8 @@ public class AdminPanel extends JPanel {
     // Placeholder shown while the async album load is in-flight
     albumLoadingLabel = new JLabel("Loading library…", SwingConstants.CENTER);
     albumLoadingLabel.setForeground(ColorTheme.get().textMuted);
-    albumLoadingLabel.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, 14));
+    albumLoadingLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.ITALIC, LayoutTheme.get().fontSizeAdminSection));
     albumLoadingLabel.setVisible(false);
 
     JPanel albumListWrapper = new JPanel(new BorderLayout());
@@ -681,15 +682,16 @@ public class AdminPanel extends JPanel {
       setLayout(new BorderLayout(8, 0));
       setBorder(new EmptyBorder(3, 8, 3, 8));
 
-      thumb.setPreferredSize(new Dimension(30, 30));
+      thumb.setPreferredSize(
+          new Dimension(LayoutTheme.get().adminThumbSize, LayoutTheme.get().adminThumbSize));
       thumb.setHorizontalAlignment(SwingConstants.CENTER);
       thumb.setOpaque(true);
       thumb.setBackground(ColorTheme.get().adminThumbBg);
 
       JPanel text = new JPanel(new BorderLayout(0, 0));
       text.setOpaque(false);
-      name.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
-      artist.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+      name.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      artist.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminArtist));
       name.setForeground(ColorTheme.get().textPrimary);
       artist.setForeground(ColorTheme.get().textMuted);
       text.add(name, BorderLayout.CENTER);
@@ -708,13 +710,15 @@ public class AdminPanel extends JPanel {
 
       try {
         if (album.getCoverArtPath() != null) {
-          ImageIcon icon = imageLoader.loadFilesystemImage(album.getCoverArtPath(), 30, 30);
+          ImageIcon icon = imageLoader.loadFilesystemImage(album.getCoverArtPath(),
+              LayoutTheme.get().adminThumbSize, LayoutTheme.get().adminThumbSize);
           thumb.setIcon(icon);
         } else {
           thumb.setIcon(null);
           thumb.setText("♫");
           thumb.setForeground(ColorTheme.get().textMuted);
-          thumb.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+          thumb.setFont(
+              new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminArtist));
         }
       } catch (Exception ignored) {
         thumb.setIcon(null);
@@ -764,7 +768,7 @@ public class AdminPanel extends JPanel {
 
     JLabel lbl = new JLabel("SONG QUEUE");
     lbl.setForeground(accent);
-    lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
     header.add(lbl, BorderLayout.WEST);
     header.add(SongTrackCellRenderer.buildPriorityLegend(), BorderLayout.EAST);
     return header;
@@ -795,20 +799,23 @@ public class AdminPanel extends JPanel {
 
     JLabel lbl = new JLabel("JUKEBOX LIST");
     lbl.setForeground(ColorTheme.get().accentBlue);
-    lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
     header.add(lbl, BorderLayout.WEST);
 
     // ── Filter field ─────────────────────────────────────────────────────
     javax.swing.JTextField filterField = new javax.swing.JTextField();
-    filterField.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
+    filterField
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminSection - 1));
     filterField.setForeground(ColorTheme.get().textPrimary);
     filterField.setBackground(ColorTheme.get().adminFilterFieldBg);
     filterField.setCaretColor(ColorTheme.get().accentBlue);
     filterField.setBorder(BorderFactory.createCompoundBorder(
         BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
         new EmptyBorder(2, 6, 2, 6)));
-    filterField.setPreferredSize(new Dimension(160, 24));
-    filterField.setMaximumSize(new Dimension(160, 24));
+    filterField.setPreferredSize(
+        new Dimension(LayoutTheme.get().adminFilterFieldW, LayoutTheme.get().adminFilterFieldH));
+    filterField.setMaximumSize(
+        new Dimension(LayoutTheme.get().adminFilterFieldW, LayoutTheme.get().adminFilterFieldH));
     filterField.setToolTipText("Filter — jumps to first match");
 
     // Jump to the first album whose display name starts with the filter text
@@ -849,7 +856,7 @@ public class AdminPanel extends JPanel {
     filterWrapper.setOpaque(false);
     JLabel filterLbl = new JLabel("Filter: ");
     filterLbl.setForeground(ColorTheme.get().textMuted);
-    filterLbl.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+    filterLbl.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminArtist));
     filterWrapper.add(filterLbl);
     filterWrapper.add(filterField);
     header.add(filterWrapper, BorderLayout.EAST);
@@ -956,14 +963,14 @@ public class AdminPanel extends JPanel {
         g2.setColor(ColorTheme.get().textPrimary);
         if (line2 == null) {
           // Single line
-          g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 11));
+          g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSideBtn1));
           java.awt.FontMetrics fm = g2.getFontMetrics();
           g2.drawString(line1, (w - fm.stringWidth(line1)) / 2,
               (faceH - fm.getHeight()) / 2 + fm.getAscent());
         } else {
           // Two lines: symbol on top, text label below
-          Font f1 = new Font(Font.SANS_SERIF, Font.BOLD, 13);
-          Font f2 = new Font(Font.SANS_SERIF, Font.BOLD, 10);
+          Font f1 = new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSideBtn1);
+          Font f2 = new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSideBtn2);
           java.awt.FontMetrics fm1 = g2.getFontMetrics(f1);
           java.awt.FontMetrics fm2 = g2.getFontMetrics(f2);
           int totalH = fm1.getHeight() + fm2.getHeight() - 2;
@@ -978,7 +985,7 @@ public class AdminPanel extends JPanel {
       }
     };
 
-    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 11));
+    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSideBtn1));
     btn.setForeground(ColorTheme.get().textPrimary);
     btn.setContentAreaFilled(false);
     btn.setBorderPainted(false);
