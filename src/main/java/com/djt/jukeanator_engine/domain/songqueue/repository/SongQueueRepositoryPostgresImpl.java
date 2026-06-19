@@ -17,7 +17,8 @@ public final class SongQueueRepositoryPostgresImpl implements SongQueueRepositor
       throws EntityDoesNotExistException {
 
     // TODO: TDM:
-    return new SongQueueRootEntity();
+    boolean resetQueuedAtTime = true;
+    return new SongQueueRootEntity(naturalIdentity, resetQueuedAtTime);
     //throw new SongLibraryException("Not implemented yet!");
   }
   

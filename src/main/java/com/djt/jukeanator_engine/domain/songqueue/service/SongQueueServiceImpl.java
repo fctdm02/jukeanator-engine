@@ -122,7 +122,6 @@ public final class SongQueueServiceImpl
     currentlyPlayingSong = nextSong.getSong();
 
     if (enableBackgroundMusic) {
-
       autoPopulateQueue();
     }
 
@@ -162,8 +161,12 @@ public final class SongQueueServiceImpl
       Integer albumId = randomSong.getAlbum().getPersistentIdentity();
       Integer songId = randomSong.getPersistentIdentity();
 
-      if (isSongEligibleForQueue(albumId, songId, 0) != null) {
+      String reasonForIneligibility = isSongEligibleForQueue(albumId, songId, 0);
+      if (reasonForIneligibility == null) {
         addSongToQueue("BACKGROUND_MUSIC", albumId, songId, 0);
+      } else {
+        System.err
+            .println("randomSong not eligible for queueing because: " + reasonForIneligibility);
       }
     }
 
@@ -263,7 +266,9 @@ public final class SongQueueServiceImpl
       }
 
       // C. Build a prioritized sandbox mirror of the queue to simulate placement
-      SongQueueRootEntity mirrorQueue = new SongQueueRootEntity(songQueueRoot.getLocation());
+      boolean resetQueuedAtTime = false;
+      SongQueueRootEntity mirrorQueue =
+          new SongQueueRootEntity(songQueueRoot.getLocation(), resetQueuedAtTime);
       for (SongQueueEntryEntity existingEntry : songQueueRoot.getSongs()) {
         mirrorQueue.getSongs().add(existingEntry);
       }
@@ -620,12 +625,14 @@ public final class SongQueueServiceImpl
   }
 
   private synchronized void initialize() {
+
+    boolean resetQueuedAtTime = true;
     try {
       this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(rootPath);
     } catch (EntityDoesNotExistException ednee) {
       log.error("Could not load song library from: " + rootPath
           + ", using empty song library root for now, error: " + ednee.getMessage());
-      this.songUserRepositoryReset();
+      this.songLibraryRoot = new RootFolderEntity(rootPath);
     }
 
     try {
@@ -634,19 +641,15 @@ public final class SongQueueServiceImpl
     } catch (EntityDoesNotExistException ednee) {
       log.error("Could not load song queue from: " + rootPath
           + ", using empty song library root for now, error: " + ednee.getMessage());
-      this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
+      this.songQueueRoot =
+          new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME, resetQueuedAtTime);
     }
 
     // Seed the queue with background music if it is below the minimum threshold.
     // This handles the cold-start case where there are no persisted songs in the queue,
     // so playback can begin immediately without waiting for dequeueNextSong() to be called first.
     if (enableBackgroundMusic) {
-
       autoPopulateQueue();
     }
-  }
-
-  private void songUserRepositoryReset() {
-    this.songQueueRoot = new SongQueueRootEntity(rootPath);
   }
 }

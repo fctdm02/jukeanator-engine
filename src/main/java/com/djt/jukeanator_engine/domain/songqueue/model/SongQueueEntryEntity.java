@@ -50,6 +50,10 @@ public class SongQueueEntryEntity extends AbstractPersistentEntity {
     return this.queuedAtTime;
   }
 
+  public void setQueuedAtTime(Instant queuedAtTime) {
+    this.queuedAtTime = queuedAtTime;
+  }
+
   @Override
   public int compareTo(AbstractEntity obj) {
 
