@@ -37,16 +37,10 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private static final Color ACCENT_BLUE = new Color(0, 210, 255);
   private static final Color TEXT_PRIMARY = Color.WHITE;
 
-  // ── Layout constants ──────────────────────────────────────────────────────
-  private static final int SEARCH_BAR_HEIGHT = 90;
-  // Number of result rows visible at one time in each column.
-  // Tune this value if the screen resolution changes the visible row count.
-  private static final int SEARCH_PREVIEW_COUNT = 5;
-
-  // Unified Screen Margin Padding to expose base background gradient
-  private static final int SCREEN_PADDING_HORIZONTAL = 60;
-  // Must match the exact column edge margin defined in ResultsColumnPanel.java
-  private static final int COLUMN_INTERNAL_EDGE_GAP = 10;
+  // ── Layout constants — sourced from LayoutTheme ───────────────────────────
+  // All pixel values previously declared here as local static constants are now
+  // read from LayoutTheme.get() at use-site so that portrait / small-screen
+  // themes override them from one place.
 
   // ── Card names ────────────────────────────────────────────────────────────
   private static final String CARD_ENTRY = "ENTRY";
@@ -190,8 +184,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
     // Outer alignment container shell ensuring margins allow background gradient to pass through
     JPanel heroWrapper = new JPanel(new BorderLayout());
     heroWrapper.setOpaque(false);
-    heroWrapper
-        .setBorder(new EmptyBorder(0, SCREEN_PADDING_HORIZONTAL, 0, SCREEN_PADDING_HORIZONTAL));
+    heroWrapper.setBorder(new EmptyBorder(0, LayoutTheme.get().screenPaddingHorizontal, 0,
+        LayoutTheme.get().screenPaddingHorizontal));
 
     // Enhanced inner panel incorporating the exact same frosted glass lighten execution as the
     // keyboard panel
@@ -212,17 +206,17 @@ public class SearchPanel extends JPanel implements TabNavigator {
       }
     };
     enhancedHeroBody.setOpaque(false);
-    enhancedHeroBody.setPreferredSize(new Dimension(100, 300));
+    enhancedHeroBody.setPreferredSize(new Dimension(100, LayoutTheme.get().searchHeroHeight));
 
     JLabel heroLabel = new JLabel("Search for your favorite music.");
     heroLabel.setForeground(TEXT_PRIMARY);
-    heroLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 42));
+    heroLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSearchHero));
     enhancedHeroBody.add(heroLabel);
 
     heroWrapper.add(enhancedHeroBody, BorderLayout.CENTER);
 
     JPanel searchBar = buildSearchBarPanel(false);
-    searchBar.setPreferredSize(new Dimension(100, SEARCH_BAR_HEIGHT));
+    searchBar.setPreferredSize(new Dimension(100, LayoutTheme.get().searchBarHeight));
 
     entryKeyboard = buildSearchKeyboard();
 
@@ -239,8 +233,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private JPanel buildSearchBarPanel(boolean forResults) {
     JPanel wrapper = new JPanel(new BorderLayout());
     wrapper.setOpaque(false);
-    wrapper
-        .setBorder(new EmptyBorder(12, SCREEN_PADDING_HORIZONTAL, 12, SCREEN_PADDING_HORIZONTAL));
+    wrapper.setBorder(new EmptyBorder(12, LayoutTheme.get().screenPaddingHorizontal, 12,
+        LayoutTheme.get().screenPaddingHorizontal));
 
     JPanel bar = new JPanel(new BorderLayout(10, 0));
     bar.setBackground(Color.BLACK);
@@ -248,7 +242,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
     bar.setBorder(BorderFactory.createMatteBorder(2, 1, 1, 1, Color.WHITE));
 
     JLabel lbl = new JLabel();
-    lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32));
+    lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSearchBar));
     lbl.setForeground(Color.WHITE);
     lbl.setOpaque(true);
     lbl.setBackground(Color.BLACK);
@@ -265,8 +259,9 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
     if (!enableTypeAheadSearch) {
       JButton btn = new JButton("SEARCH");
-      btn.setPreferredSize(new Dimension(180, 60));
-      btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+      btn.setPreferredSize(
+          new Dimension(LayoutTheme.get().searchBtnW, LayoutTheme.get().searchBtnH));
+      btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSearchBtn));
       btn.setForeground(Color.BLACK);
       btn.setBackground(ACCENT_BLUE);
       btn.setFocusPainted(false);
@@ -378,26 +373,29 @@ public class SearchPanel extends JPanel implements TabNavigator {
     JPanel columnsLayoutContainer = new JPanel(new GridLayout(1, 3, 0, 0));
     columnsLayoutContainer.setOpaque(false);
 
-    // MATHEMATICAL FIX: By subtracting COLUMN_INTERNAL_EDGE_GAP (10px) from
-    // SCREEN_PADDING_HORIZONTAL (60px), the outer edges expand to line up cleanly.
-    int unifiedPaddingCalculation = SCREEN_PADDING_HORIZONTAL - COLUMN_INTERNAL_EDGE_GAP;
+    // MATHEMATICAL FIX: By subtracting columnInternalEdgeGap (10px) from
+    // screenPaddingHorizontal (60px), the outer edges expand to line up cleanly.
+    int unifiedPaddingCalculation =
+        LayoutTheme.get().screenPaddingHorizontal - LayoutTheme.get().columnInternalEdgeGap;
     columnsLayoutContainer
         .setBorder(new EmptyBorder(10, unifiedPaddingCalculation, 10, unifiedPaddingCalculation));
 
+    int previewCount = LayoutTheme.get().searchPreviewCount;
+
     columnsLayoutContainer.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset,
-        SEARCH_PREVIEW_COUNT, imageLoader, newOffset -> {
+        previewCount, imageLoader, newOffset -> {
           artistsOffset = newOffset;
           rebuildResultsCard();
         }, item -> handleRowClick("ARTISTS", item)));
 
     columnsLayoutContainer.add(ResultsColumnPanel.build("ALBUMS", albums, albumsOffset,
-        SEARCH_PREVIEW_COUNT, imageLoader, newOffset -> {
+        previewCount, imageLoader, newOffset -> {
           albumsOffset = newOffset;
           rebuildResultsCard();
         }, item -> handleRowClick("ALBUMS", item)));
 
-    columnsLayoutContainer.add(ResultsColumnPanel.build("SONGS", songs, songsOffset,
-        SEARCH_PREVIEW_COUNT, imageLoader, newOffset -> {
+    columnsLayoutContainer.add(ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount,
+        imageLoader, newOffset -> {
           songsOffset = newOffset;
           rebuildResultsCard();
         }, item -> handleRowClick("SONGS", item)));

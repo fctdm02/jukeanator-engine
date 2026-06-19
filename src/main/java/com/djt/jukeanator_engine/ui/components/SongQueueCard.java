@@ -42,9 +42,9 @@ public class SongQueueCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
-  // ── Timeout / layout ──────────────────────────────────────────────────────
-  private static final int TIMEOUT_SECONDS = 120;
-  private static final int MAX_QUEUE_VISIBLE = 5;
+  // ── Timeout / layout — sourced from LayoutTheme ───────────────────────────
+  // Previously: private static final int TIMEOUT_SECONDS = 120;
+  // private static final int MAX_QUEUE_VISIBLE = 5;
 
   /**
    * Three distinct visual states for the action buttons. GREY = no selection (or positional lock) —
@@ -106,9 +106,10 @@ public class SongQueueCard extends JPanel {
 
   // ── Timeout ───────────────────────────────────────────────────────────────
   private final Timer countdownTimer;
-  private int secondsRemaining = TIMEOUT_SECONDS;
+  private int secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
   private final JLabel timeoutLabel = new JProgressLabel();
-  private final JProgressBar timeoutBar = new JProgressBar(0, TIMEOUT_SECONDS);
+  private final JProgressBar timeoutBar =
+      new JProgressBar(0, LayoutTheme.get().overlayTimeoutSeconds);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -130,7 +131,8 @@ public class SongQueueCard extends JPanel {
     setOpaque(false);
     setLayout(new java.awt.GridBagLayout());
     JPanel sized = buildBorderPanel();
-    sized.setPreferredSize(new Dimension(900, 660));
+    sized.setPreferredSize(
+        new Dimension(LayoutTheme.get().songQueueCardW, LayoutTheme.get().songQueueCardH));
     add(sized);
 
     countdownTimer = new Timer(1000, e -> {
@@ -154,7 +156,7 @@ public class SongQueueCard extends JPanel {
 
   /** Called whenever this card is shown — rebuilds the queue list, restarts the countdown. */
   public void onShown() {
-    secondsRemaining = TIMEOUT_SECONDS;
+    secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
     updateTimeout();
     if (!countdownTimer.isRunning()) {
       countdownTimer.start();
@@ -350,8 +352,8 @@ public class SongQueueCard extends JPanel {
         updateButtonStates();
     });
 
-    // Fix the list height to exactly MAX_QUEUE_VISIBLE rows — no scroll bar needed.
-    int listH = SongTrackCellRenderer.CELL_HEIGHT * MAX_QUEUE_VISIBLE;
+    // Fix the list height to exactly songQueueMaxVisible rows — no scroll bar needed.
+    int listH = SongTrackCellRenderer.CELL_HEIGHT * LayoutTheme.get().songQueueMaxVisible;
     queueList.setPreferredSize(new Dimension(Integer.MAX_VALUE, listH));
     queueList.setMinimumSize(new Dimension(0, listH));
     queueList.setMaximumSize(new Dimension(Integer.MAX_VALUE, listH));
@@ -389,9 +391,12 @@ public class SongQueueCard extends JPanel {
 
     // Cancel button — narrower and shorter than the action buttons, centred
     JButton cancel = createCancelButton("Cancel");
-    cancel.setPreferredSize(new Dimension(200, 52));
-    cancel.setMinimumSize(new Dimension(200, 52));
-    cancel.setMaximumSize(new Dimension(200, 52));
+    cancel.setPreferredSize(new Dimension(LayoutTheme.get().songQueueCancelBtnW,
+        LayoutTheme.get().songQueueCancelBtnH));
+    cancel.setMinimumSize(new Dimension(LayoutTheme.get().songQueueCancelBtnW,
+        LayoutTheme.get().songQueueCancelBtnH));
+    cancel.setMaximumSize(new Dimension(LayoutTheme.get().songQueueCancelBtnW,
+        LayoutTheme.get().songQueueCancelBtnH));
     JPanel cancelRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
     cancelRow.setOpaque(false);
     cancelRow.add(cancel);
@@ -559,7 +564,7 @@ public class SongQueueCard extends JPanel {
     timeoutLabel.setHorizontalAlignment(SwingConstants.RIGHT);
     updateTimeout();
 
-    timeoutBar.setValue(TIMEOUT_SECONDS);
+    timeoutBar.setValue(LayoutTheme.get().overlayTimeoutSeconds);
     timeoutBar.setForeground(ACCENT_BLUE);
     timeoutBar.setBackground(new Color(40, 40, 55));
     timeoutBar.setBorderPainted(false);
@@ -584,7 +589,7 @@ public class SongQueueCard extends JPanel {
   private void refreshQueueListModel() {
     queueListModel.clear();
     if (queue != null) {
-      int limit = Math.min(queue.size(), MAX_QUEUE_VISIBLE);
+      int limit = Math.min(queue.size(), LayoutTheme.get().songQueueMaxVisible);
       for (int i = 0; i < limit; i++) {
         queueListModel.addElement(queue.get(i));
       }
@@ -755,7 +760,8 @@ public class SongQueueCard extends JPanel {
     button.setFocusPainted(false);
     button.setOpaque(false);
     button.setEnabled(false);
-    button.setPreferredSize(new Dimension(200, 80));
+    button.setPreferredSize(new Dimension(LayoutTheme.get().songQueueActionBtnW,
+        LayoutTheme.get().songQueueActionBtnH));
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     button.addActionListener(onClick);
 
@@ -832,7 +838,8 @@ public class SongQueueCard extends JPanel {
     button.setBorderPainted(false);
     button.setFocusPainted(false);
     button.setOpaque(false);
-    button.setPreferredSize(new Dimension(200, 60));
+    button.setPreferredSize(new Dimension(LayoutTheme.get().songQueueCancelBtnW,
+        LayoutTheme.get().songQueueCancelBtnH));
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     button.addActionListener(e -> dismiss());
 

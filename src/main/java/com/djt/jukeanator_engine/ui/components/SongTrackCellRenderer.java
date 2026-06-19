@@ -25,11 +25,17 @@ public class SongTrackCellRenderer extends JPanel
 
   private static final long serialVersionUID = 1L;
 
-  // ── Popularity bar geometry (shared with AlbumViewCard) ─────────────────
-  public static final int BAR_WIDTH = 5;
-  public static final int BAR_GAP = 3;
-  public static final int BAR_MAX_H = 18;
-  public static final int[] BAR_HEIGHTS = {8, 13, 18};
+  // ── Popularity bar geometry — sourced from LayoutTheme ───────────────────
+  // These public fields are kept for backward compatibility with AlbumViewCard
+  // (which reads BAR_WIDTH/GAP/MAX_H) and SongQueueCard (which reads CELL_HEIGHT).
+  // LayoutTheme is the single source of truth; changing it here changes all consumers.
+  public static final int BAR_WIDTH = LayoutTheme.get().popularityBarWidth;
+  public static final int BAR_GAP = LayoutTheme.get().popularityBarGap;
+  public static final int BAR_MAX_H = LayoutTheme.get().popularityBarMaxH;
+  public static final int[] BAR_HEIGHTS = {BAR_MAX_H / 2, // bar 1 — ~half height
+      (int) Math.round(BAR_MAX_H * 0.72), // bar 2 — ~72 % height
+      BAR_MAX_H // bar 3 — full height
+  };
 
   // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
 
@@ -79,15 +85,15 @@ public class SongTrackCellRenderer extends JPanel
     setLayout(new BorderLayout(6, 0));
     setBorder(new EmptyBorder(4, 8, 4, 8));
 
-    // Popularity bars — fixed size
+    // Popularity bars — width derived from LayoutTheme bar geometry
     barsPanel.setPreferredSize(new Dimension(3 * (BAR_WIDTH + BAR_GAP) + 6, BAR_MAX_H + 4));
     barsPanel.setOpaque(false);
 
     // Text cluster
     JPanel text = new JPanel(new BorderLayout(0, 1));
     text.setOpaque(false);
-    song.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
-    sub.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+    song.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackSong));
+    sub.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackArtist));
     text.add(song, BorderLayout.CENTER);
     text.add(sub, BorderLayout.SOUTH);
 
@@ -190,8 +196,9 @@ public class SongTrackCellRenderer extends JPanel
     }
   }
 
-  // ── Default cell height that consumers should apply to their JList ─────────
-  public static final int CELL_HEIGHT = 44;
+  // ── Default cell height — sourced from LayoutTheme ───────────────────────
+  // Kept public so SongQueueCard can still reference SongTrackCellRenderer.CELL_HEIGHT.
+  public static final int CELL_HEIGHT = LayoutTheme.get().songTrackCellHeight;
 
   // ── Convenience factory ────────────────────────────────────────────────────
   /**
@@ -226,7 +233,7 @@ public class SongTrackCellRenderer extends JPanel
 
     // "PRIORITY LEGEND" title — styled to match the section header labels
     JLabel title = new JLabel("PRIORITY LEGEND");
-    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
     title.setForeground(ColorTheme.get().accentGreen);
     legend.add(title);
 
@@ -251,11 +258,13 @@ public class SongTrackCellRenderer extends JPanel
         }
       };
       swatch.setOpaque(false);
-      swatch.setPreferredSize(new Dimension(12, 12));
+      // Swatch size: 12×12 at canonical resolution; scales with bar width in LayoutTheme
+      int swatchSize = Math.max(8, BAR_WIDTH * 2 + 2);
+      swatch.setPreferredSize(new Dimension(swatchSize, swatchSize));
 
-      // Number label — muted but visible on the dark header background
       JLabel lbl = new JLabel(numLabel);
-      lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 11));
+      lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD,
+          Math.max(9, LayoutTheme.get().fontSizeTrackArtist - 3)));
       lbl.setForeground(new Color(200, 200, 200));
 
       // Wrapper keeps swatch and number snug and vertically centred

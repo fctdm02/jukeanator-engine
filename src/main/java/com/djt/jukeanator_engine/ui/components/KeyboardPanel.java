@@ -33,12 +33,9 @@ public class KeyboardPanel extends JPanel {
 
   // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
 
-  // ── Layout constants ──────────────────────────────────────────────────────
-  /** Preferred height of the keyboard wrapper (matches SearchPanel). */
-  public static final int KEYBOARD_HEIGHT = 260;
-
-  /** Horizontal margin applied to the keyboard wrapper. */
-  public static final int SCREEN_PADDING_HORIZONTAL = 60;
+  // ── Layout constants — sourced from LayoutTheme ───────────────────────────
+  // Previously declared as public static final int fields here (KEYBOARD_HEIGHT,
+  // SCREEN_PADDING_HORIZONTAL). All callers should now use LayoutTheme.get() directly.
 
   // ── Keyboard mode ─────────────────────────────────────────────────────────
   private enum KeyboardMode {
@@ -80,7 +77,8 @@ public class KeyboardPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Creates a self-contained keyboard wrapper panel sized at {@link #KEYBOARD_HEIGHT} pixels tall.
+   * Creates a self-contained keyboard wrapper panel sized at {@link LayoutTheme#keyboardHeight}
+   * pixels tall.
    *
    * @param listener receives key events
    */
@@ -89,9 +87,10 @@ public class KeyboardPanel extends JPanel {
 
     setLayout(new java.awt.BorderLayout());
     setOpaque(false);
-    setPreferredSize(new Dimension(100, KEYBOARD_HEIGHT));
-    setMinimumSize(new Dimension(100, KEYBOARD_HEIGHT));
-    setMaximumSize(new Dimension(Integer.MAX_VALUE, KEYBOARD_HEIGHT));
+    int kh = LayoutTheme.get().keyboardHeight;
+    setPreferredSize(new Dimension(100, kh));
+    setMinimumSize(new Dimension(100, kh));
+    setMaximumSize(new Dimension(Integer.MAX_VALUE, kh));
 
     outerWrapper = buildKeyboardWrapper();
     add(outerWrapper, java.awt.BorderLayout.CENTER);
@@ -104,7 +103,8 @@ public class KeyboardPanel extends JPanel {
   private JPanel buildKeyboardWrapper() {
     JPanel wrapper = new JPanel(new java.awt.BorderLayout());
     wrapper.setOpaque(false);
-    wrapper.setBorder(new EmptyBorder(0, SCREEN_PADDING_HORIZONTAL, 0, SCREEN_PADDING_HORIZONTAL));
+    wrapper.setBorder(new EmptyBorder(0, LayoutTheme.get().keyboardPaddingHorizontal, 0,
+        LayoutTheme.get().keyboardPaddingHorizontal));
 
     JPanel frostedBodyPanel = new JPanel(new java.awt.BorderLayout()) {
       private static final long serialVersionUID = 1L;
@@ -136,9 +136,11 @@ public class KeyboardPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
 
   private JPanel buildKeyboardPanel() {
-    JPanel p = new JPanel(new GridLayout(3, 1, 10, 10));
+    JPanel p =
+        new JPanel(new GridLayout(3, 1, LayoutTheme.get().keyRowGap, LayoutTheme.get().keyRowGap));
     p.setOpaque(false);
-    p.setBorder(new EmptyBorder(20, 20, 20, 20));
+    int pad = LayoutTheme.get().keyboardInnerPad;
+    p.setBorder(new EmptyBorder(pad, pad, pad, pad));
 
     if (keyboardMode == KeyboardMode.ABC) {
       p.add(buildAbcRow1());
@@ -153,12 +155,13 @@ public class KeyboardPanel extends JPanel {
   }
 
   private JPanel buildAbcRow1() {
-    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, LayoutTheme.get().keyColGap, 0));
     row.setOpaque(false);
     for (char c : "QWERTYUIOP".toCharArray())
       row.add(letterKey(String.valueOf(c)));
 
-    JButton clear = styledKey("CLEAR", new Dimension(140, 60));
+    JButton clear = styledKey("CLEAR",
+        new Dimension(LayoutTheme.get().keyClearW, LayoutTheme.get().keyLetterH));
     clear.addActionListener(e -> listener.onClear());
     row.add(clear);
 
@@ -167,7 +170,7 @@ public class KeyboardPanel extends JPanel {
   }
 
   private JPanel buildAbcRow2() {
-    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, LayoutTheme.get().keyColGap, 0));
     row.setOpaque(false);
     for (char c : "ASDFGHJKL".toCharArray())
       row.add(letterKey(String.valueOf(c)));
@@ -179,24 +182,26 @@ public class KeyboardPanel extends JPanel {
   }
 
   private JPanel buildAbcRow3() {
-    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, LayoutTheme.get().keyColGap, 0));
     row.setOpaque(false);
     for (char c : "ZXCVBNM,.".toCharArray())
       row.add(letterKey(String.valueOf(c)));
 
-    JButton space = styledKey("SPACE", new Dimension(420, 60));
+    JButton space = styledKey("SPACE",
+        new Dimension(LayoutTheme.get().keySpaceW, LayoutTheme.get().keyLetterH));
     space.addActionListener(e -> listener.onSpace());
     row.add(space);
     return row;
   }
 
   private JPanel buildNumRow1() {
-    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, LayoutTheme.get().keyColGap, 0));
     row.setOpaque(false);
     for (String s : new String[] {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"})
       row.add(letterKey(s));
 
-    JButton clear = styledKey("CLEAR", new Dimension(140, 60));
+    JButton clear = styledKey("CLEAR",
+        new Dimension(LayoutTheme.get().keyClearW, LayoutTheme.get().keyLetterH));
     clear.addActionListener(e -> listener.onClear());
     row.add(clear);
 
@@ -205,7 +210,7 @@ public class KeyboardPanel extends JPanel {
   }
 
   private JPanel buildNumRow2() {
-    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, LayoutTheme.get().keyColGap, 0));
     row.setOpaque(false);
     for (String s : new String[] {"!", "@", "#", "$", "%", "^", "&", "*", "\"", "'"})
       row.add(letterKey(s));
@@ -216,12 +221,13 @@ public class KeyboardPanel extends JPanel {
   }
 
   private JPanel buildNumRow3() {
-    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+    JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, LayoutTheme.get().keyColGap, 0));
     row.setOpaque(false);
     for (String s : new String[] {"(", ")", "[", "]", "/", "\\", "?", ":", ";"})
       row.add(letterKey(s));
 
-    JButton space = styledKey("SPACE", new Dimension(420, 60));
+    JButton space = styledKey("SPACE",
+        new Dimension(LayoutTheme.get().keySpaceW, LayoutTheme.get().keyLetterH));
     space.addActionListener(e -> listener.onSpace());
     row.add(space);
     return row;
@@ -233,7 +239,9 @@ public class KeyboardPanel extends JPanel {
     boolean isActiveMode = (targetMode == keyboardMode);
 
     // Pass the active state flag straight into our unified styledKey generator
-    JButton btn = styledKey(label, new Dimension(140, 60), isActiveMode);
+    JButton btn = styledKey(label,
+        new Dimension(LayoutTheme.get().keyModeToggleW, LayoutTheme.get().keyLetterH),
+        isActiveMode);
 
     if (isActiveMode) {
       btn.setBackground(ColorTheme.get().keyActiveModeBackground);
@@ -253,7 +261,8 @@ public class KeyboardPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
 
   private JButton buildBackspaceButton() {
-    JButton back = styledKey("⌫", new Dimension(100, 60));
+    JButton back = styledKey("⌫",
+        new Dimension(LayoutTheme.get().keyBackspaceW, LayoutTheme.get().keyLetterH));
     back.addActionListener(e -> listener.onBackspace());
     return back;
   }
@@ -272,7 +281,8 @@ public class KeyboardPanel extends JPanel {
   }
 
   private JButton letterKey(String text) {
-    JButton btn = styledKey(text, new Dimension(70, 60));
+    JButton btn =
+        styledKey(text, new Dimension(LayoutTheme.get().keyLetterW, LayoutTheme.get().keyLetterH));
     btn.addActionListener(e -> listener.onCharacter(text));
     return btn;
   }
@@ -364,7 +374,7 @@ public class KeyboardPanel extends JPanel {
     btn.setBorderPainted(false);
     btn.setOpaque(false);
     btn.setForeground(ColorTheme.get().textPrimary);
-    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeKeyLabel));
     btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     return btn;
   }

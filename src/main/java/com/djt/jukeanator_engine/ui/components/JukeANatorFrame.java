@@ -81,12 +81,11 @@ public class JukeANatorFrame extends JFrame {
 
   // GENRE TAB
   /**
-   * Genre-tile grid profile for the Genres screen, computed once from the
-   * actual screen dimensions.  Passed to GenrePanel instead of the raw
-   * HOME_GRID_* constants.
+   * Genre-tile grid profile for the Genres screen, computed once from the actual screen dimensions.
+   * Passed to GenrePanel instead of the raw HOME_GRID_* constants.
    */
   private LayoutTheme.GenreGridProfile genreGridProfile;
-  
+
   private GenrePanel genrePanel;
 
   // QUEUE TAB
@@ -266,7 +265,7 @@ public class JukeANatorFrame extends JFrame {
     // TOP 10%
     //
     JPanel topPanel = buildTopPanel();
-    topPanel.setPreferredSize(new Dimension(100, 110));
+    topPanel.setPreferredSize(new Dimension(100, LayoutTheme.get().topPanelHeight));
     getContentPane().add(topPanel, BorderLayout.NORTH);
 
     //
@@ -486,8 +485,8 @@ public class JukeANatorFrame extends JFrame {
 
     tabs.setUI(new javax.swing.plaf.basic.BasicTabbedPaneUI() {
 
-      private static final int TAB_WIDTH = 200;
-      private static final int SEPARATOR_HEIGHT = 2;
+      final int TAB_WIDTH = LayoutTheme.get().tabWidth;
+      final int SEPARATOR_HEIGHT = LayoutTheme.get().tabSeparatorHeight;
 
       //
       // FIXED TAB WIDTH
@@ -499,7 +498,7 @@ public class JukeANatorFrame extends JFrame {
 
       @Override
       protected int calculateTabHeight(int tabPlacement, int tabIndex, int fontHeight) {
-        return 96;
+        return LayoutTheme.get().tabHeight;
       }
 
       //
@@ -691,7 +690,7 @@ public class JukeANatorFrame extends JFrame {
       JLabel iconLabel = new JLabel(iconText);
       iconLabel.setAlignmentX(CENTER_ALIGNMENT);
       iconLabel.setForeground(accentColor);
-      iconLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 34));
+      iconLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().tabIconFontSize));
 
       //
       // TEXT
@@ -699,7 +698,7 @@ public class JukeANatorFrame extends JFrame {
       JLabel textLabel = new JLabel(title);
       textLabel.setAlignmentX(CENTER_ALIGNMENT);
       textLabel.setForeground(accentColor);
-      textLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
+      textLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().tabTextFontSize));
 
       add(iconLabel);
       add(Box.createVerticalStrut(4));
@@ -772,19 +771,12 @@ public class JukeANatorFrame extends JFrame {
   // ============================================================
   private GenrePanel buildGenresPanel() {
 
-    return new GenrePanel(
-        incrementCreditsKey,
-        creditManager,
-        songLibraryService,
-        songQueueService,
-        imageLoader,
-        priorityCostMultiplier,
-        POPULARITY_THRESHOLD_1,
-        POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3,
-        albumGridProfile,      // album sub-grid (artist detail within Genres tab)
-        genreGridProfile);    // genre-tile grid (top-level genre picker)
-  }  
+    return new GenrePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
+        imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
+        POPULARITY_THRESHOLD_3, albumGridProfile, // album sub-grid (artist detail within Genres
+                                                  // tab)
+        genreGridProfile); // genre-tile grid (top-level genre picker)
+  }
 
   // ============================================================
   // ADMIN PANEL
@@ -832,28 +824,32 @@ public class JukeANatorFrame extends JFrame {
     creditsPanel.setBackground(ColorTheme.get().bgFieldDark);
     creditsPanel
         .setBorder(BorderFactory.createMatteBorder(2, 1, 1, 1, ColorTheme.get().textPrimary));
-    Dimension sidePanelSize = new Dimension(485, 100);
+    Dimension sidePanelSize =
+        new Dimension(LayoutTheme.get().creditsPanelW, LayoutTheme.get().creditsPanelH);
     creditsPanel.setPreferredSize(sidePanelSize);
     creditsPanel.setMinimumSize(sidePanelSize);
     creditsPanel.setMaximumSize(sidePanelSize);
 
     //
-    // LOCATION LOGO (96x96 — same size as Now Playing cover art)
+    // LOCATION LOGO (same size as Now Playing cover art)
     //
     JLabel locationLogo = new JLabel();
     locationLogo.setHorizontalAlignment(SwingConstants.CENTER);
     locationLogo.setVerticalAlignment(SwingConstants.CENTER);
     locationLogo.setOpaque(true);
     locationLogo.setBackground(ColorTheme.get().frameLocationLogoBg);
-    locationLogo.setPreferredSize(new Dimension(96, 96));
+    locationLogo.setPreferredSize(
+        new Dimension(LayoutTheme.get().topPanelIconSize, LayoutTheme.get().topPanelIconSize));
     locationLogo.setBorder(BorderFactory.createLineBorder(ColorTheme.get().coverArtBorder, 1));
 
     // Try JPG first
-    ImageIcon logoIcon = imageLoader.loadImage("locationLogo.jpg", 96, 96);
+    ImageIcon logoIcon = imageLoader.loadImage("locationLogo.jpg",
+        LayoutTheme.get().topPanelIconSize, LayoutTheme.get().topPanelIconSize);
 
     // Fallback PNG
     if (logoIcon == null) {
-      logoIcon = imageLoader.loadImage("locationLogo.png", 96, 96);
+      logoIcon = imageLoader.loadImage("locationLogo.png", LayoutTheme.get().topPanelIconSize,
+          LayoutTheme.get().topPanelIconSize);
     }
 
     if (logoIcon != null) {
@@ -875,11 +871,13 @@ public class JukeANatorFrame extends JFrame {
 
     creditsTitle = new JLabel("CREDITS: " + numCredits);
     creditsTitle.setForeground(ColorTheme.get().frameCreditsTitleColor);
-    creditsTitle.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+    creditsTitle
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeCreditTitle));
 
     JLabel creditDescription = new JLabel(buildCreditsDescription());
     creditDescription.setForeground(ColorTheme.get().textPrimary);
-    creditDescription.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
+    creditDescription
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeCreditDesc));
 
     creditsTextPanel.add(creditsTitle);
     creditsTextPanel.add(Box.createVerticalStrut(5));
@@ -909,7 +907,8 @@ public class JukeANatorFrame extends JFrame {
     bannerLabel.setVerticalAlignment(SwingConstants.CENTER);
 
     // Loaded at scaled dimensions to fit perfectly within the 100px banner row height constraints
-    ImageIcon icon = imageLoader.loadImage("JukeANatorLogo.png", 320, 96);
+    ImageIcon icon = imageLoader.loadImage("JukeANatorLogo.png",
+        LayoutTheme.get().topPanelIconSize * 3, LayoutTheme.get().topPanelIconSize);
     Image transparentStrippedImage = ImageLoader.createTransparentImage(icon.getImage(), false, 15);
     icon = new ImageIcon(transparentStrippedImage);
     bannerLabel.setIcon(icon);
@@ -921,7 +920,8 @@ public class JukeANatorFrame extends JFrame {
     nowPlayingPanel = buildNowPlayingPanel();
     JPanel nowPlayingWrapper = new JPanel(new BorderLayout());
     nowPlayingWrapper.setOpaque(false);
-    Dimension wrapperSize = new Dimension(485, 100);
+    Dimension wrapperSize =
+        new Dimension(LayoutTheme.get().nowPlayingWrapperW, LayoutTheme.get().nowPlayingWrapperH);
     nowPlayingWrapper.setPreferredSize(wrapperSize);
     nowPlayingWrapper.setMinimumSize(wrapperSize);
     nowPlayingWrapper.setMaximumSize(wrapperSize);
@@ -954,7 +954,8 @@ public class JukeANatorFrame extends JFrame {
 
     // Fixed size — always the same whether a song is playing or not.
     // Sized to match the "song playing" state so the center logo never shifts.
-    Dimension fixedSize = new Dimension(450, 100);
+    Dimension fixedSize =
+        new Dimension(LayoutTheme.get().nowPlayingPanelW, LayoutTheme.get().nowPlayingPanelH);
     panel.setPreferredSize(fixedSize);
     panel.setMinimumSize(fixedSize);
     panel.setMaximumSize(fixedSize);
@@ -962,7 +963,8 @@ public class JukeANatorFrame extends JFrame {
     //
     // LEFT : PLAY STATUS (animated GIF / paused icon)
     //
-    playStatus.setPreferredSize(new Dimension(96, 96));
+    playStatus.setPreferredSize(
+        new Dimension(LayoutTheme.get().topPanelIconSize, LayoutTheme.get().topPanelIconSize));
     playStatus.setHorizontalAlignment(SwingConstants.CENTER);
     playStatus.setBorder(null);
 
@@ -978,13 +980,14 @@ public class JukeANatorFrame extends JFrame {
     textPanel.setBorder(new EmptyBorder(8, 0, 8, 0));
 
     songLabel.setForeground(ColorTheme.get().textPrimary);
-    songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
+    songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
 
     artistLabel.setForeground(ColorTheme.get().textPrimary);
-    artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
+    artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
 
     albumLabel.setForeground(ColorTheme.get().textSecondary);
-    albumLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
+    albumLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackArtist));
 
     textPanel.add(Box.createVerticalGlue());
     textPanel.add(songLabel);
@@ -997,7 +1000,8 @@ public class JukeANatorFrame extends JFrame {
     //
     // RIGHT : COVER ART
     //
-    albumArtLabel.setPreferredSize(new Dimension(96, 96));
+    albumArtLabel.setPreferredSize(
+        new Dimension(LayoutTheme.get().topPanelIconSize, LayoutTheme.get().topPanelIconSize));
     albumArtLabel.setHorizontalAlignment(SwingConstants.CENTER);
     albumArtLabel.setBorder(null);
 
@@ -1073,12 +1077,14 @@ public class JukeANatorFrame extends JFrame {
       songLabel.setText(songDto.getSongName());
       artistLabel.setText(songDto.getArtistName());
       albumLabel.setText(songDto.getAlbumName());
-      albumArtLabel.setIcon(imageLoader.loadFilesystemImage(songDto.getCoverArtPath(), 96, 96));
+      albumArtLabel.setIcon(imageLoader.loadFilesystemImage(songDto.getCoverArtPath(),
+          LayoutTheme.get().topPanelIconSize, LayoutTheme.get().topPanelIconSize));
       currentNowPlayingSong = songDto;
 
       musicPaused = false;
       playStatus.setIcon(
-          imageLoader.loadClasspathImage("music_playing.gif", 96, 96, Image.SCALE_DEFAULT));
+          imageLoader.loadClasspathImage("music_playing.gif", LayoutTheme.get().topPanelIconSize,
+              LayoutTheme.get().topPanelIconSize, Image.SCALE_DEFAULT));
 
       nowPlayingPanel.setVisible(true);
     });
@@ -1386,10 +1392,12 @@ public class JukeANatorFrame extends JFrame {
 
       if (musicPaused) {
         playStatus.setIcon(
-            imageLoader.loadClasspathImage("music_paused.png", 96, 96, Image.SCALE_DEFAULT));
+            imageLoader.loadClasspathImage("music_paused.png", LayoutTheme.get().topPanelIconSize,
+                LayoutTheme.get().topPanelIconSize, Image.SCALE_DEFAULT));
       } else {
         playStatus.setIcon(
-            imageLoader.loadClasspathImage("music_playing.gif", 96, 96, Image.SCALE_DEFAULT));
+            imageLoader.loadClasspathImage("music_playing.gif", LayoutTheme.get().topPanelIconSize,
+                LayoutTheme.get().topPanelIconSize, Image.SCALE_DEFAULT));
       }
     });
   }

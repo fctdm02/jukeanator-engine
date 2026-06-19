@@ -43,7 +43,8 @@ public final class ButtonFactory {
 
         // Gradient fill — brighter on hover
         Color top = hovered ? ColorTheme.get().navBtnHoverTop : ColorTheme.get().navBtnGradTop;
-        Color bottom = hovered ? ColorTheme.get().navBtnHoverBottom : ColorTheme.get().navBtnGradBottom;
+        Color bottom =
+            hovered ? ColorTheme.get().navBtnHoverBottom : ColorTheme.get().navBtnGradBottom;
         g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
         g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
 
@@ -57,13 +58,13 @@ public final class ButtonFactory {
       }
     };
 
-    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeNavBtn));
     button.setForeground(Color.WHITE);
     button.setContentAreaFilled(false);
     button.setBorderPainted(false);
     button.setFocusPainted(false);
     button.setOpaque(false);
-    button.setPreferredSize(new Dimension(140, 36));
+    button.setPreferredSize(new Dimension(LayoutTheme.get().navBtnW, LayoutTheme.get().navBtnH));
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     return button;

@@ -19,8 +19,8 @@ public class HotHerePanel extends JPanel implements TabNavigator {
 
   private static final long serialVersionUID = 1L;
 
-  // ── Preview row count ─────────────────────────────────────────────────────
-  private static final int PREVIEW_COUNT = 10;
+  // ── Preview row count — sourced from LayoutTheme ──────────────────────────
+  // Previously: private static final int PREVIEW_COUNT = 10;
 
   // ── Card names ────────────────────────────────────────────────────────────
   private static final String CARD_CONTENT = "CONTENT";
@@ -194,19 +194,21 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     JPanel columns = new JPanel(new GridLayout(1, 3, 2, 0));
     columns.setOpaque(false);
 
-    columns.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, PREVIEW_COUNT,
+    int previewCount = LayoutTheme.get().hotHerePreviewCount;
+
+    columns.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, previewCount,
         imageLoader, newOffset -> {
           artistsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("ARTISTS", item)));
 
-    columns.add(ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, PREVIEW_COUNT, imageLoader,
+    columns.add(ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, previewCount, imageLoader,
         newOffset -> {
           albumsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("ALBUMS", item)));
 
-    columns.add(ResultsColumnPanel.build("SONGS", songs, songsOffset, PREVIEW_COUNT, imageLoader,
+    columns.add(ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount, imageLoader,
         newOffset -> {
           songsOffset = newOffset;
           rebuildColumnsPanel();

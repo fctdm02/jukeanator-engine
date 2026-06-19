@@ -58,7 +58,8 @@ public class DetailHeaderPanel extends JPanel {
     // IMAGE
     //
     JLabel imageLabel = new JLabel();
-    imageLabel.setPreferredSize(new Dimension(72, 72));
+    imageLabel.setPreferredSize(
+        new Dimension(LayoutTheme.get().detailHeaderImageW, LayoutTheme.get().detailHeaderImageH));
     imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
     imageLabel.setVerticalAlignment(SwingConstants.CENTER);
     imageLabel.setOpaque(true);
@@ -73,7 +74,7 @@ public class DetailHeaderPanel extends JPanel {
 
       imageLabel.setText(fallbackText);
       imageLabel.setForeground(ColorTheme.get().detailHeaderImageFg);
-      imageLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32));
+      imageLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32)); // fallback symbol — not scaled
     }
 
     //
@@ -85,11 +86,12 @@ public class DetailHeaderPanel extends JPanel {
 
     JLabel titleLabel = new JLabel(title != null ? title : "");
     titleLabel.setForeground(ColorTheme.get().textPrimary);
-    titleLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 26));
+    titleLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeDetailTitle));
 
     JLabel subtitleLabel = new JLabel(subtitle != null ? subtitle : "");
     subtitleLabel.setForeground(ColorTheme.get().textSecondary);
-    subtitleLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
+    subtitleLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeDetailSubtitle));
 
     textBlock.add(titleLabel);
     textBlock.add(Box.createVerticalStrut(4));
@@ -158,13 +160,14 @@ public class DetailHeaderPanel extends JPanel {
       }
     };
 
-    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeNavBtn));
     button.setForeground(ColorTheme.get().textPrimary);
     button.setContentAreaFilled(false);
     button.setBorderPainted(false);
     button.setFocusPainted(false);
     button.setOpaque(false);
-    button.setPreferredSize(new Dimension(140, 52));
+    button.setPreferredSize(
+        new Dimension(LayoutTheme.get().detailBackBtnW, LayoutTheme.get().detailBackBtnH));
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     return button;

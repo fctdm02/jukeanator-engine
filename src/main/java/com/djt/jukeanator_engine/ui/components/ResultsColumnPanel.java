@@ -35,8 +35,6 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
  */
 public final class ResultsColumnPanel {
 
-  // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
-
   private ResultsColumnPanel() {}
 
   // ─────────────────────────────────────────────────────────────────────────

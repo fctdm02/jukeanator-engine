@@ -23,13 +23,14 @@ public class AlbumDetailCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
-  private static final int TIMEOUT_SECONDS = 120;
-  // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
+  // ── Timeout — sourced from LayoutTheme ───────────────────────────────────
+  // Previously: private static final int TIMEOUT_SECONDS = 120;
 
-  private int secondsRemaining = TIMEOUT_SECONDS;
+  private int secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
   private final Timer countdownTimer;
   private final JLabel timeoutLabel = new JLabel();
-  private final JProgressBar timeoutBar = new JProgressBar(0, TIMEOUT_SECONDS);
+  private final JProgressBar timeoutBar =
+      new JProgressBar(0, LayoutTheme.get().overlayTimeoutSeconds);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -43,7 +44,7 @@ public class AlbumDetailCard extends JPanel {
     setOpaque(false);
 
     AlbumViewCard.SongClickListener songClick = song -> {
-      secondsRemaining = TIMEOUT_SECONDS;
+      secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
       updateTimeout();
       if (owner instanceof JukeANatorFrame frame) {
         frame.showAddSongToQueueCard(song);
@@ -91,7 +92,7 @@ public class AlbumDetailCard extends JPanel {
     JPanel timeoutSection = new JPanel(new BorderLayout(8, 0));
     timeoutSection.setOpaque(false);
 
-    timeoutBar.setValue(TIMEOUT_SECONDS);
+    timeoutBar.setValue(LayoutTheme.get().overlayTimeoutSeconds);
     timeoutBar.setForeground(ColorTheme.get().accentBlue);
     timeoutBar.setOpaque(false);
     timeoutBar.setBorderPainted(false);
@@ -156,13 +157,14 @@ public class AlbumDetailCard extends JPanel {
       }
     };
 
-    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+    button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeNavBtn));
     button.setForeground(ColorTheme.get().textPrimary);
     button.setContentAreaFilled(false);
     button.setBorderPainted(false);
     button.setFocusPainted(false);
     button.setOpaque(false);
-    button.setPreferredSize(new Dimension(140, 52));
+    button.setPreferredSize(
+        new Dimension(LayoutTheme.get().detailBackBtnW, LayoutTheme.get().detailBackBtnH));
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     button.addActionListener(e -> action.run());
 
