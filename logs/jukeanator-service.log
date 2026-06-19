@@ -1,0 +1,74 @@
+2026-06-19 09:08:29.546 [main] INFO  c.d.j.JukeANatorBackendApplication - Starting JukeANatorBackendApplication using Java 21.0.6 with PID 370236 (/home/tmyers/projects/jukeanator-engine/target/classes started by tmyers in /home/tmyers/projects/jukeanator-engine)
+2026-06-19 09:08:29.554 [main] INFO  c.d.j.JukeANatorBackendApplication - No active profile set, falling back to 1 default profile: "default"
+2026-06-19 09:08:31.561 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-06-19 09:08:31.647 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 62 ms. Found 0 JPA repository interfaces.
+2026-06-19 09:08:33.157 [main] INFO  o.s.boot.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-06-19 09:08:33.183 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8080"]
+2026-06-19 09:08:33.190 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-06-19 09:08:33.191 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/11.0.18]
+2026-06-19 09:08:33.331 [main] INFO  o.s.b.w.c.s.WebApplicationContextInitializer - Root WebApplicationContext: initialization completed in 3620 ms
+2026-06-19 09:08:34.237 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-06-19 09:08:34.589 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:9b5af18b-5dcd-4315-9686-1c276ed3fc37 user=SA
+2026-06-19 09:08:34.594 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-06-19 09:08:34.697 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:h2:mem:9b5af18b-5dcd-4315-9686-1c276ed3fc37 (H2 2.4)
+2026-06-19 09:08:34.712 [main] WARN  o.f.c.i.database.base.Database - Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026-06-19 09:08:34.768 [main] INFO  o.f.c.i.s.JdbcTableSchemaHistory - Schema history table "PUBLIC"."flyway_schema_history" does not exist yet
+2026-06-19 09:08:34.772 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 0 migrations (execution time 00:00.017s)
+2026-06-19 09:08:34.772 [main] WARN  o.f.core.internal.command.DbValidate - No migrations found. Are your locations set up correctly?
+2026-06-19 09:08:34.788 [main] INFO  o.f.c.i.s.JdbcTableSchemaHistory - Creating Schema History table "PUBLIC"."flyway_schema_history" ...
+2026-06-19 09:08:34.874 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "PUBLIC": << Empty Schema >>
+2026-06-19 09:08:34.885 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "PUBLIC" is up to date. No migration necessary.
+2026-06-19 09:08:35.111 [main] INFO  org.hibernate.orm.jpa - HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-06-19 09:08:35.217 [main] INFO  org.hibernate.orm.core - HHH000001: Hibernate ORM core version 7.2.7.Final
+2026-06-19 09:08:36.128 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-06-19 09:08:36.273 [main] INFO  o.hibernate.orm.connections.pooling - HHH10001005: Database info:
+	Database JDBC URL [jdbc:h2:mem:9b5af18b-5dcd-4315-9686-1c276ed3fc37]
+	Database driver: H2 JDBC Driver
+	Database dialect: H2Dialect
+	Database version: 2.4.240
+	Default catalog/schema: 9B5AF18B-5DCD-4315-9686-1C276ED3FC37/PUBLIC
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: 100
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-06-19 09:08:37.014 [main] INFO  org.hibernate.orm.core - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-06-19 09:08:37.032 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-06-19 09:08:38.361 [main] INFO  c.d.j.d.s.s.SongQueueServiceImpl - Using song library root: /mnt/readyNAS/Rock_On_Third
+2026-06-19 09:08:38.627 [main] INFO  c.d.j.d.s.s.SongPlayerServiceImpl - Using song library root: null
+2026-06-19 09:08:38.627 [main] INFO  c.d.j.d.s.s.SongPlayerServiceImpl - Using : vlc
+2026-06-19 09:08:38.628 [main] INFO  c.d.j.d.s.s.SongPlayerServiceImpl - Volume : 100
+2026-06-19 09:08:38.633 [song-queue-thread] INFO  o.s.b.f.s.DefaultListableBeanFactory - Obtaining singleton bean 'delegatingApplicationListener' in thread "song-queue-thread" while other thread holds singleton lock for other beans [songPlayerController, songPlayerService]
+2026-06-19 09:08:38.674 [main] ERROR c.d.j.d.user.service.UserServiceImpl - Could not load user root from: /mnt/readyNAS/Rock_On_Third, using empty user root for now, error: Could not read user list from disk with naturalIdentity: /mnt/readyNAS/Rock_On_Third and filePath: /mnt/readyNAS/Rock_On_Third/JukeANator_Users.oos
+2026-06-19 09:08:38.674 [main] INFO  c.d.j.d.user.service.UserServiceImpl - Using user root: UserRootEntity
+2026-06-19 09:08:38.865 [main] WARN  o.s.b.j.a.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-06-19 09:08:39.065 [main] WARN  o.s.b.s.a.UserDetailsServiceAutoConfiguration - 
+
+Using generated security password: 0db04632-97cd-4da1-9da3-9d1e2271f00d
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-06-19 09:08:39.084 [main] INFO  o.s.s.c.a.a.c.InitializeUserDetailsBeanManagerConfigurer$InitializeUserDetailsManagerConfigurer - Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-06-19 09:08:40.199 [song-queue-thread] INFO  c.d.j.d.s.s.SongPlayerServiceImpl - Playing song: /mnt/readyNAS/Rock_On_Third/Motown/Compilations/16 #1 Hits From The Early 60's/Smokey Robison & The Miracles - 01 - Shop Around.mp3
+2026-06-19 09:08:40.534 [main] INFO  o.s.s.q.SchedulerFactoryBean$LocalSchedulerFactory - Using default implementation for ThreadExecutor
+2026-06-19 09:08:40.603 [main] INFO  o.quartz.core.SchedulerSignalerImpl - Initialized Scheduler Signaller of type: class org.quartz.core.SchedulerSignalerImpl
+2026-06-19 09:08:40.604 [main] INFO  org.quartz.core.QuartzScheduler - Quartz Scheduler v2.5.2 created.
+2026-06-19 09:08:40.605 [main] INFO  org.quartz.simpl.RAMJobStore - RAMJobStore initialized.
+2026-06-19 09:08:40.606 [main] INFO  org.quartz.core.QuartzScheduler - Scheduler meta-data: Quartz Scheduler (v2.5.2) 'quartzScheduler' with instanceId 'NON_CLUSTERED'
+  Scheduler class: 'org.quartz.core.QuartzScheduler' - running locally.
+  NOT STARTED.
+  Currently in standby mode.
+  Number of jobs executed: 0
+  Using thread pool 'org.quartz.simpl.SimpleThreadPool' - with 10 threads.
+  Using job-store 'org.quartz.simpl.RAMJobStore' - which does not support persistence. and is not clustered.
+
+2026-06-19 09:08:40.607 [main] INFO  o.s.s.q.SchedulerFactoryBean$LocalSchedulerFactory - Quartz scheduler 'quartzScheduler' initialized from an externally provided properties instance.
+2026-06-19 09:08:40.607 [main] INFO  o.s.s.q.SchedulerFactoryBean$LocalSchedulerFactory - Quartz scheduler version: 2.5.2
+2026-06-19 09:08:40.607 [main] INFO  org.quartz.core.QuartzScheduler - JobFactory set to: org.springframework.scheduling.quartz.SpringBeanJobFactory@b31cd6b
+2026-06-19 09:08:40.695 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8080"]
+2026-06-19 09:08:40.768 [main] INFO  o.s.boot.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path '/'
+2026-06-19 09:08:40.771 [main] INFO  o.s.s.quartz.SchedulerFactoryBean - Starting Quartz Scheduler now
+2026-06-19 09:08:40.771 [main] INFO  org.quartz.core.QuartzScheduler - Scheduler quartzScheduler_$_NON_CLUSTERED started.
+2026-06-19 09:08:40.786 [main] INFO  c.d.j.JukeANatorBackendApplication - Started JukeANatorBackendApplication in 12.648 seconds (process running for 13.584)
+2026-06-19 09:08:54.168 [AWT-EventQueue-0] INFO  c.d.j.u.JukeANatorUserInterfaceApplication - JukeANator UI launched

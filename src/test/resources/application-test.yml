@@ -4,7 +4,14 @@ app:
   jwt:
     secret: fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP
     expiration-ms: 3600000
-    
+  logging:
+    file-path: logs/jukeanator-service.log
+    max-file-size: 10MB
+
+logging:
+  level:
+    com.djt.jukeanator_engine: INFO
+            
 spring:
   application:
     name: JukeANator

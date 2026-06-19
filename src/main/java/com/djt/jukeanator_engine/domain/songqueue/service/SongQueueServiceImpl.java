@@ -166,7 +166,7 @@ public final class SongQueueServiceImpl
         addSongToQueue("BACKGROUND_MUSIC", albumId, songId, 0);
       } else {
         System.err
-            .println("randomSong not eligible for queueing because: " + reasonForIneligibility);
+            .println(randomSong + "not eligible for queueing because: " + reasonForIneligibility);
       }
     }
 
