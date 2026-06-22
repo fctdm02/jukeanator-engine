@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import java.util.ArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
@@ -13,6 +14,7 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
+import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
@@ -29,7 +31,7 @@ public final class UserServiceImpl implements UserService, AggregateRootService<
 
   private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
-  private final String rootPath;
+  private String rootPath;
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
@@ -54,6 +56,18 @@ public final class UserServiceImpl implements UserService, AggregateRootService<
     log.info("Using user root: " + this.userRoot);
   }
 
+  @EventListener
+  public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
+    log.info("""
+        Received ScanFileSystemForSongsEvent:
+        scanPath={}
+        albumCount={}
+        """, event.scanPath(), event.albumCount());
+
+    this.rootPath = event.scanPath();
+    initialize();
+  }
+  
   // Service methods
   @Override
   public AuthResponse register(RegisterRequest request) {
