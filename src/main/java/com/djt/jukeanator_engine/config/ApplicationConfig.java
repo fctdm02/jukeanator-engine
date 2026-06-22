@@ -29,7 +29,6 @@ import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryPostgresImpl;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
-import com.djt.jukeanator_engine.domain.user.config.UserProperties;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryPostgresImpl;
@@ -39,6 +38,8 @@ import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
 
 @Configuration
 public class ApplicationConfig {
+
+  // ── Utility / helper beans ────────────────────────────────────────────────
 
   @Bean
   public DiscogsClientWrapper discogsClientWrapper(SongLibraryProperties songLibraryProperties) {
@@ -50,147 +51,146 @@ public class ApplicationConfig {
 
   @Bean
   public MusicBrainzClientWrapper musicBrainzClientWrapper() {
-    
     return new MusicBrainzClientWrapper();
   }
 
   @Bean
   public JAudioTaggerClient jAudioTaggerClient() {
-    
     return new JAudioTaggerClient();
   }
 
   @Bean
   public CoverArtDownloader coverArtDownloader() {
-    
     return new CoverArtDownloader();
   }
 
   @Bean
   public SongLibraryObjectPersistor songLibraryObjectPersistor() {
-    
     return new SongLibraryObjectPersistor();
   }
 
   @Bean
   public SongQueueObjectPersistor songQueueObjectPersistor() {
-    
     return new SongQueueObjectPersistor();
   }
 
   @Bean
   public UserRootObjectPersistor userRootObjectPersistor() {
-    
     return new UserRootObjectPersistor();
   }
-  
+
+  // ── Song library repository ───────────────────────────────────────────────
+
   @Bean
   @ConditionalOnProperty(name = "song-library.repository-type", havingValue = "filesystem",
-      matchIfMissing = true // default
-  )
-  public SongLibraryRepository songLibraryRepositoryFileSystemImpl(SongLibraryProperties songLibraryProperties) {
+      matchIfMissing = true)
+  public SongLibraryRepository songLibraryRepositoryFileSystemImpl(AppProperties appProperties) {
     
-    return new SongLibraryRepositoryFileSystemImpl(songLibraryProperties.getRootPath() // basePath = rootPath
-    );
+    return new SongLibraryRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
   }
 
   @Bean
   @ConditionalOnProperty(name = "song-library.repository-type", havingValue = "postgres")
-  public SongLibraryRepository songLibraryRepositoryPostgresImpl(SongLibraryProperties songLibraryProperties) {
+  public SongLibraryRepository songLibraryRepositoryPostgresImpl() {
     
     return new SongLibraryRepositoryPostgresImpl();
   }
 
+  // ── Song scanner ──────────────────────────────────────────────────────────
+
   @Bean
   public SongScanner songScanner(
       SongLibraryProperties songLibraryProperties,
-      DiscogsClientWrapper discogsClientWrapper, 
+      DiscogsClientWrapper discogsClientWrapper,
       MusicBrainzClientWrapper musicBrainzClientWrapper,
-      JAudioTaggerClient jAudioTaggerClient, 
+      JAudioTaggerClient jAudioTaggerClient,
       CoverArtDownloader coverArtDownloader) {
     
     return new SongScanner(
-        discogsClientWrapper, 
-        musicBrainzClientWrapper, 
+        discogsClientWrapper,
+        musicBrainzClientWrapper,
         jAudioTaggerClient,
-        coverArtDownloader, 
-        songLibraryProperties.isRequiresMetadata(), 
+        coverArtDownloader,
+        songLibraryProperties.isRequiresMetadata(),
         songLibraryProperties.isUseGenre(),
         songLibraryProperties.isUseTopFolderForGenre(),
         songLibraryProperties.getAcceptedSongFileExtensions());
   }
 
+  // ── Song queue repository ─────────────────────────────────────────────────
+
   @Bean
   @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "filesystem",
-      matchIfMissing = true // default
-  )
-  public SongQueueRepository songQueueRepositoryFileSystemImpl(SongQueueProperties songQueueProperties) {
+      matchIfMissing = true)
+  public SongQueueRepository songQueueRepositoryFileSystemImpl(AppProperties appProperties) {
     
-    return new SongQueueRepositoryFileSystemImpl(songQueueProperties.getRootPath() // basePath = rootPath
-    );
+    return new SongQueueRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
   }
-  
+
   @Bean
   @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "postgres")
-  public SongQueueRepository songQueueRepositoryPostgresImpl(SongQueueProperties songQueueProperties) {
+  public SongQueueRepository songQueueRepositoryPostgresImpl() {
     
     return new SongQueueRepositoryPostgresImpl();
   }
-  
+
+  // ── User repository ───────────────────────────────────────────────────────
+
   @Bean
   @ConditionalOnProperty(name = "user.repository-type", havingValue = "filesystem",
-      matchIfMissing = true // default
-  )
-  public UserRepository userRepositoryFileSystemImpl(UserProperties userProperties) {
+      matchIfMissing = true)
+  public UserRepository userRepositoryFileSystemImpl(AppProperties appProperties) {
     
-    return new UserRepositoryFileSystemImpl(userProperties.getRootPath() // basePath = rootPath
-    );
+    return new UserRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
   }
-  
+
   @Bean
   @ConditionalOnProperty(name = "user.repository-type", havingValue = "postgres")
-  public UserRepository userRepositoryPostgresImpl(UserProperties userProperties) {
+  public UserRepository userRepositoryPostgresImpl() {
     
     return new UserRepositoryPostgresImpl();
   }
-  
+
+  // ── Services ──────────────────────────────────────────────────────────────
+
   @Bean
   @Primary
   public SongLibraryService songLibraryService(
+      AppProperties appProperties,
       SongLibraryProperties songLibraryProperties,
-      SongLibraryRepository repository, 
+      SongLibraryRepository repository,
       SongScanner songScanner,
       ApplicationEventPublisher eventPublisher) {
     
     return new SongLibraryServiceImpl(
-        songLibraryProperties.getRootPath(), 
-        repository, 
+        appProperties.getEffectiveRootPath(),
+        repository,
         songScanner,
         songLibraryProperties.getSearchResultSize(),
         eventPublisher);
   }
-  
+
   @Bean
   @Primary
   public SongQueueService songQueueService(
+      AppProperties appProperties,
       SongQueueProperties songQueueProperties,
       SongLibraryRepository songLibraryRepository,
       SongQueueRepository songQueueRepository,
       ApplicationEventPublisher eventPublisher) {
     
     return new SongQueueServiceImpl(
-        songQueueProperties, 
-        songLibraryRepository, 
+        appProperties.getEffectiveRootPath(),
+        songQueueProperties,
+        songLibraryRepository,
         songQueueRepository,
         eventPublisher);
   }
-  
+
   @Bean
   @Primary
   public SongPlayerService songPlayerService(
       SongPlayerProperties songPlayerProperties,
-      SongLibraryProperties songLibraryProperties,
-      SongLibraryRepository songLibraryRepository,
       SongQueueService songQueueService,
       ApplicationEventPublisher eventPublisher) {
     
@@ -199,19 +199,19 @@ public class ApplicationConfig {
         songQueueService,
         eventPublisher);
   }
-  
+
   @Bean
   @Primary
   public UserService userService(
-      UserProperties userProperties,
+      AppProperties appProperties,
       UserRepository userRepository,
-      PasswordEncoder passwordEncoder, 
+      PasswordEncoder passwordEncoder,
       JwtUtil jwtUtil) {
     
     return new UserServiceImpl(
-        userProperties.getRootPath(), 
+        appProperties.getEffectiveRootPath(),
         userRepository,
-        passwordEncoder, 
+        passwordEncoder,
         jwtUtil);
-  }  
+  }
 }

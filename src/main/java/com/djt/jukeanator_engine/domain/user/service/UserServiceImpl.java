@@ -29,8 +29,8 @@ public final class UserServiceImpl implements UserService, AggregateRootService<
 
   private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
-  private String rootPath;
-  private UserRepository userRepository;
+  private final String rootPath;
+  private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
 

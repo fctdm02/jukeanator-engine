@@ -3,12 +3,18 @@ package com.djt.jukeanator_engine.domain.songqueue.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Properties bound to the {@code song-queue:} YAML prefix.
+ *
+ * <p>Note: the filesystem root path previously held here has been moved to
+ * {@code app.root-path} / {@code app.root-path-windows} and is resolved via
+ * {@link com.djt.jukeanator_engine.config.AppProperties#getEffectiveRootPath()}.
+ */
 @Validated
 @ConfigurationProperties(prefix = "song-queue")
 public class SongQueueProperties {
 
   private String repositoryType; // "filesystem" or "postgres"
-  private String rootPath;
   private boolean enableBackgroundMusic = false;
   private int minimumNumberSongsToKeepInQueue = 5;
   private int minimumMinutesBetweenSongPlays = 60;
@@ -19,14 +25,6 @@ public class SongQueueProperties {
 
   public String getRepositoryType() {
     return repositoryType;
-  }
-
-  public String getRootPath() {
-    return rootPath;
-  }
-
-  public void setRootPath(String rootPath) {
-    this.rootPath = rootPath;
   }
 
   public void setRepositoryType(String repositoryType) {

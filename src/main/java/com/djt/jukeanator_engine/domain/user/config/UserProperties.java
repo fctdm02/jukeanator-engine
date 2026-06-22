@@ -8,18 +8,9 @@ import org.springframework.validation.annotation.Validated;
 public class UserProperties {
 
   private String repositoryType; // "filesystem" or "postgres"
-  private String rootPath;
 
   public String getRepositoryType() {
     return repositoryType;
-  }
-
-  public String getRootPath() {
-    return rootPath;
-  }
-
-  public void setRootPath(String rootPath) {
-    this.rootPath = rootPath;
   }
 
   public void setRepositoryType(String repositoryType) {

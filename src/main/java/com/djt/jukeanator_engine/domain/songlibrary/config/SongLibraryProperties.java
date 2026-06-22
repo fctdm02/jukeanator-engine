@@ -4,12 +4,19 @@ import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Properties bound to the {@code song-library:} YAML prefix.
+ *
+ * <p>
+ * Note: the filesystem root path previously held here has been moved to {@code app.root-path} /
+ * {@code app.root-path-windows} and is resolved via
+ * {@link com.djt.jukeanator_engine.config.AppProperties#getEffectiveRootPath()}.
+ */
 @Validated
 @ConfigurationProperties(prefix = "song-library")
 public class SongLibraryProperties {
 
   private String repositoryType; // "filesystem" or "postgres"
-  private String rootPath;
   private boolean requiresMetadata;
   private boolean useGenre;
   private boolean useTopFolderForGenre;
@@ -19,7 +26,7 @@ public class SongLibraryProperties {
   private Discogs discogs = new Discogs();
 
   public static class Discogs {
-    
+
     private String consumerKey;
     private String consumerSecret;
 
@@ -48,14 +55,6 @@ public class SongLibraryProperties {
     this.repositoryType = repositoryType;
   }
 
-  public String getRootPath() {
-    return rootPath;
-  }
-
-  public void setRootPath(String rootPath) {
-    this.rootPath = rootPath;
-  }
-
   public boolean isRequiresMetadata() {
     return requiresMetadata;
   }
@@ -75,13 +74,17 @@ public class SongLibraryProperties {
   public boolean isUseTopFolderForGenre() {
     return useTopFolderForGenre;
   }
-  
+
+  public void setUseTopFolderForGenre(boolean useTopFolderForGenre) {
+    this.useTopFolderForGenre = useTopFolderForGenre;
+  }
+
   public Set<String> getAcceptedSongFileExtensions() {
     return this.acceptedSongFileExtensions;
   }
 
-  public void setUseTopFolderForGenre(boolean useTopFolderForGenre) {
-    this.useTopFolderForGenre = useTopFolderForGenre;
+  public void setAcceptedSongFileExtensions(Set<String> acceptedSongFileExtensions) {
+    this.acceptedSongFileExtensions = acceptedSongFileExtensions;
   }
 
   public Discogs getDiscogs() {
@@ -90,10 +93,6 @@ public class SongLibraryProperties {
 
   public void setDiscogs(Discogs discogs) {
     this.discogs = discogs;
-  }
-  
-  public void setAcceptedSongFileExtensions(Set<String> acceptedSongFileExtensions) {
-    this.acceptedSongFileExtensions = acceptedSongFileExtensions;
   }
 
   public Integer getSearchResultSize() {

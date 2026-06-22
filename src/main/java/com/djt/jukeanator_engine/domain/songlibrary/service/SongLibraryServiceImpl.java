@@ -62,24 +62,24 @@ public final class SongLibraryServiceImpl
 
   private final ApplicationEventPublisher eventPublisher;
 
-  private String scanPath;
-  private SongLibraryRepository songLibraryRepository;
-  private SongScanner songScanner;
-  private Integer searchResultSize;
+  private String rootPath;
+  private final SongLibraryRepository songLibraryRepository;
+  private final SongScanner songScanner;
+  private final Integer searchResultSize;
 
   private RootFolderEntity root;
   private boolean isInitialized;
 
-  public SongLibraryServiceImpl(String scanPath, SongLibraryRepository songLibraryRepository,
+  public SongLibraryServiceImpl(String rootPath, SongLibraryRepository songLibraryRepository,
       SongScanner songScanner, Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
 
-    requireNonNull(scanPath, "scanPath cannot be null");
+    requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
     requireNonNull(songScanner, "songScanner cannot be null");
     requireNonNull(searchResultSize, "searchResultSize cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
-    this.scanPath = scanPath;
+    this.rootPath = rootPath;
     this.songLibraryRepository = songLibraryRepository;
     this.songScanner = songScanner;
     this.searchResultSize = searchResultSize;
@@ -457,19 +457,20 @@ public final class SongLibraryServiceImpl
       return null;
     }
   }
-  
+
   @Override
   public SongDto getRandomSongFromBackgroundMusicPlaylist() {
-    
-    return SongLibraryMapper.toSongDto(this.root.getRandomSongFromBackgroundMusicPlaylist(this.scanPath));
+
+    return SongLibraryMapper
+        .toSongDto(this.root.getRandomSongFromBackgroundMusicPlaylist(this.rootPath));
   }
 
-  
+
   // ADMIN ROLE METHODS
   @Override
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 
-    return scanFileSystemForSongs(new ScanRequest(this.scanPath));
+    return scanFileSystemForSongs(new ScanRequest(this.rootPath));
   }
 
   @Override
@@ -478,15 +479,15 @@ public final class SongLibraryServiceImpl
     try {
 
       // Scan the file system for songs
-      this.scanPath = scanRequest.getScanPath();
-      this.root.storeSongNumPlays(this.scanPath);
-      this.root = songScanner.scanFileSystemForSongs(this.scanPath);
+      this.rootPath = scanRequest.getScanPath();
+      this.root.storeSongNumPlays(this.rootPath);
+      this.root = songScanner.scanFileSystemForSongs(this.rootPath);
 
       // Restore song num plays, persist, then re-initialize the root
-      this.root.restoreSongNumPlays(this.scanPath);
+      this.root.restoreSongNumPlays(this.rootPath);
       if (this.songLibraryRepository instanceof SongLibraryRepositoryFileSystemImpl) {
         ((SongLibraryRepositoryFileSystemImpl) this.songLibraryRepository)
-            .setBasePath(this.scanPath);
+            .setBasePath(this.rootPath);
       }
       this.songLibraryRepository.storeAggregateRoot(this.root);
       this.root.initialize();
@@ -496,14 +497,14 @@ public final class SongLibraryServiceImpl
 
       // Publish the event
       eventPublisher
-          .publishEvent(new ScanFileSystemForSongsEvent(scanPath, root.getAlbums().size()));
+          .publishEvent(new ScanFileSystemForSongsEvent(rootPath, root.getAlbums().size()));
 
       return Integer.valueOf(root.getAlbums().size());
     } catch (SongLibraryException sle) {
       throw sle;
     } catch (Exception e) {
       throw new SongScanFailedException(
-          "Could not scan file system for songs in: " + scanPath
+          "Could not scan file system for songs in: " + rootPath
               + " with acceptedSongFileExtensions: " + songScanner.getAcceptedSongFileExtensions(),
           e);
     }
@@ -613,7 +614,7 @@ public final class SongLibraryServiceImpl
   private Boolean authenticatePassword(String password, String hashFileName) {
 
     try {
-      Path hashFile = Path.of(this.scanPath, hashFileName);
+      Path hashFile = Path.of(this.rootPath, hashFileName);
 
       if (!Files.exists(hashFile)) {
         return Boolean.FALSE;
@@ -685,14 +686,14 @@ public final class SongLibraryServiceImpl
     // startup.
     try {
 
-      this.root = this.songLibraryRepository.loadAggregateRoot(this.scanPath);
+      this.root = this.songLibraryRepository.loadAggregateRoot(this.rootPath);
 
     } catch (EntityDoesNotExistException ednee) {
 
-      log.error("Could not load song library from: " + scanPath
+      log.error("Could not load song library from: " + rootPath
           + ", using empty song library root for now, error: " + ednee.getMessage());
 
-      this.root = new RootFolderEntity(this.scanPath);
+      this.root = new RootFolderEntity(this.rootPath);
     }
 
     this.isInitialized = true;

@@ -73,16 +73,25 @@ public final class SongQueueServiceImpl
   /** Reference to the track that is currently playing on the output system */
   private SongFileEntity currentlyPlayingSong;
 
-  public SongQueueServiceImpl(SongQueueProperties songQueueProperties,
+  /**
+   * @param rootPath The shared filesystem root path resolved by
+   *        {@code AppProperties.getEffectiveRootPath()}.
+   * @param songQueueProperties Queue-specific configuration (does not include root-path).
+   * @param songLibraryRepository Repository for the song library aggregate.
+   * @param songQueueRepository Repository for the song queue aggregate.
+   * @param eventPublisher Spring application event publisher.
+   */
+  public SongQueueServiceImpl(String rootPath, SongQueueProperties songQueueProperties,
       SongLibraryRepository songLibraryRepository, SongQueueRepository songQueueRepository,
       ApplicationEventPublisher eventPublisher) {
 
+    requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(songQueueProperties, "songQueueProperties cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
     requireNonNull(songQueueRepository, "songQueueRepository cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
-    this.rootPath = songQueueProperties.getRootPath();
+    this.rootPath = rootPath;
     this.songLibraryRepository = songLibraryRepository;
     this.songQueueRepository = songQueueRepository;
     this.eventPublisher = eventPublisher;
