@@ -2,8 +2,10 @@ package com.djt.jukeanator_engine.domain.songplayer.audio;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueEmptyEvent;
+import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 
 /**
  * Starts/stops line-in monitoring based on jukebox playback state: monitoring runs whenever
@@ -24,18 +26,25 @@ public class JukeboxAudioCoordinator {
   private static final Logger log = LoggerFactory.getLogger(JukeboxAudioCoordinator.class);
 
   private final LineInService lineInService;
-  private final SongQueueStateProvider queueStateProvider;
+  private final SongQueueService songQueueService;
 
-  public JukeboxAudioCoordinator(LineInService lineInService,
-      SongQueueStateProvider queueStateProvider) {
+  public JukeboxAudioCoordinator(LineInService lineInService, SongQueueService songQueueService) {
+
     this.lineInService = lineInService;
-    this.queueStateProvider = queueStateProvider;
+    this.songQueueService = songQueueService;
   }
 
-  @Scheduled(fixedDelay = 1000)
+  @EventListener
+  public void handleSongQueueEmptyEvent(SongQueueEmptyEvent event) {
+
+    // Instead of polling, we let the song queue service tell us when the queue is empty
+    reconcile();
+  }
+
   public void reconcile() {
+
     boolean shouldMonitor =
-        queueStateProvider.isQueueEmpty() && !queueStateProvider.isBackgroundMusicEnabled();
+        songQueueService.isQueueEmpty() && !songQueueService.isBackgroundMusicEnabled();
 
     if (shouldMonitor && !lineInService.isMonitoring()) {
       if (lineInService.isLineInAvailable()) {

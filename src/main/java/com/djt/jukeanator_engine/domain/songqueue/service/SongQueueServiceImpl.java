@@ -35,6 +35,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueEmptyEvent;
 import com.djt.jukeanator_engine.domain.songqueue.exception.SongQueueException;
 import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
@@ -54,7 +55,12 @@ public final class SongQueueServiceImpl
   private final SongLibraryRepository songLibraryRepository;
   private final SongQueueRepository songQueueRepository;
 
+  // BACKGROUND MUSIC (THROUGH LINE IN AUDIO JACK)
   private final boolean enableBackgroundMusic;
+  private final String preferredMixerName;
+  private final int lineInVolume;
+
+  // SONG QUEUE CONSTRAINTS
   private final int minimumNumberSongsToKeepInQueue;
   private final int minimumMinutesBetweenSongPlays;
   private final int maximumConsecutiveSongPlaysByArtist;
@@ -97,6 +103,9 @@ public final class SongQueueServiceImpl
     this.eventPublisher = eventPublisher;
 
     this.enableBackgroundMusic = songQueueProperties.isEnableBackgroundMusic();
+    this.preferredMixerName = songQueueProperties.getPreferredMixerName();
+    this.lineInVolume = songQueueProperties.getLineInVolume();
+
     this.minimumNumberSongsToKeepInQueue = songQueueProperties.getMinimumNumberSongsToKeepInQueue();
     this.minimumMinutesBetweenSongPlays = songQueueProperties.getMinimumMinutesBetweenSongPlays();
     this.maximumConsecutiveSongPlaysByArtist =
@@ -107,7 +116,18 @@ public final class SongQueueServiceImpl
 
     initialize();
 
-    log.info("Using song library root: " + this.songLibraryRoot);
+    log.info("songLibraryRoot: " + this.songLibraryRoot);
+
+    log.info("enableBackgroundMusic: " + this.enableBackgroundMusic);
+    log.info("preferredMixerName: " + this.preferredMixerName);
+    log.info("lineInVolume: " + this.lineInVolume);
+
+    log.info("minimumNumberSongsToKeepInQueue: " + this.minimumNumberSongsToKeepInQueue);
+    log.info("minimumMinutesBetweenSongPlays: " + this.minimumMinutesBetweenSongPlays);
+    log.info("maximumConsecutiveSongPlaysByArtist: " + this.maximumConsecutiveSongPlaysByArtist);
+    log.info("allowExplicitSongsAtAllTimes: " + this.allowExplicitSongsAtAllTimes);
+    log.info("allowExplicitSongsBegin: " + this.allowExplicitSongsBegin);
+    log.info("allowExplicitSongsEnd: " + this.allowExplicitSongsEnd);
   }
 
   @Override
@@ -116,6 +136,8 @@ public final class SongQueueServiceImpl
     List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
 
     if (songs.isEmpty()) {
+      
+      eventPublisher.publishEvent(new SongQueueEmptyEvent());
       return null;
     }
 
@@ -138,6 +160,16 @@ public final class SongQueueServiceImpl
         .publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
 
     return SongQueueMapper.toDto(nextSong);
+  }
+
+  @Override
+  public boolean isQueueEmpty() {
+    return this.songQueueRoot.isQueueEmpty();
+  }
+
+  @Override
+  public boolean isBackgroundMusicEnabled() {
+    return this.enableBackgroundMusic;
   }
 
   /**

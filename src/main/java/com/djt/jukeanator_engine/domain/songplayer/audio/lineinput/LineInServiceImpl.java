@@ -10,13 +10,12 @@ import javax.sound.sampled.TargetDataLine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.djt.jukeanator_engine.domain.songplayer.audio.LineInService;
-import com.djt.jukeanator_engine.domain.songplayer.audio.config.LineInProperties;
 
 public class LineInServiceImpl implements LineInService {
 
   private static final Logger log = LoggerFactory.getLogger(LineInServiceImpl.class);
 
-  private final LineInProperties properties;
+  private final String preferredMixerName;
   private final AtomicInteger volumePercent;
   private final AtomicBoolean signalPresent = new AtomicBoolean(false);
 
@@ -24,9 +23,10 @@ public class LineInServiceImpl implements LineInService {
   private Thread monitorThread;
   private LineInMonitorTask monitorTask;
 
-  public LineInServiceImpl(LineInProperties properties) {
-    this.properties = properties;
-    this.volumePercent = new AtomicInteger(properties.getDefaultVolume());
+  public LineInServiceImpl(String preferredMixerName, int defaultVolume) {
+
+    this.preferredMixerName = preferredMixerName;
+    this.volumePercent = new AtomicInteger(defaultVolume);
   }
 
   @Override
@@ -103,7 +103,7 @@ public class LineInServiceImpl implements LineInService {
    * recording device anyway.
    */
   Mixer.Info findLineInMixer() {
-    String preferred = properties.getPreferredMixerName();
+
     Mixer.Info fallback = null;
 
     for (Mixer.Info info : AudioSystem.getMixerInfo()) {
@@ -112,8 +112,8 @@ public class LineInServiceImpl implements LineInService {
         continue;
       }
 
-      if (preferred != null && !preferred.isBlank()
-          && info.getName().toLowerCase().contains(preferred.toLowerCase())) {
+      if (preferredMixerName != null && !preferredMixerName.isBlank()
+          && info.getName().toLowerCase().contains(preferredMixerName.toLowerCase())) {
         return info;
       }
 

@@ -50,6 +50,10 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
     return location;
   }
 
+  public boolean isQueueEmpty() {
+    return this.queueEntries.isEmpty();
+  }
+
   public List<SongQueueEntryEntity> getSongs() {
 
     if (queueEntries == null) {

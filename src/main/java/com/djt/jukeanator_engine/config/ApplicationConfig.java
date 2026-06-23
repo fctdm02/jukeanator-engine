@@ -19,6 +19,13 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.utils.DiscogsClientW
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.JAudioTaggerClient;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.MusicBrainzClientWrapper;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
+import com.djt.jukeanator_engine.domain.songplayer.audio.JukeboxAudioCoordinator;
+import com.djt.jukeanator_engine.domain.songplayer.audio.LineInService;
+import com.djt.jukeanator_engine.domain.songplayer.audio.MasterVolumeService;
+import com.djt.jukeanator_engine.domain.songplayer.audio.lineinput.LineInServiceImpl;
+import com.djt.jukeanator_engine.domain.songplayer.audio.linux.LinuxMasterVolumeService;
+import com.djt.jukeanator_engine.domain.songplayer.audio.mac.MacMasterVolumeService;
+import com.djt.jukeanator_engine.domain.songplayer.audio.windows.WindowsMasterVolumeService;
 import com.djt.jukeanator_engine.domain.songplayer.config.SongPlayerProperties;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerServiceImpl;
@@ -39,8 +46,27 @@ import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
 @Configuration
 public class ApplicationConfig {
 
-  // ── Utility / helper beans ────────────────────────────────────────────────
+  @Bean
+  public MasterVolumeService masterVolumeService() {
+    
+    String os = System.getProperty("os.name", "").toLowerCase();
+    if (os.contains("win")) {
+      return new WindowsMasterVolumeService();
+    } else if (os.contains("mac") || os.contains("darwin")) {
+      return new MacMasterVolumeService();
+    } else {
+      return new LinuxMasterVolumeService();
+    }
+  }
 
+  @Bean
+  public LineInService lineInService(SongQueueProperties songQueueProperties) {
+    
+    return new LineInServiceImpl(
+        songQueueProperties.getPreferredMixerName(), 
+        songQueueProperties.getLineInVolume());
+  }
+  
   @Bean
   public DiscogsClientWrapper discogsClientWrapper(SongLibraryProperties songLibraryProperties) {
     
@@ -213,5 +239,13 @@ public class ApplicationConfig {
         userRepository,
         passwordEncoder,
         jwtUtil);
+  }
+  
+  @Bean
+  public JukeboxAudioCoordinator jukeboxAudioCoordinator(
+      LineInService lineInService,
+      SongQueueService songQueueService) {
+
+    return new JukeboxAudioCoordinator(lineInService, songQueueService);
   }
 }

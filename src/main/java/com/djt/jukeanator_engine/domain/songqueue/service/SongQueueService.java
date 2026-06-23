@@ -19,11 +19,25 @@ public interface SongQueueService {
   String LOCAL_USERNAME = "LOCAL";
 
   /**
-   * NOTE: This method should only be involved by SongPlayerService when playing the next song
+   * NOTE: System method, not to be invoked on behalf of a user
    * 
    * @return
    */
   SongQueueEntryDto dequeueNextSong();
+
+  /**
+   * NOTE: System method, not to be invoked on behalf of a user
+   * 
+   * @return
+   */
+  boolean isQueueEmpty();
+
+  /**
+   * NOTE: System method, not to be invoked on behalf of a user
+   * 
+   * @return
+   */
+  boolean isBackgroundMusicEnabled();  
 
   /**
    * 

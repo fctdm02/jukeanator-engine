@@ -33,13 +33,36 @@ public class SongQueueController implements SongQueueService {
   }
 
   /**
-   * Internal system method — not exposed over HTTP. Called directly by SongPlayerService on the
-   * service bean, not via this controller.
+   * NOTE: System method, not to be invoked on behalf of a user
+   * 
+   * @return
    */
   @Override
   public SongQueueEntryDto dequeueNextSong() {
     throw new UnsupportedOperationException(
-        "dequeueNextSong() is a system-only method and is not accessible via the REST API");
+        "System method, not to be invoked on behalf of a user!");
+  }
+
+  /**
+   * NOTE: System method, not to be invoked on behalf of a user
+   * 
+   * @return
+   */
+  @Override
+  public boolean isQueueEmpty() {
+    throw new UnsupportedOperationException(
+        "System method, not to be invoked on behalf of a user!");
+  }
+
+  /**
+   * NOTE: System method, not to be invoked on behalf of a user
+   * 
+   * @return
+   */
+  @Override
+  public boolean isBackgroundMusicEnabled() {
+    throw new UnsupportedOperationException(
+        "System method, not to be invoked on behalf of a user!");
   }
 
   @Override

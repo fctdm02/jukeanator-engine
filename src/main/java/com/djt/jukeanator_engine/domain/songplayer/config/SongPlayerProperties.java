@@ -7,18 +7,10 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "song-player")
 public class SongPlayerProperties {
 
-  /*
-   * VLC: All operating systems Winamp: Windows only
-   */
   private String playerType = "vlc";
-  
   private String winampExePath = "C:\\\\Program Files (x86)\\\\Winamp\\\\winamp.exe";
-
-  /*
-   * 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software
-   * amplification)
-   */
-  private int volume = 100;
+  private int playerVolume = 100;
+  private int masterVolume = 100;
 
   public String getPlayerType() {
     return playerType;
@@ -36,11 +28,19 @@ public class SongPlayerProperties {
     this.winampExePath = winampExePath;
   }
 
-  public int getVolume() {
-    return volume;
+  public int getPlayerVolume() {
+    return playerVolume;
   }
 
-  public void setVolume(int volume) {
-    this.volume = volume;
+  public void setPlayerVolume(int playerVolume) {
+    this.playerVolume = playerVolume;
+  }
+
+  public int getMasterVolume() {
+    return masterVolume;
+  }
+
+  public void setMasterVolume(int masterVolume) {
+    this.masterVolume = masterVolume;
   }
 }

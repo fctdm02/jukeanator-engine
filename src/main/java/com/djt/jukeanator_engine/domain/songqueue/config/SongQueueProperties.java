@@ -15,7 +15,13 @@ import org.springframework.validation.annotation.Validated;
 public class SongQueueProperties {
 
   private String repositoryType; // "filesystem" or "postgres"
+  
+  // BACKGROUND MUSIC (THROUGH LINE IN AUDIO JACK)
   private boolean enableBackgroundMusic = false;
+  private String preferredMixerName = "Line In";
+  private int lineInVolume = 75;
+  
+  // SONG QUEUE CONSTRAINTS
   private int minimumNumberSongsToKeepInQueue = 5;
   private int minimumMinutesBetweenSongPlays = 60;
   private int maximumConsecutiveSongPlaysByArtist = 3;
@@ -37,6 +43,22 @@ public class SongQueueProperties {
 
   public void setEnableBackgroundMusic(boolean enableBackgroundMusic) {
     this.enableBackgroundMusic = enableBackgroundMusic;
+  }
+
+  public String getPreferredMixerName() {
+    return preferredMixerName;
+  }
+
+  public void setPreferredMixerName(String preferredMixerName) {
+    this.preferredMixerName = preferredMixerName;
+  }
+
+  public int getLineInVolume() {
+    return lineInVolume;
+  }
+
+  public void setLineInVolume(int lineInVolume) {
+    this.lineInVolume = lineInVolume;
   }
 
   public int getMinimumNumberSongsToKeepInQueue() {

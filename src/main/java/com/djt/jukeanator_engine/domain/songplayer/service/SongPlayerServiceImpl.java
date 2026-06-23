@@ -47,7 +47,9 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
       Executors.newSingleThreadExecutor(Thread.ofPlatform().name("song-queue-thread").factory());
 
   private final String playerType;
-  private final int volume;
+  private final int playerVolume;
+  private final int masterVolume;
+  
   private final SongQueueService songQueueService;
   private final ApplicationEventPublisher eventPublisher;
   private final Deque<SongQueueEntryDto> playbackHistory = new ArrayDeque<>();
@@ -76,28 +78,31 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
     this.playerType = songPlayerProperties.getPlayerType();
-    this.volume = songPlayerProperties.getVolume();
+    this.playerVolume = songPlayerProperties.getPlayerVolume();
+    this.masterVolume = songPlayerProperties.getMasterVolume();
     this.songQueueService = songQueueService;
     this.eventPublisher = eventPublisher;
 
     OSType osType = OperatingSystemDetector.getOperatingSystem();
     if (this.playerType.equals("winamp") && osType == OSType.WINDOWS) {
 
-      this.player = new WinampMediaPlayer(songPlayerProperties.getWinampExePath(), this.volume);
+      this.player =
+          new WinampMediaPlayer(songPlayerProperties.getWinampExePath(), this.playerVolume);
 
     } else if (this.playerType.equals("vlc")) {
 
-      this.player = new VlcMediaPlayer(this.volume);
+      this.player = new VlcMediaPlayer(this.playerVolume);
 
     } else {
 
-      this.player = new VideoVlcMediaPlayer(this.volume);
+      this.player = new VideoVlcMediaPlayer(this.playerVolume);
 
     }
 
-    log.info("Using song library root: " + this.songLibraryRoot);
-    log.info("Using : " + this.playerType);
-    log.info("Volume : " + this.volume);
+    log.info("songLibraryRoot: " + this.songLibraryRoot);
+    log.info("playerType : " + this.playerType);
+    log.info("playerVolume : " + this.playerVolume);
+    log.info("masterVolume : " + this.masterVolume);
 
     // Initialize the song library root and song queue
     initialize();
