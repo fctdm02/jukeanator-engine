@@ -27,8 +27,6 @@ public class AppProperties {
    */
   private String rootPathWindows;
 
-  // Nested properties that already lived under app: ─────────────────────────
-
   private Jwt jwt = new Jwt();
   private Logging logging = new Logging();
 
