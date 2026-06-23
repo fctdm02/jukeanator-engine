@@ -254,7 +254,7 @@ public final class SongScanner {
   }
 
   public List<AlbumMetadataDto> searchInternetForAlbumMetadata(AlbumFolderEntity album) {
-    return searchInternetForAlbumMetadata(album.getParentFolder().getName(), album.getName(), 1);
+    return searchInternetForAlbumMetadata(album.getParentFolder().getName(), album.getName(), 3);
   }
 
   public List<AlbumMetadataDto> searchInternetForAlbumMetadata(String artistName, String albumName,

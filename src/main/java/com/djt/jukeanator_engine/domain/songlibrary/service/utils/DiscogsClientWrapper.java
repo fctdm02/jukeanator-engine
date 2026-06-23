@@ -83,9 +83,7 @@ public final class DiscogsClientWrapper {
     SearchResponse response = doSearchWrapper(request);
 
     List<SearchResult> searchResults = response.getResults();
-    if (searchResults != null && !searchResults.isEmpty()) {
-
-      SearchResult searchResult = searchResults.get(0);
+    for (SearchResult searchResult: searchResults) {
 
       String genre = "";
       List<String> genres = searchResult.getGenre();

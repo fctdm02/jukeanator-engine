@@ -23,8 +23,7 @@ public class DiscogsClientWrapperTest {
 
 
     // STEP 2: ACT
-    List<AlbumMetadataDto> albumMetadataResults =
-        discogsClientWrapper.searchForAlbumMetadata(artist, album);
+    List<AlbumMetadataDto> albumMetadataResults = discogsClientWrapper.searchForAlbumMetadata(artist, album, 3);
 
 
     // STEP 3: ASSERT
@@ -33,7 +32,7 @@ public class DiscogsClientWrapperTest {
     AlbumMetadataDto albumMetadataResult = albumMetadataResults.get(0);
 
     String expected =
-        "https://i.discogs.com/cl5sG3Y7_n9cVne4vq0A5-0-3k0zoFYUVZioZsJ_LYs/rs:fit/g:sm/q:90/h:595/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTEwODE4/MDEtMTYxMjA1MTcy/NS00Njg3LmpwZWc.jpeg";
+        "https://i.discogs.com/d_m3zdDiDw_v_ABtlF5-zOybNp-hyJBEnn4lZEx5whQ/rs:fit/g:sm/q:90/h:268/w:249/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTM3NDM5/ODItMTM0Mjc4NTE1/NS05MTUwLmpwZWc.jpeg";
     String actual = albumMetadataResult.getCoverArtUrl();
     assertEquals(expected, actual, "coverArtUrl is incorrect");
 
@@ -41,7 +40,7 @@ public class DiscogsClientWrapperTest {
     actual = albumMetadataResult.getRecordLabel();
     assertEquals(expected, actual, "recordLabel is incorrect");
 
-    expected = "2002";
+    expected = "1985";
     actual = albumMetadataResult.getReleaseDate();
     assertEquals(expected, actual, "releaseDate is incorrect");
   }

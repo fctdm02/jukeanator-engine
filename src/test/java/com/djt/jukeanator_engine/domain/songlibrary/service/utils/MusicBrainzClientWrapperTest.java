@@ -25,7 +25,7 @@ public class MusicBrainzClientWrapperTest {
 
     // STEP 2: ACT
     List<AlbumMetadataDto> albumMetadataResults =
-        musicBrainzClientWrapper.searchForAlbumMetadata(artist, album, useGenre);
+        musicBrainzClientWrapper.searchForAlbumMetadata(artist, album, useGenre, 3);
 
 
     // STEP 3: ASSERT

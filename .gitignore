@@ -32,3 +32,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder/BackgroundMusic_YetToBePlayed_linux.TXT
+src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder/BackgroundMusic_linux.TXT
+src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder/CDStats_linux.TXT
+
