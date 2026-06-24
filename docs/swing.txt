@@ -1041,4 +1041,19 @@ public class SongLibraryServiceImpl implements SongLibraryService {
 
         
         
-- Logins aren't working for OWNER/ADMIN        
+DONE - Logins aren't working for OWNER/ADMIN        
+
+
+
+- JukeANator.oos isn't loading/storing with OS suffix like it's supposed to
+
+- After a rescan on an empty library, the home page is empty
+
+- After a restart after a rescan on an empty library, the song player is attempting to play music from R:\ (need to delete playlist after rescan?)
+
+
+
+
+
+
+

@@ -1,7 +1,10 @@
 package com.djt.jukeanator_engine.domain.songplayer.service;
 
+import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlaybackStatusDto;
+import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
 /**
  * @author tmyers
@@ -46,4 +49,18 @@ public interface SongPlayerService {
    * the queue is not currently locked.
    */
   void unlockQueue();
+
+  /**
+   * 
+   * @param event
+   */
+  @PublicServiceMethod
+  void handleSongAddedToQueueEvent(SongAddedToQueueEvent event);
+
+  /**
+   * 
+   * @param event
+   */
+  @PublicServiceMethod
+  void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event);
 }

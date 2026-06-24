@@ -453,7 +453,7 @@ public class RootFolderEntity extends FolderEntity {
     }
   }
 
-  public void restoreSongNumPlays(String scanPath) {
+  public int restoreSongStatisticsForScanPath(String scanPath) {
 
     String cdStatsPathName = buildCdStatsPathname(scanPath);
     Path statsFile = Path.of(cdStatsPathName);
@@ -463,8 +463,19 @@ public class RootFolderEntity extends FolderEntity {
       statsFile = Path.of(cdStatsPathName);
       if (!Files.exists(statsFile)) {
         System.err.println("CD stats file does not exist: " + cdStatsPathName);
-        return;
+        return 0;
       }
+    }
+
+    return restoreSongStatisticsForFile(scanPath, cdStatsPathName);
+  }
+
+  public int restoreSongStatisticsForFile(String scanPath, String filename) {
+
+    Path statsFile = Path.of(filename);
+    if (!Files.exists(statsFile)) {
+      System.err.println("CD stats file does not exist: " + filename);
+      return 0;
     }
 
     if (this.songsMap == null) {
@@ -512,11 +523,11 @@ public class RootFolderEntity extends FolderEntity {
             SongFileEntity song = songsByPath.get(songPath.toLowerCase());
             if (song != null) {
               song.setNumPlays(numPlays);
+              restoredCount++;
             } else {
               System.err.println("Could not find song: " + songPath);
             }
-          }
-          restoredCount++;
+          }          
 
         } catch (NumberFormatException e) {
           System.err.println("Could not parse num plays from line: " + line);
@@ -529,12 +540,14 @@ public class RootFolderEntity extends FolderEntity {
           .println("Restored num plays processing completed for " + restoredCount + " log lines.");
 
     } catch (IOException e) {
-      System.err.println("Failed to restore song num plays from CD Stats file: " + cdStatsPathName);
+      System.err.println("Failed to restore song num plays from CD Stats file: " + filename);
       e.printStackTrace();
     }
+
+    return restoredCount;
   }
 
-  public void storeSongNumPlays(String scanPath) {
+  public void storeSongStatistics(String scanPath) {
 
     String cdStatsPathName = buildCdStatsPathname(scanPath);
 

@@ -5,6 +5,8 @@ import org.springframework.web.client.RestClient;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlaybackStatusDto;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
+import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
 /**
  * HTTP client implementation of SongPlayerService.
@@ -62,5 +64,15 @@ public class SongPlayerServiceHttpClient implements SongPlayerService {
   public void unlockQueue() {
 
     restClient.post().uri("/api/song-player/unlockQueue").retrieve().toBodilessEntity();
+  }
+
+  @Override
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 }

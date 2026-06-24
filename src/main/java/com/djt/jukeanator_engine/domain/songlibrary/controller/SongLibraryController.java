@@ -21,6 +21,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
+import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
 /**
  * @author tmyers
@@ -116,8 +118,8 @@ public class SongLibraryController implements SongLibraryService {
   public SongDto getRandomSongFromBackgroundMusicPlaylist() {
     return songLibraryService.getRandomSongFromBackgroundMusicPlaylist();
   }
-  
-  
+
+
   // ADMIN ROLE METHODS
   @Override
   @PostMapping("/scanNoPath")
@@ -139,6 +141,13 @@ public class SongLibraryController implements SongLibraryService {
   public Integer resetSongStatistics() {
 
     return songLibraryService.resetSongStatistics();
+  }
+
+  @Override
+  @PostMapping("/restoreSongStatistics")
+  public Integer restoreSongStatistics(@RequestBody String filename) {
+
+    return songLibraryService.restoreSongStatistics(filename);
   }
 
   @Override
@@ -170,5 +179,15 @@ public class SongLibraryController implements SongLibraryService {
   public Boolean authenticateForAdminPanel(
       @RequestBody AuthenticateForAdminPanelRequest authenticateForAdminPanelRequest) {
     return songLibraryService.authenticateForAdminPanel(authenticateForAdminPanelRequest);
+  }
+
+  @Override
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 }

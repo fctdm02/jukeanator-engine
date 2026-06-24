@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
@@ -158,5 +159,10 @@ public class SongQueueController implements SongQueueService {
       @RequestBody LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest) {
 
     return songQueueService.loadPlaylistIntoQueue(loadPlaylistIntoQueueRequest);
+  }
+
+  @Override
+  public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 }

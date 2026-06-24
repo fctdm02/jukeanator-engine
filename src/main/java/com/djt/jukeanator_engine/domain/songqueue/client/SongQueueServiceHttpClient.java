@@ -3,6 +3,7 @@ package com.djt.jukeanator_engine.domain.songqueue.client;
 import java.util.List;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
+import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
@@ -148,5 +149,10 @@ public class SongQueueServiceHttpClient implements SongQueueService {
 
     return restClient.post().uri("/api/song-queue/loadPlaylistIntoQueue")
         .body(loadPlaylistIntoQueueRequest).retrieve().body(Integer.class);
+  }
+
+  @Override
+  public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 }

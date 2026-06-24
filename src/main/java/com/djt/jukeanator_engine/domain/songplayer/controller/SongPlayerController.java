@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlaybackStatusDto;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
+import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
 /**
  * @author tmyers
@@ -71,5 +73,15 @@ public class SongPlayerController implements SongPlayerService {
   public void unlockQueue() {
 
     songPlayerService.unlockQueue();
+  }
+
+  @Override
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 }

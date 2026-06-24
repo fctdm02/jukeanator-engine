@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import static java.util.Objects.requireNonNull;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -22,6 +23,8 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
+import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
+import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -507,11 +510,19 @@ public class SongLibraryServiceImpl
 
       // Scan the file system for songs
       this.rootPath = scanRequest.getScanPath();
-      this.root.storeSongNumPlays(this.rootPath);
+      this.root.storeSongStatistics(this.rootPath);
       this.root = songScanner.scanFileSystemForSongs(this.rootPath);
 
       // Restore song num plays, persist, then re-initialize the root
-      this.root.restoreSongNumPlays(this.rootPath);
+      int numRestored = this.root.restoreSongStatisticsForScanPath(this.rootPath);
+      if (numRestored == 0) {
+
+        String filename = "CDStats_backup_[OS_NAME].TXT";
+        OSType osType = OperatingSystemDetector.getOperatingSystem();
+        filename = filename.replace("[OS_NAME]", osType.toString().toLowerCase());
+        this.root.restoreSongStatisticsForFile(this.rootPath, this.rootPath + File.separator + filename);
+      }
+
       if (this.songLibraryRepository instanceof SongLibraryRepositoryFileSystemImpl) {
         ((SongLibraryRepositoryFileSystemImpl) this.songLibraryRepository)
             .setBasePath(this.rootPath);
@@ -558,6 +569,30 @@ public class SongLibraryServiceImpl
 
     } catch (Exception e) {
       throw new SongLibraryException("Could not reset song statistics", e);
+    }
+  }
+
+  @Override
+  public Integer restoreSongStatistics(String filename) {
+
+    try {
+
+      // Restore the song statistics
+      this.root.restoreSongStatisticsForFile(this.rootPath, filename);
+
+      // Store the song library
+      this.songLibraryRepository.storeAggregateRoot(this.root);
+
+      // Initialize the song library
+      initialize();
+
+      // Publish the event
+      eventPublisher.publishEvent(new SongStatisticsChangedEvent());
+
+      return Integer.valueOf(root.getAlbums().size());
+
+    } catch (Exception e) {
+      throw new SongLibraryException("Could not restore song statistics from: " + filename, e);
     }
   }
 

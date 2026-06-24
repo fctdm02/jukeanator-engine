@@ -19,7 +19,9 @@ logging:
 spring:
   application:
     name: JukeANator
-
+  aop:
+    proxy-target-class: false   # use JDK interface proxies, not CGLIB    
+    
 song-library:
   repository-type: filesystem   # filesystem | postgres
   requires-metadata: false
@@ -36,7 +38,7 @@ song-library:
 
 song-queue:
   repository-type: filesystem   # filesystem | postgres
-  enable-background-music: true
+  enable-background-music: false
   minimum-number-songs-to-keep-in-queue: 5 # Only used when enableBackgroundMusic is true
   minimum-minutes-between-song-plays: 60
   allow-explicit-songs-at-all-times: false

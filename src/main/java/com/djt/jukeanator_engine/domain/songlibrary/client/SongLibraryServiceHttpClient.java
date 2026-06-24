@@ -16,6 +16,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
+import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
 /**
  * HTTP client implementation of SongLibraryService.
@@ -119,11 +121,10 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
   @GetMapping("/songs/random")
   public SongDto getRandomSongFromBackgroundMusicPlaylist() {
 
-    return restClient.get().uri("/api/song-library/songs/random").retrieve()
-        .body(SongDto.class);
+    return restClient.get().uri("/api/song-library/songs/random").retrieve().body(SongDto.class);
   }
-  
-  
+
+
   // ADMIN ROLE METHODS
   @Override
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
@@ -143,6 +144,13 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
 
     return restClient.post().uri("/api/song-library/resetSongStatistics").retrieve()
         .body(Integer.class);
+  }
+
+  @Override
+  public Integer restoreSongStatistics(String filename) {
+
+    return restClient.post().uri("/api/song-library/restoreSongStatistics").body(filename)
+        .retrieve().body(Integer.class);
   }
 
   @Override
@@ -173,5 +181,15 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
 
     return restClient.post().uri("/api/song-library/authenticateForAdminPanel")
         .body(authenticateForAdminPanelRequest).retrieve().body(Boolean.class);
+  }
+
+  @Override
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 }

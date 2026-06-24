@@ -12,6 +12,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
+import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
 /**
  * @author tmyers
@@ -94,14 +96,14 @@ public interface SongLibraryService {
    * @return
    */
   SongDto getSongById(Integer albumId, Integer songId);
-  
+
   /**
    * 
    * @return
    */
   SongDto getRandomSongFromBackgroundMusicPlaylist();
-  
-  
+
+
   // ADMIN ROLE METHODS
   /**
    * 
@@ -122,6 +124,13 @@ public interface SongLibraryService {
    * @return
    */
   Integer resetSongStatistics();
+
+  /**
+   * 
+   * @param filename
+   * @return
+   */
+  Integer restoreSongStatistics(String filename);
 
   /**
    * 
@@ -156,4 +165,18 @@ public interface SongLibraryService {
   @PublicServiceMethod
   Boolean authenticateForAdminPanel(
       AuthenticateForAdminPanelRequest authenticateForAdminPanelRequest);
+
+  /**
+   * 
+   * @param event
+   */
+  @PublicServiceMethod
+  void handleSongAddedToQueueEvent(SongAddedToQueueEvent event);
+
+  /**
+   * 
+   * @param event
+   */
+  @PublicServiceMethod
+  void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event);
 }
