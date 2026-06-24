@@ -434,16 +434,21 @@ public final class LayoutTheme {
   private static final int GENRE_MAX_ROWS_PORTRAIT = 6;
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // TOP-PANEL PROFILE — resolution- and orientation-aware credits / now-playing
+  // TOP-PANEL PROFILE — percentage-based, resolution-aware top-bar sizing
   //
-  // The credits panel (left) and now-playing wrapper (right) were originally
-  // designed at fixed 485 px wide for a 1920 px landscape screen. On a
-  // 1080 px portrait screen those fixed widths consume almost all of the
-  // available width, leaving nothing for the centre banner.
+  // Strategy: allocate a fixed percentage of the usable panel width to each
+  // side panel (WEST = credits, EAST = now-playing wrapper). The centre
+  // banner takes the remainder. This keeps both panels full-size and readable
+  // at every orientation without leaving wasteful empty space.
   //
-  // topPanelProfile(screenW, screenH) returns a TopPanelProfile whose widths
-  // are scaled proportionally to the actual screen width, so the top panel
-  // looks correct at any resolution and orientation.
+  // Usable width = screenW minus the top panel's left+right EmptyBorder (40 px).
+  //
+  // Default percentages (override in a subclass for custom layouts):
+  // WEST / EAST : TOP_PANEL_SIDE_PCT (30 %)
+  // The border height is 90 px (topPanelHeight 110 - 10 top - 10 bottom padding).
+  //
+  // Icon size is computed so it fits within the panel height with a small margin,
+  // clamped to a sensible range so it never becomes illegibly tiny or oversized.
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
@@ -452,12 +457,12 @@ public final class LayoutTheme {
    * <p>
    * Obtain instances via {@link LayoutTheme#topPanelProfile(int, int)}.
    *
-   * @param creditsPanelW width of the credits panel (left side)
+   * @param creditsPanelW width of the credits panel (WEST)
    * @param creditsPanelH height of the credits panel
-   * @param nowPlayingPanelW width of the now-playing panel (inner)
+   * @param nowPlayingPanelW width of the now-playing panel (inner, fits inside wrapper)
    * @param nowPlayingPanelH height of the now-playing panel
-   * @param nowPlayingWrapperW width of the now-playing wrapper (right side, typically =
-   *        creditsPanelW)
+   * @param nowPlayingWrapperW width of the now-playing wrapper (EAST, equals creditsPanelW for
+   *        symmetry)
    * @param nowPlayingWrapperH height of the now-playing wrapper
    * @param iconSize square pixel size for the location-logo and cover-art icons
    */
@@ -466,55 +471,83 @@ public final class LayoutTheme {
   }
 
   /**
-   * Computes a {@link TopPanelProfile} for the given screen dimensions.
+   * Computes a {@link TopPanelProfile} for the given screen dimensions using a
+   * <em>percentage-of-usable-width</em> strategy.
    *
    * <h3>Algorithm</h3>
    * <ol>
-   * <li><b>Scale factor</b> — {@code screenW / CANONICAL_W}, clamped to
-   * [{@value #TOP_PANEL_SCALE_MIN}, {@value #TOP_PANEL_SCALE_MAX}].</li>
-   * <li>All canonical widths/heights and icon size are multiplied by {@code scale} and rounded to
-   * the nearest integer.</li>
-   * <li>In portrait mode an additional {@value #TOP_PANEL_PORTRAIT_REDUCTION}× reduction is applied
-   * so both side panels together leave enough room for the centre banner.</li>
+   * <li><b>Usable width</b> — {@code screenW} minus the top panel's fixed left+right
+   * {@code EmptyBorder} padding ({@value #TOP_PANEL_H_PADDING} px total).</li>
+   * <li><b>Side-panel width</b> — {@code usableW × TOP_PANEL_SIDE_PCT}
+   * ({@value #TOP_PANEL_SIDE_PCT} of usable width), the same value for both WEST (credits) and EAST
+   * (now-playing wrapper) so the layout is symmetric.</li>
+   * <li><b>Panel height</b> — {@code topPanelHeight} minus top+bottom {@code EmptyBorder} padding
+   * ({@value #TOP_PANEL_V_PADDING} px total).</li>
+   * <li><b>Icon size</b> — panel height minus a small vertical margin
+   * ({@value #TOP_PANEL_ICON_V_MARGIN} px), clamped to [{@value #TOP_PANEL_ICON_MIN},
+   * {@value #TOP_PANEL_ICON_MAX}].</li>
+   * <li>The inner {@code nowPlayingPanelW} is set equal to {@code nowPlayingWrapperW} so it fills
+   * the wrapper exactly.</li>
    * </ol>
    *
+   * <p>
+   * Because the widths are derived from the actual {@code screenW}, this method produces correct
+   * results for both landscape (1920 × 1080) and portrait (1080 × 1920) screens without any
+   * orientation-specific branches.
+   *
    * @param screenW current screen width in pixels
-   * @param screenH current screen height in pixels
+   * @param screenH current screen height in pixels (used for future orientation-specific overrides)
    * @return a {@link TopPanelProfile} ready to pass to {@link JukeANatorFrame#buildTopPanel}
    */
   public TopPanelProfile topPanelProfile(int screenW, int screenH) {
 
-    boolean portrait = screenH > screenW;
+    // Usable width after the panel's own left+right EmptyBorder is removed.
+    int usableW = screenW - TOP_PANEL_H_PADDING;
 
-    double scale = (double) screenW / CANONICAL_W;
-    scale = Math.max(TOP_PANEL_SCALE_MIN, Math.min(scale, TOP_PANEL_SCALE_MAX));
+    // Each side panel occupies the configured percentage of the usable width.
+    int sideW = (int) Math.round(usableW * TOP_PANEL_SIDE_PCT);
 
-    if (portrait) {
-      scale *= TOP_PANEL_PORTRAIT_REDUCTION;
-    }
+    // Panel height = topPanelHeight minus top+bottom border padding.
+    int panelH = topPanelHeight - TOP_PANEL_V_PADDING;
 
-    int cw = (int) Math.round(creditsPanelW * scale);
-    int ch = (int) Math.round(creditsPanelH * scale);
-    int npw = (int) Math.round(nowPlayingPanelW * scale);
-    int nph = (int) Math.round(nowPlayingPanelH * scale);
-    int nww = (int) Math.round(nowPlayingWrapperW * scale);
-    int nwh = (int) Math.round(nowPlayingWrapperH * scale);
-    int icon = (int) Math.round(topPanelIconSize * scale);
+    // Icon fills the panel height minus a small top+bottom margin.
+    int icon = panelH - TOP_PANEL_ICON_V_MARGIN;
+    icon = Math.max(TOP_PANEL_ICON_MIN, Math.min(icon, TOP_PANEL_ICON_MAX));
 
-    return new TopPanelProfile(cw, ch, npw, nph, nww, nwh, icon);
+    // The inner now-playing panel fills its wrapper exactly.
+    return new TopPanelProfile(sideW, panelH, // credits panel (WEST)
+        sideW, panelH, // now-playing panel (inner) — same dims as wrapper
+        sideW, panelH, // now-playing wrapper (EAST)
+        icon);
   }
 
-  /** Minimum scale factor for the top-panel profile. */
-  private static final double TOP_PANEL_SCALE_MIN = 0.30;
-
-  /** Maximum scale factor for the top-panel profile. */
-  private static final double TOP_PANEL_SCALE_MAX = 1.50;
+  /**
+   * Fraction of the usable top-panel width allocated to each side panel (WEST credits and EAST
+   * now-playing wrapper). The centre banner receives the remainder ({@code 1 - 2 × side_pct}).
+   * Default 0.30 → 30 % each side, 40 % centre.
+   */
+  private static final double TOP_PANEL_SIDE_PCT = 0.30;
 
   /**
-   * Additional size reduction applied in portrait mode so that both side panels together fit
-   * comfortably within the narrower portrait width.
+   * Total left+right {@code EmptyBorder} padding on the top panel (px). Matches
+   * {@code new EmptyBorder(10, 20, 10, 20)} → left 20 + right 20 = 40.
    */
-  private static final double TOP_PANEL_PORTRAIT_REDUCTION = 0.55;
+  private static final int TOP_PANEL_H_PADDING = 40;
+
+  /**
+   * Total top+bottom {@code EmptyBorder} padding on the top panel (px). Matches
+   * {@code new EmptyBorder(10, 20, 10, 20)} → top 10 + bottom 10 = 20.
+   */
+  private static final int TOP_PANEL_V_PADDING = 20;
+
+  /** Top+bottom margin subtracted from panel height to derive the icon size. */
+  private static final int TOP_PANEL_ICON_V_MARGIN = 10;
+
+  /** Minimum icon size — prevents icons becoming illegibly tiny on very small screens. */
+  private static final int TOP_PANEL_ICON_MIN = 40;
+
+  /** Maximum icon size — prevents icons overflowing the panel on very large screens. */
+  private static final int TOP_PANEL_ICON_MAX = 120;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // FRAME / TOP-PANEL

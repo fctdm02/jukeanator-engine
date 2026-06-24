@@ -824,8 +824,6 @@ public class JukeANatorFrame extends JFrame {
     Dimension sidePanelSize =
         new Dimension(topPanelProfile.creditsPanelW(), topPanelProfile.creditsPanelH());
     creditsPanel.setPreferredSize(sidePanelSize);
-    creditsPanel.setMinimumSize(sidePanelSize);
-    creditsPanel.setMaximumSize(sidePanelSize);
 
     //
     // LOCATION LOGO (same size as Now Playing cover art)
@@ -920,8 +918,6 @@ public class JukeANatorFrame extends JFrame {
     Dimension wrapperSize =
         new Dimension(topPanelProfile.nowPlayingWrapperW(), topPanelProfile.nowPlayingWrapperH());
     nowPlayingWrapper.setPreferredSize(wrapperSize);
-    nowPlayingWrapper.setMinimumSize(wrapperSize);
-    nowPlayingWrapper.setMaximumSize(wrapperSize);
     nowPlayingWrapper.add(nowPlayingPanel, BorderLayout.CENTER);
 
     panel.add(creditsPanel, BorderLayout.WEST);
@@ -954,8 +950,6 @@ public class JukeANatorFrame extends JFrame {
     Dimension fixedSize =
         new Dimension(topPanelProfile.nowPlayingPanelW(), topPanelProfile.nowPlayingPanelH());
     panel.setPreferredSize(fixedSize);
-    panel.setMinimumSize(fixedSize);
-    panel.setMaximumSize(fixedSize);
 
     //
     // LEFT : PLAY STATUS (animated GIF / paused icon)
