@@ -478,19 +478,48 @@ public class JukeANatorFrame extends JFrame {
         // Do not fill background — let JFrame gradient show through
       }
     };
-    tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+    // WRAP_TAB_LAYOUT (not SCROLL) — SCROLL_TAB_LAYOUT adds a scroll-arrow widget
+    // at the right edge of the tab bar that looks like a scroll pane control.
+    // With all invisible tabs at zero width the five visible tabs fill the bar
+    // completely, so wrapping never actually triggers.
+    tabs.setTabLayoutPolicy(JTabbedPane.WRAP_TAB_LAYOUT);
 
     tabs.setUI(new javax.swing.plaf.basic.BasicTabbedPaneUI() {
 
-      final int TAB_WIDTH = LayoutTheme.get().tabWidth;
+      // Index 0 (left dummy) and index 6 (admin) are invisible — give them zero width
+      // so they neither consume space nor disrupt the centering calculation.
+      // The five visible tabs (1-5) are sized to fill the full screen width evenly.
       final int SEPARATOR_HEIGHT = LayoutTheme.get().tabSeparatorHeight;
 
+      /** Number of visible (non-hidden) tabs. */
+      private static final int VISIBLE_TAB_COUNT = 5;
+
+      /**
+       * Returns the width for a single visible tab: screen width divided evenly among the five
+       * visible tabs (HOME, SEARCH, HOT HERE, GENRES, QUEUE).
+       */
+      private int visibleTabWidth() {
+        // tabPane.getWidth() reflects the actual rendered width (1080 px in portrait,
+        // 1920 px in landscape, etc.). Dividing by VISIBLE_TAB_COUNT fills the bar
+        // completely with no left-over gap regardless of screen width.
+        int paneW = tabPane.getWidth();
+        if (paneW <= 0) {
+          // Fallback before the pane has been laid out the first time.
+          return LayoutTheme.get().tabWidth;
+        }
+        return paneW / VISIBLE_TAB_COUNT;
+      }
+
       //
-      // FIXED TAB WIDTH
+      // PER-TAB WIDTH — invisible tabs (0 = left dummy, 6 = admin) get 0 px;
+      // the five visible tabs share the full pane width equally.
       //
       @Override
       protected int calculateTabWidth(int tabPlacement, int tabIndex, FontMetrics metrics) {
-        return TAB_WIDTH;
+        if (tabIndex == 0 || tabIndex == 6) {
+          return 0;
+        }
+        return visibleTabWidth();
       }
 
       @Override
@@ -499,14 +528,14 @@ public class JukeANatorFrame extends JFrame {
       }
 
       //
-      // CENTER TABS BY PUSHING THEM IN FROM THE LEFT
+      // NO INSET NEEDED — the five visible tabs already fill the full width.
+      // Remove the old centering inset so no scroll-pane artefact appears.
       //
       @Override
       protected java.awt.Insets getTabAreaInsets(int tabPlacement) {
         java.awt.Insets base = super.getTabAreaInsets(tabPlacement);
-        int totalTabWidth = TAB_WIDTH * tabPane.getTabCount();
-        int leftInset = Math.max(0, (tabPane.getWidth() - totalTabWidth) / 2);
-        return new java.awt.Insets(base.top, leftInset, base.bottom, base.right);
+        // Zero out the left inset; the tabs are full-width by construction.
+        return new java.awt.Insets(base.top, 0, base.bottom, 0);
       }
 
       @Override
@@ -579,19 +608,18 @@ public class JukeANatorFrame extends JFrame {
     tabs.setBackground(ColorTheme.get().frameTabsTransparent);
 
     // ── Tab index layout ──────────────────────────────────────────────────────
-    // Index 0 : DUMMY (invisible, 0-size — balances hidden ADMIN on the right)
+    // Index 0 : DUMMY (zero-width — not rendered; no longer needs to balance ADMIN)
     // Index 1 : HOME
     // Index 2 : SEARCH
     // Index 3 : HOT HERE
     // Index 4 : GENRES
     // Index 5 : QUEUE
-    // Index 6 : ADMIN (invisible/disabled — reached only via LoginToAdminPanelCard)
+    // Index 6 : ADMIN (zero-width, disabled — reached only via LoginToAdminPanelCard)
     //
-    // With TAB_WIDTH=200 and 7 total tabs the centering inset formula gives:
-    // leftInset = (screenWidth - 7*200) / 2
-    // The two invisible tabs (0 and 6) each consume 0 visual pixels but their
-    // slot width is suppressed to zero by a 0x0 preferred-size component, so
-    // the five visible tabs are centred naturally.
+    // calculateTabWidth() returns 0 for indices 0 and 6, and
+    // paneWidth / 5 for the five visible tabs (indices 1–5).
+    // getTabAreaInsets() returns a zero left inset so the visible tabs
+    // start at x=0 and fill the entire tab-bar width with no scroll widget.
 
     // Index 0 — invisible dummy (left balancer)
     tabs.addTab("", new JPanel());
@@ -679,7 +707,9 @@ public class JukeANatorFrame extends JFrame {
       this.accentColor = accentColor;
       setOpaque(false);
       setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-      setBorder(new EmptyBorder(8, 20, 8, 20));
+      // Vertical padding only — horizontal space is provided by the tab width itself.
+      // A fixed left/right inset would fight the full-width layout and off-centre the icon+label.
+      setBorder(new EmptyBorder(8, 0, 8, 0));
 
       //
       // ICON
