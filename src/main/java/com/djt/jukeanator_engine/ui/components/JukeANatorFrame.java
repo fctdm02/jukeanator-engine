@@ -1118,7 +1118,10 @@ public class JukeANatorFrame extends JFrame {
       // Use loadAnimatedGif so the full frame sequence is preserved — passing an
       // animated GIF through getScaledInstance (as loadClasspathImage does)
       // reduces it to a single static frame and breaks the animation loop.
-      playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif"));
+      // The target dimensions must match the label's preferredSize so the icon
+      // fits exactly within the label bounds rather than being clipped.
+      playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif",
+          topPanelProfile.iconSize(), topPanelProfile.iconSize()));
     });
   }
 
@@ -1424,7 +1427,9 @@ public class JukeANatorFrame extends JFrame {
         // Animated GIF — must use loadAnimatedGif to preserve all frames and
         // to obtain a fresh ImageIcon instance whose observer is bound to the
         // currently-visible playStatus label (see setNowPlaying for details).
-        playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif"));
+        // Dimensions must match the label's preferredSize to avoid clipping.
+        playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif",
+            topPanelProfile.iconSize(), topPanelProfile.iconSize()));
       }
     });
   }

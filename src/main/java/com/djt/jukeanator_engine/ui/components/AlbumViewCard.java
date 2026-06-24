@@ -478,7 +478,17 @@ public class AlbumViewCard extends JPanel {
     JPanel row = new JPanel(new BorderLayout(10, 0));
     row.setOpaque(false);
     row.setBorder(new EmptyBorder(10, 16, 10, 16));
-    row.setMaximumSize(new Dimension(Integer.MAX_VALUE, LayoutTheme.get().resultRowMaxH));
+
+    // Give BoxLayout a complete height contract: preferred, minimum, and maximum
+    // are all set to the same value so the row height is fully determined and
+    // BoxLayout cannot compress rows below their intended height when the body
+    // panel has less vertical space than the sum of row heights. Without a
+    // minimum/preferred, BoxLayout is free to shrink rows toward 0 px, which
+    // causes the text from one row to be painted on top of the next.
+    Dimension rowSize = new Dimension(Integer.MAX_VALUE, LayoutTheme.get().resultRowMaxH);
+    row.setPreferredSize(rowSize);
+    row.setMinimumSize(new Dimension(0, LayoutTheme.get().resultRowMaxH));
+    row.setMaximumSize(rowSize);
 
     if (listener != null) {
       row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -640,6 +650,12 @@ public class AlbumViewCard extends JPanel {
   }
 
   private static void repaintRowChildren(java.awt.Container c) {
+    // Repaint the row container itself first so its background state (opaque
+    // hover fill or transparent default) is fully resolved before any child
+    // component repaints on top of it. Without this, the hover background color
+    // can persist beneath freshly-painted children, or a child's repaint can
+    // trigger painting at stale coordinates, causing text superimposition.
+    c.repaint();
     for (java.awt.Component child : c.getComponents()) {
       child.repaint();
     }

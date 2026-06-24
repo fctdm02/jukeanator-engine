@@ -103,27 +103,33 @@ public class ImageLoader {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Loads an animated GIF from the classpath without passing it through
-   * {@link Image#getScaledInstance}, which strips all frames past the first and silently kills the
-   * animation.
+   * Loads an animated GIF from the classpath and scales it to the requested dimensions without
+   * losing the animation.
    *
    * <p>
-   * The returned icon is constructed directly from the resource URL so that the AWT toolkit retains
-   * the full frame sequence and fires image-update callbacks correctly. The icon is <em>not</em>
-   * placed in the shared cache because animated icons must be kept as independent instances —
-   * sharing a single {@link ImageIcon} between multiple {@link javax.swing.JLabel}s causes the
-   * image-observer chain to diverge once any label is hidden, which can cause the animation to
-   * paint at stale component coordinates after a visibility change (the root cause of the
-   * portrait-mode overlay bleed described in Issue 3).
+   * {@link Image#getScaledInstance} with {@link Image#SCALE_DEFAULT} preserves animated GIF frame
+   * data when the underlying image was loaded from a URL (as {@code ImageIcon(URL)} loads it). The
+   * resulting scaled image is wrapped in a fresh {@link ImageIcon} so the AWT toolkit can continue
+   * firing per-frame image-update callbacks correctly.
+   *
+   * <p>
+   * The icon is <em>not</em> placed in the shared cache because animated icons must be kept as
+   * independent instances — sharing a single {@link ImageIcon} between multiple
+   * {@link javax.swing.JLabel}s causes the image-observer chain to diverge once any label is
+   * hidden, which can cause the animation to paint at stale component coordinates after a
+   * visibility change.
    *
    * <p>
    * If the resource cannot be found, {@code null} is returned so callers can fall back gracefully.
    *
    * @param resourceName classpath-relative resource name, e.g. {@code "music_playing.gif"}
-   * @return a freshly constructed {@link ImageIcon} that preserves the animation, or {@code null}
-   *         if the resource was not found
+   * @param width target width in pixels — should match the label's preferred width so the icon fits
+   *        without being clipped by the label bounds
+   * @param height target height in pixels — should match the label's preferred height
+   * @return a freshly constructed, scaled {@link ImageIcon} that preserves the animation, or
+   *         {@code null} if the resource was not found
    */
-  public ImageIcon loadAnimatedGif(String resourceName) {
+  public ImageIcon loadAnimatedGif(String resourceName, int width, int height) {
 
     if (resourceName == null || resourceName.isBlank()) {
       return null;
@@ -134,9 +140,21 @@ public class ImageLoader {
       return null;
     }
 
-    // Construct from URL — this is the only ImageIcon constructor that correctly
-    // initialises the MediaTracker animation thread for animated GIFs.
-    return new ImageIcon(imageUrl);
+    // ImageIcon(URL) is the only constructor that correctly initialises the
+    // MediaTracker animation thread for animated GIFs.
+    ImageIcon icon = new ImageIcon(imageUrl);
+
+    // Scale to the target dimensions so the icon fits within the JLabel bounds.
+    // SCALE_DEFAULT is used rather than SCALE_SMOOTH because SCALE_SMOOTH (which
+    // calls AreaAveragingScaleFilter) processes only a single frame and silently
+    // drops the rest. SCALE_DEFAULT delegates to the toolkit's default scaling
+    // path, which preserves the full frame sequence for URL-loaded GIF images.
+    Image scaled = icon.getImage().getScaledInstance(width, height, Image.SCALE_DEFAULT);
+
+    // Wrap the scaled image in a new ImageIcon. The ImageIcon(Image) constructor
+    // keeps the image observer alive for animated images, so frame callbacks
+    // continue to fire after scaling.
+    return new ImageIcon(scaled);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
