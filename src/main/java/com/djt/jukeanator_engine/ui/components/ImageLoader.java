@@ -98,6 +98,49 @@ public class ImageLoader {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // ANIMATED GIF LOADER
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Loads an animated GIF from the classpath without passing it through
+   * {@link Image#getScaledInstance}, which strips all frames past the first and silently kills the
+   * animation.
+   *
+   * <p>
+   * The returned icon is constructed directly from the resource URL so that the AWT toolkit retains
+   * the full frame sequence and fires image-update callbacks correctly. The icon is <em>not</em>
+   * placed in the shared cache because animated icons must be kept as independent instances —
+   * sharing a single {@link ImageIcon} between multiple {@link javax.swing.JLabel}s causes the
+   * image-observer chain to diverge once any label is hidden, which can cause the animation to
+   * paint at stale component coordinates after a visibility change (the root cause of the
+   * portrait-mode overlay bleed described in Issue 3).
+   *
+   * <p>
+   * If the resource cannot be found, {@code null} is returned so callers can fall back gracefully.
+   *
+   * @param resourceName classpath-relative resource name, e.g. {@code "music_playing.gif"}
+   * @return a freshly constructed {@link ImageIcon} that preserves the animation, or {@code null}
+   *         if the resource was not found
+   */
+  public ImageIcon loadAnimatedGif(String resourceName) {
+
+    if (resourceName == null || resourceName.isBlank()) {
+      return null;
+    }
+
+    URL imageUrl = getClass().getResource(resourceName);
+    if (imageUrl == null) {
+      return null;
+    }
+
+    // Construct from URL — this is the only ImageIcon constructor that correctly
+    // initialises the MediaTracker animation thread for animated GIFs.
+    return new ImageIcon(imageUrl);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   public static Image createTransparentImage(Image srcImage, boolean filterAbove, int threshold) {
 
     RGBImageFilter filter = new RGBImageFilter() {

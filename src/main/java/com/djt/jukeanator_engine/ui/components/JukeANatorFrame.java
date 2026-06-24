@@ -258,6 +258,7 @@ public class JukeANatorFrame extends JFrame {
     // ── Compute the Home grid profile for the actual screen dimensions ────────
     // screenWidth / screenHeight are already populated from GraphicsEnvironment
     // at field-initialisation time (lines 158-162 in the original).
+    LayoutTheme.install(LayoutTheme.forScreen(screenWidth, screenHeight));
     albumGridProfile = LayoutTheme.get().homeGridProfile(screenWidth, screenHeight);
     genreGridProfile = LayoutTheme.get().genreGridProfile(screenWidth, screenHeight);
     topPanelProfile = LayoutTheme.get().topPanelProfile(screenWidth, screenHeight);
@@ -1103,10 +1104,21 @@ public class JukeANatorFrame extends JFrame {
       currentNowPlayingSong = songDto;
 
       musicPaused = false;
-      playStatus.setIcon(imageLoader.loadClasspathImage("music_playing.gif",
-          topPanelProfile.iconSize(), topPanelProfile.iconSize(), Image.SCALE_DEFAULT));
 
+      // ── Make the panel visible BEFORE attaching the animated icon ─────────
+      // ImageIcon fires repaint callbacks on the image observer — which is the
+      // JLabel (playStatus) itself. If the icon is set while the panel is still
+      // hidden, the AWT animation thread may fire imageUpdate() against a
+      // component with no valid on-screen bounds. In portrait mode this caused
+      // the GIF to paint at stale coordinates that overlapped the AlbumViewCard
+      // track listing. Reversing the order ensures the observer always paints
+      // into the correct, visible component bounds.
       nowPlayingPanel.setVisible(true);
+
+      // Use loadAnimatedGif so the full frame sequence is preserved — passing an
+      // animated GIF through getScaledInstance (as loadClasspathImage does)
+      // reduces it to a single static frame and breaks the animation loop.
+      playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif"));
     });
   }
 
@@ -1116,6 +1128,11 @@ public class JukeANatorFrame extends JFrame {
     artistLabel.setText("");
     albumLabel.setText("");
     albumArtLabel.setIcon(null);
+
+    // Null the icon BEFORE hiding the panel so the ImageIcon animation observer
+    // stops firing imageUpdate() callbacks. If the panel is hidden first, the
+    // observer can still fire and attempt to repaint the label at its last
+    // on-screen position, which in portrait mode overlapped the track listing.
     playStatus.setIcon(null);
     musicPaused = false;
     currentNowPlayingSong = null;
@@ -1399,11 +1416,15 @@ public class JukeANatorFrame extends JFrame {
       musicPaused = !musicPaused;
 
       if (musicPaused) {
+        // Static PNG — loadClasspathImage is fine here; getScaledInstance works
+        // correctly for single-frame images and the result is safely cacheable.
         playStatus.setIcon(imageLoader.loadClasspathImage("music_paused.png",
             topPanelProfile.iconSize(), topPanelProfile.iconSize(), Image.SCALE_DEFAULT));
       } else {
-        playStatus.setIcon(imageLoader.loadClasspathImage("music_playing.gif",
-            topPanelProfile.iconSize(), topPanelProfile.iconSize(), Image.SCALE_DEFAULT));
+        // Animated GIF — must use loadAnimatedGif to preserve all frames and
+        // to obtain a fresh ImageIcon instance whose observer is bound to the
+        // currently-visible playStatus label (see setNowPlaying for details).
+        playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif"));
       }
     });
   }

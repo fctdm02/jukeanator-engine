@@ -7,10 +7,10 @@ import java.awt.Dimension;
  *
  * <p>
  * This class is the single source of truth for every pixel size, grid dimension, page count, and
- * spacing value used across the UI layer. It is designed as a singleton so that it can eventually
- * be populated at startup from a properties file (e.g. {@code application.yml}), enabling full
- * support for multiple screen resolutions and a future <em>Portrait Mode</em> (height &gt; width)
- * in addition to the current <em>Landscape Mode</em> (1920 × 1080).
+ * spacing value used across the UI layer. It is designed as a singleton so that it can be populated
+ * at startup from a properties file (e.g. {@code application.yml}), enabling full support for
+ * multiple screen resolutions and orientations — including the canonical <em>Landscape Mode</em>
+ * (1920 × 1080) and the physical <em>Portrait Mode</em> (1080 × 1920).
  *
  * <p>
  * <b>Usage:</b>
@@ -28,6 +28,18 @@ import java.awt.Dimension;
  * </pre>
  *
  * <p>
+ * <b>Orientation-aware startup (call once before any UI component is constructed):</b>
+ *
+ * <pre>
+ * LayoutTheme.install(LayoutTheme.forScreen(screenWidth, screenHeight));
+ * </pre>
+ *
+ * {@link #forScreen(int, int)} returns a landscape-tuned instance when {@code screenW >= screenH}
+ * and a portrait-tuned instance when {@code screenH > screenW}. The portrait instance carries
+ * corrected keyboard, result-column, and screen-padding values so that the three portrait-mode
+ * rendering bugs (clipped keyboard rows, too-few result rows, GIF observer bleed) cannot occur.
+ *
+ * <p>
  * <b>Design notes:</b>
  * <ul>
  * <li>All fields are {@code public final} so they read like named constants at call-sites while
@@ -43,7 +55,7 @@ import java.awt.Dimension;
  *
  * @see ColorTheme
  */
-public final class LayoutTheme {
+public class LayoutTheme {
 
   // ── Singleton ──────────────────────────────────────────────────────────────
 
@@ -76,21 +88,145 @@ public final class LayoutTheme {
     }
   }
 
+  // ── Factory ────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns the appropriate {@link LayoutTheme} for the given physical screen dimensions.
+   *
+   * <p>
+   * Call this once at startup — before any UI component is constructed — and pass the result to
+   * {@link #install(LayoutTheme)}:
+   *
+   * <pre>
+   * LayoutTheme.install(LayoutTheme.forScreen(screenWidth, screenHeight));
+   * </pre>
+   *
+   * <ul>
+   * <li>When {@code screenW >= screenH} (landscape), the standard public constructor is used and
+   * all fields retain their canonical 1920 × 1080 values.</li>
+   * <li>When {@code screenH > screenW} (portrait), the private portrait constructor is used. It
+   * overrides only the fields that are provably wrong for a 1080 × 1920 screen — keyboard sizing,
+   * result-column preview counts, and screen padding. Every other field is identical to the
+   * landscape instance, so there is no landscape regression risk.</li>
+   * </ul>
+   *
+   * @param screenW physical screen width in pixels
+   * @param screenH physical screen height in pixels
+   * @return a fully configured {@link LayoutTheme} ready for {@link #install(LayoutTheme)}
+   */
+  public static LayoutTheme forScreen(int screenW, int screenH) {
+    return (screenH > screenW) ? new LayoutTheme(Orientation.PORTRAIT) : new LayoutTheme();
+  }
+
   // ── Constructor ────────────────────────────────────────────────────────────
 
   /**
-   * Creates a {@code LayoutTheme} with the default 1920×1080 landscape-mode sizes.
+   * Creates a {@code LayoutTheme} with the default 1920 × 1080 landscape-mode sizes.
    *
    * <p>
-   * To support a different resolution or orientation (e.g. 1080×1920 portrait), create a sub-class
-   * or extend this class, override the relevant fields, and pass the result to
-   * {@link #install(LayoutTheme)}.
+   * For orientation-aware construction prefer the {@link #forScreen(int, int)} factory method,
+   * which selects landscape or portrait values automatically.
    */
   public LayoutTheme() {
-    // Derived Dimension fields must be initialised after the primitives they depend on.
+
+    // ── Keyboard ──────────────────────────────────────────────────────────────
+    keyboardHeight = 260;
+    keyboardPaddingHorizontal = 60;
+    keyLetterW = 70;
+    keyLetterH = 60;
+    keyClearW = 140;
+    keyBackspaceW = 100;
+    keyModeToggleW = 140;
+    keySpaceW = 420;
+    keyRowGap = 10;
+    keyColGap = 8;
+    keyboardInnerPad = 20;
+
+    // ── Result columns ────────────────────────────────────────────────────────
+    searchPreviewCount = 5;
+    hotHerePreviewCount = 10;
+    genreDetailPreviewCount = 9;
+    screenPaddingHorizontal = 60;
+
+    // ── Derived Dimension fields ───────────────────────────────────────────────
+    // Must be initialised after the primitives they depend on.
     navBtnSize = new Dimension(navBtnW, navBtnH);
     adminBtnSize = new Dimension(adminBtnW, adminBtnH);
     detailHeaderImageSize = new Dimension(detailHeaderImageW, detailHeaderImageH);
+  }
+
+  /**
+   * Private constructor used exclusively by {@link #forScreen(int, int)} when portrait orientation
+   * is detected. Sets only the fields whose landscape values are incorrect for a 1080 × 1920
+   * screen; all other fields are inherited from the field initialisers and are identical to the
+   * landscape instance.
+   *
+   * <p>
+   * The {@code orientation} parameter exists solely to distinguish this overload from the public
+   * no-arg constructor — its value is always {@link Orientation#PORTRAIT}.
+   */
+  private LayoutTheme(Orientation orientation) {
+
+    // ── Issue 1 : Keyboard rows clipped ─────────────────────────────────────
+    //
+    // In landscape the keyboard has 60 px padding each side, leaving
+    // 1920 − 120 = 1800 px of usable width, and row 1 (10 letter keys +
+    // CLEAR + BACKSPACE) totals ≈ 1 036 px — well within budget.
+    //
+    // In portrait the same padding leaves 1080 − 120 = 960 px, but row 1
+    // still needs ≈ 1 036 px, so FlowLayout wraps the overflow keys onto a
+    // second line inside the row panel, pushing rows 2 and 3 below the fixed
+    // keyboardHeight boundary where they are clipped from view.
+    //
+    // Fix: reduce padding to 20 px each side (1040 px usable) and tighten
+    // key widths so row 1 fits in ≈ 854 px. The keyboard wrapper grows to
+    // 320 px to give the three rows comfortable vertical breathing room.
+    //
+    keyboardHeight = 320; // landscape: 260
+    keyboardPaddingHorizontal = 20; // landscape: 60
+    keyLetterW = 60; // landscape: 70
+    keyLetterH = 64; // landscape: 60 (taller touch target)
+    keyClearW = 110; // landscape: 140
+    keyBackspaceW = 84; // landscape: 100
+    keyModeToggleW = 110; // landscape: 140
+    keySpaceW = 320; // landscape: 420
+    keyRowGap = 10; // same as landscape — vertical row spacing is correct as-is
+    keyColGap = 5; // landscape: 8
+    keyboardInnerPad = 16; // landscape: 20
+
+    // ── Issue 2 : Result columns show too few rows ───────────────────────────
+    //
+    // The preview counts were calibrated for the landscape content area
+    // (~524 px for Search after chrome deductions). In portrait the content
+    // area is far taller, leaving large empty gaps beneath the last row.
+    //
+    // Search : 1920 − 110 (top) − 96 (tab) − 90 (bar) − 320 (kbd) = 1304 px
+    // body ≈ 1304 − 53 (header) − 65 (nav) = 1186 px → 1186÷72 ≈ 16; use 14
+    // Hot Here: 1920 − 110 − 96 = 1714 px content
+    // body ≈ 1714 − 53 − 65 = 1596 px → 1596÷72 ≈ 22; use 16 (column aspect ratio)
+    // Genre : 1920 − 110 − 96 − 72 (detail header) = 1642 px content
+    // body ≈ 1642 − 53 − 65 = 1524 px → 1524÷72 ≈ 21; use 15 (column aspect ratio)
+    //
+    searchPreviewCount = 14; // landscape: 5
+    hotHerePreviewCount = 16; // landscape: 10
+    genreDetailPreviewCount = 15; // landscape: 9
+
+    // Outer horizontal screen margin for the search bar and hero panel.
+    // 60 px each side on 1080 px leaves only 960 px; 30 px gives 1020 px,
+    // consistent with the keyboard padding reduction above.
+    screenPaddingHorizontal = 30; // landscape: 60
+
+    // Derived Dimension fields — same primitives as the landscape constructor
+    // because navBtnW/H, adminBtnW/H, and detailHeaderImage*W/H are unchanged.
+    navBtnSize = new Dimension(navBtnW, navBtnH);
+    adminBtnSize = new Dimension(adminBtnW, adminBtnH);
+    detailHeaderImageSize = new Dimension(detailHeaderImageW, detailHeaderImageH);
+  }
+
+  // ── Orientation tag — used only by the private portrait constructor ─────────
+
+  private enum Orientation {
+    PORTRAIT
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -761,9 +897,10 @@ public final class LayoutTheme {
 
   /**
    * Number of result rows visible per column page in the genre detail (artists / albums / songs).
-   * Tune this value if the screen resolution changes the visible row count.
+   * Tune this value if the screen resolution changes the visible row count. Landscape: 9. Portrait:
+   * 15 (content area is ~1642 px tall after chrome deductions).
    */
-  public final int genreDetailPreviewCount = 9;
+  public final int genreDetailPreviewCount;
 
   /** Preferred width of each sort button in the genre detail header. */
   public final int sortBtnW = 170;
@@ -778,9 +915,10 @@ public final class LayoutTheme {
 
   /**
    * Number of result rows visible per column page in the Hot Here tab. Tune this value if the
-   * screen resolution changes the visible row count.
+   * screen resolution changes the visible row count. Landscape: 10. Portrait: 16 (content area is
+   * ~1714 px tall after chrome deductions).
    */
-  public final int hotHerePreviewCount = 10;
+  public final int hotHerePreviewCount;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SEARCH PANEL (SearchPanel)
@@ -792,15 +930,17 @@ public final class LayoutTheme {
 
   /**
    * Number of result rows visible per column page in search results. Tune this value if the screen
-   * resolution changes the visible row count.
+   * resolution changes the visible row count. Landscape: 5. Portrait: 14 (content area is ~1304 px
+   * tall after chrome deductions).
    */
-  public final int searchPreviewCount = 5;
+  public final int searchPreviewCount;
 
   /**
    * Outer horizontal screen margin padding (left + right) applied to the search bar wrapper,
-   * keyboard wrapper, and hero panel. Exposing background gradient on both sides.
+   * keyboard wrapper, and hero panel. Exposing background gradient on both sides. Landscape: 60 px.
+   * Portrait: 30 px (consistent with the narrower keyboard padding).
    */
-  public final int screenPaddingHorizontal = 60;
+  public final int screenPaddingHorizontal;
 
   /**
    * Internal edge gap inside each result column (left + right, each side). Must match the value
@@ -823,41 +963,67 @@ public final class LayoutTheme {
   // Origin: KeyboardPanel
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /** Preferred height of the keyboard wrapper panel. */
-  public final int keyboardHeight = 260;
+  /**
+   * Preferred height of the keyboard wrapper panel. Landscape: 260 px. Portrait: 320 px (three rows
+   * need more vertical room at the taller touch-target key height used in portrait).
+   */
+  public final int keyboardHeight;
 
   /**
    * Horizontal margin (left + right) applied to the keyboard wrapper. Exposes the background
-   * gradient on both sides.
+   * gradient on both sides. Landscape: 60 px. Portrait: 20 px (wider usable area on the narrower
+   * 1080 px screen).
    */
-  public final int keyboardPaddingHorizontal = 60;
+  public final int keyboardPaddingHorizontal;
 
-  /** Standard letter key preferred size — width. */
-  public final int keyLetterW = 70;
+  /**
+   * Standard letter key preferred size — width. Landscape: 70 px. Portrait: 60 px (tighter so row 1
+   * fits within 1040 px usable width).
+   */
+  public final int keyLetterW;
 
-  /** Standard letter key preferred size — height. */
-  public final int keyLetterH = 60;
+  /**
+   * Standard letter key preferred size — height. Landscape: 60 px. Portrait: 64 px (taller touch
+   * target on a portrait touchscreen).
+   */
+  public final int keyLetterH;
 
-  /** CLEAR key width. */
-  public final int keyClearW = 140;
+  /**
+   * CLEAR key width. Landscape: 140 px. Portrait: 110 px.
+   */
+  public final int keyClearW;
 
-  /** Backspace key width. */
-  public final int keyBackspaceW = 100;
+  /**
+   * Backspace key width. Landscape: 100 px. Portrait: 84 px.
+   */
+  public final int keyBackspaceW;
 
-  /** Mode toggle button (ABC / 123) width. */
-  public final int keyModeToggleW = 140;
+  /**
+   * Mode toggle button (ABC / 123) width. Landscape: 140 px. Portrait: 110 px.
+   */
+  public final int keyModeToggleW;
 
-  /** SPACE key width. */
-  public final int keySpaceW = 420;
+  /**
+   * SPACE key width. Landscape: 420 px. Portrait: 320 px.
+   */
+  public final int keySpaceW;
 
-  /** Key grid row gap. */
-  public final int keyRowGap = 10;
+  /**
+   * Key grid row gap. Same in both orientations: 10 px.
+   */
+  public final int keyRowGap;
 
-  /** Key grid column gap. */
-  public final int keyColGap = 8;
+  /**
+   * Key grid column gap. Landscape: 8 px. Portrait: 5 px (reclaims horizontal space without
+   * crowding).
+   */
+  public final int keyColGap;
 
-  /** Inner padding around the full keyboard layout. */
-  public final int keyboardInnerPad = 20;
+  /**
+   * Inner padding around the full keyboard layout. Landscape: 20 px. Portrait: 16 px (reclaims a
+   * little vertical space inside the taller wrapper).
+   */
+  public final int keyboardInnerPad;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RESULT ROW / RESULTS COLUMN PANEL (ResultsColumnPanel)
