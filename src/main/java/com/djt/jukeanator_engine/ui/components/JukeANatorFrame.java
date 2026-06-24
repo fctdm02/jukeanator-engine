@@ -70,6 +70,7 @@ public class JukeANatorFrame extends JFrame {
    * panel is constructed.
    */
   private LayoutTheme.GridProfile albumGridProfile;
+  private LayoutTheme.TopPanelProfile topPanelProfile;
   private HomePanel homePanel;
 
   // SEARCH TAB
@@ -259,6 +260,7 @@ public class JukeANatorFrame extends JFrame {
     // at field-initialisation time (lines 158-162 in the original).
     albumGridProfile = LayoutTheme.get().homeGridProfile(screenWidth, screenHeight);
     genreGridProfile = LayoutTheme.get().genreGridProfile(screenWidth, screenHeight);
+    topPanelProfile = LayoutTheme.get().topPanelProfile(screenWidth, screenHeight);
 
     //
     // TOP 10%
@@ -820,7 +822,7 @@ public class JukeANatorFrame extends JFrame {
     creditsPanel
         .setBorder(BorderFactory.createMatteBorder(2, 1, 1, 1, ColorTheme.get().textPrimary));
     Dimension sidePanelSize =
-        new Dimension(LayoutTheme.get().creditsPanelW, LayoutTheme.get().creditsPanelH);
+        new Dimension(topPanelProfile.creditsPanelW(), topPanelProfile.creditsPanelH());
     creditsPanel.setPreferredSize(sidePanelSize);
     creditsPanel.setMinimumSize(sidePanelSize);
     creditsPanel.setMaximumSize(sidePanelSize);
@@ -833,18 +835,18 @@ public class JukeANatorFrame extends JFrame {
     locationLogo.setVerticalAlignment(SwingConstants.CENTER);
     locationLogo.setOpaque(true);
     locationLogo.setBackground(ColorTheme.get().frameLocationLogoBg);
-    locationLogo.setPreferredSize(
-        new Dimension(LayoutTheme.get().topPanelIconSize, LayoutTheme.get().topPanelIconSize));
+    locationLogo
+        .setPreferredSize(new Dimension(topPanelProfile.iconSize(), topPanelProfile.iconSize()));
     locationLogo.setBorder(BorderFactory.createLineBorder(ColorTheme.get().coverArtBorder, 1));
 
     // Try JPG first
-    ImageIcon logoIcon = imageLoader.loadImage("locationLogo.jpg",
-        LayoutTheme.get().topPanelIconSize, LayoutTheme.get().topPanelIconSize);
+    ImageIcon logoIcon = imageLoader.loadImage("locationLogo.jpg", topPanelProfile.iconSize(),
+        topPanelProfile.iconSize());
 
     // Fallback PNG
     if (logoIcon == null) {
-      logoIcon = imageLoader.loadImage("locationLogo.png", LayoutTheme.get().topPanelIconSize,
-          LayoutTheme.get().topPanelIconSize);
+      logoIcon = imageLoader.loadImage("locationLogo.png", topPanelProfile.iconSize(),
+          topPanelProfile.iconSize());
     }
 
     if (logoIcon != null) {
@@ -902,8 +904,8 @@ public class JukeANatorFrame extends JFrame {
     bannerLabel.setVerticalAlignment(SwingConstants.CENTER);
 
     // Loaded at scaled dimensions to fit perfectly within the 100px banner row height constraints
-    ImageIcon icon = imageLoader.loadImage("JukeANatorLogo.png",
-        LayoutTheme.get().topPanelIconSize * 3, LayoutTheme.get().topPanelIconSize);
+    ImageIcon icon = imageLoader.loadImage("JukeANatorLogo.png", topPanelProfile.iconSize() * 3,
+        topPanelProfile.iconSize());
     Image transparentStrippedImage = ImageLoader.createTransparentImage(icon.getImage(), false, 15);
     icon = new ImageIcon(transparentStrippedImage);
     bannerLabel.setIcon(icon);
@@ -916,7 +918,7 @@ public class JukeANatorFrame extends JFrame {
     JPanel nowPlayingWrapper = new JPanel(new BorderLayout());
     nowPlayingWrapper.setOpaque(false);
     Dimension wrapperSize =
-        new Dimension(LayoutTheme.get().nowPlayingWrapperW, LayoutTheme.get().nowPlayingWrapperH);
+        new Dimension(topPanelProfile.nowPlayingWrapperW(), topPanelProfile.nowPlayingWrapperH());
     nowPlayingWrapper.setPreferredSize(wrapperSize);
     nowPlayingWrapper.setMinimumSize(wrapperSize);
     nowPlayingWrapper.setMaximumSize(wrapperSize);
@@ -950,7 +952,7 @@ public class JukeANatorFrame extends JFrame {
     // Fixed size — always the same whether a song is playing or not.
     // Sized to match the "song playing" state so the center logo never shifts.
     Dimension fixedSize =
-        new Dimension(LayoutTheme.get().nowPlayingPanelW, LayoutTheme.get().nowPlayingPanelH);
+        new Dimension(topPanelProfile.nowPlayingPanelW(), topPanelProfile.nowPlayingPanelH());
     panel.setPreferredSize(fixedSize);
     panel.setMinimumSize(fixedSize);
     panel.setMaximumSize(fixedSize);
@@ -958,8 +960,8 @@ public class JukeANatorFrame extends JFrame {
     //
     // LEFT : PLAY STATUS (animated GIF / paused icon)
     //
-    playStatus.setPreferredSize(
-        new Dimension(LayoutTheme.get().topPanelIconSize, LayoutTheme.get().topPanelIconSize));
+    playStatus
+        .setPreferredSize(new Dimension(topPanelProfile.iconSize(), topPanelProfile.iconSize()));
     playStatus.setHorizontalAlignment(SwingConstants.CENTER);
     playStatus.setBorder(null);
 
@@ -995,8 +997,8 @@ public class JukeANatorFrame extends JFrame {
     //
     // RIGHT : COVER ART
     //
-    albumArtLabel.setPreferredSize(
-        new Dimension(LayoutTheme.get().topPanelIconSize, LayoutTheme.get().topPanelIconSize));
+    albumArtLabel
+        .setPreferredSize(new Dimension(topPanelProfile.iconSize(), topPanelProfile.iconSize()));
     albumArtLabel.setHorizontalAlignment(SwingConstants.CENTER);
     albumArtLabel.setBorder(null);
 
@@ -1073,13 +1075,12 @@ public class JukeANatorFrame extends JFrame {
       artistLabel.setText(songDto.getArtistName());
       albumLabel.setText(songDto.getAlbumName());
       albumArtLabel.setIcon(imageLoader.loadFilesystemImage(songDto.getCoverArtPath(),
-          LayoutTheme.get().topPanelIconSize, LayoutTheme.get().topPanelIconSize));
+          topPanelProfile.iconSize(), topPanelProfile.iconSize()));
       currentNowPlayingSong = songDto;
 
       musicPaused = false;
-      playStatus.setIcon(
-          imageLoader.loadClasspathImage("music_playing.gif", LayoutTheme.get().topPanelIconSize,
-              LayoutTheme.get().topPanelIconSize, Image.SCALE_DEFAULT));
+      playStatus.setIcon(imageLoader.loadClasspathImage("music_playing.gif",
+          topPanelProfile.iconSize(), topPanelProfile.iconSize(), Image.SCALE_DEFAULT));
 
       nowPlayingPanel.setVisible(true);
     });
@@ -1374,13 +1375,11 @@ public class JukeANatorFrame extends JFrame {
       musicPaused = !musicPaused;
 
       if (musicPaused) {
-        playStatus.setIcon(
-            imageLoader.loadClasspathImage("music_paused.png", LayoutTheme.get().topPanelIconSize,
-                LayoutTheme.get().topPanelIconSize, Image.SCALE_DEFAULT));
+        playStatus.setIcon(imageLoader.loadClasspathImage("music_paused.png",
+            topPanelProfile.iconSize(), topPanelProfile.iconSize(), Image.SCALE_DEFAULT));
       } else {
-        playStatus.setIcon(
-            imageLoader.loadClasspathImage("music_playing.gif", LayoutTheme.get().topPanelIconSize,
-                LayoutTheme.get().topPanelIconSize, Image.SCALE_DEFAULT));
+        playStatus.setIcon(imageLoader.loadClasspathImage("music_playing.gif",
+            topPanelProfile.iconSize(), topPanelProfile.iconSize(), Image.SCALE_DEFAULT));
       }
     });
   }

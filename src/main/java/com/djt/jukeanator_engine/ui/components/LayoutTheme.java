@@ -434,6 +434,89 @@ public final class LayoutTheme {
   private static final int GENRE_MAX_ROWS_PORTRAIT = 6;
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // TOP-PANEL PROFILE — resolution- and orientation-aware credits / now-playing
+  //
+  // The credits panel (left) and now-playing wrapper (right) were originally
+  // designed at fixed 485 px wide for a 1920 px landscape screen. On a
+  // 1080 px portrait screen those fixed widths consume almost all of the
+  // available width, leaving nothing for the centre banner.
+  //
+  // topPanelProfile(screenW, screenH) returns a TopPanelProfile whose widths
+  // are scaled proportionally to the actual screen width, so the top panel
+  // looks correct at any resolution and orientation.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Immutable value-object that bundles the widths and heights needed to lay out the top panel.
+   *
+   * <p>
+   * Obtain instances via {@link LayoutTheme#topPanelProfile(int, int)}.
+   *
+   * @param creditsPanelW width of the credits panel (left side)
+   * @param creditsPanelH height of the credits panel
+   * @param nowPlayingPanelW width of the now-playing panel (inner)
+   * @param nowPlayingPanelH height of the now-playing panel
+   * @param nowPlayingWrapperW width of the now-playing wrapper (right side, typically =
+   *        creditsPanelW)
+   * @param nowPlayingWrapperH height of the now-playing wrapper
+   * @param iconSize square pixel size for the location-logo and cover-art icons
+   */
+  public record TopPanelProfile(int creditsPanelW, int creditsPanelH, int nowPlayingPanelW,
+      int nowPlayingPanelH, int nowPlayingWrapperW, int nowPlayingWrapperH, int iconSize) {
+  }
+
+  /**
+   * Computes a {@link TopPanelProfile} for the given screen dimensions.
+   *
+   * <h3>Algorithm</h3>
+   * <ol>
+   * <li><b>Scale factor</b> — {@code screenW / CANONICAL_W}, clamped to
+   * [{@value #TOP_PANEL_SCALE_MIN}, {@value #TOP_PANEL_SCALE_MAX}].</li>
+   * <li>All canonical widths/heights and icon size are multiplied by {@code scale} and rounded to
+   * the nearest integer.</li>
+   * <li>In portrait mode an additional {@value #TOP_PANEL_PORTRAIT_REDUCTION}× reduction is applied
+   * so both side panels together leave enough room for the centre banner.</li>
+   * </ol>
+   *
+   * @param screenW current screen width in pixels
+   * @param screenH current screen height in pixels
+   * @return a {@link TopPanelProfile} ready to pass to {@link JukeANatorFrame#buildTopPanel}
+   */
+  public TopPanelProfile topPanelProfile(int screenW, int screenH) {
+
+    boolean portrait = screenH > screenW;
+
+    double scale = (double) screenW / CANONICAL_W;
+    scale = Math.max(TOP_PANEL_SCALE_MIN, Math.min(scale, TOP_PANEL_SCALE_MAX));
+
+    if (portrait) {
+      scale *= TOP_PANEL_PORTRAIT_REDUCTION;
+    }
+
+    int cw = (int) Math.round(creditsPanelW * scale);
+    int ch = (int) Math.round(creditsPanelH * scale);
+    int npw = (int) Math.round(nowPlayingPanelW * scale);
+    int nph = (int) Math.round(nowPlayingPanelH * scale);
+    int nww = (int) Math.round(nowPlayingWrapperW * scale);
+    int nwh = (int) Math.round(nowPlayingWrapperH * scale);
+    int icon = (int) Math.round(topPanelIconSize * scale);
+
+    return new TopPanelProfile(cw, ch, npw, nph, nww, nwh, icon);
+  }
+
+  /** Minimum scale factor for the top-panel profile. */
+  private static final double TOP_PANEL_SCALE_MIN = 0.30;
+
+  /** Maximum scale factor for the top-panel profile. */
+  private static final double TOP_PANEL_SCALE_MAX = 1.50;
+
+  /**
+   * Additional size reduction applied in portrait mode so that both side panels together fit
+   * comfortably within the narrower portrait width.
+   */
+  private static final double TOP_PANEL_PORTRAIT_REDUCTION = 0.55;
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // FRAME / TOP-PANEL
   // Origin: JukeANatorFrame#buildTopPanel
   // ═══════════════════════════════════════════════════════════════════════════
@@ -441,28 +524,32 @@ public final class LayoutTheme {
   /** Preferred height of the top panel (credits + banner + now-playing). */
   public final int topPanelHeight = 110;
 
-  /** Fixed width of the credits panel (left side of the top panel). */
+  /** Fixed width of the credits panel (left side of the top panel). Canonical 1920 px value. */
   public final int creditsPanelW = 485;
 
-  /** Fixed height of the credits panel (left side of the top panel). */
+  /** Fixed height of the credits panel (left side of the top panel). Canonical 1920 px value. */
   public final int creditsPanelH = 100;
 
-  /** Fixed width of the now-playing panel (right side of the top panel). */
+  /**
+   * Fixed width of the now-playing panel (right side of the top panel). Canonical 1920 px value.
+   */
   public final int nowPlayingPanelW = 450;
 
-  /** Fixed height of the now-playing panel. */
+  /** Fixed height of the now-playing panel. Canonical 1920 px value. */
   public final int nowPlayingPanelH = 100;
 
   /**
    * Width reserved for the now-playing wrapper (matches credits panel for symmetric layout).
-   * Origin: JukeANatorFrame — {@code nowPlayingWrapper}
+   * Canonical 1920 px value. Origin: JukeANatorFrame — {@code nowPlayingWrapper}
    */
   public final int nowPlayingWrapperW = 485;
 
-  /** Height of the now-playing wrapper. */
+  /** Height of the now-playing wrapper. Canonical 1920 px value. */
   public final int nowPlayingWrapperH = 100;
 
-  /** Size of the location logo / cover-art icon in the top panel (square). */
+  /**
+   * Size of the location logo / cover-art icon in the top panel (square). Canonical 1920 px value.
+   */
   public final int topPanelIconSize = 96;
 
   // ═══════════════════════════════════════════════════════════════════════════
