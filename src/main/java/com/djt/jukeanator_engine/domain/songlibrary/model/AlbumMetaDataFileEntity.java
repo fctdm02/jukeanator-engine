@@ -110,7 +110,7 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
       while ((line = reader.readLine()) != null) {
 
         if (line.startsWith("Genre=")) {
-          coverArtUrl = line.substring("Genre=".length());
+          genre = line.substring("Genre=".length());
         } else if (line.startsWith("CoverArtURL=")) {
           coverArtUrl = line.substring("CoverArtURL=".length());
         } else if (line.startsWith("RecordLabel=")) {
