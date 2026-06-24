@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import java.util.List;
+import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -152,6 +153,7 @@ public interface SongLibraryService {
    * @param authenticateForAdminPanelRequest Contains username and password fields
    * @return True, if authentication was successful for either admin or owner accounts.
    */
+  @PublicServiceMethod
   Boolean authenticateForAdminPanel(
       AuthenticateForAdminPanelRequest authenticateForAdminPanelRequest);
 }

@@ -46,7 +46,7 @@ import com.djt.jukeanator_engine.domain.songqueue.service.utils.PlaylistManager;
 /**
  * @author tmyers
  */
-public final class SongQueueServiceImpl
+public class SongQueueServiceImpl
     implements SongQueueService, AggregateRootService<SongQueueRootEntity> {
 
   private static final Logger log = LoggerFactory.getLogger(SongQueueServiceImpl.class);

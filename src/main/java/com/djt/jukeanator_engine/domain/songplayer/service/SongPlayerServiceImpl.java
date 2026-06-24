@@ -9,6 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.djt.jukeanator_engine.domain.common.security.SecurityContextPropagatingRunnable;
+import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
@@ -36,7 +40,7 @@ import jakarta.annotation.PreDestroy;
 /**
  * @author tmyers
  */
-public final class SongPlayerServiceImpl implements SongPlayerService {
+public class SongPlayerServiceImpl implements SongPlayerService {
 
   private static final Logger log = LoggerFactory.getLogger(SongPlayerServiceImpl.class);
 
@@ -258,17 +262,20 @@ public final class SongPlayerServiceImpl implements SongPlayerService {
    */
   private void submitQueueProcessing() {
 
-    queueExecutor.submit(() -> {
+    // Capture whatever authentication the calling thread currently holds.
+    // If there is none (background callback, timer, etc.) fall back to the
+    // internal SYSTEM principal so the security aspect is satisfied.
+    Authentication callerAuth = SecurityContextHolder.getContext().getAuthentication();
+    Authentication effectiveAuth = (callerAuth != null && callerAuth.isAuthenticated()) ? callerAuth
+        : SystemPrincipal.SystemAuthenticationToken.INSTANCE;
 
+    queueExecutor.submit(new SecurityContextPropagatingRunnable(() -> {
       try {
-
         processQueue();
-
       } catch (Exception e) {
-
         log.error("Queue processing failed", e);
       }
-    });
+    }, effectiveAuth));
   }
 
   /**

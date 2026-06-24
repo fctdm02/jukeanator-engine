@@ -11,7 +11,6 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
-import java.util.concurrent.CompletableFuture;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -29,6 +28,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
+import com.djt.jukeanator_engine.ui.security.SwingSecurityUtil;
 
 // ─────────────────────────────────────────────────────────────────────────
 // CONSTRUCTOR
@@ -334,7 +334,7 @@ public class AddSongToQueueCard extends JPanel {
         createQueueButton("Play Song", normalPlayCost, ColorTheme.get().accentBlue, e -> {
           if (creditManager.deductCredits(normalPlayCost)) {
 
-            CompletableFuture
+            SwingSecurityUtil
                 .runAsync(() -> songQueueService.addSongToQueue(new AddSongToQueueRequest(
                     SongQueueService.LOCAL_USERNAME, song.getAlbumId(), song.getSongId(), 1)));
 
@@ -346,7 +346,7 @@ public class AddSongToQueueCard extends JPanel {
         createQueueButton("Priority Play Song", priorityCost, ColorTheme.get().accentGold, e -> {
           if (creditManager.deductCredits(priorityCost)) {
 
-            CompletableFuture.runAsync(() -> songQueueService
+            SwingSecurityUtil.runAsync(() -> songQueueService
                 .addSongToQueue(new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME,
                     song.getAlbumId(), song.getSongId(), highestPriority)));
 

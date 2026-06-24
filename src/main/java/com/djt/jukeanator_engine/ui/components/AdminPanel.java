@@ -17,13 +17,12 @@ import java.awt.RenderingHints;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -33,7 +32,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ListSelectionModel;
-import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -46,6 +44,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueReque
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
+import com.djt.jukeanator_engine.ui.security.SwingSecurityUtil;
 
 public class AdminPanel extends JPanel {
 
@@ -64,7 +63,6 @@ public class AdminPanel extends JPanel {
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
   private final CreditManager creditManager;
-  private final ImageLoader imageLoader;
   private final Frame ownerFrame;
 
   // ── Album list ────────────────────────────────────────────────────────────
@@ -83,26 +81,21 @@ public class AdminPanel extends JPanel {
   private int popularityT2 = 5;
   private int popularityT3 = 15;
 
-  // ── Invalid Metadata Tracking Cache (Item #1) ─────────────────────────────
+  // ── Invalid Metadata Tracking Cache ──────────────────────────────────────
   private final List<AlbumDto> albumsWithInvalidMetadata = new ArrayList<>();
-
-  // ── Album list loading placeholder ────────────────────────────────────────
-  private JLabel albumLoadingLabel;
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
   public AdminPanel(Frame ownerFrame, SongLibraryService songLibraryService,
       SongQueueService songQueueService, SongPlayerService songPlayerService,
-      CreditManager creditManager, ImageLoader imageLoader,
-      CompletableFuture<List<AlbumDto>> prefetchedAlbums) {
+      CreditManager creditManager) {
 
     this.ownerFrame = ownerFrame;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
     this.creditManager = creditManager;
-    this.imageLoader = imageLoader;
 
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
@@ -112,7 +105,7 @@ public class AdminPanel extends JPanel {
     add(buildListsCenter(), BorderLayout.CENTER);
     add(buildQueueButtons(), BorderLayout.EAST);
 
-    populateAlbumListFrom(prefetchedAlbums);
+    loadAlbumList();
     setQueue(songQueueService.getQueuedSongs());
 
     requestFocusInWindow();
@@ -185,19 +178,7 @@ public class AdminPanel extends JPanel {
     albumPane.setOpaque(false);
     albumPane.add(buildAlbumSectionHeader(), BorderLayout.NORTH);
 
-    // Placeholder shown while the async album load is in-flight
-    albumLoadingLabel = new JLabel("Loading library…", SwingConstants.CENTER);
-    albumLoadingLabel.setForeground(ColorTheme.get().textMuted);
-    albumLoadingLabel
-        .setFont(new Font(Font.SANS_SERIF, Font.ITALIC, LayoutTheme.get().fontSizeAdminSection));
-    albumLoadingLabel.setVisible(false);
-
-    JPanel albumListWrapper = new JPanel(new BorderLayout());
-    albumListWrapper.setOpaque(false);
-    albumListWrapper.add(darkScrollPane(albumList), BorderLayout.CENTER);
-    albumListWrapper.add(albumLoadingLabel, BorderLayout.NORTH);
-
-    albumPane.add(albumListWrapper, BorderLayout.CENTER);
+    albumPane.add(darkScrollPane(albumList), BorderLayout.CENTER);
 
     // ── Queue list ────────────────────────────────────────────────────────
     queueList.setOpaque(true);
@@ -293,7 +274,7 @@ public class AdminPanel extends JPanel {
     // Capture the ID safely
     final Integer albumId = selected.getAlbumId();
 
-    CompletableFuture.runAsync(() -> {
+    SwingSecurityUtil.runAsync(() -> {
       try {
         // 1. Fetch full album entity context in the background
         AlbumDto full = songLibraryService.getAlbumById(albumId);
@@ -338,7 +319,7 @@ public class AdminPanel extends JPanel {
     int confirm = JOptionPane.showConfirmDialog(this, "Reset all song play statistics?",
         "Reset Statistics", JOptionPane.YES_NO_OPTION);
     if (confirm == JOptionPane.YES_OPTION) {
-      CompletableFuture.runAsync(() -> {
+      SwingSecurityUtil.runAsync(() -> {
         try {
           songLibraryService.resetSongStatistics();
         } catch (Exception ex) {
@@ -354,7 +335,7 @@ public class AdminPanel extends JPanel {
         JOptionPane.showConfirmDialog(this, "Rescan the song library? This may take a moment.",
             "Rescan Library", JOptionPane.YES_NO_OPTION);
     if (confirm == JOptionPane.YES_OPTION) {
-      CompletableFuture.runAsync(() -> {
+      SwingSecurityUtil.runAsync(() -> {
         try {
           songLibraryService.scanFileSystemForSongs();
           SwingUtilities.invokeLater(this::refreshAlbumList);
@@ -512,7 +493,7 @@ public class AdminPanel extends JPanel {
       return;
 
     String filename = chooser.getSelectedFile().getAbsolutePath();
-    CompletableFuture.runAsync(() -> {
+    SwingSecurityUtil.runAsync(() -> {
       try {
 
         LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest =
@@ -540,7 +521,7 @@ public class AdminPanel extends JPanel {
       return;
 
     String filename = chooser.getSelectedFile().getAbsolutePath();
-    CompletableFuture.runAsync(() -> {
+    SwingSecurityUtil.runAsync(() -> {
       try {
         this.songQueueService.saveQueueAsPlaylist(filename);
 
@@ -556,25 +537,14 @@ public class AdminPanel extends JPanel {
   }
 
   /**
-   * Primary entry point for loading the album list. Chains off {@code prefetchedAlbums} when one is
-   * provided (the future was started in {@code JukeANatorFrame} as soon as the login overlay
-   * appeared, so the data is usually already available or nearly so by the time the panel is
-   * visible). Falls back to a fresh {@code CompletableFuture.runAsync} call when no pre-fetch
-   * future is supplied (e.g. after a library rescan).
+   * Synchronously loads the full album list from the song library service into the list model.
+   * Called once from the constructor and again from {@link #refreshAlbumList()} after a rescan.
+   * Runs on the EDT; the security context is already present via
+   * {@code LocalAuthenticatedEventQueue}.
    */
-  private void populateAlbumListFrom(CompletableFuture<List<AlbumDto>> prefetchedAlbums) {
-
-    if (albumLoadingLabel != null) {
-      albumLoadingLabel.setVisible(true);
-    }
-
-    CompletableFuture<List<AlbumDto>> source = (prefetchedAlbums != null) ? prefetchedAlbums
-        : CompletableFuture.supplyAsync(() -> songLibraryService.getAlbums());
-
-    source.thenAccept(albums -> SwingUtilities.invokeLater(() -> {
-      if (albumLoadingLabel != null) {
-        albumLoadingLabel.setVisible(false);
-      }
+  private void loadAlbumList() {
+    try {
+      List<AlbumDto> albums = songLibraryService.getAlbums();
       albumListModel.clear();
       albumsWithInvalidMetadata.clear();
       if (albums != null) {
@@ -585,20 +555,14 @@ public class AdminPanel extends JPanel {
           }
         }
       }
-    })).exceptionally(ex -> {
+    } catch (Exception ex) {
       ex.printStackTrace();
-      SwingUtilities.invokeLater(() -> {
-        if (albumLoadingLabel != null) {
-          albumLoadingLabel.setVisible(false);
-        }
-      });
-      return null;
-    });
+    }
   }
 
   /** Triggers a fresh reload of the album list (used after a library rescan). */
   public void refreshAlbumList() {
-    populateAlbumListFrom(null);
+    loadAlbumList();
   }
 
   private boolean isMetadataInvalid(AlbumDto album) {
@@ -671,67 +635,41 @@ public class AdminPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   // CELL RENDERERS
   // ─────────────────────────────────────────────────────────────────────────
-  private class AlbumCellRenderer extends JPanel implements javax.swing.ListCellRenderer<AlbumDto> {
+  /**
+   * Single-line album cell renderer. Displays artist, album name, and genre on one row with no
+   * thumbnail — fast to render regardless of library size.
+   *
+   * <p>
+   * Format: {@code ArtistName — AlbumName  [Genre]}
+   */
+  private static class AlbumCellRenderer extends DefaultListCellRenderer {
 
     private static final long serialVersionUID = 1L;
-    private final JLabel thumb = new JLabel();
-    private final JLabel name = new JLabel();
-    private final JLabel artist = new JLabel();
-
-    AlbumCellRenderer() {
-      setLayout(new BorderLayout(8, 0));
-      setBorder(new EmptyBorder(3, 8, 3, 8));
-
-      thumb.setPreferredSize(
-          new Dimension(LayoutTheme.get().adminThumbSize, LayoutTheme.get().adminThumbSize));
-      thumb.setHorizontalAlignment(SwingConstants.CENTER);
-      thumb.setOpaque(true);
-      thumb.setBackground(ColorTheme.get().adminThumbBg);
-
-      JPanel text = new JPanel(new BorderLayout(0, 0));
-      text.setOpaque(false);
-      name.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
-      artist.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminArtist));
-      name.setForeground(ColorTheme.get().textPrimary);
-      artist.setForeground(ColorTheme.get().textMuted);
-      text.add(name, BorderLayout.CENTER);
-      text.add(artist, BorderLayout.SOUTH);
-
-      add(thumb, BorderLayout.WEST);
-      add(text, BorderLayout.CENTER);
-    }
 
     @Override
-    public java.awt.Component getListCellRendererComponent(JList<? extends AlbumDto> list,
-        AlbumDto album, int index, boolean isSelected, boolean cellHasFocus) {
+    public java.awt.Component getListCellRendererComponent(JList<?> list, Object value, int index,
+        boolean isSelected, boolean cellHasFocus) {
 
-      name.setText(AlbumGridPanel.albumDisplayName(album.getAlbumName(), album.getGenreName()));
-      artist.setText(album.getArtistName() != null ? album.getArtistName() : "");
+      super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
 
-      try {
-        if (album.getCoverArtPath() != null) {
-          ImageIcon icon = imageLoader.loadFilesystemImage(album.getCoverArtPath(),
-              LayoutTheme.get().adminThumbSize, LayoutTheme.get().adminThumbSize);
-          thumb.setIcon(icon);
-        } else {
-          thumb.setIcon(null);
-          thumb.setText("♫");
-          thumb.setForeground(ColorTheme.get().textMuted);
-          thumb.setFont(
-              new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminArtist));
-        }
-      } catch (Exception ignored) {
-        thumb.setIcon(null);
+      if (value instanceof AlbumDto album) {
+        String artist = album.getArtistName() != null ? album.getArtistName() : "";
+        String display =
+            AlbumGridPanel.albumDisplayName(album.getAlbumName(), album.getGenreName());
+        setText(artist + " \u2014 " + display);
       }
+
+      setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
 
       if (isSelected) {
         setBackground(ColorTheme.get().bgListSelected);
-        name.setForeground(ColorTheme.get().accentBlue);
+        setForeground(ColorTheme.get().accentBlue);
       } else {
         setBackground(index % 2 == 0 ? ColorTheme.get().bgList : ColorTheme.get().bgListRowAlt);
-        name.setForeground(ColorTheme.get().textPrimary);
+        setForeground(ColorTheme.get().textPrimary);
       }
       setOpaque(true);
+      setBorder(new EmptyBorder(3, 8, 3, 8));
       return this;
     }
   }

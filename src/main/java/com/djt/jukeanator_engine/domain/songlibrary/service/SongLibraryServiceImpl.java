@@ -52,7 +52,7 @@ import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 /**
  * @author tmyers
  */
-public final class SongLibraryServiceImpl
+public class SongLibraryServiceImpl
     implements SongLibraryService, AggregateRootService<RootFolderEntity> {
 
   private static final Logger log = LoggerFactory.getLogger(SongLibraryServiceImpl.class);

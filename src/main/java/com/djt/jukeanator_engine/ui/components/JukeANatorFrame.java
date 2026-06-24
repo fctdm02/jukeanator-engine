@@ -94,7 +94,6 @@ public class JukeANatorFrame extends JFrame {
   // ADMIN TAB
   private int preAdminTabIndex = 1; // Tracks the tab to return to when exiting Admin
   private AdminPanel adminPanel;
-  private java.util.concurrent.CompletableFuture<java.util.List<AlbumDto>> adminAlbumPrefetch;
 
   // ── OVERLAY CARD SYSTEM (replaces former JDialog popups) ───────────────────
   private static final String CARD_TABS = "TABS";
@@ -337,10 +336,6 @@ public class JukeANatorFrame extends JFrame {
 
         // Safe lazy initialization of AdminPanel
         if (adminPanel == null) {
-          if (adminAlbumPrefetch == null) {
-            adminAlbumPrefetch =
-                java.util.concurrent.CompletableFuture.supplyAsync(songLibraryService::getAlbums);
-          }
           adminPanel = buildAdminPanel();
           contentPanelTabs.setComponentAt(6, adminPanel);
           adminPanel.setQueue(currentQueue);
@@ -784,7 +779,7 @@ public class JukeANatorFrame extends JFrame {
   private AdminPanel buildAdminPanel() {
 
     return new AdminPanel(this, songLibraryService, songQueueService, songPlayerService,
-        creditManager, imageLoader, adminAlbumPrefetch);
+        creditManager);
   }
 
   // ============================================================
@@ -1328,14 +1323,6 @@ public class JukeANatorFrame extends JFrame {
    */
   public void showLoginToAdminPanelCard() {
 
-    // Kick off the album fetch in the background immediately — by the time the
-    // admin successfully logs in and AdminPanel is constructed, the data will
-    // likely already be available, eliminating the first-show delay.
-    if (adminPanel == null && adminAlbumPrefetch == null) {
-      adminAlbumPrefetch =
-          java.util.concurrent.CompletableFuture.supplyAsync(songLibraryService::getAlbums);
-    }
-
     if (loginToAdminPanelCard != null) {
       loginToAdminPanelCard.dismiss();
     }
@@ -1344,12 +1331,8 @@ public class JukeANatorFrame extends JFrame {
         /* onSuccess */ () -> SwingUtilities.invokeLater(() -> {
           hideOverlay();
 
-          // ── Lazy initialisation ───────────────────────────────────────────
-          // The album list was pre-fetched in the background as soon as the
-          // login overlay appeared, so AdminPanel construction is now cheap.
           if (adminPanel == null) {
             adminPanel = buildAdminPanel();
-            adminAlbumPrefetch = null; // consumed — allow a fresh fetch next time if needed
             // Swap the lightweight placeholder out for the real panel.
             contentPanelTabs.setComponentAt(6, adminPanel);
             // Push any queue updates that arrived before the panel existed.

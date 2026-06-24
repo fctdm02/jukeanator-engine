@@ -15,7 +15,7 @@ app:
 logging:
   level:
     com.djt.jukeanator_engine: INFO
-            
+
 spring:
   application:
     name: JukeANator

@@ -27,7 +27,7 @@ import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 /**
  * @author tmyers
  */
-public final class UserServiceImpl implements UserService, AggregateRootService<UserRootEntity> {
+public class UserServiceImpl implements UserService, AggregateRootService<UserRootEntity> {
 
   private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 

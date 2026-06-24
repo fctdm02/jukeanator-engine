@@ -11,7 +11,6 @@ import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -34,6 +33,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
+import com.djt.jukeanator_engine.ui.security.SwingSecurityUtil;
 
 // ─────────────────────────────────────────────────────────────────────────
 // CONSTRUCTOR
@@ -429,7 +429,7 @@ public class SongQueueCard extends JPanel {
     if (selected == null || !deductCostFor(selected))
       return;
     int idx = queueList.getSelectedIndex();
-    CompletableFuture.runAsync(() -> {
+    SwingSecurityUtil.runAsync(() -> {
       try {
         songQueueService.moveSongUpInQueue(new ChangeSongQueueRequest(
             selected.getSong().getAlbumId(), selected.getSong().getSongId()));
@@ -453,7 +453,7 @@ public class SongQueueCard extends JPanel {
     if (selected == null || !deductCostFor(selected))
       return;
     int idx = queueList.getSelectedIndex();
-    CompletableFuture.runAsync(() -> {
+    SwingSecurityUtil.runAsync(() -> {
       try {
         songQueueService.moveSongDownInQueue(new ChangeSongQueueRequest(
             selected.getSong().getAlbumId(), selected.getSong().getSongId()));
@@ -476,7 +476,7 @@ public class SongQueueCard extends JPanel {
     if (selected == null || !deductCostFor(selected))
       return;
     int idx = queueList.getSelectedIndex();
-    CompletableFuture.runAsync(() -> {
+    SwingSecurityUtil.runAsync(() -> {
       try {
         songQueueService.removeSongDownFromQueue(new ChangeSongQueueRequest(
             selected.getSong().getAlbumId(), selected.getSong().getSongId()));

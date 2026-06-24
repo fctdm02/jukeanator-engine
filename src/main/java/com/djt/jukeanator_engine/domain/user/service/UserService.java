@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.user.service;
 
+import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
@@ -15,6 +16,7 @@ public interface UserService {
    * @param request
    * @return
    */
+  @PublicServiceMethod
   AuthResponse register(RegisterRequest request);
   
   /**
@@ -22,6 +24,7 @@ public interface UserService {
    * @param request
    * @return
    */
+  @PublicServiceMethod
   AuthResponse login(LoginRequest request);
 
   /**
