@@ -86,7 +86,34 @@ public class SongLibraryServiceImpl
     this.eventPublisher = eventPublisher;
 
     // Initialize the song library
-    initializeSongLibrary();
+    initialize();
+  }
+
+  public void initialize() {
+
+    // If we cannot load the song library from disk at startup, then assume a new install and return
+    // an
+    // empty root folder. The application will automatically ask the user to scan for songs at
+    // startup.
+    try {
+
+      this.root = this.songLibraryRepository.loadAggregateRoot(this.rootPath);
+
+    } catch (EntityDoesNotExistException ednee) {
+
+      log.error("Could not load song library from: " + rootPath
+          + ", using empty song library root for now, error: " + ednee.getMessage());
+
+      this.root = new RootFolderEntity(this.rootPath);
+      this.root.initialize();
+    }
+
+    this.isInitialized = true;
+
+    log.info("rootPath: " + this.rootPath);
+    log.info("searchResultSize: " + this.searchResultSize);
+    log.info("root: " + this.root.getRootPrefix());
+    log.info("");
   }
 
   // Service methods
@@ -493,7 +520,7 @@ public class SongLibraryServiceImpl
       this.root.initialize();
 
       // Initialize the song library
-      initializeSongLibrary();
+      initialize();
 
       // Publish the event
       eventPublisher
@@ -522,7 +549,7 @@ public class SongLibraryServiceImpl
       this.songLibraryRepository.storeAggregateRoot(this.root);
 
       // Initialize the song library
-      initializeSongLibrary();
+      initialize();
 
       // Publish the event
       eventPublisher.publishEvent(new SongStatisticsChangedEvent());
@@ -676,27 +703,6 @@ public class SongLibraryServiceImpl
   public QueryResponse<QueryRequest, QueryResponseItem> processQuery(QueryRequest queryRequest) {
 
     throw new SongLibraryException("Not implemented yet!");
-  }
-
-  public void initializeSongLibrary() {
-
-    // If we cannot load the song library from disk at startup, then assume a new install and return
-    // an
-    // empty root folder. The application will automatically ask the user to scan for songs at
-    // startup.
-    try {
-
-      this.root = this.songLibraryRepository.loadAggregateRoot(this.rootPath);
-
-    } catch (EntityDoesNotExistException ednee) {
-
-      log.error("Could not load song library from: " + rootPath
-          + ", using empty song library root for now, error: " + ednee.getMessage());
-
-      this.root = new RootFolderEntity(this.rootPath);
-    }
-
-    this.isInitialized = true;
   }
 
   // Event handlers

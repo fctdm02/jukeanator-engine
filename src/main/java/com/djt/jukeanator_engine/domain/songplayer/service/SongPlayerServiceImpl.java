@@ -16,7 +16,6 @@ import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
-import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songplayer.config.SongPlayerProperties;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlaybackStatusDto;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlayerStatus;
@@ -53,7 +52,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   private final String playerType;
   private final int playerVolume;
   private final int masterVolume;
-  
+
   private final SongQueueService songQueueService;
   private final ApplicationEventPublisher eventPublisher;
   private final Deque<SongQueueEntryDto> playbackHistory = new ArrayDeque<>();
@@ -64,7 +63,6 @@ public class SongPlayerServiceImpl implements SongPlayerService {
    * {@code queueLocked}, which is written from external callers (e.g. the hibernation timer on the
    * Swing EDT) and read on the queue executor thread, so it must be volatile.
    */
-  private RootFolderEntity songLibraryRoot;
   private SongQueueEntryDto nowPlayingSong;
   private SongPlayerStatus songPlayerStatus;
 
@@ -103,19 +101,22 @@ public class SongPlayerServiceImpl implements SongPlayerService {
 
     }
 
-    log.info("songLibraryRoot: " + this.songLibraryRoot);
+    initialize();
+
     log.info("playerType : " + this.playerType);
     log.info("playerVolume : " + this.playerVolume);
     log.info("masterVolume : " + this.masterVolume);
-
-    // Initialize the song library root and song queue
-    initialize();
 
     /*
      * Whenever playback finishes, queue processing is re-submitted onto the SAME single executor
      * thread.
      */
     this.player.setOnFinished(this::submitQueueProcessing);
+  }
+
+  private void initialize() {
+
+    submitQueueProcessing();
   }
 
   @Override
@@ -230,11 +231,6 @@ public class SongPlayerServiceImpl implements SongPlayerService {
     queueExecutor.shutdownNow();
     player.stop();
     player.release();
-  }
-
-  private void initialize() {
-
-    submitQueueProcessing();
   }
 
   @EventListener

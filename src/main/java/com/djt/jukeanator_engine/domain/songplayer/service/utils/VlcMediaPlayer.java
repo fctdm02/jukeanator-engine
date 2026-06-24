@@ -73,12 +73,16 @@ public class VlcMediaPlayer implements Player {
 
     try {
 
+      System.err.println("PLAY: " + songPath);
+
       status.set(SongPlayerStatus.STOPPED);
       durationMillis = 0;
 
       return mediaPlayer.media().play(songPath);
 
     } catch (Exception e) {
+
+      System.err.println("UNABLE TO PLAY: " + songPath + ", error: " + e.getMessage());
 
       status.set(SongPlayerStatus.STOPPED);
       durationMillis = 0;

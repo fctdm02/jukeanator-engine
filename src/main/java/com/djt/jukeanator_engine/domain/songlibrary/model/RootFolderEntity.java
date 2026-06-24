@@ -196,7 +196,8 @@ public class RootFolderEntity extends FolderEntity {
       }
     }
 
-    for (AlbumFolderEntity album : getAllAlbums()) {
+    List<AlbumFolderEntity> allAlbums = getAllAlbums();
+    for (AlbumFolderEntity album : allAlbums) {
 
       GenreFolderEntity genre = album.getParentGenre();
       Integer genreId = genre.getPersistentIdentity();
@@ -239,7 +240,11 @@ public class RootFolderEntity extends FolderEntity {
       }
     }
 
-    initializeBackgroundSongsYetToBePlayedList(getName());
+    try {
+      initializeBackgroundSongsYetToBePlayedList(getName());
+    } catch (Exception e) {
+      System.err.println("initializeBackgroundSongsYetToBePlayedList: " + e.getMessage());
+    }
   }
 
   public void resetSongStatistics() {

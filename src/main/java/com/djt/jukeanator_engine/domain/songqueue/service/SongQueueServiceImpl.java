@@ -56,12 +56,12 @@ public class SongQueueServiceImpl
   private final SongQueueRepository songQueueRepository;
 
   // BACKGROUND MUSIC (THROUGH LINE IN AUDIO JACK)
-  private final boolean enableBackgroundMusic;
+  private boolean enableBackgroundMusic;
   private final String preferredMixerName;
   private final int lineInVolume;
 
   // SONG QUEUE CONSTRAINTS
-  private final int minimumNumberSongsToKeepInQueue;
+  private int minimumNumberSongsToKeepInQueue;
   private final int minimumMinutesBetweenSongPlays;
   private final int maximumConsecutiveSongPlaysByArtist;
   private final boolean allowExplicitSongsAtAllTimes;
@@ -136,7 +136,7 @@ public class SongQueueServiceImpl
     List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
 
     if (songs.isEmpty()) {
-      
+
       eventPublisher.publishEvent(new SongQueueEmptyEvent());
       return null;
     }
@@ -689,8 +689,15 @@ public class SongQueueServiceImpl
     // Seed the queue with background music if it is below the minimum threshold.
     // This handles the cold-start case where there are no persisted songs in the queue,
     // so playback can begin immediately without waiting for dequeueNextSong() to be called first.
-    if (enableBackgroundMusic) {
-      autoPopulateQueue();
+    try {
+      if (enableBackgroundMusic) {
+        autoPopulateQueue();
+      }
+    } catch (Exception e) {
+      log.error(
+          "Unable to auto-populate song queue for background music, error: " + e.getMessage());
+      this.enableBackgroundMusic = false;
+      this.minimumNumberSongsToKeepInQueue = 0;
     }
   }
 }
