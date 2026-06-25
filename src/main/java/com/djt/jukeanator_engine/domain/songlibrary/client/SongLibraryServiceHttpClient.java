@@ -15,6 +15,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
+import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
@@ -190,6 +191,11 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
 
   @Override
   public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public RootFolderEntity getRootFolderEntity() {
     throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 }

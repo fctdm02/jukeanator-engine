@@ -74,8 +74,9 @@ public class SongLibraryServiceImpl
   private RootFolderEntity songLibraryRoot;
   private boolean isInitialized;
 
-  public SongLibraryServiceImpl(String rootPath, String rootPathWindows, SongLibraryRepository songLibraryRepository,
-      SongScanner songScanner, Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
+  public SongLibraryServiceImpl(String rootPath, String rootPathWindows,
+      SongLibraryRepository songLibraryRepository, SongScanner songScanner,
+      Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
@@ -124,7 +125,7 @@ public class SongLibraryServiceImpl
     }
 
     log.info("rootPath: " + this.rootPath);
-    log.info("rootPathWindows: " + this.rootPathWindows);    
+    log.info("rootPathWindows: " + this.rootPathWindows);
     log.info("searchResultSize: " + this.searchResultSize);
     log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
     log.info("");
@@ -720,6 +721,11 @@ public class SongLibraryServiceImpl
   }
 
   // Repository methods
+  @Override
+  public RootFolderEntity getRootFolderEntity() {
+    return this.songLibraryRoot;
+  }
+
   @Override
   public RootFolderEntity loadAggregateRoot(String naturalIdentity)
       throws EntityDoesNotExistException {

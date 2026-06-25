@@ -23,7 +23,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryExcepti
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
+import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.config.SongQueueProperties;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
@@ -52,7 +52,7 @@ public class SongQueueServiceImpl
   private static final Logger log = LoggerFactory.getLogger(SongQueueServiceImpl.class);
 
   private final ApplicationEventPublisher eventPublisher;
-  private final SongLibraryRepository songLibraryRepository;
+  private final SongLibraryService songLibraryService;
   private final SongQueueRepository songQueueRepository;
 
   // BACKGROUND MUSIC (THROUGH LINE IN AUDIO JACK)
@@ -69,6 +69,7 @@ public class SongQueueServiceImpl
   private final int allowExplicitSongsEnd;
 
   private String rootPath;
+  private String rootPathWindows;
   private RootFolderEntity songLibraryRoot;
   private SongQueueRootEntity songQueueRoot;
 
@@ -79,26 +80,20 @@ public class SongQueueServiceImpl
   /** Reference to the track that is currently playing on the output system */
   private SongFileEntity currentlyPlayingSong;
 
-  /**
-   * @param rootPath The shared filesystem root path resolved by
-   *        {@code AppProperties.getEffectiveRootPath()}.
-   * @param songQueueProperties Queue-specific configuration (does not include root-path).
-   * @param songLibraryRepository Repository for the song library aggregate.
-   * @param songQueueRepository Repository for the song queue aggregate.
-   * @param eventPublisher Spring application event publisher.
-   */
-  public SongQueueServiceImpl(String rootPath, SongQueueProperties songQueueProperties,
-      SongLibraryRepository songLibraryRepository, SongQueueRepository songQueueRepository,
-      ApplicationEventPublisher eventPublisher) {
+  public SongQueueServiceImpl(String rootPath, String rootPathWindows,
+      SongQueueProperties songQueueProperties, SongLibraryService songLibraryService,
+      SongQueueRepository songQueueRepository, ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(rootPath, "rootPath cannot be null");
+    requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
     requireNonNull(songQueueProperties, "songQueueProperties cannot be null");
-    requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
+    requireNonNull(songLibraryService, "songLibraryService cannot be null");
     requireNonNull(songQueueRepository, "songQueueRepository cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
     this.rootPath = rootPath;
-    this.songLibraryRepository = songLibraryRepository;
+    this.rootPathWindows = rootPathWindows;
+    this.songLibraryService = songLibraryService;
     this.songQueueRepository = songQueueRepository;
     this.eventPublisher = eventPublisher;
 
@@ -120,13 +115,8 @@ public class SongQueueServiceImpl
   private synchronized void initialize() {
 
     boolean resetQueuedAtTime = true;
-    try {
-      this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(rootPath);
-    } catch (EntityDoesNotExistException ednee) {
-      log.error("Could not load song library from: " + rootPath
-          + ", using empty song library root for now, error: " + ednee.getMessage());
-      this.songLibraryRoot = new RootFolderEntity(rootPath);
-    }
+
+    this.songLibraryRoot = this.songLibraryService.getRootFolderEntity();
 
     try {
       this.songQueueRoot =
@@ -165,6 +155,7 @@ public class SongQueueServiceImpl
     }
 
     log.info("rootPath: " + this.rootPath);
+    log.info("rootPathWindows: " + this.rootPathWindows);
     log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
     log.info("songQueueRoot: " + this.songQueueRoot.getRootPath());
     log.info("enableBackgroundMusic: " + this.enableBackgroundMusic);
@@ -703,6 +694,7 @@ public class SongQueueServiceImpl
 
   @EventListener
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
+
     log.info("""
         Received ScanFileSystemForSongsEvent:
         scanPath={}
@@ -710,6 +702,8 @@ public class SongQueueServiceImpl
         """, event.scanPath(), event.albumCount());
 
     this.rootPath = event.scanPath();
-    initialize();
+    // SongLibraryServiceImpl has already re-initialized RootFolderEntity in response
+    // to this same event; grab the new shared instance rather than loading from disk again.
+    this.songLibraryRoot = this.songLibraryService.getRootFolderEntity();
   }
 }

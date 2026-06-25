@@ -12,6 +12,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
+import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
@@ -157,6 +158,7 @@ public interface SongLibraryService {
    */
   String downloadAlbumCoverArt(DownloadAlbumCoverArtRequest downloadAlbumCoverArtRequest);
 
+  // SYSTEM METHODS (not to be invoked on behalf of a user)
   /**
    * 
    * @param authenticateForAdminPanelRequest Contains username and password fields
@@ -179,4 +181,16 @@ public interface SongLibraryService {
    */
   @PublicServiceMethod
   void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event);
+
+  /**
+   * Returns the single shared {@link RootFolderEntity} instance managed by this service. Intended
+   * for use by other services (e.g. {@code SongQueueServiceImpl}) that need read access to the
+   * library aggregate root without loading a second copy from the repository.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   *
+   * @return the live {@link RootFolderEntity} held by this service
+   */
+  @PublicServiceMethod
+  RootFolderEntity getRootFolderEntity();
 }

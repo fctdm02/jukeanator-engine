@@ -206,14 +206,15 @@ public class AppConfig {
   public SongQueueService songQueueService(
       AppProperties appProperties,
       SongQueueProperties songQueueProperties,
-      SongLibraryRepository songLibraryRepository,
+      SongLibraryService songLibraryService,
       SongQueueRepository songQueueRepository,
       ApplicationEventPublisher eventPublisher) {
     
     return new SongQueueServiceImpl(
         appProperties.getEffectiveRootPath(),
+        appProperties.getRootPathWindows(),
         songQueueProperties,
-        songLibraryRepository,
+        songLibraryService,
         songQueueRepository,
         eventPublisher);
   }
