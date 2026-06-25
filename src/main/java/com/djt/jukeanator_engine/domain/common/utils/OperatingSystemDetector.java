@@ -1,5 +1,7 @@
 package com.djt.jukeanator_engine.domain.common.utils;
 
+import java.util.Locale;
+
 public class OperatingSystemDetector {
 
   public enum OSType {
@@ -9,13 +11,13 @@ public class OperatingSystemDetector {
   private static final OSType DETECTED_OS;
 
   static {
-    String osName = System.getProperty("os.name").toLowerCase();
 
-    if (osName.contains("win")) {
+    String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+    if (os.startsWith("windows")) {
       DETECTED_OS = OSType.WINDOWS;
-    } else if (osName.contains("mac") || osName.contains("darwin")) {
+    } else if (os.startsWith("mac") || os.startsWith("darwin")) {
       DETECTED_OS = OSType.MACOS;
-    } else if (osName.contains("nux") || osName.contains("nix") || osName.contains("aix")) {
+    } else if (os.startsWith("linux")) {
       DETECTED_OS = OSType.LINUX;
     } else {
       DETECTED_OS = OSType.UNKNOWN;

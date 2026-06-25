@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
+import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
+import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
@@ -44,19 +46,21 @@ import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
 
 @Configuration
-public class ApplicationConfig {
+public class AppConfig {
 
   @Bean
   public MasterVolumeService masterVolumeService() {
     
-    String os = System.getProperty("os.name", "").toLowerCase();
-    if (os.contains("win")) {
+    OSType osType = OperatingSystemDetector.getOperatingSystem();
+    if (osType == OSType.WINDOWS) {
       return new WindowsMasterVolumeService();
-    } else if (os.contains("mac") || os.contains("darwin")) {
-      return new MacMasterVolumeService();
-    } else {
-      return new LinuxMasterVolumeService();
     }
+    
+    if (osType == OSType.MACOS) {
+      return new MacMasterVolumeService();
+    } 
+    
+    return new LinuxMasterVolumeService();
   }
 
   @Bean
