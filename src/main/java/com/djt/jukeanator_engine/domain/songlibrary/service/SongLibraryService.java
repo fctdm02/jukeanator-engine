@@ -192,5 +192,5 @@ public interface SongLibraryService {
    * @return the live {@link RootFolderEntity} held by this service
    */
   @PublicServiceMethod
-  RootFolderEntity getRootFolderEntity();
+  RootFolderEntity getSongLibraryRoot();
 }

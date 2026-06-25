@@ -195,7 +195,7 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
   }
 
   @Override
-  public RootFolderEntity getRootFolderEntity() {
+  public RootFolderEntity getSongLibraryRoot() {
     throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 }

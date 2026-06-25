@@ -116,7 +116,7 @@ public class SongQueueServiceImpl
 
     boolean resetQueuedAtTime = true;
 
-    this.songLibraryRoot = this.songLibraryService.getRootFolderEntity();
+    this.songLibraryRoot = this.songLibraryService.getSongLibraryRoot();
 
     try {
       this.songQueueRoot =
@@ -702,8 +702,9 @@ public class SongQueueServiceImpl
         """, event.scanPath(), event.albumCount());
 
     this.rootPath = event.scanPath();
+
     // SongLibraryServiceImpl has already re-initialized RootFolderEntity in response
     // to this same event; grab the new shared instance rather than loading from disk again.
-    this.songLibraryRoot = this.songLibraryService.getRootFolderEntity();
+    this.songLibraryRoot = this.songLibraryService.getSongLibraryRoot();
   }
 }

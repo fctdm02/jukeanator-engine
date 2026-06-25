@@ -54,7 +54,7 @@ public class RootFolderEntity extends FolderEntity {
   public String getRootPath() {
     return getName();
   }
-  
+
   public void setRootPath(String rootPath) {
     this.setName(rootPath);
   }
@@ -324,86 +324,86 @@ public class RootFolderEntity extends FolderEntity {
     return albumId.toString() + "__" + songId.toString();
   }
 
-  private String buildCdStatsPathname(String scanPath) {
+  private String buildCdStatsPathname(String rootPath) {
 
     String cdStatsPathName = null;
     OSType osType = OperatingSystemDetector.getOperatingSystem();
     if (osType == OSType.WINDOWS) {
-      cdStatsPathName = scanPath + File.separator + CD_STATS_FILE_PREFIX + CD_STATS_FILE_SUFFIX;
+      cdStatsPathName = rootPath + File.separator + CD_STATS_FILE_PREFIX + CD_STATS_FILE_SUFFIX;
     } else if (osType == OSType.MACOS) {
       cdStatsPathName =
-          scanPath + File.separator + CD_STATS_FILE_PREFIX + "_mac" + CD_STATS_FILE_SUFFIX;
+          rootPath + File.separator + CD_STATS_FILE_PREFIX + "_mac" + CD_STATS_FILE_SUFFIX;
     } else {
       cdStatsPathName =
-          scanPath + File.separator + CD_STATS_FILE_PREFIX + "_linux" + CD_STATS_FILE_SUFFIX;
+          rootPath + File.separator + CD_STATS_FILE_PREFIX + "_linux" + CD_STATS_FILE_SUFFIX;
     }
     return cdStatsPathName;
   }
 
-  private String buildBackgroundMusicPathname(String scanPath) {
+  private String buildBackgroundMusicPathname(String rootPath) {
 
     String backgroundMusicPathName = null;
     OSType osType = OperatingSystemDetector.getOperatingSystem();
     if (osType == OSType.WINDOWS) {
       backgroundMusicPathName =
-          scanPath + File.separator + BACKGROUND_MUSIC_FILE_PREFIX + BACKGROUND_MUSIC_FILE_SUFFIX;
+          rootPath + File.separator + BACKGROUND_MUSIC_FILE_PREFIX + BACKGROUND_MUSIC_FILE_SUFFIX;
     } else if (osType == OSType.MACOS) {
-      backgroundMusicPathName = scanPath + File.separator + BACKGROUND_MUSIC_FILE_PREFIX + "_mac"
+      backgroundMusicPathName = rootPath + File.separator + BACKGROUND_MUSIC_FILE_PREFIX + "_mac"
           + BACKGROUND_MUSIC_FILE_SUFFIX;
     } else {
-      backgroundMusicPathName = scanPath + File.separator + BACKGROUND_MUSIC_FILE_PREFIX + "_linux"
+      backgroundMusicPathName = rootPath + File.separator + BACKGROUND_MUSIC_FILE_PREFIX + "_linux"
           + BACKGROUND_MUSIC_FILE_SUFFIX;
     }
     return backgroundMusicPathName;
   }
 
 
-  private String buildBackgroundMusicYetToBePlayedPathname(String scanPath) {
+  private String buildBackgroundMusicYetToBePlayedPathname(String rootPath) {
 
     String pathname = null;
     OSType osType = OperatingSystemDetector.getOperatingSystem();
     if (osType == OSType.WINDOWS) {
-      pathname = scanPath + File.separator + BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE_PREFIX
+      pathname = rootPath + File.separator + BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE_PREFIX
           + BACKGROUND_MUSIC_FILE_SUFFIX;
     } else if (osType == OSType.MACOS) {
-      pathname = scanPath + File.separator + BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE_PREFIX + "_mac"
+      pathname = rootPath + File.separator + BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE_PREFIX + "_mac"
           + BACKGROUND_MUSIC_FILE_SUFFIX;
     } else {
-      pathname = scanPath + File.separator + BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE_PREFIX
+      pathname = rootPath + File.separator + BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE_PREFIX
           + "_linux" + BACKGROUND_MUSIC_FILE_SUFFIX;
     }
     return pathname;
   }
 
-  private void copyBackgroundMusicPlaylist(String scanPath) {
+  private void copyBackgroundMusicPlaylist(String rootPath) {
 
     try {
-      Files.copy(Path.of(buildBackgroundMusicPathname(scanPath)),
-          Path.of(buildBackgroundMusicYetToBePlayedPathname(scanPath)),
+      Files.copy(Path.of(buildBackgroundMusicPathname(rootPath)),
+          Path.of(buildBackgroundMusicYetToBePlayedPathname(rootPath)),
           java.nio.file.StandardCopyOption.REPLACE_EXISTING);
     } catch (IOException e) {
       throw new IllegalStateException("Failed to copy background music playlist.", e);
     }
   }
 
-  private void initializeBackgroundSongsYetToBePlayedList(String scanPath) {
+  private void initializeBackgroundSongsYetToBePlayedList(String rootPath) {
 
-    String pathname = buildBackgroundMusicYetToBePlayedPathname(scanPath);
+    String pathname = buildBackgroundMusicYetToBePlayedPathname(rootPath);
     Path file = Path.of(pathname);
-    Path primaryPlaylistFile = Path.of(buildBackgroundMusicPathname(scanPath));
+    Path primaryPlaylistFile = Path.of(buildBackgroundMusicPathname(rootPath));
 
     try {
 
       if (!Files.exists(primaryPlaylistFile)) {
-        createBackgroundMusicPlaylistFromTopSongs(scanPath);
+        createBackgroundMusicPlaylistFromTopSongs(rootPath);
       }
 
       if (!Files.exists(file)) {
         try {
-          copyBackgroundMusicPlaylist(scanPath);
+          copyBackgroundMusicPlaylist(rootPath);
         } catch (Exception e) {
-          createBackgroundMusicPlaylistFromTopSongs(scanPath);
-          copyBackgroundMusicPlaylist(scanPath);
+          createBackgroundMusicPlaylistFromTopSongs(rootPath);
+          copyBackgroundMusicPlaylist(rootPath);
         }
       }
 
@@ -412,15 +412,15 @@ public class RootFolderEntity extends FolderEntity {
         songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
             .filter(line -> !line.isEmpty()).toList();
       } catch (IOException e) {
-        createBackgroundMusicPlaylistFromTopSongs(scanPath);
-        copyBackgroundMusicPlaylist(scanPath);
+        createBackgroundMusicPlaylistFromTopSongs(rootPath);
+        copyBackgroundMusicPlaylist(rootPath);
         songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
             .filter(line -> !line.isEmpty()).toList();
       }
 
       if (songs.isEmpty()) {
         try {
-          copyBackgroundMusicPlaylist(scanPath);
+          copyBackgroundMusicPlaylist(rootPath);
           songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
               .filter(line -> !line.isEmpty()).toList();
         } catch (Exception e) {
@@ -428,8 +428,8 @@ public class RootFolderEntity extends FolderEntity {
         }
 
         if (songs.isEmpty()) {
-          createBackgroundMusicPlaylistFromTopSongs(scanPath);
-          copyBackgroundMusicPlaylist(scanPath);
+          createBackgroundMusicPlaylistFromTopSongs(rootPath);
+          copyBackgroundMusicPlaylist(rootPath);
           songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
               .filter(line -> !line.isEmpty()).toList();
         }
@@ -442,10 +442,10 @@ public class RootFolderEntity extends FolderEntity {
     }
   }
 
-  private void writeBackgroundSongsYetToBePlayed(String scanPath) {
+  private void writeBackgroundSongsYetToBePlayed(String rootPath) {
 
     try (BufferedWriter writer = Files.newBufferedWriter(
-        Path.of(buildBackgroundMusicYetToBePlayedPathname(scanPath)), StandardCharsets.UTF_8)) {
+        Path.of(buildBackgroundMusicYetToBePlayedPathname(rootPath)), StandardCharsets.UTF_8)) {
 
       for (String song : this.backgroundSongsYetToBePlayedList) {
         writer.write(song);
@@ -457,13 +457,13 @@ public class RootFolderEntity extends FolderEntity {
     }
   }
 
-  public int restoreSongStatisticsForScanPath(String scanPath) {
+  public int restoreSongStatisticsForRootPath(String rootPath, String rootPathWindows) {
 
-    String cdStatsPathName = buildCdStatsPathname(scanPath);
+    String cdStatsPathName = buildCdStatsPathname(rootPath);
     Path statsFile = Path.of(cdStatsPathName);
     if (!Files.exists(statsFile)) {
       cdStatsPathName =
-          scanPath + File.separator + CD_STATS_FILE_PREFIX + BACKGROUND_MUSIC_FILE_SUFFIX;
+          rootPath + File.separator + CD_STATS_FILE_PREFIX + BACKGROUND_MUSIC_FILE_SUFFIX;
       statsFile = Path.of(cdStatsPathName);
       if (!Files.exists(statsFile)) {
         System.err.println("CD stats file does not exist: " + cdStatsPathName);
@@ -471,10 +471,11 @@ public class RootFolderEntity extends FolderEntity {
       }
     }
 
-    return restoreSongStatisticsForFile(scanPath, cdStatsPathName);
+    return restoreSongStatisticsForFile(rootPath, rootPathWindows, cdStatsPathName);
   }
 
-  public int restoreSongStatisticsForFile(String scanPath, String filename) {
+  public int restoreSongStatisticsForFile(String rootPath, String rootPathWindows,
+      String filename) {
 
     Path statsFile = Path.of(filename);
     if (!Files.exists(statsFile)) {
@@ -511,19 +512,19 @@ public class RootFolderEntity extends FolderEntity {
 
         try {
 
-          int scanPathIndex = line.indexOf(scanPath);
-          if (scanPathIndex < 0) {
-            System.err.println("scanPath: [" + scanPath + "] does not exist in: [" + line + "]");
+          int rootPathIndex = line.indexOf(rootPath);
+          if (rootPathIndex < 0) {
+            System.err.println("rootPath: [" + rootPath + "] does not exist in: [" + line + "]");
             continue;
           }
 
-          String prefix = line.substring(0, scanPathIndex);
+          String prefix = line.substring(0, rootPathIndex);
           String[] parts = prefix.split(" ");
 
           int numPlays = Integer.parseInt(parts[0].trim());
           if (numPlays > 0) {
 
-            String songPath = line.substring(scanPathIndex).trim();
+            String songPath = line.substring(rootPathIndex).trim();
             SongFileEntity song = songsByPath.get(songPath.toLowerCase());
             if (song != null) {
               song.setNumPlays(numPlays);
@@ -531,7 +532,7 @@ public class RootFolderEntity extends FolderEntity {
             } else {
               System.err.println("Could not find song: " + songPath);
             }
-          }          
+          }
 
         } catch (NumberFormatException e) {
           System.err.println("Could not parse num plays from line: " + line);
@@ -551,9 +552,9 @@ public class RootFolderEntity extends FolderEntity {
     return restoredCount;
   }
 
-  public void storeSongStatistics(String scanPath) {
+  public void storeSongStatistics(String rootPath) {
 
-    String cdStatsPathName = buildCdStatsPathname(scanPath);
+    String cdStatsPathName = buildCdStatsPathname(rootPath);
 
     List<SongFileEntity> songs = new ArrayList<>(this.songsMap.values());
 
@@ -583,7 +584,7 @@ public class RootFolderEntity extends FolderEntity {
     }
   }
 
-  public SongFileEntity getRandomSongFromBackgroundMusicPlaylist(String scanPath) {
+  public SongFileEntity getRandomSongFromBackgroundMusicPlaylist(String rootPath) {
 
     if (this.songsMap == null) {
       initialize();
@@ -592,7 +593,7 @@ public class RootFolderEntity extends FolderEntity {
     if (this.backgroundSongsYetToBePlayedList == null
         || this.backgroundSongsYetToBePlayedList.isEmpty()) {
 
-      initializeBackgroundSongsYetToBePlayedList(scanPath);
+      initializeBackgroundSongsYetToBePlayedList(rootPath);
     }
 
     String songPathname = null;
@@ -604,10 +605,10 @@ public class RootFolderEntity extends FolderEntity {
       songPathname = this.backgroundSongsYetToBePlayedList.remove(index);
     }
 
-    writeBackgroundSongsYetToBePlayed(scanPath);
+    writeBackgroundSongsYetToBePlayed(rootPath);
 
     if (this.backgroundSongsYetToBePlayedList.isEmpty()) {
-      initializeBackgroundSongsYetToBePlayedList(scanPath);
+      initializeBackgroundSongsYetToBePlayedList(rootPath);
     }
 
     try {
@@ -618,13 +619,13 @@ public class RootFolderEntity extends FolderEntity {
     }
   }
 
-  private void createBackgroundMusicPlaylistFromTopSongs(String scanPath) {
+  private void createBackgroundMusicPlaylistFromTopSongs(String rootPath) {
 
     if (this.songsMap == null) {
       initialize();
     }
 
-    String backgroundMusicPathname = buildBackgroundMusicPathname(scanPath);
+    String backgroundMusicPathname = buildBackgroundMusicPathname(rootPath);
 
     List<SongFileEntity> songs = new ArrayList<>(this.songsMap.values());
 

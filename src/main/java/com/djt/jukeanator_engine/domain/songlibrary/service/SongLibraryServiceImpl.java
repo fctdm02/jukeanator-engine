@@ -527,13 +527,14 @@ public class SongLibraryServiceImpl
       this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath);
 
       // Restore song num plays, persist, then re-initialize the songLibraryRoot
-      int numRestored = this.songLibraryRoot.restoreSongStatisticsForScanPath(this.rootPath);
+      int numRestored = this.songLibraryRoot.restoreSongStatisticsForRootPath(this.rootPath,
+          this.rootPathWindows);
       if (numRestored == 0) {
 
         String filename = "CDStats_backup_[OS_NAME].TXT";
         OSType osType = OperatingSystemDetector.getOperatingSystem();
         filename = filename.replace("[OS_NAME]", osType.toString().toLowerCase());
-        this.songLibraryRoot.restoreSongStatisticsForFile(this.rootPath,
+        this.songLibraryRoot.restoreSongStatisticsForFile(this.rootPath, this.rootPathWindows,
             this.rootPath + File.separator + filename);
       }
 
@@ -592,7 +593,8 @@ public class SongLibraryServiceImpl
     try {
 
       // Restore the song statistics
-      this.songLibraryRoot.restoreSongStatisticsForFile(this.rootPath, filename);
+      this.songLibraryRoot.restoreSongStatisticsForFile(this.rootPath, this.rootPathWindows,
+          filename);
 
       // Store the song library
       this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
@@ -722,7 +724,7 @@ public class SongLibraryServiceImpl
 
   // Repository methods
   @Override
-  public RootFolderEntity getRootFolderEntity() {
+  public RootFolderEntity getSongLibraryRoot() {
     return this.songLibraryRoot;
   }
 
