@@ -194,6 +194,7 @@ public class AppConfig {
     
     return new SongLibraryServiceImpl(
         appProperties.getEffectiveRootPath(),
+        appProperties.getRootPathWindows(),
         repository,
         songScanner,
         songLibraryProperties.getSearchResultSize(),

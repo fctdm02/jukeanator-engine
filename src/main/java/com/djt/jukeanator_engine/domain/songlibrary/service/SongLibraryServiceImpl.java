@@ -66,6 +66,7 @@ public class SongLibraryServiceImpl
   private final ApplicationEventPublisher eventPublisher;
 
   private String rootPath;
+  private String rootPathWindows;
   private final SongLibraryRepository songLibraryRepository;
   private final SongScanner songScanner;
   private final Integer searchResultSize;
@@ -73,16 +74,18 @@ public class SongLibraryServiceImpl
   private RootFolderEntity songLibraryRoot;
   private boolean isInitialized;
 
-  public SongLibraryServiceImpl(String rootPath, SongLibraryRepository songLibraryRepository,
+  public SongLibraryServiceImpl(String rootPath, String rootPathWindows, SongLibraryRepository songLibraryRepository,
       SongScanner songScanner, Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(rootPath, "rootPath cannot be null");
+    requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
     requireNonNull(songScanner, "songScanner cannot be null");
     requireNonNull(searchResultSize, "searchResultSize cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
     this.rootPath = rootPath;
+    this.rootPathWindows = rootPathWindows;
     this.songLibraryRepository = songLibraryRepository;
     this.songScanner = songScanner;
     this.searchResultSize = searchResultSize;
@@ -121,6 +124,7 @@ public class SongLibraryServiceImpl
     }
 
     log.info("rootPath: " + this.rootPath);
+    log.info("rootPathWindows: " + this.rootPathWindows);    
     log.info("searchResultSize: " + this.searchResultSize);
     log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
     log.info("");
