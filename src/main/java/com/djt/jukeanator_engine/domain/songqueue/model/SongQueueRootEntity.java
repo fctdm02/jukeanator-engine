@@ -16,14 +16,14 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
   // Declaring the static constant for Jan 1st, 2020 at midnight UTC
   public static final Instant JAN_1_2020 = Instant.parse("2020-01-01T00:00:00Z");
 
-  private String location;
-
   private ArrayList<SongQueueEntryEntity> queueEntries;
+  private String rootPath;
 
-  public SongQueueRootEntity(String location, boolean resetQueuedAtTime) {
-    super();
-    requireNonNull(location, "location cannot be null");
-    this.location = location;
+  public SongQueueRootEntity(String rootPath, boolean resetQueuedAtTime) {
+
+    super(null);
+    requireNonNull(rootPath, "rootPath cannot be null");
+    this.rootPath = rootPath;
 
     initialize(resetQueuedAtTime);
   }
@@ -41,13 +41,17 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
     }
   }
 
-  public String getLocation() {
-    return location;
+  public String getRootPath() {
+    return this.rootPath;
+  }
+
+  public void setRootPath(String rootPath) {
+    this.rootPath = rootPath;
   }
 
   @Override
   public String getNaturalIdentity() {
-    return location;
+    return this.rootPath;
   }
 
   public boolean isQueueEmpty() {

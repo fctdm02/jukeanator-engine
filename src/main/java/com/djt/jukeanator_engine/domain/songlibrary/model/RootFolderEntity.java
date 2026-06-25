@@ -46,13 +46,17 @@ public class RootFolderEntity extends FolderEntity {
   private transient Map<String, SongFileEntity> songsByPathMap;
   private transient List<String> backgroundSongsYetToBePlayedList;
 
-  public RootFolderEntity(String scanPath) {
+  public RootFolderEntity(String rootPath) {
 
-    super(null, scanPath);
+    super(null, rootPath);
   }
 
-  public String getRootPrefix() {
+  public String getRootPath() {
     return getName();
+  }
+  
+  public void setRootPath(String rootPath) {
+    this.setName(rootPath);
   }
 
   public ArtistFromSongEntity getArtistFromSong(String songArtistName) {

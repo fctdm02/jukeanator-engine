@@ -70,7 +70,7 @@ public class SongLibraryServiceImpl
   private final SongScanner songScanner;
   private final Integer searchResultSize;
 
-  private RootFolderEntity root;
+  private RootFolderEntity songLibraryRoot;
   private boolean isInitialized;
 
   public SongLibraryServiceImpl(String rootPath, SongLibraryRepository songLibraryRepository,
@@ -96,26 +96,33 @@ public class SongLibraryServiceImpl
 
     // If we cannot load the song library from disk at startup, then assume a new install and return
     // an
-    // empty root folder. The application will automatically ask the user to scan for songs at
+    // empty songLibraryRoot folder. The application will automatically ask the user to scan for
+    // songs at
     // startup.
     try {
 
-      this.root = this.songLibraryRepository.loadAggregateRoot(this.rootPath);
+      this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(this.rootPath);
 
     } catch (EntityDoesNotExistException ednee) {
 
       log.error("Could not load song library from: " + rootPath
-          + ", using empty song library root for now, error: " + ednee.getMessage());
+          + ", using empty song library songLibraryRoot for now, error: " + ednee.getMessage());
 
-      this.root = new RootFolderEntity(this.rootPath);
-      this.root.initialize();
+      this.songLibraryRoot = new RootFolderEntity(this.rootPath);
+      this.songLibraryRoot.initialize();
     }
 
     this.isInitialized = true;
 
+    if (!this.rootPath.equals(this.songLibraryRoot.getRootPath())) {
+
+      this.songLibraryRoot.setRootPath(this.rootPath);
+      this.songLibraryRoot.initialize();
+    }
+
     log.info("rootPath: " + this.rootPath);
     log.info("searchResultSize: " + this.searchResultSize);
-    log.info("root: " + this.root.getRootPrefix());
+    log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
     log.info("");
   }
 
@@ -247,14 +254,14 @@ public class SongLibraryServiceImpl
 
     // ── Queries ───────────────────────────────────────────────────────────
 
-    List<SongFileEntity> songs = root.getSongs().stream().filter(hasPlays).filter(inGenre)
-        .filter(matchesSearch).sorted(comparator).limit(searchResultSize).toList();
+    List<SongFileEntity> songs = songLibraryRoot.getSongs().stream().filter(hasPlays)
+        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(searchResultSize).toList();
 
-    List<ArtistFolderEntity> artists = root.getArtists().stream().filter(hasPlays).filter(inGenre)
-        .filter(matchesSearch).sorted(comparator).limit(searchResultSize).toList();
+    List<ArtistFolderEntity> artists = songLibraryRoot.getArtists().stream().filter(hasPlays)
+        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(searchResultSize).toList();
 
-    List<AlbumFolderEntity> albums = root.getAlbums().stream().filter(hasPlays).filter(inGenre)
-        .filter(matchesSearch).sorted(comparator).limit(searchResultSize).toList();
+    List<AlbumFolderEntity> albums = songLibraryRoot.getAlbums().stream().filter(hasPlays)
+        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(searchResultSize).toList();
 
     return new SearchResultDto(SongLibraryMapper.toSongDtoList(songs),
         SongLibraryMapper.toArtistDtoList(artists), SongLibraryMapper.toAlbumDtoList(albums));
@@ -410,11 +417,12 @@ public class SongLibraryServiceImpl
       throw new SongLibraryException("SongLibraryService has not been initialized yet!");
     }
     List<GenreDto> dtos = new ArrayList<>();
-    for (GenreFolderEntity genre : root.getGenres()) {
+    for (GenreFolderEntity genre : songLibraryRoot.getGenres()) {
 
       int numPlays = 0;
       List<Integer> albumIds = new ArrayList<>();
-      for (AlbumFolderEntity album : root.getAlbumsForGenre(genre.getPersistentIdentity())) {
+      for (AlbumFolderEntity album : songLibraryRoot
+          .getAlbumsForGenre(genre.getPersistentIdentity())) {
 
         albumIds.add(album.getPersistentIdentity());
         numPlays = numPlays + album.getNumPlays().intValue();
@@ -432,7 +440,7 @@ public class SongLibraryServiceImpl
     if (!isInitialized) {
       throw new SongLibraryException("SongLibraryService has not been initialized yet!");
     }
-    return SongLibraryMapper.toArtistDtoList(root.getArtists());
+    return SongLibraryMapper.toArtistDtoList(songLibraryRoot.getArtists());
   }
 
   @Override
@@ -441,7 +449,7 @@ public class SongLibraryServiceImpl
     if (!isInitialized) {
       throw new SongLibraryException("SongLibraryService has not been initialized yet!");
     }
-    return SongLibraryMapper.toAlbumDtoList(root.getAlbums());
+    return SongLibraryMapper.toAlbumDtoList(songLibraryRoot.getAlbums());
   }
 
   @Override
@@ -455,14 +463,14 @@ public class SongLibraryServiceImpl
       return List.of();
     }
 
-    return SongLibraryMapper.toAlbumDtoList(root.getAlbumsForGenre(genreId));
+    return SongLibraryMapper.toAlbumDtoList(songLibraryRoot.getAlbumsForGenre(genreId));
   }
 
   @Override
   public ArtistDto getArtistByName(String artistName) {
 
     try {
-      return SongLibraryMapper.toArtistDto(root.getArtistByName(artistName));
+      return SongLibraryMapper.toArtistDto(songLibraryRoot.getArtistByName(artistName));
     } catch (EntityDoesNotExistException e) {
       return null;
     }
@@ -472,7 +480,7 @@ public class SongLibraryServiceImpl
   public AlbumDto getAlbumById(Integer albumId) {
 
     try {
-      return SongLibraryMapper.toAlbumDto(root.getAlbumById(albumId));
+      return SongLibraryMapper.toAlbumDto(songLibraryRoot.getAlbumById(albumId));
     } catch (EntityDoesNotExistException e) {
       return null;
     }
@@ -482,7 +490,7 @@ public class SongLibraryServiceImpl
   public SongDto getSongById(Integer albumId, Integer songId) {
 
     try {
-      return SongLibraryMapper.toSongDto(root.getSongById(albumId, songId));
+      return SongLibraryMapper.toSongDto(songLibraryRoot.getSongById(albumId, songId));
     } catch (EntityDoesNotExistException e) {
       return null;
     }
@@ -492,7 +500,7 @@ public class SongLibraryServiceImpl
   public SongDto getRandomSongFromBackgroundMusicPlaylist() {
 
     return SongLibraryMapper
-        .toSongDto(this.root.getRandomSongFromBackgroundMusicPlaylist(this.rootPath));
+        .toSongDto(this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(this.rootPath));
   }
 
 
@@ -510,34 +518,35 @@ public class SongLibraryServiceImpl
 
       // Scan the file system for songs
       this.rootPath = scanRequest.getScanPath();
-      this.root.storeSongStatistics(this.rootPath);
-      this.root = songScanner.scanFileSystemForSongs(this.rootPath);
+      this.songLibraryRoot.storeSongStatistics(this.rootPath);
+      this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath);
 
-      // Restore song num plays, persist, then re-initialize the root
-      int numRestored = this.root.restoreSongStatisticsForScanPath(this.rootPath);
+      // Restore song num plays, persist, then re-initialize the songLibraryRoot
+      int numRestored = this.songLibraryRoot.restoreSongStatisticsForScanPath(this.rootPath);
       if (numRestored == 0) {
 
         String filename = "CDStats_backup_[OS_NAME].TXT";
         OSType osType = OperatingSystemDetector.getOperatingSystem();
         filename = filename.replace("[OS_NAME]", osType.toString().toLowerCase());
-        this.root.restoreSongStatisticsForFile(this.rootPath, this.rootPath + File.separator + filename);
+        this.songLibraryRoot.restoreSongStatisticsForFile(this.rootPath,
+            this.rootPath + File.separator + filename);
       }
 
       if (this.songLibraryRepository instanceof SongLibraryRepositoryFileSystemImpl) {
         ((SongLibraryRepositoryFileSystemImpl) this.songLibraryRepository)
             .setBasePath(this.rootPath);
       }
-      this.songLibraryRepository.storeAggregateRoot(this.root);
-      this.root.initialize();
+      this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
+      this.songLibraryRoot.initialize();
 
       // Initialize the song library
       initialize();
 
       // Publish the event
-      eventPublisher
-          .publishEvent(new ScanFileSystemForSongsEvent(rootPath, root.getAlbums().size()));
+      eventPublisher.publishEvent(
+          new ScanFileSystemForSongsEvent(rootPath, songLibraryRoot.getAlbums().size()));
 
-      return Integer.valueOf(root.getAlbums().size());
+      return Integer.valueOf(songLibraryRoot.getAlbums().size());
     } catch (SongLibraryException sle) {
       throw sle;
     } catch (Exception e) {
@@ -554,10 +563,10 @@ public class SongLibraryServiceImpl
     try {
 
       // Reset all the song statistics
-      this.root.resetSongStatistics();
+      this.songLibraryRoot.resetSongStatistics();
 
       // Store the song library
-      this.songLibraryRepository.storeAggregateRoot(this.root);
+      this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
 
       // Initialize the song library
       initialize();
@@ -565,7 +574,7 @@ public class SongLibraryServiceImpl
       // Publish the event
       eventPublisher.publishEvent(new SongStatisticsChangedEvent());
 
-      return Integer.valueOf(root.getAlbums().size());
+      return Integer.valueOf(songLibraryRoot.getAlbums().size());
 
     } catch (Exception e) {
       throw new SongLibraryException("Could not reset song statistics", e);
@@ -578,10 +587,10 @@ public class SongLibraryServiceImpl
     try {
 
       // Restore the song statistics
-      this.root.restoreSongStatisticsForFile(this.rootPath, filename);
+      this.songLibraryRoot.restoreSongStatisticsForFile(this.rootPath, filename);
 
       // Store the song library
-      this.songLibraryRepository.storeAggregateRoot(this.root);
+      this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
 
       // Initialize the song library
       initialize();
@@ -589,7 +598,7 @@ public class SongLibraryServiceImpl
       // Publish the event
       eventPublisher.publishEvent(new SongStatisticsChangedEvent());
 
-      return Integer.valueOf(root.getAlbums().size());
+      return Integer.valueOf(songLibraryRoot.getAlbums().size());
 
     } catch (Exception e) {
       throw new SongLibraryException("Could not restore song statistics from: " + filename, e);
@@ -618,7 +627,7 @@ public class SongLibraryServiceImpl
 
     try {
 
-      AlbumFolderEntity album = this.root.getAlbumById(albumId);
+      AlbumFolderEntity album = this.songLibraryRoot.getAlbumById(albumId);
 
       album.getMetaData().writeMetadataToFileSystem(albumMetadata);
 
@@ -634,7 +643,8 @@ public class SongLibraryServiceImpl
 
     try {
 
-      AlbumFolderEntity album = this.root.getAlbumById(downloadAlbumCoverArtRequest.getAlbumId());
+      AlbumFolderEntity album =
+          this.songLibraryRoot.getAlbumById(downloadAlbumCoverArtRequest.getAlbumId());
 
       String coverArtPath = album.getCoverArtPath();
 
@@ -746,8 +756,8 @@ public class SongLibraryServiceImpl
 
     try {
 
-      SongFileEntity song = this.root.getSongById(event.queueEntry().getSong().getAlbumId(),
-          event.queueEntry().getSong().getSongId());
+      SongFileEntity song = this.songLibraryRoot.getSongById(
+          event.queueEntry().getSong().getAlbumId(), event.queueEntry().getSong().getSongId());
       song.incrementNumPlays();
 
       // Publish the event
@@ -768,7 +778,7 @@ public class SongLibraryServiceImpl
 
       for (SongQueueEntryDto queueEntry : event.queueEntries()) {
 
-        SongFileEntity song = this.root.getSongById(queueEntry.getSong().getAlbumId(),
+        SongFileEntity song = this.songLibraryRoot.getSongById(queueEntry.getSong().getAlbumId(),
             queueEntry.getSong().getSongId());
         song.incrementNumPlays();
       }

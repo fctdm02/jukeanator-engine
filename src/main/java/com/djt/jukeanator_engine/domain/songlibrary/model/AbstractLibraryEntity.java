@@ -30,6 +30,10 @@ public abstract class AbstractLibraryEntity extends AbstractPersistentEntity {
   public String getName() {
     return this.name;
   }
+  
+  void setName(String name) {
+    this.name = name;
+  }
 
   public boolean existsOnFilesystem() {
 

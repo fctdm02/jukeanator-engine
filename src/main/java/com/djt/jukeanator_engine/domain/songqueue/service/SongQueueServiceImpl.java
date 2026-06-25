@@ -115,13 +115,61 @@ public class SongQueueServiceImpl
     this.allowExplicitSongsEnd = songQueueProperties.getAllowExplicitSongsEnd();
 
     initialize();
+  }
 
-    log.info("songLibraryRoot: " + this.songLibraryRoot);
+  private synchronized void initialize() {
 
+    boolean resetQueuedAtTime = true;
+    try {
+      this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(rootPath);
+    } catch (EntityDoesNotExistException ednee) {
+      log.error("Could not load song library from: " + rootPath
+          + ", using empty song library root for now, error: " + ednee.getMessage());
+      this.songLibraryRoot = new RootFolderEntity(rootPath);
+    }
+
+    try {
+      this.songQueueRoot =
+          this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
+    } catch (EntityDoesNotExistException ednee) {
+      log.error("Could not load song queue from: " + rootPath
+          + ", using empty song library root for now, error: " + ednee.getMessage());
+      this.songQueueRoot =
+          new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME, resetQueuedAtTime);
+    }
+
+    if (!this.rootPath.equals(this.songLibraryRoot.getRootPath())) {
+
+      this.songLibraryRoot.setRootPath(this.rootPath);
+      this.songLibraryRoot.initialize();
+    }
+
+    if (!this.rootPath.equals(this.songQueueRoot.getRootPath())) {
+
+      this.songQueueRoot.setRootPath(this.rootPath);
+      this.songQueueRoot.initialize(true);
+    }
+
+    // Seed the queue with background music if it is below the minimum threshold.
+    // This handles the cold-start case where there are no persisted songs in the queue,
+    // so playback can begin immediately without waiting for dequeueNextSong() to be called first.
+    try {
+      if (enableBackgroundMusic) {
+        autoPopulateQueue();
+      }
+    } catch (Exception e) {
+      log.error(
+          "Unable to auto-populate song queue for background music, error: " + e.getMessage());
+      this.enableBackgroundMusic = false;
+      this.minimumNumberSongsToKeepInQueue = 0;
+    }
+
+    log.info("rootPath: " + this.rootPath);
+    log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
+    log.info("songQueueRoot: " + this.songQueueRoot.getRootPath());
     log.info("enableBackgroundMusic: " + this.enableBackgroundMusic);
     log.info("preferredMixerName: " + this.preferredMixerName);
     log.info("lineInVolume: " + this.lineInVolume);
-
     log.info("minimumNumberSongsToKeepInQueue: " + this.minimumNumberSongsToKeepInQueue);
     log.info("minimumMinutesBetweenSongPlays: " + this.minimumMinutesBetweenSongPlays);
     log.info("maximumConsecutiveSongPlaysByArtist: " + this.maximumConsecutiveSongPlaysByArtist);
@@ -309,7 +357,7 @@ public class SongQueueServiceImpl
       // C. Build a prioritized sandbox mirror of the queue to simulate placement
       boolean resetQueuedAtTime = false;
       SongQueueRootEntity mirrorQueue =
-          new SongQueueRootEntity(songQueueRoot.getLocation(), resetQueuedAtTime);
+          new SongQueueRootEntity(songQueueRoot.getRootPath(), resetQueuedAtTime);
       for (SongQueueEntryEntity existingEntry : songQueueRoot.getSongs()) {
         mirrorQueue.getSongs().add(existingEntry);
       }
@@ -663,41 +711,5 @@ public class SongQueueServiceImpl
 
     this.rootPath = event.scanPath();
     initialize();
-  }
-
-  private synchronized void initialize() {
-
-    boolean resetQueuedAtTime = true;
-    try {
-      this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(rootPath);
-    } catch (EntityDoesNotExistException ednee) {
-      log.error("Could not load song library from: " + rootPath
-          + ", using empty song library root for now, error: " + ednee.getMessage());
-      this.songLibraryRoot = new RootFolderEntity(rootPath);
-    }
-
-    try {
-      this.songQueueRoot =
-          this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
-    } catch (EntityDoesNotExistException ednee) {
-      log.error("Could not load song queue from: " + rootPath
-          + ", using empty song library root for now, error: " + ednee.getMessage());
-      this.songQueueRoot =
-          new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME, resetQueuedAtTime);
-    }
-
-    // Seed the queue with background music if it is below the minimum threshold.
-    // This handles the cold-start case where there are no persisted songs in the queue,
-    // so playback can begin immediately without waiting for dequeueNextSong() to be called first.
-    try {
-      if (enableBackgroundMusic) {
-        autoPopulateQueue();
-      }
-    } catch (Exception e) {
-      log.error(
-          "Unable to auto-populate song queue for background music, error: " + e.getMessage());
-      this.enableBackgroundMusic = false;
-      this.minimumNumberSongsToKeepInQueue = 0;
-    }
   }
 }
