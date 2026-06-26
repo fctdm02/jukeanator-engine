@@ -62,22 +62,17 @@ public final class SongScanner {
     return this.acceptedSongFileExtensions;
   }
 
-  /**
-   * @param scanPath
-   * @return
-   * @throws IOException
-   */
-  public RootFolderEntity scanFileSystemForSongs(String scanPath) throws IOException {
+  public RootFolderEntity scanFileSystemForSongs(String rootPath, String rootPathWindows, String rootPathUnix) throws IOException {
 
     // FIX: Clean up invisible whitespace trailing paths to prevent Linux mounting discrepancies
-    if (scanPath != null) {
-      scanPath = scanPath.strip();
+    if (rootPath != null) {
+      rootPath = rootPath.strip();
     }
-    File file = new File(scanPath).getCanonicalFile();
+    File file = new File(rootPath).getCanonicalFile();
 
     String rootName = file.getAbsolutePath();
 
-    rootFolder = new RootFolderEntity(rootName);
+    rootFolder = new RootFolderEntity(rootName, rootPathWindows, rootPathUnix);
 
     process(rootFolder);
 

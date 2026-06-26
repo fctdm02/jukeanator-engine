@@ -67,6 +67,7 @@ public class SongLibraryServiceImpl
 
   private String rootPath;
   private String rootPathWindows;
+  private String rootPathUnix;
   private final SongLibraryRepository songLibraryRepository;
   private final SongScanner songScanner;
   private final Integer searchResultSize;
@@ -74,12 +75,13 @@ public class SongLibraryServiceImpl
   private RootFolderEntity songLibraryRoot;
   private boolean isInitialized;
 
-  public SongLibraryServiceImpl(String rootPath, String rootPathWindows,
+  public SongLibraryServiceImpl(String rootPath, String rootPathWindows, String rootPathUnix,
       SongLibraryRepository songLibraryRepository, SongScanner songScanner,
       Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
+    requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
     requireNonNull(songScanner, "songScanner cannot be null");
     requireNonNull(searchResultSize, "searchResultSize cannot be null");
@@ -87,6 +89,7 @@ public class SongLibraryServiceImpl
 
     this.rootPath = rootPath;
     this.rootPathWindows = rootPathWindows;
+    this.rootPathUnix = rootPathUnix;
     this.songLibraryRepository = songLibraryRepository;
     this.songScanner = songScanner;
     this.searchResultSize = searchResultSize;
@@ -112,7 +115,8 @@ public class SongLibraryServiceImpl
       log.error("Could not load song library from: " + rootPath
           + ", using empty song library songLibraryRoot for now, error: " + ednee.getMessage());
 
-      this.songLibraryRoot = new RootFolderEntity(this.rootPath);
+      this.songLibraryRoot =
+          new RootFolderEntity(this.rootPath, this.rootPathWindows, this.rootPathUnix);
       this.songLibraryRoot.initialize();
     }
 
@@ -126,9 +130,9 @@ public class SongLibraryServiceImpl
 
     log.info("rootPath: " + this.rootPath);
     log.info("rootPathWindows: " + this.rootPathWindows);
+    log.info("rootPathUnix: " + this.rootPathUnix);
     log.info("searchResultSize: " + this.searchResultSize);
     log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
-    log.info("");
   }
 
   // Service methods
@@ -524,7 +528,7 @@ public class SongLibraryServiceImpl
       // Scan the file system for songs
       this.rootPath = scanRequest.getScanPath();
       this.songLibraryRoot.storeSongStatistics(this.rootPath);
-      this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath);
+      this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath, this.rootPathWindows, this.rootPathUnix);
 
       // Restore song num plays, persist, then re-initialize the songLibraryRoot
       int numRestored = this.songLibraryRoot.restoreSongStatisticsForRootPath(this.rootPath,

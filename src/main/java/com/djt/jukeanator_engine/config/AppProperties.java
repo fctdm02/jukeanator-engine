@@ -7,62 +7,37 @@ import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OST
 
 /**
  * Top-level application properties bound to the {@code app:} YAML prefix.
- *
- * <p>
- * All services that need a filesystem root path (song-library, song-queue, user) should call
- * {@link #getEffectiveRootPath()} rather than reading their own per-domain {@code root-path}
- * property. The resolved path is chosen at runtime based on the detected operating system:
- * {@code app.root-path-windows} on Windows, {@code app.root-path} everywhere else.
  */
 @Validated
 @ConfigurationProperties(prefix = "app")
 public class AppProperties {
 
-  /** Root path used on Linux / macOS. */
-  private String rootPath;
-
-  /**
-   * Root path used on Windows. When set, this value takes precedence over {@link #rootPath}
-   * whenever the JVM is running on a Windows host.
-   */
   private String rootPathWindows;
+  private String rootPathUnix; // Both Linux and MacOSX
 
   private Jwt jwt = new Jwt();
   private Logging logging = new Logging();
 
-  // ── OS-aware path resolution ──────────────────────────────────────────────
-
-  /**
-   * Returns the correct root path for the current operating system.
-   *
-   * <ul>
-   * <li>Windows: returns {@link #rootPathWindows} if it is non-blank, otherwise falls back to
-   * {@link #rootPath}.
-   * <li>All other platforms: returns {@link #rootPath}.
-   * </ul>
-   */
   public String getEffectiveRootPath() {
-    if (OperatingSystemDetector.getOperatingSystem() == OSType.WINDOWS && rootPathWindows != null
-        && !rootPathWindows.isBlank()) {
+
+    if (OperatingSystemDetector.getOperatingSystem() == OSType.WINDOWS) {
       return rootPathWindows;
     }
-    return rootPath;
-  }
-
-  // ── Getters / setters ─────────────────────────────────────────────────────
-
-  public String getRootPath() {
-    return rootPath;
-  }
-
-  public void setRootPath(String rootPath) {
-    this.rootPath = rootPath;
+    return rootPathUnix;
   }
 
   public String getRootPathWindows() {
     return rootPathWindows;
   }
 
+  public String getRootPathUnix() {
+    return rootPathUnix;
+  }
+
+  public void setRootPathUnix(String rootPathUnix) {
+    this.rootPathUnix = rootPathUnix;
+  }
+  
   public void setRootPathWindows(String rootPathWindows) {
     this.rootPathWindows = rootPathWindows;
   }

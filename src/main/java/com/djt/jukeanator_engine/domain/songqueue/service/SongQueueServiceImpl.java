@@ -70,6 +70,7 @@ public class SongQueueServiceImpl
 
   private String rootPath;
   private String rootPathWindows;
+  private String rootPathUnix;
   private RootFolderEntity songLibraryRoot;
   private SongQueueRootEntity songQueueRoot;
 
@@ -80,12 +81,13 @@ public class SongQueueServiceImpl
   /** Reference to the track that is currently playing on the output system */
   private SongFileEntity currentlyPlayingSong;
 
-  public SongQueueServiceImpl(String rootPath, String rootPathWindows,
+  public SongQueueServiceImpl(String rootPath, String rootPathWindows, String rootPathUnix,
       SongQueueProperties songQueueProperties, SongLibraryService songLibraryService,
       SongQueueRepository songQueueRepository, ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
+    requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
     requireNonNull(songQueueProperties, "songQueueProperties cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
     requireNonNull(songQueueRepository, "songQueueRepository cannot be null");
@@ -93,6 +95,7 @@ public class SongQueueServiceImpl
 
     this.rootPath = rootPath;
     this.rootPathWindows = rootPathWindows;
+    this.rootPathUnix = rootPathUnix;
     this.songLibraryService = songLibraryService;
     this.songQueueRepository = songQueueRepository;
     this.eventPublisher = eventPublisher;
@@ -156,6 +159,7 @@ public class SongQueueServiceImpl
 
     log.info("rootPath: " + this.rootPath);
     log.info("rootPathWindows: " + this.rootPathWindows);
+    log.info("rootPathUnix: " + this.rootPathUnix);
     log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
     log.info("songQueueRoot: " + this.songQueueRoot.getRootPath());
     log.info("enableBackgroundMusic: " + this.enableBackgroundMusic);

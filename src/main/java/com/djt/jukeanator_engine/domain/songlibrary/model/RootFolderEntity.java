@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.songlibrary.model;
 
+import static java.util.Objects.requireNonNull;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -33,6 +34,9 @@ public class RootFolderEntity extends FolderEntity {
   private static final String BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE_PREFIX =
       "BackgroundMusic_YetToBePlayed";
 
+  private String rootPathWindows;
+  private String rootPathUnix;
+
   private Set<ArtistFromSongEntity> artistsFromSongs = new TreeSet<ArtistFromSongEntity>();
 
   private transient Map<Integer, GenreFolderEntity> genresMap;
@@ -46,9 +50,11 @@ public class RootFolderEntity extends FolderEntity {
   private transient Map<String, SongFileEntity> songsByPathMap;
   private transient List<String> backgroundSongsYetToBePlayedList;
 
-  public RootFolderEntity(String rootPath) {
-
+  public RootFolderEntity(String rootPath, String rootPathWindows, String rootPathUnix) {
     super(null, rootPath);
+    requireNonNull(rootPath, "rootPath cannot be null");
+    requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
+    requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
   }
 
   public String getRootPath() {
@@ -57,6 +63,14 @@ public class RootFolderEntity extends FolderEntity {
 
   public void setRootPath(String rootPath) {
     this.setName(rootPath);
+  }
+
+  public String getRootPathWindows() {
+    return this.rootPathWindows;
+  }
+
+  public String getRootPathUnix() {
+    return this.rootPathUnix;
   }
 
   public ArtistFromSongEntity getArtistFromSong(String songArtistName) {
