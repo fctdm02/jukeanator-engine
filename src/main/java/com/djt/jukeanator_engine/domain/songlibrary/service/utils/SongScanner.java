@@ -62,7 +62,7 @@ public final class SongScanner {
     return this.acceptedSongFileExtensions;
   }
 
-  public RootFolderEntity scanFileSystemForSongs(String rootPath, String rootPathWindows, String rootPathUnix) throws IOException {
+  public RootFolderEntity scanFileSystemForSongs(String rootPath) throws IOException {
 
     // FIX: Clean up invisible whitespace trailing paths to prevent Linux mounting discrepancies
     if (rootPath != null) {
@@ -72,7 +72,7 @@ public final class SongScanner {
 
     String rootName = file.getAbsolutePath();
 
-    rootFolder = new RootFolderEntity(rootName, rootPathWindows, rootPathUnix);
+    rootFolder = new RootFolderEntity(rootName);
 
     process(rootFolder);
 

@@ -112,8 +112,7 @@ public class SongLibraryServiceImpl
       log.error("Could not load song library from: " + rootPath
           + ", using empty song library songLibraryRoot for now, error: " + ednee.getMessage());
 
-      this.songLibraryRoot =
-          new RootFolderEntity(this.rootPath, this.rootPathWindows, this.rootPathUnix);
+      this.songLibraryRoot = new RootFolderEntity(this.rootPath);
       this.songLibraryRoot.initialize();
     }
 
@@ -506,7 +505,8 @@ public class SongLibraryServiceImpl
   public SongDto getRandomSongFromBackgroundMusicPlaylist() {
 
     return SongLibraryMapper
-        .toSongDto(this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(this.rootPath));
+        .toSongDto(this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(this.rootPath,
+            this.rootPathWindows, this.rootPathUnix));
   }
 
 
@@ -525,8 +525,7 @@ public class SongLibraryServiceImpl
       // Scan the file system for songs
       this.rootPath = scanRequest.getScanPath();
       this.songLibraryRoot.storeSongStatistics(this.rootPath);
-      this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath, this.rootPathWindows,
-          this.rootPathUnix);
+      this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath);
 
       // Restore song num plays, persist, then re-initialize the songLibraryRoot
       this.songLibraryRoot.restoreSongStatisticsForRootPath(this.rootPath, this.rootPathWindows,

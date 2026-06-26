@@ -235,8 +235,8 @@ public class SongQueueServiceImpl
     while (songQueueRoot.getSongs().size() < minimumNumberSongsToKeepInQueue && attempts < 50) {
 
       attempts++;
-      SongFileEntity randomSong =
-          this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(this.rootPath);
+      SongFileEntity randomSong = this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(
+          this.rootPath, this.rootPathWindows, this.rootPathUnix);
 
       if (randomSong == null) {
         break; // Background-music playlist is empty; nothing more we can do.

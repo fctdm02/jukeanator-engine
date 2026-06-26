@@ -1,6 +1,5 @@
 package com.djt.jukeanator_engine.domain.songlibrary.model;
 
-import static java.util.Objects.requireNonNull;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -32,9 +31,6 @@ public class RootFolderEntity extends FolderEntity {
   private static final String BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE =
       "BackgroundMusic_YetToBePlayed.TXT";
 
-  private String rootPathWindows;
-  private String rootPathUnix;
-
   private Set<ArtistFromSongEntity> artistsFromSongs = new TreeSet<ArtistFromSongEntity>();
 
   private transient Map<Integer, GenreFolderEntity> genresMap;
@@ -48,13 +44,8 @@ public class RootFolderEntity extends FolderEntity {
   private transient Map<String, SongFileEntity> songsByPathMap;
   private transient List<String> backgroundSongsYetToBePlayedList;
 
-  public RootFolderEntity(String rootPath, String rootPathWindows, String rootPathUnix) {
+  public RootFolderEntity(String rootPath) {
     super(null, rootPath);
-    requireNonNull(rootPath, "rootPath cannot be null");
-    requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
-    requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
-    this.rootPathWindows = rootPathWindows;
-    this.rootPathUnix = rootPathUnix;
   }
 
   public String getRootPath() {
@@ -63,14 +54,6 @@ public class RootFolderEntity extends FolderEntity {
 
   public void setRootPath(String rootPath) {
     this.setName(rootPath);
-  }
-
-  public String getRootPathWindows() {
-    return this.rootPathWindows;
-  }
-
-  public String getRootPathUnix() {
-    return this.rootPathUnix;
   }
 
   public ArtistFromSongEntity getArtistFromSong(String songArtistName) {
@@ -438,7 +421,7 @@ public class RootFolderEntity extends FolderEntity {
         restoreSongStatisticsForFile(rootPath, rootPathWindows, rootPathUnix, cdStatsPathName);
     if (numRestored == 0) {
 
-      numRestored = restoreSongStatisticsForFile(rootPath, this.rootPathWindows, this.rootPathUnix,
+      numRestored = restoreSongStatisticsForFile(rootPath, rootPathWindows, rootPathUnix,
           rootPath + File.separator + RootFolderEntity.CD_STATS_BACKUP_FILE);
     }
     return numRestored;
@@ -577,7 +560,8 @@ public class RootFolderEntity extends FolderEntity {
     }
   }
 
-  public SongFileEntity getRandomSongFromBackgroundMusicPlaylist(String rootPath) {
+  public SongFileEntity getRandomSongFromBackgroundMusicPlaylist(String rootPath,
+      String rootPathWindows, String rootPathUnix) {
 
     if (this.songsMap == null) {
       initialize();
@@ -600,7 +584,7 @@ public class RootFolderEntity extends FolderEntity {
 
     // Normalize rootPathWindows in case the config value was loaded with a double backslash
     // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
-    String normalizedRootPathWindows = this.rootPathWindows.replace(":\\\\", ":\\");
+    String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
 
     // See if we need to fix up song pathnames that we read in.
     boolean switchToUnixFormat = false;
