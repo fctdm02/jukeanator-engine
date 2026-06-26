@@ -208,9 +208,12 @@ public class HomePanel extends JPanel implements TabNavigator {
     DetailHeaderPanel header = new DetailHeaderPanel(null, null, allAlbumsIcon, "♫", "ALL ALBUMS",
         allAlbums.size() + " albums");
     header.setOpaque(false);
-    // Match the 12px left/right padding used by AlbumGridPanel's gridPanel border.
-    // Top/bottom padding is kept tight to minimise the header's height.
-    header.setBorder(new javax.swing.border.EmptyBorder(4, 12, 4, 12));
+    // Left/right padding matches the album grid's own horizontal border so the header
+    // icon/text aligns on the y-axis with the tile columns below it.
+    // homeHeaderBorderH is 12px by default (matches gridPanel's EmptyBorder(8,12,4,12))
+    // and 20px for small-landscape (1024x768) where additional correction is needed.
+    int hbH = LayoutTheme.get().homeHeaderBorderH;
+    header.setBorder(new javax.swing.border.EmptyBorder(4, hbH, 4, hbH));
 
     if (allAlbums.isEmpty()) {
       JLabel empty = new JLabel("No albums found.", SwingConstants.CENTER);

@@ -61,6 +61,15 @@ public class AlbumViewCard extends JPanel {
 
   // ── Track list pagination state ───────────────────────────────────────────
   private int trackOffset = 0;
+  /**
+   * The number of track rows actually rendered on the most recent call to
+   * {@link #rebuildTrackRows()}.  Used as the page-jump size for the prev/next
+   * buttons so that the navigation always advances by exactly as many rows as
+   * are visible — regardless of the {@code TRACKS_PER_PAGE} constant, which
+   * may differ from the visible count when the panel height is constrained
+   * (e.g. on a 1024 × 768 display).
+   */
+  private int lastRenderedCount = TRACKS_PER_PAGE;
   private List<SongDto> trackSongs;
   private AlbumDto trackAlbum;
   private int trackT1;
@@ -312,17 +321,21 @@ public class AlbumViewCard extends JPanel {
     // ── Footer nav panel (mirrors ResultsColumnPanel navPanel) ────────────
     JPanel navPanel = new JPanel(new BorderLayout(8, 0));
     navPanel.setBackground(Color.BLACK);
-    navPanel.setBorder(new EmptyBorder(8, 12, 12, 12));
+    // Use resultNavBorderV (half per side) so the nav panel height matches
+    // ResultsColumnPanel exactly — both shrink together on small-landscape,
+    // freeing the same 29px that lets 7 rows fit fully visible.
+    int navBorderEach = LayoutTheme.get().resultNavBorderV / 2;
+    navPanel.setBorder(new EmptyBorder(navBorderEach, 12, navBorderEach, 12));
 
     trackPrevBtn = trackNavButton(true);
     trackPrevBtn.addActionListener(e -> {
-      trackOffset = Math.max(0, trackOffset - TRACKS_PER_PAGE);
+      trackOffset = Math.max(0, trackOffset - lastRenderedCount);
       rebuildTrackRows();
     });
 
     trackNextBtn = trackNavButton(false);
     trackNextBtn.addActionListener(e -> {
-      trackOffset += TRACKS_PER_PAGE;
+      trackOffset += lastRenderedCount;
       rebuildTrackRows();
     });
 
@@ -363,8 +376,15 @@ public class AlbumViewCard extends JPanel {
       }
     }
 
+    // Record how many rows were actually rendered this pass.
+    // The prev/next buttons jump by this count, not by TRACKS_PER_PAGE, so that
+    // navigation always advances by exactly the number of visible rows — even
+    // when the panel height is constrained to fewer rows than TRACKS_PER_PAGE
+    // (e.g. 6 visible rows on a 1024 × 768 display vs. TRACKS_PER_PAGE = 15).
+    lastRenderedCount = end - trackOffset;
+
     trackPrevBtn.setEnabled(trackOffset > 0);
-    trackNextBtn.setEnabled(trackOffset + TRACKS_PER_PAGE < total);
+    trackNextBtn.setEnabled(trackOffset + lastRenderedCount < total);
 
     trackRowsPanel.revalidate();
     trackRowsPanel.repaint();

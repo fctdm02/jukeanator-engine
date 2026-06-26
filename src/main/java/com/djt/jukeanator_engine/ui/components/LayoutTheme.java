@@ -184,6 +184,7 @@ public class LayoutTheme {
     fontSizeAlbumLabel = 14;
 
     // ── Tab bar ────────────────────────────────────────────────────────────────
+    tabWidth = 200;
     tabHeight = 96;
     tabIconFontSize = 34;
     tabTextFontSize = 20;
@@ -192,6 +193,14 @@ public class LayoutTheme {
     // ── Detail header image ────────────────────────────────────────────────────
     detailHeaderImageW = 72;
     detailHeaderImageH = 72;
+    homeHeaderBorderH = 12;
+
+    // ── ResultsColumnPanel nav panel ──────────────────────────────────────────
+    resultNavBtnH = 45;
+    resultNavBorderV = 20; // 8px top + 12px bottom (original EmptyBorder(8,12,12,12))
+
+    // ── AlbumViewCard track list ───────────────────────────────────────────────
+    albumViewTracksPerPage = 15;
 
     // ── Derived Dimension fields ───────────────────────────────────────────────
     // Must be initialised after the primitives they depend on.
@@ -267,6 +276,7 @@ public class LayoutTheme {
       fontSizeAlbumLabel = 14;
 
       // Tab bar — same as landscape for portrait
+      tabWidth = 200;
       tabHeight = 96;
       tabIconFontSize = 34;
       tabTextFontSize = 20;
@@ -275,6 +285,14 @@ public class LayoutTheme {
       // Detail header image — same as landscape for portrait
       detailHeaderImageW = 72;
       detailHeaderImageH = 72;
+      homeHeaderBorderH = 12;
+
+      // ResultsColumnPanel nav panel — same as landscape for portrait
+      resultNavBtnH = 45;
+      resultNavBorderV = 20;
+
+      // AlbumViewCard track list — same as landscape for portrait
+      albumViewTracksPerPage = 15;
 
     } else {
       // ── SMALL_LANDSCAPE (1024 × 768 and similar) ────────────────────────────
@@ -296,7 +314,17 @@ public class LayoutTheme {
       keyboardInnerPad = 20;
 
       searchPreviewCount = 5;
-      hotHerePreviewCount = 10;
+      // ── HotHere row count — reduced to match visible rows on 1024 × 768 ────────
+      //
+      // The content area height on 1024 × 768 (after top panel and tab bar) is 606px.
+      // With resultRowMaxH=72, 1px separators, a ~53px column header, 8px rowsPanel
+      // border, and the new compact navPanel (resultNavBorderV=4 + resultNavBtnH=32
+      // = 36px total), exactly 7 full rows fit:
+      // 606 - 53 (header) - 8 (rowsPad) - 36 (nav) = 509px / 73 = 6.97 rows → 7
+      // Setting previewCount=7 ensures the pagination jumps by exactly 7, which is
+      // the number of rows that are both rendered and fully visible.
+      //
+      hotHerePreviewCount = 7; // landscape default: 10
       genreDetailPreviewCount = 9;
       screenPaddingHorizontal = 60;
 
@@ -354,6 +382,17 @@ public class LayoutTheme {
       detailHeaderImageW = 40; // landscape default: 72
       detailHeaderImageH = 40; // landscape default: 72
 
+      // ── "ALL ALBUMS" header horizontal padding ────────────────────────────────
+      //
+      // The header EmptyBorder left/right must align the icon/text content with the
+      // visual left/right edges of the tile columns below. On 1920 x 1080 the
+      // gridPanel's 12px border is sufficient. On 1024 x 768 the BasicTabbedPaneUI
+      // content-area insets and the tile's own 1px border shift the tile edges
+      // slightly rightward, so increasing this to 20px brings the header content
+      // into visual alignment with the tile left edges.
+      //
+      homeHeaderBorderH = 20; // landscape default: 12
+
       // ── Tab bar height and font sizes ─────────────────────────────────────────
       //
       // The JTabbedPane tab bar sits at the SOUTH of the content pane and consumes
@@ -362,6 +401,7 @@ public class LayoutTheme {
       // Font sizes scale down proportionally so the icon and label still fit
       // comfortably within the shorter tab.
       //
+      tabWidth = 130; // landscape default: 200 -- 5x130=650px centred in 1024px
       tabHeight = 52; // landscape default: 96 (saves 44 px vs original)
       tabIconFontSize = 20; // landscape default: 34 (fits in 52px height)
       tabTextFontSize = 12; // landscape default: 20 (fits in 52px height)
@@ -376,6 +416,27 @@ public class LayoutTheme {
       // leaving just enough padding at the top for a comfortable look.
       //
       fontSizeAlbumLabel = 11; // landscape default: 14
+
+      // ── ResultsColumnPanel nav panel — compact for 1024 × 768 ────────────────
+      //
+      // Reducing the nav button height and its surrounding EmptyBorder shrinks the
+      // nav panel from 65px (original: 8+12 border + 45px btn) to 36px
+      // (2+2 border + 32px btn). This frees the 29px needed so that 7 complete
+      // result rows fit in the available content area without clipping.
+      //
+      resultNavBtnH = 32; // landscape default: 45
+      resultNavBorderV = 4; // landscape default: 20 (8px top + 12px bottom)
+
+      // ── AlbumViewCard track list ────────────────────────────────────────────
+      //
+      // With resultNavBorderV=4 and resultNavBtnH=32 the nav panel is 36px tall.
+      // In practice 6 track rows are fully visible on 1024x768 (the 7th is clipped
+      // by the surrounding AlbumDetailCard chrome not accounted for in the formula).
+      // Setting albumViewTracksPerPage=6 ensures TRACKS_PER_PAGE=6, so 6 rows are
+      // rendered, lastRenderedCount=6, and the page jump is correct: page 1 shows
+      // rows 1-6, page 2 shows rows 7-12, etc.
+      //
+      albumViewTracksPerPage = 6; // landscape default: 15
     }
 
     // Derived Dimension fields — always computed last from the primitives set above.
@@ -1008,8 +1069,11 @@ public class LayoutTheme {
   // TAB BAR (JukeANatorFrame — custom BasicTabbedPaneUI)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /** Width of each tab header button. */
-  public final int tabWidth = 200;
+  /**
+   * Width of each tab header button. Landscape default: 200px. Reduced for small-landscape so the
+   * five tabs cluster together in the centre rather than filling the full bar width.
+   */
+  public final int tabWidth;
 
   /** Height of each tab header. */
   public final int tabHeight;
@@ -1083,7 +1147,7 @@ public class LayoutTheme {
   public final int albumViewCoverSize = 320;
 
   /** Number of track rows shown per page in the paginated track listing. */
-  public final int albumViewTracksPerPage = 15;
+  public final int albumViewTracksPerPage;
 
   /** Width allocated for the "# Plays" (popularity bars) column header and cells. */
   public final int albumViewPlaysColW = 64;
@@ -1124,6 +1188,15 @@ public class LayoutTheme {
 
   /** Height of the cover-art / icon image in the detail header. */
   public final int detailHeaderImageH;
+
+  /**
+   * Left and right padding (px) of the "ALL ALBUMS" header {@code EmptyBorder} in
+   * {@code HomePanel}. Must visually align the header content with the left/right edges of the
+   * album tile columns below it. Default: 12px (matches {@code gridPanel}'s own left/right border).
+   * Increased to 20px for small-landscape where the header background visibly extends wider than
+   * the tile area.
+   */
+  public final int homeHeaderBorderH;
 
   /** Preferred size of the detail header image label (derived). */
   public final Dimension detailHeaderImageSize;
@@ -1336,7 +1409,19 @@ public class LayoutTheme {
   public final int resultNavBtnW = 75;
 
   /** Nav button preferred size — height. */
-  public final int resultNavBtnH = 45;
+  public final int resultNavBtnH;
+
+  /**
+   * Total vertical padding (px) of the nav panel's {@code EmptyBorder} inside
+   * {@code ResultsColumnPanel}. Represents the sum of top + bottom insets.
+   *
+   * <p>
+   * The default is 20px (8px top + 12px bottom) matching the original
+   * {@code EmptyBorder(8, 12, 12, 12)}. For small-landscape (1024x768) this is reduced to 4px (2px
+   * top + 2px bottom) so that the nav panel is compact enough to leave room for 7 fully-visible
+   * result rows within the available content height.
+   */
+  public final int resultNavBorderV;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SONG TRACK CELL RENDERER (SongTrackCellRenderer)

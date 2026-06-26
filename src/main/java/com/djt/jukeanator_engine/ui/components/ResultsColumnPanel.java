@@ -112,13 +112,22 @@ public final class ResultsColumnPanel {
 
     JPanel navPanel = new JPanel(new BorderLayout(8, 0));
     navPanel.setBackground(ColorTheme.get().bgFieldDark);
-    navPanel.setBorder(new EmptyBorder(8, 12, 12, 12));
+    // Split resultNavBorderV evenly between top and bottom so the nav panel is as
+    // compact as the theme requires (small-landscape: 4px total; landscape: 20px total).
+    int navBorderEach = lt.resultNavBorderV / 2;
+    navPanel.setBorder(new EmptyBorder(navBorderEach, 12, navBorderEach, 12));
+
+    // actualCount is the number of real item rows rendered this page (may be less
+    // than previewCount on the last page, or equal to previewCount otherwise).
+    // The nav buttons jump by this value so that pagination always advances by
+    // exactly the number of visible rows -- matching the AlbumViewCard fix.
+    final int actualCount = Math.min(previewCount, Math.max(0, total - offset));
 
     JButton upBtn = navButton(true, lt);
     upBtn.setEnabled(offset > 0);
     upBtn.addActionListener(e -> {
       if (onOffsetChanged != null) {
-        int newOffset = Math.max(0, offset - previewCount);
+        int newOffset = Math.max(0, offset - actualCount);
         onOffsetChanged.accept(newOffset);
       }
     });
@@ -127,7 +136,7 @@ public final class ResultsColumnPanel {
     downBtn.setEnabled(offset + previewCount < total);
     downBtn.addActionListener(e -> {
       if (onOffsetChanged != null) {
-        int newOffset = offset + previewCount;
+        int newOffset = offset + actualCount;
         onOffsetChanged.accept(newOffset);
       }
     });
