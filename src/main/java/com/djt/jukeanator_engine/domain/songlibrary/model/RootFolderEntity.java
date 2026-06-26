@@ -20,6 +20,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ThreadLocalRandom;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
+import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 
 public class RootFolderEntity extends FolderEntity {
   private static final long serialVersionUID = 2L;
@@ -51,6 +53,8 @@ public class RootFolderEntity extends FolderEntity {
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
     requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
+    this.rootPathWindows = rootPathWindows;
+    this.rootPathUnix = rootPathUnix;
   }
 
   public String getRootPath() {
@@ -478,6 +482,29 @@ public class RootFolderEntity extends FolderEntity {
 
         try {
 
+          // Normalize rootPathWindows in case the config value was loaded with a double backslash
+          // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
+          // CDStats.TXT always stores single-backslash Windows paths, so we must match that form.
+          String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
+
+          // See if we need to fix up song pathnames that we read in.
+          boolean switchToUnixFormat = false;
+          boolean switchToWindowsFormat = false;
+          OSType osType = OperatingSystemDetector.getOperatingSystem();
+          if (osType == OSType.WINDOWS && !line.contains(normalizedRootPathWindows)) {
+            switchToWindowsFormat = true;
+          } else if ((osType == OSType.LINUX || osType == OSType.MACOS)
+              && !line.contains(rootPathUnix)) {
+            switchToUnixFormat = true;
+          }
+
+          if (switchToUnixFormat) {
+            line = line.replace(normalizedRootPathWindows, rootPathUnix).replace("\\", "/");
+          } else if (switchToWindowsFormat) {
+            line = line.replace(":\\", ":\\\\").replace(rootPathUnix, normalizedRootPathWindows)
+                .replace("/", "\\");
+          }
+
           int rootPathIndex = line.indexOf(rootPath);
           if (rootPathIndex < 0) {
             System.err.println("rootPath: [" + rootPath + "] does not exist in: [" + line + "]");
@@ -569,6 +596,29 @@ public class RootFolderEntity extends FolderEntity {
     } else {
       int index = ThreadLocalRandom.current().nextInt(this.backgroundSongsYetToBePlayedList.size());
       songPathname = this.backgroundSongsYetToBePlayedList.remove(index);
+    }
+
+    // Normalize rootPathWindows in case the config value was loaded with a double backslash
+    // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
+    String normalizedRootPathWindows = this.rootPathWindows.replace(":\\\\", ":\\");
+
+    // See if we need to fix up song pathnames that we read in.
+    boolean switchToUnixFormat = false;
+    boolean switchToWindowsFormat = false;
+    OSType osType = OperatingSystemDetector.getOperatingSystem();
+    if (osType == OSType.WINDOWS && !songPathname.contains(normalizedRootPathWindows)) {
+      switchToWindowsFormat = true;
+    } else if ((osType == OSType.LINUX || osType == OSType.MACOS)
+        && !songPathname.contains(rootPathUnix)) {
+      switchToUnixFormat = true;
+    }
+
+    if (switchToUnixFormat) {
+      songPathname =
+          songPathname.replace(normalizedRootPathWindows, rootPathUnix).replace("\\", "/");
+    } else if (switchToWindowsFormat) {
+      songPathname =
+          songPathname.replace(rootPathUnix, normalizedRootPathWindows).replace("/", "\\");
     }
 
     writeBackgroundSongsYetToBePlayed(rootPath);
