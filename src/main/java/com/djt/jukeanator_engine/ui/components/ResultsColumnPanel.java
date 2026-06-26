@@ -215,14 +215,29 @@ public final class ResultsColumnPanel {
       public void mouseEntered(java.awt.event.MouseEvent e) {
         row.setOpaque(true);
         row.setBackground(ColorTheme.get().bgRowHover);
-        repaintChildren(row);
+        // Repaint the entire rows panel so the hover background is drawn
+        // in a single pass and no adjacent row text or animated-GIF frames
+        // are left as stale pixels within this row's screen bounds.
+        java.awt.Container rowsPanel = row.getParent();
+        if (rowsPanel != null) {
+          rowsPanel.repaint();
+        } else {
+          row.repaint();
+        }
       }
 
       @Override
       public void mouseExited(java.awt.event.MouseEvent e) {
         row.setOpaque(false);
         row.setBackground(ColorTheme.get().bgRowTransparent);
-        repaintChildren(row);
+        // Repaint the parent panel on exit for the same reason: clearing the
+        // hover fill must happen in one pass so no residue bleeds onto neighbours.
+        java.awt.Container rowsPanel = row.getParent();
+        if (rowsPanel != null) {
+          rowsPanel.repaint();
+        } else {
+          row.repaint();
+        }
       }
 
       @Override
@@ -360,8 +375,5 @@ public final class ResultsColumnPanel {
     return btn;
   }
 
-  private static void repaintChildren(java.awt.Container c) {
-    for (java.awt.Component child : c.getComponents())
-      child.repaint();
-  }
+
 }

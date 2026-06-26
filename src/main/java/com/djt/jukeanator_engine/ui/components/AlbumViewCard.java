@@ -563,14 +563,29 @@ public class AlbumViewCard extends JPanel {
       public void mouseEntered(java.awt.event.MouseEvent e) {
         row.setOpaque(true);
         row.setBackground(BG_ROW_HOVER);
-        repaintRowChildren(row);
+        // Repaint the entire trackRowsPanel in one pass so the hover background
+        // is fully drawn before any child repaints, and so stale pixels from
+        // adjacent rows (text bleed, animated-GIF observer frames) are cleared.
+        java.awt.Container rowsPanel = row.getParent();
+        if (rowsPanel != null) {
+          rowsPanel.repaint();
+        } else {
+          row.repaint();
+        }
       }
 
       @Override
       public void mouseExited(java.awt.event.MouseEvent e) {
         row.setOpaque(false);
         row.setBackground(null);
-        repaintRowChildren(row);
+        // Repaint the parent on exit for the same reason: the background clear
+        // must happen in one pass so no hover residue bleeds onto neighbours.
+        java.awt.Container rowsPanel = row.getParent();
+        if (rowsPanel != null) {
+          rowsPanel.repaint();
+        } else {
+          row.repaint();
+        }
       }
 
       @Override
@@ -649,15 +664,5 @@ public class AlbumViewCard extends JPanel {
     return SongTrackCellRenderer.barsForPlays(numPlays == null ? 0 : numPlays, t1, t2, t3);
   }
 
-  private static void repaintRowChildren(java.awt.Container c) {
-    // Repaint the row container itself first so its background state (opaque
-    // hover fill or transparent default) is fully resolved before any child
-    // component repaints on top of it. Without this, the hover background color
-    // can persist beneath freshly-painted children, or a child's repaint can
-    // trigger painting at stale coordinates, causing text superimposition.
-    c.repaint();
-    for (java.awt.Component child : c.getComponents()) {
-      child.repaint();
-    }
-  }
+
 }
