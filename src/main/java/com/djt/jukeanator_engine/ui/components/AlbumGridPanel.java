@@ -12,6 +12,8 @@ import java.awt.LinearGradientPaint;
 import java.awt.RenderingHints;
 import java.util.List;
 import java.util.Map;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -496,23 +498,34 @@ public class AlbumGridPanel extends JPanel {
     artWrapper.add(artLabel);
 
     // ── Text panel ────────────────────────────────────────────────────────
-    // GridLayout gives each label the full tile width; CENTER alignment centres the text.
-    JPanel textPanel = new JPanel(new java.awt.GridLayout(2, 1, 0, 2));
+    // BoxLayout Y_AXIS lets the HTML album-name label expand to two lines
+    // when the tile is narrow (e.g. 1024 × 768), preventing clipping (Item 3).
+    JPanel textPanel = new JPanel();
+    textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
     textPanel.setOpaque(false);
     textPanel.setBorder(new EmptyBorder(6, 8, 6, 8));
 
-    JLabel albumLabel = new JLabel(albumDisplayName(album.getAlbumName(), album.getGenreName()),
+    JLabel albumLabel = new JLabel(
+        "<html><div style='text-align:center;'>"
+            + albumDisplayName(album.getAlbumName(), album.getGenreName()).replace("&", "&amp;")
+                .replace("<", "&lt;").replace(">", "&gt;")
+            + "</div></html>",
         SwingConstants.CENTER);
     albumLabel.setForeground(ColorTheme.get().textPrimary);
     albumLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAlbumLabel));
+    albumLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+    // Tooltip shows the full untruncated name when the tile is too narrow.
+    albumLabel.setToolTipText(albumDisplayName(album.getAlbumName(), album.getGenreName()));
 
     JLabel artistLabel = new JLabel(album.getArtistName() != null ? album.getArtistName() : "",
         SwingConstants.CENTER);
     artistLabel.setForeground(ColorTheme.get().textSecondary);
     artistLabel
         .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeArtistLabel));
+    artistLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
 
     textPanel.add(albumLabel);
+    textPanel.add(Box.createVerticalStrut(2));
     textPanel.add(artistLabel);
 
     tile.add(artWrapper, BorderLayout.CENTER);

@@ -996,11 +996,15 @@ public class JukeANatorFrame extends JFrame {
 
     //
     // LEFT : PLAY STATUS (animated GIF / paused icon)
+    // When nowPlayingGifW == 0 (e.g. 1024 × 768) the label is hidden so the
+    // full panel width is available for the song/artist/album text area.
     //
+    boolean showGif = LayoutTheme.get().nowPlayingGifW > 0;
     playStatus.setPreferredSize(
         new Dimension(LayoutTheme.get().nowPlayingGifW, topPanelProfile.iconSize()));
     playStatus.setHorizontalAlignment(SwingConstants.CENTER);
     playStatus.setBorder(null);
+    playStatus.setVisible(showGif);
 
     //
     // CENTER : TEXT PANEL
@@ -1129,13 +1133,13 @@ public class JukeANatorFrame extends JFrame {
       // into the correct, visible component bounds.
       nowPlayingPanel.setVisible(true);
 
-      // Use loadAnimatedGif so the full frame sequence is preserved — passing an
-      // animated GIF through getScaledInstance (as loadClasspathImage does)
-      // reduces it to a single static frame and breaks the animation loop.
-      // The target dimensions must match the label's preferredSize so the icon
-      // fits exactly within the label bounds rather than being clipped.
-      playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif",
-          LayoutTheme.get().nowPlayingGifW, topPanelProfile.iconSize()));
+      // Skip the animated GIF when nowPlayingGifW == 0 (e.g. 1024 × 768) —
+      // the label is hidden in that case and loading the GIF would waste memory
+      // and risk stale-observer paint artifacts.
+      if (LayoutTheme.get().nowPlayingGifW > 0) {
+        playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif",
+            LayoutTheme.get().nowPlayingGifW, topPanelProfile.iconSize()));
+      }
     });
   }
 
@@ -1431,6 +1435,11 @@ public class JukeANatorFrame extends JFrame {
       }
 
       musicPaused = !musicPaused;
+
+      if (LayoutTheme.get().nowPlayingGifW <= 0) {
+        // GIF label is hidden on this display size — nothing to update.
+        return;
+      }
 
       if (musicPaused) {
         // Static PNG — loadClasspathImage is fine here; getScaledInstance works

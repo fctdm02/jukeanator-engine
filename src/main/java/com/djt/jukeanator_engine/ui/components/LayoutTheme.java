@@ -115,7 +115,16 @@ public class LayoutTheme {
    * @return a fully configured {@link LayoutTheme} ready for {@link #install(LayoutTheme)}
    */
   public static LayoutTheme forScreen(int screenW, int screenH) {
-    return (screenH > screenW) ? new LayoutTheme(Orientation.PORTRAIT) : new LayoutTheme();
+    if (screenH > screenW) {
+      return new LayoutTheme(Orientation.PORTRAIT);
+    }
+    // 1024×768 (and similarly small landscape screens up to ~1280×800) need their own
+    // profile: smaller nav buttons, a tighter grid (3×2), no animated GIF in the
+    // now-playing panel, and wider side-panel allocation so the song text is not clipped.
+    if (screenW <= 1280 && screenH <= 800) {
+      return new LayoutTheme(Orientation.SMALL_LANDSCAPE);
+    }
+    return new LayoutTheme();
   }
 
   // ── Constructor ────────────────────────────────────────────────────────────
@@ -176,120 +185,121 @@ public class LayoutTheme {
     topPanelSidePct = 0.30; // 30 % each side, 40 % centre
   }
 
-  /**
-   * Private constructor used exclusively by {@link #forScreen(int, int)} when portrait orientation
-   * is detected. Sets only the fields whose landscape values are incorrect for a 1080 × 1920
-   * screen; all other fields are inherited from the field initialisers and are identical to the
-   * landscape instance.
-   *
-   * <p>
-   * The {@code orientation} parameter exists solely to distinguish this overload from the public
-   * no-arg constructor — its value is always {@link Orientation#PORTRAIT}.
-   */
+  // ─────────────────────────────────────────────────────────────────────────
+  // ORIENTATION-SPECIFIC CONSTRUCTOR (portrait and small-landscape)
+  //
+  // Used exclusively by {@link #forScreen(int, int)}. The {@code orientation}
+  // parameter selects between the {@link Orientation#PORTRAIT} (1080 × 1920)
+  // path and the {@link Orientation#SMALL_LANDSCAPE} (≤ 1280 × 800, e.g. the
+  // canonical 1024 × 768 touch display) path. All fields that are identical
+  // to the standard landscape defaults are set explicitly here so the intent is
+  // auditable; only fields that differ from 1920 × 1080 need explanatory
+  // comments.
+  // ─────────────────────────────────────────────────────────────────────────
   private LayoutTheme(Orientation orientation) {
 
-    // ── Issue 1 : Keyboard rows clipped ─────────────────────────────────────
-    //
-    // In landscape the keyboard has 60 px padding each side, leaving
-    // 1920 − 120 = 1800 px of usable width, and row 1 (10 letter keys +
-    // CLEAR + BACKSPACE) totals ≈ 1 036 px — well within budget.
-    //
-    // In portrait the same padding leaves 1080 − 120 = 960 px, but row 1
-    // still needs ≈ 1 036 px, so FlowLayout wraps the overflow keys onto a
-    // second line inside the row panel, pushing rows 2 and 3 below the fixed
-    // keyboardHeight boundary where they are clipped from view.
-    //
-    // Fix: reduce padding to 20 px each side (1040 px usable) and tighten
-    // key widths so row 1 fits in ≈ 854 px. The keyboard wrapper grows to
-    // 320 px to give the three rows comfortable vertical breathing room.
-    //
-    keyboardHeight = 320; // landscape: 260
-    keyboardPaddingHorizontal = 20; // landscape: 60
-    keyLetterW = 60; // landscape: 70
-    keyLetterH = 64; // landscape: 60 (taller touch target)
-    keyClearW = 110; // landscape: 140
-    keyBackspaceW = 84; // landscape: 100
-    keyModeToggleW = 110; // landscape: 140
-    keySpaceW = 320; // landscape: 420
-    keyRowGap = 10; // same as landscape — vertical row spacing is correct as-is
-    keyColGap = 5; // landscape: 8
-    keyboardInnerPad = 16; // landscape: 20
+    // Delegate to the existing portrait path when called for portrait.
+    // The SMALL_LANDSCAPE block is the only new path; we keep the portrait
+    // logic intact by using an if/else inside this shared overload.
+    if (orientation == Orientation.PORTRAIT) {
+      // ── Issue 1 : Keyboard rows clipped ─────────────────────────────────────
+      keyboardHeight = 320;
+      keyboardPaddingHorizontal = 20;
+      keyLetterW = 60;
+      keyLetterH = 64;
+      keyClearW = 110;
+      keyBackspaceW = 84;
+      keyModeToggleW = 110;
+      keySpaceW = 320;
+      keyRowGap = 10;
+      keyColGap = 5;
+      keyboardInnerPad = 16;
 
-    // ── Issue 2 : Result columns show too few rows ───────────────────────────
-    //
-    // The preview counts were calibrated for the landscape content area
-    // (~524 px for Search after chrome deductions). In portrait the content
-    // area is far taller, leaving large empty gaps beneath the last row.
-    //
-    // Search : 1920 − 110 (top) − 96 (tab) − 90 (bar) − 320 (kbd) = 1304 px
-    // body ≈ 1304 − 53 (header) − 65 (nav) = 1186 px → 1186÷72 ≈ 16; use 14
-    // Hot Here: 1920 − 110 − 96 = 1714 px content
-    // body ≈ 1714 − 53 − 65 = 1596 px → 1596÷72 ≈ 22; use 16 (column aspect ratio)
-    // Genre : 1920 − 110 − 96 − 72 (detail header) = 1642 px content
-    // body ≈ 1642 − 53 − 65 = 1524 px → 1524÷72 ≈ 21; use 15 (column aspect ratio)
-    //
-    searchPreviewCount = 14; // landscape: 5
-    hotHerePreviewCount = 16; // landscape: 10
-    genreDetailPreviewCount = 15; // landscape: 9
+      // ── Issue 2 : Result columns show too few rows ───────────────────────────
+      searchPreviewCount = 14;
+      hotHerePreviewCount = 16;
+      genreDetailPreviewCount = 15;
+      screenPaddingHorizontal = 30;
 
-    // Outer horizontal screen margin for the search bar and hero panel.
-    // 60 px each side on 1080 px leaves only 960 px; 30 px gives 1020 px,
-    // consistent with the keyboard padding reduction above.
-    screenPaddingHorizontal = 30; // landscape: 60
+      // ── Item 1.3 / Item 2.2 : Reduce prev/next page buttons by ~40 % ────────
+      navBtnW = 84;
+      navBtnH = 32;
+      genrePaginationBtnW = 84;
+      genrePaginationBtnH = 32;
 
-    // ── Item 1.3 / Item 2.2 : Reduce prev/next page buttons by ~40 % ────────
-    //
-    // In portrait the album grid and genre grid have ample horizontal space.
-    // Shrinking the navigation buttons frees up width for the letter-button
-    // strip (Item 1.4) and keeps the pagination row compact.
-    //
-    navBtnW = 84; // landscape: 140 (−40 %)
-    navBtnH = 32; // landscape: 36 — kept tall for touch; width reduced
-    genrePaginationBtnW = 84; // landscape: 140
-    genrePaginationBtnH = 32; // landscape: 36 — kept tall for touch
+      // ── Item 1.2 : Album cover art tiles — remove excess padding ────────────
+      albumTileInnerPad = 1;
+      portraitArtReduction = 1.05;
 
-    // ── Item 1.2 : Album cover art tiles — remove excess padding ────────────
-    //
-    // albumTileInnerPad is the EmptyBorder on each tile. Keeping it at 1 px
-    // (same as landscape) is correct; the extra visible padding comes from the
-    // artWrapper GridBagLayout centering a smaller-than-tile icon. The real
-    // fix is to increase portraitArtReduction so the art fills the tile.
-    //
-    albumTileInnerPad = 1; // unchanged — padding is already minimal
+      // ── Item 2.1 : Genre tile images — remove excess padding ────────────────
+      genreTileInnerPad = 8;
+      genrePortraitImgReduction = 1.20;
 
-    // Raise the portrait art-reduction factor so tiles are filled more tightly.
-    // Previously 0.85 produced art that was noticeably smaller than the tile
-    // cell. 1.05 nudges it slightly above the short-axis scale so the art
-    // occupies most of the tile without clipping.
-    portraitArtReduction = 1.05; // landscape default: 0.85
+      // ── Item 1.1 : Wider side panels + smaller now-playing text ─────────────
+      topPanelSidePct = 0.38;
+      nowPlayingGifW = 52;
+      fontSizeNowPlayingSong = 14;
 
-    // ── Item 2.1 : Genre tile images — remove excess padding ────────────────
-    //
-    // Increase the portrait image reduction factor so the genre image fills the
-    // tile. The previous 0.80 left large empty margins; 1.00 removes the extra
-    // shrink and lets the short-axis scale alone determine the image size.
-    //
-    genreTileInnerPad = 8; // landscape: 16 (halved to free space)
-    genrePortraitImgReduction = 1.20; // landscape default: 0.80 — larger images per feedback
+    } else {
+      // ── SMALL_LANDSCAPE (1024 × 768 and similar) ────────────────────────────
+      //
+      // All keyboard, result-column, genre-tile and portrait-reduction fields
+      // keep their standard landscape defaults (set by the field initialisers
+      // above the constructors) because those screens exist only in landscape.
 
-    // ── Item 1.1 : Wider side panels + smaller now-playing text ─────────────
-    //
-    // On a 1080 px wide portrait screen, 30 % per side = 308 px. The now-
-    // playing panel tries to fit a 96×96 GIF, song name, artist name, and album
-    // art in that space. The long song names are clipped.
-    //
-    // Fix 1: increase the side-panel allocation to 38 % (≈ 390 px per side).
-    // Fix 2: make the animated GIF label narrower (52 px) so the text area
-    // gets more horizontal room.
-    // Fix 3: use a smaller font (14 pt = fontSizeAlbumLabel) for the song name
-    // and artist name in the now-playing panel.
-    //
-    topPanelSidePct = 0.38; // landscape: 0.30
-    nowPlayingGifW = 52; // landscape: 96 (= topPanelIconSize)
-    fontSizeNowPlayingSong = 14; // landscape: 17 (= fontSizeTrackSong)
+      keyboardHeight = 260;
+      keyboardPaddingHorizontal = 60;
+      keyLetterW = 70;
+      keyLetterH = 60;
+      keyClearW = 140;
+      keyBackspaceW = 100;
+      keyModeToggleW = 140;
+      keySpaceW = 420;
+      keyRowGap = 10;
+      keyColGap = 8;
+      keyboardInnerPad = 20;
 
-    // Derived Dimension fields — same primitives as the landscape constructor
-    // because adminBtnW/H and detailHeaderImage*W/H are unchanged.
+      searchPreviewCount = 5;
+      hotHerePreviewCount = 10;
+      genreDetailPreviewCount = 9;
+      screenPaddingHorizontal = 60;
+
+      albumTileInnerPad = 1;
+      portraitArtReduction = 0.85;
+      genreTileInnerPad = 16;
+      genrePortraitImgReduction = 0.80;
+
+      // ── Item 4 : Reduce prev/next navigation buttons by 40 % ────────────────
+      //
+      // At 1024 px wide the letter-strip has very little room when the nav buttons
+      // are full-size (140 px each). Reducing them to 84 px (−40 %) gives back
+      // ~112 px for the letter buttons without affecting any other resolution.
+      //
+      navBtnW = 84; // landscape default: 140
+      navBtnH = 36; // height unchanged — still comfortable to tap
+      genrePaginationBtnW = 84; // landscape default: 140
+      genrePaginationBtnH = 36;
+
+      // ── Item 1 : Now-playing panel — hide animated GIF, widen text area ─────
+      //
+      // At 1024 × 768 the now-playing wrapper is ~307 px wide (30 % of 984 usable).
+      // The animated GIF consumes 96 px of that, leaving only ~115 px for song/artist
+      // text before the cover art — causing severe clipping on typical song names.
+      //
+      // Fix: set nowPlayingGifW to 0 so buildNowPlayingPanel() gives the GIF label
+      // zero preferred width, which effectively hides it and returns the full text
+      // area to the song / artist / album labels. The cover art icon on the right
+      // is unchanged and continues to identify the album at a glance.
+      //
+      // topPanelSidePct is nudged up to 0.35 (35 %) so the wrapper is ~345 px wide,
+      // giving the three text lines comfortable room even for long song names.
+      //
+      topPanelSidePct = 0.35; // landscape default: 0.30
+      nowPlayingGifW = 0; // hide animated GIF — zero-width label
+      fontSizeNowPlayingSong = 13; // smaller font so long names don't wrap
+    }
+
+    // Derived Dimension fields — always computed last from the primitives set above.
     navBtnSize = new Dimension(navBtnW, navBtnH);
     adminBtnSize = new Dimension(adminBtnW, adminBtnH);
     detailHeaderImageSize = new Dimension(detailHeaderImageW, detailHeaderImageH);
@@ -298,7 +308,9 @@ public class LayoutTheme {
   // ── Orientation tag — used only by the private portrait constructor ─────────
 
   private enum Orientation {
-    PORTRAIT
+    PORTRAIT,
+    /** Landscape screens ≤ 1280 × 800 — e.g. the canonical 1024 × 768 touch display. */
+    SMALL_LANDSCAPE
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -377,6 +389,11 @@ public class LayoutTheme {
 
     if (portrait) {
       return computePortraitProfile(screenW, screenH);
+    } else if (screenW <= 1280 && screenH <= 800) {
+      // ── Item 2 : 1024 × 768 (and similar small landscape screens) ──────────
+      // Fix: cap at 3 columns × 2 rows so tiles are large enough to be tappable
+      // and album names are not clipped on a 1024 px wide display.
+      return computeSmallLandscapeProfile(screenW, screenH);
     } else {
       return computeLandscapeProfile(screenW, screenH);
     }
@@ -456,7 +473,51 @@ public class LayoutTheme {
     return new GridProfile(cols, rows, artW, artH);
   }
 
-  // ── Grid-profile tuning constants ─────────────────────────────────────────
+  // ── Small landscape (≤ 1280 × 800, e.g. 1024 × 768) ──────────────────────
+
+  /**
+   * Grid profile for small landscape screens (≤ 1280 × 800).
+   *
+   * <p>
+   * Differs from the standard landscape path in two ways:
+   * <ul>
+   * <li>The art tiles are scaled against the actual screen dimensions instead of the canonical 1920
+   * × 1080 reference, so tiles are sized to actually fill the available space.</li>
+   * <li>The column and row counts are capped at {@value #GRID_MAX_COLS_SMALL_LANDSCAPE} ×
+   * {@value #GRID_MAX_ROWS_SMALL_LANDSCAPE} (3 × 2) — Items 2 and 3. Fewer, larger tiles give album
+   * names enough width to display without clipping and keep the touch targets comfortably
+   * large.</li>
+   * </ul>
+   */
+  private GridProfile computeSmallLandscapeProfile(int screenW, int screenH) {
+
+    // Scale against the actual screen, not the canonical 1920 × 1080 reference,
+    // so tiles genuinely fill the available area rather than being undersized.
+    double scaleX = (double) screenW / CANONICAL_W;
+    double scaleY = (double) screenH / CANONICAL_H;
+    double scale = Math.min(scaleX, scaleY);
+    scale = Math.max(GRID_SCALE_MIN, Math.min(scale, GRID_SCALE_MAX));
+
+    int artW = roundEven((int) Math.round(homeArtW * scale));
+    int artH = roundEven((int) Math.round(homeArtH * scale));
+
+    int availH = screenH - topPanelHeight - tabHeight - LETTER_NAV_H - TILE_TEXT_H - GRID_PADDING_V;
+    int availW = screenW - GRID_PADDING_H;
+
+    int tileW = artW + albumGridGapH;
+    int tileH = artH + albumGridGapV;
+
+    int cols = Math.max(1, availW / tileW);
+    int rows = Math.max(1, availH / tileH);
+
+    // Hard caps: 3 columns × 2 rows (Items 2 & 3).
+    cols = Math.min(cols, GRID_MAX_COLS_SMALL_LANDSCAPE);
+    rows = Math.min(rows, GRID_MAX_ROWS_SMALL_LANDSCAPE);
+
+    return new GridProfile(cols, rows, artW, artH);
+  }
+
+
   // Adjust these if the fixed-chrome heights change or the aesthetics need tuning.
 
   /** Minimum allowed scale factor — prevents tiles becoming unusably tiny. */
@@ -499,6 +560,9 @@ public class LayoutTheme {
   private static final int GRID_MAX_ROWS_LANDSCAPE = 5;
   private static final int GRID_MAX_COLS_PORTRAIT = 4;
   private static final int GRID_MAX_ROWS_PORTRAIT = 8;
+  /** Hard caps for small landscape (≤ 1280 × 800) — Items 2 & 3. */
+  private static final int GRID_MAX_COLS_SMALL_LANDSCAPE = 3;
+  private static final int GRID_MAX_ROWS_SMALL_LANDSCAPE = 2;
 
   // ── Utility ───────────────────────────────────────────────────────────────
 
