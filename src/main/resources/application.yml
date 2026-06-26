@@ -37,7 +37,7 @@ song-library:
 
 song-queue:
   repository-type: filesystem   # filesystem | postgres
-  enable-background-music: false
+  enable-background-music: true
   minimum-number-songs-to-keep-in-queue: 5 # Only used when enableBackgroundMusic is true
   minimum-minutes-between-song-plays: 60
   allow-explicit-songs-at-all-times: false
