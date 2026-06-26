@@ -148,11 +148,32 @@ public class LayoutTheme {
     genreDetailPreviewCount = 9;
     screenPaddingHorizontal = 60;
 
+    // ── Navigation / pagination buttons ───────────────────────────────────────
+    navBtnW = 140;
+    navBtnH = 36;
+    genrePaginationBtnW = 140;
+    genrePaginationBtnH = 36;
+
+    // ── Tile padding ───────────────────────────────────────────────────────────
+    albumTileInnerPad = 1;
+    genreTileInnerPad = 16;
+
+    // ── Portrait art/image reduction factors ──────────────────────────────────
+    portraitArtReduction = 0.85; // landscape default (not used in landscape path)
+    genrePortraitImgReduction = 0.80; // landscape default (not used in landscape path)
+
+    // ── Now-playing panel ─────────────────────────────────────────────────────
+    nowPlayingGifW = 96; // matches topPanelIconSize in landscape
+    fontSizeNowPlayingSong = 17; // matches fontSizeTrackSong in landscape
+
     // ── Derived Dimension fields ───────────────────────────────────────────────
     // Must be initialised after the primitives they depend on.
     navBtnSize = new Dimension(navBtnW, navBtnH);
     adminBtnSize = new Dimension(adminBtnW, adminBtnH);
     detailHeaderImageSize = new Dimension(detailHeaderImageW, detailHeaderImageH);
+
+    // ── Top-panel side percentage ──────────────────────────────────────────────
+    topPanelSidePct = 0.30; // 30 % each side, 40 % centre
   }
 
   /**
@@ -216,8 +237,59 @@ public class LayoutTheme {
     // consistent with the keyboard padding reduction above.
     screenPaddingHorizontal = 30; // landscape: 60
 
+    // ── Item 1.3 / Item 2.2 : Reduce prev/next page buttons by ~40 % ────────
+    //
+    // In portrait the album grid and genre grid have ample horizontal space.
+    // Shrinking the navigation buttons frees up width for the letter-button
+    // strip (Item 1.4) and keeps the pagination row compact.
+    //
+    navBtnW = 84; // landscape: 140 (−40 %)
+    navBtnH = 32; // landscape: 36 — kept tall for touch; width reduced
+    genrePaginationBtnW = 84; // landscape: 140
+    genrePaginationBtnH = 32; // landscape: 36 — kept tall for touch
+
+    // ── Item 1.2 : Album cover art tiles — remove excess padding ────────────
+    //
+    // albumTileInnerPad is the EmptyBorder on each tile. Keeping it at 1 px
+    // (same as landscape) is correct; the extra visible padding comes from the
+    // artWrapper GridBagLayout centering a smaller-than-tile icon. The real
+    // fix is to increase portraitArtReduction so the art fills the tile.
+    //
+    albumTileInnerPad = 1; // unchanged — padding is already minimal
+
+    // Raise the portrait art-reduction factor so tiles are filled more tightly.
+    // Previously 0.85 produced art that was noticeably smaller than the tile
+    // cell. 1.05 nudges it slightly above the short-axis scale so the art
+    // occupies most of the tile without clipping.
+    portraitArtReduction = 1.05; // landscape default: 0.85
+
+    // ── Item 2.1 : Genre tile images — remove excess padding ────────────────
+    //
+    // Increase the portrait image reduction factor so the genre image fills the
+    // tile. The previous 0.80 left large empty margins; 1.00 removes the extra
+    // shrink and lets the short-axis scale alone determine the image size.
+    //
+    genreTileInnerPad = 8; // landscape: 16 (halved to free space)
+    genrePortraitImgReduction = 1.20; // landscape default: 0.80 — larger images per feedback
+
+    // ── Item 1.1 : Wider side panels + smaller now-playing text ─────────────
+    //
+    // On a 1080 px wide portrait screen, 30 % per side = 308 px. The now-
+    // playing panel tries to fit a 96×96 GIF, song name, artist name, and album
+    // art in that space. The long song names are clipped.
+    //
+    // Fix 1: increase the side-panel allocation to 38 % (≈ 390 px per side).
+    // Fix 2: make the animated GIF label narrower (52 px) so the text area
+    // gets more horizontal room.
+    // Fix 3: use a smaller font (14 pt = fontSizeAlbumLabel) for the song name
+    // and artist name in the now-playing panel.
+    //
+    topPanelSidePct = 0.38; // landscape: 0.30
+    nowPlayingGifW = 52; // landscape: 96 (= topPanelIconSize)
+    fontSizeNowPlayingSong = 14; // landscape: 17 (= fontSizeTrackSong)
+
     // Derived Dimension fields — same primitives as the landscape constructor
-    // because navBtnW/H, adminBtnW/H, and detailHeaderImage*W/H are unchanged.
+    // because adminBtnW/H and detailHeaderImage*W/H are unchanged.
     navBtnSize = new Dimension(navBtnW, navBtnH);
     adminBtnSize = new Dimension(adminBtnW, adminBtnH);
     detailHeaderImageSize = new Dimension(detailHeaderImageW, detailHeaderImageH);
@@ -362,7 +434,7 @@ public class LayoutTheme {
     scale = Math.max(GRID_SCALE_MIN, Math.min(scale, GRID_SCALE_MAX));
 
     // In portrait the art is a bit smaller than in landscape so more rows fit.
-    int artW = roundEven((int) Math.round(homeArtW * scale * PORTRAIT_ART_REDUCTION));
+    int artW = roundEven((int) Math.round(homeArtW * scale * portraitArtReduction));
     int artH = artW; // keep square thumbnails
 
     // Available area — same fixed-chrome deductions as landscape.
@@ -417,9 +489,10 @@ public class LayoutTheme {
 
   /**
    * Additional art-size reduction factor applied in portrait mode so that tiles are proportionally
-   * narrower to match the shorter portrait width.
+   * narrower to match the shorter portrait width. Landscape: not used. Portrait: 1.0 (no extra
+   * reduction — the short-axis scale already constrains tile size).
    */
-  private static final double PORTRAIT_ART_REDUCTION = 0.85;
+  private final double portraitArtReduction;
 
   // Maximum grid dimensions (prevents absurdly large pages on 4 K+ or portrait 4 K displays)
   private static final int GRID_MAX_COLS_LANDSCAPE = 8;
@@ -528,8 +601,7 @@ public class LayoutTheme {
     double scale = (double) screenW / CANONICAL_W;
     scale = Math.max(GENRE_SCALE_MIN, Math.min(scale, GENRE_SCALE_MAX));
 
-    int imageSize =
-        roundEven((int) Math.round(genreImageSize * scale * GENRE_PORTRAIT_IMG_REDUCTION));
+    int imageSize = roundEven((int) Math.round(genreImageSize * scale * genrePortraitImgReduction));
 
     int availH = screenH - topPanelHeight - tabHeight - (genrePagePadV * 2) - GENRE_LABEL_H;
     int availW = screenW - (genrePagePadH * 2);
@@ -560,8 +632,8 @@ public class LayoutTheme {
    */
   private static final int GENRE_LABEL_H = 44;
 
-  /** Extra art reduction applied in portrait mode. */
-  private static final double GENRE_PORTRAIT_IMG_REDUCTION = 0.80;
+  /** Extra art reduction applied in portrait mode for genre tiles. Portrait: 1.0 (no reduction). */
+  private final double genrePortraitImgReduction;
 
   // Maximum genre grid dimensions
   private static final int GENRE_MAX_COLS_LANDSCAPE = 8;
@@ -641,7 +713,7 @@ public class LayoutTheme {
     int usableW = screenW - TOP_PANEL_H_PADDING;
 
     // Each side panel occupies the configured percentage of the usable width.
-    int sideW = (int) Math.round(usableW * TOP_PANEL_SIDE_PCT);
+    int sideW = (int) Math.round(usableW * topPanelSidePct);
 
     // Panel height = topPanelHeight minus top+bottom border padding.
     int panelH = topPanelHeight - TOP_PANEL_V_PADDING;
@@ -660,9 +732,10 @@ public class LayoutTheme {
   /**
    * Fraction of the usable top-panel width allocated to each side panel (WEST credits and EAST
    * now-playing wrapper). The centre banner receives the remainder ({@code 1 - 2 × side_pct}).
-   * Default 0.30 → 30 % each side, 40 % centre.
+   * Default 0.30 → 30 % each side, 40 % centre. Portrait: 0.38 → wider panels so the now-playing
+   * song name is not clipped.
    */
-  private static final double TOP_PANEL_SIDE_PCT = 0.30;
+  private final double topPanelSidePct;
 
   /**
    * Total left+right {@code EmptyBorder} padding on the top panel (px). Matches
@@ -720,6 +793,13 @@ public class LayoutTheme {
    * Size of the location logo / cover-art icon in the top panel (square). Canonical 1920 px value.
    */
   public final int topPanelIconSize = 96;
+
+  /**
+   * Width of the animated GIF (music_playing.gif) label in the now-playing panel. In portrait mode
+   * this is narrower than {@link #topPanelIconSize} so the text area has more room and the song
+   * name is not clipped. Landscape: equals {@code topPanelIconSize} (96 px). Portrait: 52 px.
+   */
+  public final int nowPlayingGifW;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // TAB BAR (JukeANatorFrame — custom BasicTabbedPaneUI)
@@ -779,7 +859,7 @@ public class LayoutTheme {
   public final int albumGridGapV = 10;
 
   /** Inner padding (all sides) inside each album tile border. */
-  public final int albumTileInnerPad = 1;
+  public final int albumTileInnerPad;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ALBUM VIEW CARD — left sidebar and track list
@@ -817,10 +897,10 @@ public class LayoutTheme {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /** Preferred width of the standard navigation button (❮ / ❯). */
-  public final int navBtnW = 140;
+  public final int navBtnW;
 
   /** Preferred height of the standard navigation button. */
-  public final int navBtnH = 36;
+  public final int navBtnH;
 
   /** Preferred {@link Dimension} for the standard navigation button (derived). */
   public final Dimension navBtnSize;
@@ -876,7 +956,7 @@ public class LayoutTheme {
   public final int genrePagePadV = 30;
 
   /** Inner padding (all sides) inside each genre tile. */
-  public final int genreTileInnerPad = 16;
+  public final int genreTileInnerPad;
 
   /** Pixel size (square) of the genre image loaded and displayed in each tile. */
   public final int genreImageSize = 240;
@@ -885,10 +965,10 @@ public class LayoutTheme {
    * Width and height for the prev/next wrapper panels in the genre pagination row. Matches
    * {@link #navBtnW} × {@link #navBtnH}.
    */
-  public final int genrePaginationBtnW = 140;
+  public final int genrePaginationBtnW;
 
   /** Height of the genre pagination nav wrapper. */
-  public final int genrePaginationBtnH = 36;
+  public final int genrePaginationBtnH;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GENRE DETAIL PANEL (GenreDetailPanel)
@@ -1232,6 +1312,13 @@ public class LayoutTheme {
   // Track list / result rows
   public final int fontSizeTrackSong = 17; // AlbumViewCard song label
   public final int fontSizeTrackArtist = 14; // AlbumViewCard artist/header label
+
+  /**
+   * Font size for the song name and artist name labels in the now-playing top panel. In landscape
+   * these match {@link #fontSizeTrackSong} (17 px). In portrait they are reduced to match the album
+   * label size ({@link #fontSizeAlbumLabel}) so the text fits without clipping.
+   */
+  public final int fontSizeNowPlayingSong; // now-playing panel song / artist label
   public final int fontSizeResultLine1 = 17; // ResultsColumnPanel primary line
   public final int fontSizeResultLine2 = 13; // ResultsColumnPanel secondary line
   public final int fontSizeResultNum = 16; // ResultsColumnPanel row number label

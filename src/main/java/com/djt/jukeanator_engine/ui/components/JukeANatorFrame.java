@@ -985,8 +985,8 @@ public class JukeANatorFrame extends JFrame {
     //
     // LEFT : PLAY STATUS (animated GIF / paused icon)
     //
-    playStatus
-        .setPreferredSize(new Dimension(topPanelProfile.iconSize(), topPanelProfile.iconSize()));
+    playStatus.setPreferredSize(
+        new Dimension(LayoutTheme.get().nowPlayingGifW, topPanelProfile.iconSize()));
     playStatus.setHorizontalAlignment(SwingConstants.CENTER);
     playStatus.setBorder(null);
 
@@ -1002,10 +1002,12 @@ public class JukeANatorFrame extends JFrame {
     textPanel.setBorder(new EmptyBorder(8, 0, 8, 0));
 
     songLabel.setForeground(ColorTheme.get().textPrimary);
-    songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
+    songLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeNowPlayingSong));
 
     artistLabel.setForeground(ColorTheme.get().textPrimary);
-    artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
+    artistLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeNowPlayingSong));
 
     albumLabel.setForeground(ColorTheme.get().textSecondary);
     albumLabel
@@ -1121,7 +1123,7 @@ public class JukeANatorFrame extends JFrame {
       // The target dimensions must match the label's preferredSize so the icon
       // fits exactly within the label bounds rather than being clipped.
       playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif",
-          topPanelProfile.iconSize(), topPanelProfile.iconSize()));
+          LayoutTheme.get().nowPlayingGifW, topPanelProfile.iconSize()));
     });
   }
 
@@ -1429,7 +1431,7 @@ public class JukeANatorFrame extends JFrame {
         // currently-visible playStatus label (see setNowPlaying for details).
         // Dimensions must match the label's preferredSize to avoid clipping.
         playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif",
-            topPanelProfile.iconSize(), topPanelProfile.iconSize()));
+            LayoutTheme.get().nowPlayingGifW, topPanelProfile.iconSize()));
       }
     });
   }
