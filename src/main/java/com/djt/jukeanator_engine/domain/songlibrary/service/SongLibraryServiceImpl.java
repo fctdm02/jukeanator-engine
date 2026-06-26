@@ -1,7 +1,6 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import static java.util.Objects.requireNonNull;
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -23,8 +22,6 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
-import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
-import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -528,19 +525,12 @@ public class SongLibraryServiceImpl
       // Scan the file system for songs
       this.rootPath = scanRequest.getScanPath();
       this.songLibraryRoot.storeSongStatistics(this.rootPath);
-      this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath, this.rootPathWindows, this.rootPathUnix);
+      this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath, this.rootPathWindows,
+          this.rootPathUnix);
 
       // Restore song num plays, persist, then re-initialize the songLibraryRoot
-      int numRestored = this.songLibraryRoot.restoreSongStatisticsForRootPath(this.rootPath,
-          this.rootPathWindows);
-      if (numRestored == 0) {
-
-        String filename = "CDStats_backup_[OS_NAME].TXT";
-        OSType osType = OperatingSystemDetector.getOperatingSystem();
-        filename = filename.replace("[OS_NAME]", osType.toString().toLowerCase());
-        this.songLibraryRoot.restoreSongStatisticsForFile(this.rootPath, this.rootPathWindows,
-            this.rootPath + File.separator + filename);
-      }
+      this.songLibraryRoot.restoreSongStatisticsForRootPath(this.rootPath, this.rootPathWindows,
+          this.rootPathUnix);
 
       if (this.songLibraryRepository instanceof SongLibraryRepositoryFileSystemImpl) {
         ((SongLibraryRepositoryFileSystemImpl) this.songLibraryRepository)
@@ -598,7 +588,7 @@ public class SongLibraryServiceImpl
 
       // Restore the song statistics
       this.songLibraryRoot.restoreSongStatisticsForFile(this.rootPath, this.rootPathWindows,
-          filename);
+          this.rootPathUnix, filename);
 
       // Store the song library
       this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
