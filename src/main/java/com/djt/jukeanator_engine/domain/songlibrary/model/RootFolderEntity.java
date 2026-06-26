@@ -303,7 +303,7 @@ public class RootFolderEntity extends FolderEntity {
       initializeSongsByPathMap();
     }
 
-    SongFileEntity entity = songsByPathMap.get(songPathName);
+    SongFileEntity entity = songsByPathMap.get(songPathName.replace(":\\\\", ":\\"));
     if (entity != null) {
       return entity;
     }
@@ -311,6 +311,7 @@ public class RootFolderEntity extends FolderEntity {
   }
 
   private void initializeSongsByPathMap() {
+    
     this.songsByPathMap = new HashMap<>();
     for (SongFileEntity song : this.songsMap.values()) {
       String songPathName = song.getNaturalIdentity().replace(":\\\\", ":\\");
@@ -456,7 +457,7 @@ public class RootFolderEntity extends FolderEntity {
     for (SongFileEntity song : this.songsMap.values()) {
 
       String songPathName = song.getNaturalIdentity().toLowerCase();
-      songsByPath.put(songPathName, song);
+      songsByPath.put(songPathName.replace(":\\\\", ":\\"), song);
     }
 
     // NEW FORMAT
