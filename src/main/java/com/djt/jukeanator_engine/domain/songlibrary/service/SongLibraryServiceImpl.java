@@ -22,6 +22,8 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
+import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
+import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -112,7 +114,8 @@ public class SongLibraryServiceImpl
       log.error("Could not load song library from: " + rootPath
           + ", using empty song library songLibraryRoot for now, error: " + ednee.getMessage());
 
-      this.songLibraryRoot = new RootFolderEntity(this.rootPath);
+      this.songLibraryRoot =
+          new RootFolderEntity(this.rootPath, this.rootPathWindows, this.rootPathUnix);
       this.songLibraryRoot.initialize();
     }
 
@@ -525,7 +528,16 @@ public class SongLibraryServiceImpl
       // Scan the file system for songs
       this.rootPath = scanRequest.getScanPath();
       this.songLibraryRoot.storeSongStatistics(this.rootPath);
-      this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath);
+
+      OSType osType = OperatingSystemDetector.getOperatingSystem();
+      if (osType == OSType.WINDOWS) {
+        this.rootPathWindows = this.rootPath;
+      } else {
+        this.rootPathUnix = this.rootPath;
+      }
+
+      this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath, this.rootPathWindows,
+          this.rootPathUnix);
 
       // Restore song num plays, persist, then re-initialize the songLibraryRoot
       this.songLibraryRoot.restoreSongStatisticsForRootPath(this.rootPath, this.rootPathWindows,

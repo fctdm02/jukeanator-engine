@@ -31,6 +31,8 @@ public class RootFolderEntity extends FolderEntity {
   private static final String BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE =
       "BackgroundMusic_YetToBePlayed.TXT";
 
+  private String rootPathWindows;
+  private String rootPathUnix;
   private Set<ArtistFromSongEntity> artistsFromSongs = new TreeSet<ArtistFromSongEntity>();
 
   private transient Map<Integer, GenreFolderEntity> genresMap;
@@ -44,8 +46,78 @@ public class RootFolderEntity extends FolderEntity {
   private transient Map<String, SongFileEntity> songsByPathMap;
   private transient List<String> backgroundSongsYetToBePlayedList;
 
-  public RootFolderEntity(String rootPath) {
+  public RootFolderEntity(String rootPath, String rootPathWindows, String rootPathUnix) {
     super(null, rootPath);
+    this.rootPathWindows = rootPathWindows;
+    this.rootPathUnix = rootPathUnix;
+  }
+
+  public void initialize() {
+
+    this.genresMap = new TreeMap<>();
+    this.albumsByGenreMap = new TreeMap<>();
+    this.artistsMap = new TreeMap<>();
+    this.albumsMap = new TreeMap<>();
+    this.songsMap = new TreeMap<>();
+
+    // Iterate over artistsFromSongs and add to artistsMap
+    for (ArtistFromSongEntity artistFromSong : this.artistsFromSongs) {
+
+      String artistName = artistFromSong.getName();
+      if (!this.artistsMap.containsKey(artistName)) {
+        this.artistsMap.put(artistName, artistFromSong);
+      }
+    }
+
+    List<AlbumFolderEntity> allAlbums = getAllAlbums();
+    for (AlbumFolderEntity album : allAlbums) {
+
+      GenreFolderEntity genre = album.getParentGenre();
+      Integer genreId = genre.getPersistentIdentity();
+      if (!this.genresMap.containsKey(genreId)) {
+        this.genresMap.put(genreId, genre);
+      }
+
+      Set<AlbumFolderEntity> genreAlbums = null;
+      if (!this.albumsByGenreMap.containsKey(genre)) {
+        genreAlbums = new HashSet<>();
+        genreAlbums.add(album);
+        this.albumsByGenreMap.put(genre, genreAlbums);
+      } else {
+        genreAlbums = this.albumsByGenreMap.get(genre);
+        if (!genreAlbums.contains(album)) {
+          genreAlbums.add(album);
+        }
+      }
+
+      // For compilation albums, the song artist's will
+      // be in this collection, so there's no need to
+      // add the "Compilations" artist itself, as any of these
+      // albums will be retrievable via the song artist.
+      ArtistFolderEntity artist = album.getParentArtist();
+      String artistName = artist.getName();
+      if (!artistName.equals("Compilations")) {
+
+        if (!this.artistsMap.containsKey(artistName)) {
+          this.artistsMap.put(artistName, artist);
+        }
+      }
+
+      Integer albumId = album.getPersistentIdentity();
+      if (!this.albumsMap.containsKey(albumId)) {
+        this.albumsMap.put(albumId, album);
+      }
+
+      for (SongFileEntity song : album.getChildSongs()) {
+        this.songsMap.put(buildSongKey(albumId, song.getPersistentIdentity()), song);
+      }
+    }
+
+    try {
+      initializeBackgroundSongsYetToBePlayedList(getName());
+    } catch (Exception e) {
+      System.err.println("initializeBackgroundSongsYetToBePlayedList: " + e.getMessage());
+    }
   }
 
   public String getRootPath() {
@@ -180,74 +252,6 @@ public class RootFolderEntity extends FolderEntity {
     return songsMap.values();
   }
 
-  public void initialize() {
-
-    this.genresMap = new TreeMap<>();
-    this.albumsByGenreMap = new TreeMap<>();
-    this.artistsMap = new TreeMap<>();
-    this.albumsMap = new TreeMap<>();
-    this.songsMap = new TreeMap<>();
-
-    // Iterate over artistsFromSongs and add to artistsMap
-    for (ArtistFromSongEntity artistFromSong : this.artistsFromSongs) {
-
-      String artistName = artistFromSong.getName();
-      if (!this.artistsMap.containsKey(artistName)) {
-        this.artistsMap.put(artistName, artistFromSong);
-      }
-    }
-
-    List<AlbumFolderEntity> allAlbums = getAllAlbums();
-    for (AlbumFolderEntity album : allAlbums) {
-
-      GenreFolderEntity genre = album.getParentGenre();
-      Integer genreId = genre.getPersistentIdentity();
-      if (!this.genresMap.containsKey(genreId)) {
-        this.genresMap.put(genreId, genre);
-      }
-
-      Set<AlbumFolderEntity> genreAlbums = null;
-      if (!this.albumsByGenreMap.containsKey(genre)) {
-        genreAlbums = new HashSet<>();
-        genreAlbums.add(album);
-        this.albumsByGenreMap.put(genre, genreAlbums);
-      } else {
-        genreAlbums = this.albumsByGenreMap.get(genre);
-        if (!genreAlbums.contains(album)) {
-          genreAlbums.add(album);
-        }
-      }
-
-      // For compilation albums, the song artist's will
-      // be in this collection, so there's no need to
-      // add the "Compilations" artist itself, as any of these
-      // albums will be retrievable via the song artist.
-      ArtistFolderEntity artist = album.getParentArtist();
-      String artistName = artist.getName();
-      if (!artistName.equals("Compilations")) {
-
-        if (!this.artistsMap.containsKey(artistName)) {
-          this.artistsMap.put(artistName, artist);
-        }
-      }
-
-      Integer albumId = album.getPersistentIdentity();
-      if (!this.albumsMap.containsKey(albumId)) {
-        this.albumsMap.put(albumId, album);
-      }
-
-      for (SongFileEntity song : album.getChildSongs()) {
-        this.songsMap.put(buildSongKey(albumId, song.getPersistentIdentity()), song);
-      }
-    }
-
-    try {
-      initializeBackgroundSongsYetToBePlayedList(getName());
-    } catch (Exception e) {
-      System.err.println("initializeBackgroundSongsYetToBePlayedList: " + e.getMessage());
-    }
-  }
-
   public void resetSongStatistics() {
     if (this.songsMap == null) {
       initialize();
@@ -293,25 +297,25 @@ public class RootFolderEntity extends FolderEntity {
         "Song with songId: [" + songId + "] and albumId: [" + albumId + "] not found.");
   }
 
-  public SongFileEntity getSongByPath(String songPathname) throws EntityDoesNotExistException {
+  public SongFileEntity getSongByPath(String songPathName) throws EntityDoesNotExistException {
 
     if (songsByPathMap == null) {
       initializeSongsByPathMap();
     }
 
-    SongFileEntity entity = songsByPathMap.get(songPathname);
+    SongFileEntity entity = songsByPathMap.get(songPathName);
     if (entity != null) {
       return entity;
     }
-    throw new EntityDoesNotExistException("Song with path: [" + songPathname + "] not found.");
+    throw new EntityDoesNotExistException("Song with path: [" + songPathName + "] not found.");
   }
 
   private void initializeSongsByPathMap() {
     this.songsByPathMap = new HashMap<>();
     for (SongFileEntity song : this.songsMap.values()) {
-      String songPathname = song.getNaturalIdentity();
-      if (songPathname != null && !this.songsByPathMap.containsKey(songPathname)) {
-        this.songsByPathMap.put(songPathname, song);
+      String songPathName = song.getNaturalIdentity().replace(":\\\\", ":\\");
+      if (songPathName != null && !this.songsByPathMap.containsKey(songPathName)) {
+        this.songsByPathMap.put(songPathName, song);
       }
     }
   }
@@ -334,7 +338,8 @@ public class RootFolderEntity extends FolderEntity {
 
   private void initializeBackgroundSongsYetToBePlayedList(String rootPath) {
 
-    String pathname = rootPath + RootFolderEntity.BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE;
+    String pathname =
+        rootPath + File.separator + RootFolderEntity.BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE;
     Path file = Path.of(pathname);
     Path primaryPlaylistFile =
         Path.of(rootPath + File.separator + RootFolderEntity.BACKGROUND_MUSIC_FILE);
@@ -342,14 +347,14 @@ public class RootFolderEntity extends FolderEntity {
     try {
 
       if (!Files.exists(primaryPlaylistFile)) {
-        createBackgroundMusicPlaylistFromTopSongs(rootPath);
+        createBackgroundMusicPlaylistFromTopSongs(rootPath, rootPathWindows, rootPathUnix);
       }
 
       if (!Files.exists(file)) {
         try {
           copyBackgroundMusicPlaylist(rootPath);
         } catch (Exception e) {
-          createBackgroundMusicPlaylistFromTopSongs(rootPath);
+          createBackgroundMusicPlaylistFromTopSongs(rootPath, rootPathWindows, rootPathUnix);
           copyBackgroundMusicPlaylist(rootPath);
         }
       }
@@ -359,7 +364,7 @@ public class RootFolderEntity extends FolderEntity {
         songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
             .filter(line -> !line.isEmpty()).toList();
       } catch (IOException e) {
-        createBackgroundMusicPlaylistFromTopSongs(rootPath);
+        createBackgroundMusicPlaylistFromTopSongs(rootPath, rootPathWindows, rootPathUnix);
         copyBackgroundMusicPlaylist(rootPath);
         songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
             .filter(line -> !line.isEmpty()).toList();
@@ -375,7 +380,7 @@ public class RootFolderEntity extends FolderEntity {
         }
 
         if (songs.isEmpty()) {
-          createBackgroundMusicPlaylistFromTopSongs(rootPath);
+          createBackgroundMusicPlaylistFromTopSongs(rootPath, rootPathWindows, rootPathUnix);
           copyBackgroundMusicPlaylist(rootPath);
           songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
               .filter(line -> !line.isEmpty()).toList();
@@ -430,6 +435,13 @@ public class RootFolderEntity extends FolderEntity {
   public int restoreSongStatisticsForFile(String rootPath, String rootPathWindows,
       String rootPathUnix, String filename) {
 
+    // Normalize rootPathWindows in case the config value was loaded with a double backslash
+    // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
+    // CDStats.TXT always stores single-backslash Windows paths, so we must match that form.
+    String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
+
+    OSType osType = OperatingSystemDetector.getOperatingSystem();
+
     Path statsFile = Path.of(filename);
     if (!Files.exists(statsFile)) {
       System.err.println("CD stats file does not exist: " + filename);
@@ -443,8 +455,8 @@ public class RootFolderEntity extends FolderEntity {
     Map<String, SongFileEntity> songsByPath = new HashMap<>();
     for (SongFileEntity song : this.songsMap.values()) {
 
-      String songPathname = song.getNaturalIdentity().toLowerCase();
-      songsByPath.put(songPathname, song);
+      String songPathName = song.getNaturalIdentity().toLowerCase();
+      songsByPath.put(songPathName, song);
     }
 
     // NEW FORMAT
@@ -465,15 +477,9 @@ public class RootFolderEntity extends FolderEntity {
 
         try {
 
-          // Normalize rootPathWindows in case the config value was loaded with a double backslash
-          // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
-          // CDStats.TXT always stores single-backslash Windows paths, so we must match that form.
-          String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
-
           // See if we need to fix up song pathnames that we read in.
           boolean switchToUnixFormat = false;
           boolean switchToWindowsFormat = false;
-          OSType osType = OperatingSystemDetector.getOperatingSystem();
           if (osType == OSType.WINDOWS && !line.contains(normalizedRootPathWindows)) {
             switchToWindowsFormat = true;
           } else if ((osType == OSType.LINUX || osType == OSType.MACOS)
@@ -563,6 +569,12 @@ public class RootFolderEntity extends FolderEntity {
   public SongFileEntity getRandomSongFromBackgroundMusicPlaylist(String rootPath,
       String rootPathWindows, String rootPathUnix) {
 
+    // Normalize rootPathWindows in case the config value was loaded with a double backslash
+    // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
+    String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
+
+    OSType osType = OperatingSystemDetector.getOperatingSystem();
+
     if (this.songsMap == null) {
       initialize();
     }
@@ -573,36 +585,31 @@ public class RootFolderEntity extends FolderEntity {
       initializeBackgroundSongsYetToBePlayedList(rootPath);
     }
 
-    String songPathname = null;
+    String songPathName = null;
 
     if (this.backgroundSongsYetToBePlayedList.size() == 1) {
-      songPathname = this.backgroundSongsYetToBePlayedList.remove(0);
+      songPathName = this.backgroundSongsYetToBePlayedList.remove(0);
     } else {
       int index = ThreadLocalRandom.current().nextInt(this.backgroundSongsYetToBePlayedList.size());
-      songPathname = this.backgroundSongsYetToBePlayedList.remove(index);
+      songPathName = this.backgroundSongsYetToBePlayedList.remove(index);
     }
-
-    // Normalize rootPathWindows in case the config value was loaded with a double backslash
-    // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
-    String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
 
     // See if we need to fix up song pathnames that we read in.
     boolean switchToUnixFormat = false;
     boolean switchToWindowsFormat = false;
-    OSType osType = OperatingSystemDetector.getOperatingSystem();
-    if (osType == OSType.WINDOWS && !songPathname.contains(normalizedRootPathWindows)) {
+    if (osType == OSType.WINDOWS && !songPathName.contains(normalizedRootPathWindows)) {
       switchToWindowsFormat = true;
     } else if ((osType == OSType.LINUX || osType == OSType.MACOS)
-        && !songPathname.contains(rootPathUnix)) {
+        && !songPathName.contains(rootPathUnix)) {
       switchToUnixFormat = true;
     }
 
     if (switchToUnixFormat) {
-      songPathname =
-          songPathname.replace(normalizedRootPathWindows, rootPathUnix).replace("\\", "/");
+      songPathName =
+          songPathName.replace(normalizedRootPathWindows, rootPathUnix).replace("\\", "/");
     } else if (switchToWindowsFormat) {
-      songPathname =
-          songPathname.replace(rootPathUnix, normalizedRootPathWindows).replace("/", "\\");
+      songPathName =
+          songPathName.replace(rootPathUnix, normalizedRootPathWindows).replace("/", "\\");
     }
 
     writeBackgroundSongsYetToBePlayed(rootPath);
@@ -612,14 +619,21 @@ public class RootFolderEntity extends FolderEntity {
     }
 
     try {
-      return getSongByPath(songPathname);
+      return getSongByPath(songPathName);
     } catch (EntityDoesNotExistException e) {
-      throw new IllegalStateException("Background music song not found in library: " + songPathname,
+      throw new IllegalStateException("Background music song not found in library: " + songPathName,
           e);
     }
   }
 
-  private void createBackgroundMusicPlaylistFromTopSongs(String rootPath) {
+  private void createBackgroundMusicPlaylistFromTopSongs(String rootPath, String rootPathWindows,
+      String rootPathUnix) {
+
+    // Normalize rootPathWindows in case the config value was loaded with a double backslash
+    // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
+    String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
+
+    OSType osType = OperatingSystemDetector.getOperatingSystem();
 
     if (this.songsMap == null) {
       initialize();
@@ -637,16 +651,33 @@ public class RootFolderEntity extends FolderEntity {
         Files.newBufferedWriter(Path.of(backgroundMusicPathname), StandardCharsets.UTF_8)) {
 
       int count = 0;
-
       for (SongFileEntity song : songs) {
 
-        String songPath = song.getNaturalIdentity();
+        String songPathName = song.getNaturalIdentity();
 
-        if (songPath == null || songPath.isBlank()) {
+        // See if we need to fix up song pathnames that we read in.
+        boolean switchToUnixFormat = false;
+        boolean switchToWindowsFormat = false;
+        if (osType == OSType.WINDOWS && !songPathName.contains(normalizedRootPathWindows)) {
+          switchToWindowsFormat = true;
+        } else if ((osType == OSType.LINUX || osType == OSType.MACOS)
+            && !songPathName.contains(rootPathUnix)) {
+          switchToUnixFormat = true;
+        }
+
+        if (switchToUnixFormat) {
+          songPathName =
+              songPathName.replace(normalizedRootPathWindows, rootPathUnix).replace("\\", "/");
+        } else if (switchToWindowsFormat) {
+          songPathName =
+              songPathName.replace(rootPathUnix, normalizedRootPathWindows).replace("/", "\\");
+        }
+
+        if (songPathName == null || songPathName.isBlank()) {
           continue;
         }
 
-        writer.write(songPath);
+        writer.write(songPathName);
         writer.newLine();
 
         count++;
@@ -660,8 +691,8 @@ public class RootFolderEntity extends FolderEntity {
           + backgroundMusicPathname);
 
     } catch (IOException e) {
-      throw new IllegalStateException(
-          "Failed to create background music playlist: " + backgroundMusicPathname, e);
+      throw new IllegalStateException("Failed to create background music playlist: "
+          + backgroundMusicPathname + ", error: " + e.getMessage());
     }
   }
 }
