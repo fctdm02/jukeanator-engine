@@ -496,24 +496,29 @@ public class JukeANatorFrame extends JFrame {
       private static final int VISIBLE_TAB_COUNT = 5;
 
       /**
-       * Returns the width for a single visible tab: screen width divided evenly among the five
-       * visible tabs (HOME, SEARCH, HOT HERE, GENRES, QUEUE).
+       * Returns the width for a single visible tab.
+       *
+       * <p>
+       * In portrait mode (pane width ≤ screen height) the five tabs share the full pane width
+       * evenly, exactly as before. In landscape mode the tab width is capped at
+       * {@link LayoutTheme#tabWidth} so the tabs stay compact and centred rather than stretching
+       * across the wide screen.
        */
       private int visibleTabWidth() {
-        // tabPane.getWidth() reflects the actual rendered width (1080 px in portrait,
-        // 1920 px in landscape, etc.). Dividing by VISIBLE_TAB_COUNT fills the bar
-        // completely with no left-over gap regardless of screen width.
         int paneW = tabPane.getWidth();
         if (paneW <= 0) {
           // Fallback before the pane has been laid out the first time.
           return LayoutTheme.get().tabWidth;
         }
-        return paneW / VISIBLE_TAB_COUNT;
+        // Portrait: fill the full bar width (paneW ≈ 1080 px → 216 px/tab — fine).
+        // Landscape: paneW ≈ 1920 px → 384 px/tab — too wide; cap at tabWidth (200 px).
+        int natural = paneW / VISIBLE_TAB_COUNT;
+        return Math.min(natural, LayoutTheme.get().tabWidth);
       }
 
       //
       // PER-TAB WIDTH — invisible tabs (0 = left dummy, 6 = admin) get 0 px;
-      // the five visible tabs share the full pane width equally.
+      // the five visible tabs are sized by visibleTabWidth().
       //
       @Override
       protected int calculateTabWidth(int tabPlacement, int tabIndex, FontMetrics metrics) {
@@ -529,14 +534,21 @@ public class JukeANatorFrame extends JFrame {
       }
 
       //
-      // NO INSET NEEDED — the five visible tabs already fill the full width.
-      // Remove the old centering inset so no scroll-pane artefact appears.
+      // CENTER the tab group horizontally.
+      //
+      // In portrait the tabs fill the full bar width, so leftInset == 0 and
+      // behaviour is unchanged. In landscape the tabs are narrower than the
+      // bar, so we compute a left inset that centres the group.
       //
       @Override
       protected java.awt.Insets getTabAreaInsets(int tabPlacement) {
         java.awt.Insets base = super.getTabAreaInsets(tabPlacement);
-        // Zero out the left inset; the tabs are full-width by construction.
-        return new java.awt.Insets(base.top, 0, base.bottom, 0);
+        int paneW = tabPane.getWidth();
+        int groupW = visibleTabWidth() * VISIBLE_TAB_COUNT;
+        // left inset = half of the remaining space; clamp to zero in portrait
+        // where groupW == paneW (or very close).
+        int leftInset = Math.max(0, (paneW - groupW) / 2);
+        return new java.awt.Insets(base.top, leftInset, base.bottom, 0);
       }
 
       @Override
@@ -618,9 +630,9 @@ public class JukeANatorFrame extends JFrame {
     // Index 6 : ADMIN (zero-width, disabled — reached only via LoginToAdminPanelCard)
     //
     // calculateTabWidth() returns 0 for indices 0 and 6, and
-    // paneWidth / 5 for the five visible tabs (indices 1–5).
-    // getTabAreaInsets() returns a zero left inset so the visible tabs
-    // start at x=0 and fill the entire tab-bar width with no scroll widget.
+    // min(paneWidth / 5, tabWidth) for the five visible tabs (indices 1–5).
+    // In portrait the natural width fills the bar; in landscape the width is
+    // capped at tabWidth and getTabAreaInsets() centres the group horizontally.
 
     // Index 0 — invisible dummy (left balancer)
     tabs.addTab("", new JPanel());
