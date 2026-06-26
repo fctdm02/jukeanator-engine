@@ -167,6 +167,10 @@ public class LayoutTheme {
     albumTileInnerPad = 1;
     genreTileInnerPad = 16;
 
+    // ── Album grid gaps ────────────────────────────────────────────────────────
+    albumGridGapH = 10;
+    albumGridGapV = 10;
+
     // ── Portrait art/image reduction factors ──────────────────────────────────
     portraitArtReduction = 0.85; // landscape default (not used in landscape path)
     genrePortraitImgReduction = 0.80; // landscape default (not used in landscape path)
@@ -174,6 +178,20 @@ public class LayoutTheme {
     // ── Now-playing panel ─────────────────────────────────────────────────────
     nowPlayingGifW = 96; // matches topPanelIconSize in landscape
     fontSizeNowPlayingSong = 17; // matches fontSizeTrackSong in landscape
+
+    // ── Font sizes (header) ───────────────────────────────────────────────────
+    fontSizeDetailTitle = 26;
+    fontSizeAlbumLabel = 14;
+
+    // ── Tab bar ────────────────────────────────────────────────────────────────
+    tabHeight = 96;
+    tabIconFontSize = 34;
+    tabTextFontSize = 20;
+    tabComponentBorderV = 8;
+
+    // ── Detail header image ────────────────────────────────────────────────────
+    detailHeaderImageW = 72;
+    detailHeaderImageH = 72;
 
     // ── Derived Dimension fields ───────────────────────────────────────────────
     // Must be initialised after the primitives they depend on.
@@ -235,10 +253,28 @@ public class LayoutTheme {
       genreTileInnerPad = 8;
       genrePortraitImgReduction = 1.20;
 
+      // Album grid gaps — same as landscape for portrait
+      albumGridGapH = 10;
+      albumGridGapV = 10;
+
       // ── Item 1.1 : Wider side panels + smaller now-playing text ─────────────
       topPanelSidePct = 0.38;
       nowPlayingGifW = 52;
       fontSizeNowPlayingSong = 14;
+
+      // Detail header font, album label font — same as landscape for portrait
+      fontSizeDetailTitle = 26;
+      fontSizeAlbumLabel = 14;
+
+      // Tab bar — same as landscape for portrait
+      tabHeight = 96;
+      tabIconFontSize = 34;
+      tabTextFontSize = 20;
+      tabComponentBorderV = 8;
+
+      // Detail header image — same as landscape for portrait
+      detailHeaderImageW = 72;
+      detailHeaderImageH = 72;
 
     } else {
       // ── SMALL_LANDSCAPE (1024 × 768 and similar) ────────────────────────────
@@ -272,31 +308,74 @@ public class LayoutTheme {
       // ── Item 4 : Reduce prev/next navigation buttons by 40 % ────────────────
       //
       // At 1024 px wide the letter-strip has very little room when the nav buttons
-      // are full-size (140 px each). Reducing them to 84 px (−40 %) gives back
+      // are full-size (140 px each). Reducing them to 84 px (-40 %) gives back
       // ~112 px for the letter buttons without affecting any other resolution.
       //
       navBtnW = 84; // landscape default: 140
-      navBtnH = 36; // height unchanged — still comfortable to tap
+      navBtnH = 36; // height unchanged -- still comfortable to tap
       genrePaginationBtnW = 84; // landscape default: 140
       genrePaginationBtnH = 36;
 
-      // ── Item 1 : Now-playing panel — hide animated GIF, widen text area ─────
+      // ── Album grid tile gaps ──────────────────────────────────────────────────
       //
-      // At 1024 × 768 the now-playing wrapper is ~307 px wide (30 % of 984 usable).
-      // The animated GIF consumes 96 px of that, leaving only ~115 px for song/artist
-      // text before the cover art — causing severe clipping on typical song names.
+      // Reduce inter-tile gaps from 10 px to 4 px. The reclaimed vertical space
+      // (2 gaps x 6 px saving = 12 px) is redistributed by the art-size calculation
+      // in computeSmallLandscapeProfile(), which re-runs each time with the new gap
+      // values, so the art grows slightly to fill the freed space. The tighter gap
+      // also means the cover art no longer starts flush against the tile top edge --
+      // the tile's EmptyBorder padding (albumTileInnerPad) now has room to breathe.
       //
-      // Fix: set nowPlayingGifW to 0 so buildNowPlayingPanel() gives the GIF label
-      // zero preferred width, which effectively hides it and returns the full text
-      // area to the song / artist / album labels. The cover art icon on the right
-      // is unchanged and continues to identify the album at a glance.
+      albumGridGapH = 4; // landscape default: 10
+      albumGridGapV = 4; // landscape default: 10
+
+      // ── Item 1 : Now-playing panel -- narrow animated GIF, wider text area ────
       //
-      // topPanelSidePct is nudged up to 0.35 (35 %) so the wrapper is ~345 px wide,
-      // giving the three text lines comfortable room even for long song names.
+      // At 1024 x 768 the now-playing wrapper is ~345 px wide (35 % of 984 usable).
+      // A 32 px GIF leaves ~245 px for song/artist text alongside the cover art.
       //
       topPanelSidePct = 0.35; // landscape default: 0.30
-      nowPlayingGifW = 0; // hide animated GIF — zero-width label
+      nowPlayingGifW = 32; // narrow GIF; landscape default: 96
       fontSizeNowPlayingSong = 13; // smaller font so long names don't wrap
+
+      // ── "ALL ALBUMS" header font ──────────────────────────────────────────────
+      //
+      // The DetailHeaderPanel uses fontSizeDetailTitle for its primary label.
+      // At 1024 x 768 the header bar is shorter and 26 pt looks oversized;
+      // 20 pt keeps the heading readable while reclaiming vertical space.
+      //
+      fontSizeDetailTitle = 20; // landscape default: 26
+
+      // ── "ALL ALBUMS" header icon size ─────────────────────────────────────────
+      //
+      // The DetailHeaderPanel positions the icon at detailHeaderImageW x detailHeaderImageH.
+      // Reducing it from 72 x 72 to 40 x 40 shrinks the header bar height by ~32 px,
+      // handing that space back to the album grid.
+      //
+      detailHeaderImageW = 40; // landscape default: 72
+      detailHeaderImageH = 40; // landscape default: 72
+
+      // ── Tab bar height and font sizes ─────────────────────────────────────────
+      //
+      // The JTabbedPane tab bar sits at the SOUTH of the content pane and consumes
+      // tabHeight pixels regardless of content. At 1024 x 768 those 96 px are
+      // precious; reducing to 64 px saves 32 px for the album grid.
+      // Font sizes scale down proportionally so the icon and label still fit
+      // comfortably within the shorter tab.
+      //
+      tabHeight = 52; // landscape default: 96 (saves 44 px vs original)
+      tabIconFontSize = 20; // landscape default: 34 (fits in 52px height)
+      tabTextFontSize = 12; // landscape default: 20 (fits in 52px height)
+      tabComponentBorderV = 2; // landscape default: 8 (icon+label+padding fits in 52px)
+
+      // ── Album tile label font size ────────────────────────────────────────────
+      //
+      // Reducing the album name label font from 14 pt to 11 pt shrinks the rendered
+      // text panel height inside each tile. Combined with the smaller tile text
+      // height hint used in computeSmallLandscapeProfile (SMALL_TILE_TEXT_H = 36),
+      // the art image is sized ~20 px larger and the art fills more of the tile,
+      // leaving just enough padding at the top for a comfortable look.
+      //
+      fontSizeAlbumLabel = 11; // landscape default: 14
     }
 
     // Derived Dimension fields — always computed last from the primitives set above.
@@ -479,43 +558,96 @@ public class LayoutTheme {
    * Grid profile for small landscape screens (≤ 1280 × 800).
    *
    * <p>
-   * Differs from the standard landscape path in two ways:
-   * <ul>
-   * <li>The art tiles are scaled against the actual screen dimensions instead of the canonical 1920
-   * × 1080 reference, so tiles are sized to actually fill the available space.</li>
-   * <li>The column and row counts are capped at {@value #GRID_MAX_COLS_SMALL_LANDSCAPE} ×
-   * {@value #GRID_MAX_ROWS_SMALL_LANDSCAPE} (3 × 2) — Items 2 and 3. Fewer, larger tiles give album
-   * names enough width to display without clipping and keep the touch targets comfortably
-   * large.</li>
-   * </ul>
+   * Uses a <em>tile-cell-aware</em> formula that derives the square art size from the actual pixel
+   * height and width each tile cell receives from the {@code GridLayout}, rather than from a
+   * simplified top-down deduction. This guarantees the art is always square and never overflows its
+   * tile.
+   *
+   * <h3>Height calculation (binding axis on 1024 × 768)</h3>
+   * <ol>
+   * <li>{@code gridPanelH = screenH - topPanelH - tabHeight - detailHeaderH - navStripH}</li>
+   * <li>{@code tileCellH = (gridPanelH - gapV*(rows-1) - GRID_BORDER_V) / rows}</li>
+   * <li>{@code artH = tileCellH - SMALL_TILE_TEXT_H - TILE_BORDER_V}</li>
+   * </ol>
+   *
+   * <h3>Width calculation</h3>
+   * <ol>
+   * <li>{@code tileCellW = (screenW - gapH*(cols-1) - GRID_BORDER_H) / cols}</li>
+   * <li>{@code artW = tileCellW - TILE_BORDER_H}</li>
+   * </ol>
+   *
+   * <p>
+   * {@code artSize = min(artH, artW)}, rounded down to an even integer.
    */
   private GridProfile computeSmallLandscapeProfile(int screenW, int screenH) {
 
-    // Scale against the actual screen, not the canonical 1920 × 1080 reference,
-    // so tiles genuinely fill the available area rather than being undersized.
-    double scaleX = (double) screenW / CANONICAL_W;
-    double scaleY = (double) screenH / CANONICAL_H;
-    double scale = Math.min(scaleX, scaleY);
-    scale = Math.max(GRID_SCALE_MIN, Math.min(scale, GRID_SCALE_MAX));
+    final int cols = GRID_MAX_COLS_SMALL_LANDSCAPE; // 3
+    final int rows = GRID_MAX_ROWS_SMALL_LANDSCAPE; // 2
 
-    int artW = roundEven((int) Math.round(homeArtW * scale));
-    int artH = roundEven((int) Math.round(homeArtH * scale));
+    // ── Height axis ────────────────────────────────────────────────────────────
+    //
+    // The AlbumGridPanel lives inside a card that also contains the DetailHeaderPanel
+    // (NORTH) and the nav strip (SOUTH). GridLayout then distributes gridPanelH evenly
+    // across the rows, each tile cell receiving tileCellH pixels. The art must fit
+    // inside that cell after subtracting the text panel and tile border.
+    //
+    // detailHeaderH = detailHeaderImageH + DETAIL_HEADER_BORDER_V (4 top + 4 bottom)
+    int detailHeaderH = detailHeaderImageH + DETAIL_HEADER_BORDER_V;
 
-    int availH = screenH - topPanelHeight - tabHeight - LETTER_NAV_H - TILE_TEXT_H - GRID_PADDING_V;
-    int availW = screenW - GRID_PADDING_H;
+    // gridPanelH: screen minus everything that is NOT the grid panel.
+    int gridPanelH = screenH - topPanelHeight - tabHeight - detailHeaderH - LETTER_NAV_H;
 
-    int tileW = artW + albumGridGapH;
-    int tileH = artH + albumGridGapV;
+    // Each tile cell's height from GridLayout: total minus grid's own border and
+    // inter-tile vertical gaps, divided by the row count.
+    int tileCellH = (gridPanelH - GRID_BORDER_V - albumGridGapV * (rows - 1)) / rows;
 
-    int cols = Math.max(1, availW / tileW);
-    int rows = Math.max(1, availH / tileH);
+    // Art height = tile cell minus the text panel below the art and the tile's own border.
+    int artH = tileCellH - SMALL_LANDSCAPE_TILE_TEXT_H - TILE_BORDER_V;
 
-    // Hard caps: 3 columns × 2 rows (Items 2 & 3).
-    cols = Math.min(cols, GRID_MAX_COLS_SMALL_LANDSCAPE);
-    rows = Math.min(rows, GRID_MAX_ROWS_SMALL_LANDSCAPE);
+    // ── Width axis ─────────────────────────────────────────────────────────────
+    //
+    // GridLayout distributes gridPanelW (= screenW) across cols after the grid's own
+    // horizontal border and inter-tile horizontal gaps.
+    int tileCellW = (screenW - GRID_BORDER_H - albumGridGapH * (cols - 1)) / cols;
+    int artW = tileCellW - TILE_BORDER_H;
 
-    return new GridProfile(cols, rows, artW, artH);
+    // ── Square art size ────────────────────────────────────────────────────────
+    //
+    // Use the smaller axis so the image is always square and never overflows.
+    // Round down to the nearest even integer for clean image scaling.
+    int artSize = roundEven(Math.min(artH, artW));
+    artSize = Math.max(artSize, 80); // safety floor
+
+    return new GridProfile(cols, rows, artSize, artSize);
   }
+
+  // ── Small-landscape tile geometry constants ────────────────────────────────
+  //
+  // These mirror the hard-coded values in AlbumGridPanel / HomePanel that
+  // determine how the grid panel and individual tiles consume vertical space.
+  // They are declared here (not in AlbumGridPanel) so computeSmallLandscapeProfile
+  // can read them without introducing a circular dependency.
+
+  /** Top + bottom {@code EmptyBorder} of the DetailHeaderPanel in HomePanel (4 + 4 px). */
+  private static final int DETAIL_HEADER_BORDER_V = 8;
+
+  /**
+   * Top + bottom {@code EmptyBorder} of the {@code gridPanel} ({@code EmptyBorder(8,12,4,12)} →
+   * 8+4=12 px).
+   */
+  private static final int GRID_BORDER_V = 12;
+
+  /**
+   * Left + right {@code EmptyBorder} of the {@code gridPanel} ({@code EmptyBorder(8,12,4,12)} →
+   * 12+12=24 px).
+   */
+  private static final int GRID_BORDER_H = 24;
+
+  /** Top + bottom of the tile's own {@code EmptyBorder(1,1,1,1)} (1+1=2 px). */
+  private static final int TILE_BORDER_V = 2;
+
+  /** Left + right of the tile's own {@code EmptyBorder(1,1,1,1)} (1+1=2 px). */
+  private static final int TILE_BORDER_H = 2;
 
 
   // Adjust these if the fixed-chrome heights change or the aesthetics need tuning.
@@ -537,6 +669,13 @@ public class LayoutTheme {
    * ~16px each, plus 6px top/bottom padding = ~44px.
    */
   private static final int TILE_TEXT_H = 44;
+
+  /**
+   * Tile text panel height for small-landscape mode, where the album label font is reduced to 11 pt
+   * and the artist label stays at 12 pt. Two lines × ~14px each, plus ~8px padding = ~36px. Used
+   * only by {@link #computeSmallLandscapeProfile}.
+   */
+  private static final int SMALL_LANDSCAPE_TILE_TEXT_H = 36;
 
   /**
    * Total vertical padding of the grid panel ({@code EmptyBorder(8,12,4,12)} = 12px top+bottom).
@@ -873,16 +1012,23 @@ public class LayoutTheme {
   public final int tabWidth = 200;
 
   /** Height of each tab header. */
-  public final int tabHeight = 96;
+  public final int tabHeight;
 
   /** Height of the painted separator line between the tab bar and content area. */
   public final int tabSeparatorHeight = 2;
 
   /** Icon font size inside each JukeboxTabComponent. */
-  public final int tabIconFontSize = 34;
+  public final int tabIconFontSize;
 
   /** Text font size inside each JukeboxTabComponent. */
-  public final int tabTextFontSize = 20;
+  public final int tabTextFontSize;
+
+  /**
+   * Top and bottom padding (px) inside each {@code JukeboxTabComponent} border. Default: 8px.
+   * Reduced to 4px for small-landscape (1024x768) so the icon and label fit within the shorter
+   * {@link #tabHeight}.
+   */
+  public final int tabComponentBorderV;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // COUNTDOWN TIMEOUT (AlbumDetailCard, AddSongToQueueCard, SongQueueCard,
@@ -917,10 +1063,10 @@ public class LayoutTheme {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /** Horizontal gap between tiles in AlbumGridPanel. */
-  public final int albumGridGapH = 10;
+  public final int albumGridGapH;
 
   /** Vertical gap between tiles in AlbumGridPanel. */
-  public final int albumGridGapV = 10;
+  public final int albumGridGapV;
 
   /** Inner padding (all sides) inside each album tile border. */
   public final int albumTileInnerPad;
@@ -974,10 +1120,10 @@ public class LayoutTheme {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /** Width of the cover-art / icon image in the detail header. */
-  public final int detailHeaderImageW = 72;
+  public final int detailHeaderImageW;
 
   /** Height of the cover-art / icon image in the detail header. */
-  public final int detailHeaderImageH = 72;
+  public final int detailHeaderImageH;
 
   /** Preferred size of the detail header image label (derived). */
   public final Dimension detailHeaderImageSize;
@@ -1359,11 +1505,11 @@ public class LayoutTheme {
 
   // Navigation & header
   public final int fontSizeNavBtn = 18; // ButtonFactory, AlbumDetailCard back button
-  public final int fontSizeDetailTitle = 26; // DetailHeaderPanel title label
+  public final int fontSizeDetailTitle; // DetailHeaderPanel title label
   public final int fontSizeDetailSubtitle = 14; // DetailHeaderPanel subtitle label
   public final int fontSizeAdminHeader = 22; // AdminPanel header title
   public final int fontSizeAdminSection = 14; // AdminPanel section header labels
-  public final int fontSizeAlbumLabel = 14; // AlbumGridPanel tile album name
+  public final int fontSizeAlbumLabel; // AlbumGridPanel tile album name
   public final int fontSizeArtistLabel = 12; // AlbumGridPanel tile artist name
   public final int fontSizePageLabel = 15; // Pagination page labels
   public final int fontSizeSortBtn = 18; // GenreDetailPanel sort buttons

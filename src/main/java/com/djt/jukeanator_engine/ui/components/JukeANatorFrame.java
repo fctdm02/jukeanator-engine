@@ -720,9 +720,9 @@ public class JukeANatorFrame extends JFrame {
       this.accentColor = accentColor;
       setOpaque(false);
       setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-      // Vertical padding only — horizontal space is provided by the tab width itself.
-      // A fixed left/right inset would fight the full-width layout and off-centre the icon+label.
-      setBorder(new EmptyBorder(8, 0, 8, 0));
+      // Vertical padding scales with tabHeight so the icon+label fit without clipping.
+      int bv = LayoutTheme.get().tabComponentBorderV;
+      setBorder(new EmptyBorder(bv, 0, bv, 0));
 
       //
       // ICON

@@ -199,9 +199,12 @@ public class HomePanel extends JPanel implements TabNavigator {
     // ── Item #2: Build ordered letter→albums map (#, A–Z) ───────────────────
     Map<String, List<AlbumDto>> letterMap = buildLetterMap(allAlbums);
 
-    // Use a smaller icon (48×48 instead of 72×72) so the header occupies less
-    // vertical space and gives the album grid more room.
-    ImageIcon allAlbumsIcon = imageLoader.loadImage("AllAlbumsLogo.png", 48, 48);
+    // Icon size is read from LayoutTheme so that the header shrinks on small-landscape
+    // displays (1024x768) where detailHeaderImageW/H are reduced to 40px, keeping the
+    // header compact and giving the album grid more vertical room.
+    int headerIconSize = LayoutTheme.get().detailHeaderImageW;
+    ImageIcon allAlbumsIcon =
+        imageLoader.loadImage("AllAlbumsLogo.png", headerIconSize, headerIconSize);
     DetailHeaderPanel header = new DetailHeaderPanel(null, null, allAlbumsIcon, "♫", "ALL ALBUMS",
         allAlbums.size() + " albums");
     header.setOpaque(false);

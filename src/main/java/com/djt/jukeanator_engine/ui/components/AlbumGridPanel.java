@@ -157,7 +157,8 @@ public class AlbumGridPanel extends JPanel {
 
     // ── Grid ──────────────────────────────────────────────────────────────
     gridPanel.removeAll();
-    gridPanel.setLayout(new GridLayout(albumGridProfile.rows(), albumGridProfile.cols(), 10, 10));
+    gridPanel.setLayout(new GridLayout(albumGridProfile.rows(), albumGridProfile.cols(),
+        LayoutTheme.get().albumGridGapH, LayoutTheme.get().albumGridGapV));
     gridPanel.setBorder(new EmptyBorder(8, 12, 4, 12));
 
     for (int i = start; i < end; i++) {
