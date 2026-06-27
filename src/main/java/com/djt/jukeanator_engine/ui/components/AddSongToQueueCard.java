@@ -362,7 +362,7 @@ public class AddSongToQueueCard extends JPanel {
 
     updateButtonStates();
 
-    JButton cancel = createCancelButton("CANCEL");
+    JButton cancel = createCancelButton("Cancel");
     JPanel cancelRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
     cancelRow.setOpaque(false);
     cancelRow.add(cancel);

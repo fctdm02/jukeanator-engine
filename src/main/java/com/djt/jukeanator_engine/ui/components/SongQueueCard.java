@@ -221,9 +221,20 @@ public class SongQueueCard extends JPanel {
     main.setBorder(
         BorderFactory.createEmptyBorder(LayoutTheme.get().songQueueCardPadTop, 28, 14, 28));
 
+    // NORTH: now-playing section only
     main.add(buildNowPlayingSection(), BorderLayout.NORTH);
-    main.add(buildDivider(), BorderLayout.CENTER);
-    main.add(buildQueueSection(), BorderLayout.SOUTH);
+
+    // CENTER: divider + "Queued Songs:" header row + list + action area, stacked
+    // vertically so the header row is always between the now-playing card and the
+    // queue list — it can never be pushed up into the now-playing panel.
+    JPanel centerStack = new JPanel();
+    centerStack.setOpaque(false);
+    centerStack.setLayout(new BoxLayout(centerStack, BoxLayout.Y_AXIS));
+    centerStack.add(buildDivider());
+    centerStack.add(buildQueueHeaderRow()); // standalone label + legend row
+    centerStack.add(buildQueueBody()); // list + action area
+
+    main.add(centerStack, BorderLayout.CENTER);
 
     return main;
   }
@@ -322,26 +333,47 @@ public class SongQueueCard extends JPanel {
     return divider;
   }
 
-  // ── Queue section ─────────────────────────────────────────────────────────
+  // ── Queue section (split into header row + body) ──────────────────
 
-  private JPanel buildQueueSection() {
-    JPanel section = new JPanel(new BorderLayout(0, 8));
-    section.setOpaque(false);
-    // Extra top margin separates this section visually from Now Playing
-    section.setBorder(new EmptyBorder(LayoutTheme.get().songQueueSectionPadTop, 0, 0, 0));
+  /**
+   * Builds the standalone "Queued Songs:" label + priority-legend row.
+   *
+   * <p>
+   * This panel is inserted directly into the main BoxLayout stack between the now-playing section
+   * and the queue list, so it can never overlap either section. Content is bottom-aligned within a
+   * fixed-height container (songQueueHeaderRowH) so any extra vertical space appears above the
+   * labels, pulling them visually toward the queue list below rather than the now-playing card
+   * above.
+   */
+  private JPanel buildQueueHeaderRow() {
+    JPanel headerContent = new JPanel(new BorderLayout(8, 0));
+    headerContent.setOpaque(false);
+    headerContent.setBorder(new EmptyBorder(0, 0, 4, 0));
 
-    // Header row: label on the left, priority legend aligned to the right
-    JPanel headerRow = new JPanel(new BorderLayout(8, 0));
-    headerRow.setOpaque(false);
-    headerRow.setBorder(new EmptyBorder(0, 0, 4, 0));
-
-    JLabel header = new JLabel("QUEUED SONGS:");
+    JLabel header = new JLabel("Queued Songs:");
     header.setForeground(ACCENT_GREEN);
     header.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
-    headerRow.add(header, BorderLayout.WEST);
-    headerRow.add(SongTrackCellRenderer.buildPriorityLegend(), BorderLayout.EAST);
+    headerContent.add(header, BorderLayout.WEST);
+    headerContent.add(SongTrackCellRenderer.buildPriorityLegend(), BorderLayout.EAST);
 
-    section.add(headerRow, BorderLayout.NORTH);
+    // Outer container: fixed height, content placed in SOUTH so extra space is above.
+    JPanel headerRow = new JPanel(new BorderLayout());
+    headerRow.setOpaque(false);
+    int rowH = LayoutTheme.get().songQueueHeaderRowH;
+    headerRow.setPreferredSize(new Dimension(Short.MAX_VALUE, rowH));
+    headerRow.setMinimumSize(new Dimension(0, rowH));
+    headerRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowH));
+    headerRow.add(headerContent, BorderLayout.SOUTH);
+    return headerRow;
+  }
+
+  /**
+   * Builds the queue list and action area only (header row lives above this in the BoxLayout stack,
+   * guaranteed between the now-playing card and this panel).
+   */
+  private JPanel buildQueueBody() {
+    JPanel section = new JPanel(new BorderLayout(0, 8));
+    section.setOpaque(false);
 
     // Populate model (up to MAX_QUEUE_VISIBLE entries)
     refreshQueueListModel();
@@ -396,7 +428,7 @@ public class SongQueueCard extends JPanel {
     buttons.add(moveDownButton);
     buttons.add(removeButton);
 
-    // Cancel button — narrower and shorter than the action buttons, centred
+    // Cancel button — same size as the action buttons, centred horizontally.
     JButton cancel = createCancelButton("Cancel");
     cancel.setPreferredSize(new Dimension(LayoutTheme.get().songQueueCancelBtnW,
         LayoutTheme.get().songQueueCancelBtnH));
@@ -510,7 +542,7 @@ public class SongQueueCard extends JPanel {
 
   private void updateButtonStates() {
     if (moveUpButton == null || moveDownButton == null || removeButton == null)
-      return; // buttons not yet constructed (initial population during buildQueueSection)
+      return; // buttons not yet constructed (initial population during buildQueueBody)
     SongQueueEntryDto selected = queueList.getSelectedValue();
     int currentCredits = creditManager.getCredits();
     int idx = queueList.getSelectedIndex();

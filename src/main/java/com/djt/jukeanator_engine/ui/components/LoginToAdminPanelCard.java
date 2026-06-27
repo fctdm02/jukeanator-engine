@@ -187,7 +187,7 @@ public class LoginToAdminPanelCard extends JPanel {
     panel.setBorder(BorderFactory.createEmptyBorder(24, 32, 20, 32));
 
     // Title
-    JLabel title = new JLabel("ADMIN LOGIN", SwingConstants.CENTER);
+    JLabel title = new JLabel("Admin Panel Login", SwingConstants.CENTER);
     title.setForeground(ColorTheme.get().loginTitleColor);
     title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeLoginTitle));
     title.setBorder(new EmptyBorder(0, 0, 16, 0));
@@ -291,8 +291,8 @@ public class LoginToAdminPanelCard extends JPanel {
     errorLabel
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
 
-    JButton loginBtn = createActionButton("LOGIN", () -> attemptLogin());
-    JButton cancelBtn = createActionButton("CANCEL", onDismiss);
+    JButton loginBtn = createActionButton("Login", () -> attemptLogin());
+    JButton cancelBtn = createActionButton("Cancel", onDismiss);
 
     JPanel buttons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 20, 0));
     buttons.setOpaque(false);

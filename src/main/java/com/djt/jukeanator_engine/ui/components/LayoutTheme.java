@@ -255,6 +255,9 @@ public class LayoutTheme {
     songQueueCardPadTop = 16;
     songQueueSectionPadTop = 15;
     songQueueActionAreaGap = 10;
+    songQueueHeaderRowH = 28; // natural label height — no extra spacing
+    fontSizeQueueBtn = 17;
+    fontSizeQueueCancelBtn = 20;
 
     // ── AlbumViewCard track list ───────────────────────────────────────────────
     //
@@ -423,6 +426,9 @@ public class LayoutTheme {
       songQueueCardPadTop = 16;
       songQueueSectionPadTop = 15;
       songQueueActionAreaGap = 10;
+      songQueueHeaderRowH = 28; // natural label height — no extra spacing
+      fontSizeQueueBtn = 17;
+      fontSizeQueueCancelBtn = 20;
 
       // AlbumViewCard track list — same row height and page size as original landscape defaults
       albumViewRowH = 72; // portrait: keep full row height (same as resultRowMaxH)
@@ -750,21 +756,26 @@ public class LayoutTheme {
       // Action buttons: (924 - 2×16 gap) / 3 = 297px → 290px (round down).
       // Action button height matches Cancel button height (52px).
       //
-      songQueueCardW = 980; // landscape default: 900 (Item 2: +~9% wider)
-      songQueueActionBtnW = 290; // landscape default: 200 (Item 2: wider buttons)
-      songQueueActionBtnH = 52; // landscape default: 80 (Item 2: match cancel height)
-      songQueueCancelBtnW = 290; // landscape default: 200 (widened to match)
-      songQueueCancelBtnH = 52; // landscape default: 52 (unchanged)
-      //
-      // Item 3: Increase card height by 5% to prevent queue/legend overlap.
-      // 660 × 1.05 = 693px.
-      //
-      songQueueCardH = 693; // landscape default: 660 (Item 3: +5%)
-      // Increase section top padding to push queue list + buttons down, creating
-      // visible breathing room between the now-playing panel and the queue.
-      songQueueSectionPadTop = 28; // landscape default: 15
-      // Tighten internal action-area gaps so the reclaimed space accumulates at top.
-      songQueueActionAreaGap = 6; // landscape default: 10
+      // Item 2: Card width 850px (22px margin each side at 1024px).
+      songQueueCardW = 850;
+      // Inner usable width: 850 - 2x28 padding = 794px.
+      // Action buttons: (794 - 2x12 gap) / 3 = 256px -> 250px (round down).
+      songQueueActionBtnW = 250;
+      songQueueActionBtnH = 52;
+      // Item 1: Cancel button same size as action buttons, centered.
+      songQueueCancelBtnW = 250; // same as songQueueActionBtnW
+      songQueueCancelBtnH = 52; // same as songQueueActionBtnH
+      songQueueSectionPadTop = 0; // Item 3: header row is now its own panel between sections
+      songQueueActionAreaGap = 6;
+      // Item 3: songQueueHeaderRowH drives the fixed height of the standalone
+      // header row that sits between the now-playing card and the queue list.
+      // 36px is enough for the label + a few px of breathing room below.
+      songQueueHeaderRowH = 36;
+      fontSizeQueueBtn = 13;
+      fontSizeQueueCancelBtn = 13;
+      // Card height: now-playing (~110px) + header row (36px) + list (5x44=220px)
+      // + action area (~130px) + paddings (~50px) = ~546px -> use 600px for comfort.
+      songQueueCardH = 600;
     }
 
     // Derived Dimension fields — always computed last from the primitives set above.
@@ -1963,6 +1974,15 @@ public class LayoutTheme {
    */
   public final int songQueueActionAreaGap;
 
+  /**
+   * Fixed height (px) of the "Queued Songs:" / priority-legend header row. Setting this taller than
+   * the natural label height causes both labels to sit at the bottom of the row via a BoxLayout
+   * with a vertical strut, placing the visual gap above them (between the now-playing card and the
+   * labels) rather than below. Landscape / portrait: 28 px (natural label height — no extra space).
+   * Small-landscape: 44 px to push labels visually away from the now-playing panel.
+   */
+  public final int songQueueHeaderRowH;
+
   // ═══════════════════════════════════════════════════════════════════════════
   // ADMIN PANEL (AdminPanel)
   // Origin: AdminPanel
@@ -2088,8 +2108,8 @@ public class LayoutTheme {
   // Queue / overlay cards
   public final int fontSizeAddSongTitle = 32; // AddSongToQueueCard song title
   public final int fontSizeAddSongArtist = 22; // AddSongToQueueCard artist / album
-  public final int fontSizeQueueBtn = 17; // SongQueueCard action buttons
-  public final int fontSizeQueueCancelBtn = 20; // SongQueueCard cancel button
+  public final int fontSizeQueueBtn; // SongQueueCard action buttons
+  public final int fontSizeQueueCancelBtn; // SongQueueCard cancel button
   public final int fontSizeTimeoutLabel = 13; // Countdown "Closes in Xs" label
 
   // Keyboard

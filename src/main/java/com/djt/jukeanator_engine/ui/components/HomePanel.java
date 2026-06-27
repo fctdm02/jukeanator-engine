@@ -205,7 +205,7 @@ public class HomePanel extends JPanel implements TabNavigator {
     int headerIconSize = LayoutTheme.get().detailHeaderImageW;
     ImageIcon allAlbumsIcon =
         imageLoader.loadImage("AllAlbumsLogo.png", headerIconSize, headerIconSize);
-    DetailHeaderPanel header = new DetailHeaderPanel(null, null, allAlbumsIcon, "♫", "ALL ALBUMS",
+    DetailHeaderPanel header = new DetailHeaderPanel(null, null, allAlbumsIcon, "♫", "All Albums",
         allAlbums.size() + " albums");
     header.setOpaque(false);
     // Left/right padding matches the album grid's own horizontal border so the header
