@@ -127,7 +127,7 @@ public class GenreDetailPanel extends JPanel {
 
     JLabel sortLabel = new JLabel("Sort By: ");
     sortLabel.setForeground(ColorTheme.get().textPrimary);
-    sortLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 26));
+    sortLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSortLabel));
     row.add(sortLabel);
 
     btnPopularity = sortButton("Popularity", SortMode.POPULARITY);

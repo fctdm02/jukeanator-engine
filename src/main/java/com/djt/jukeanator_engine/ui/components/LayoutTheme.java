@@ -224,6 +224,15 @@ public class LayoutTheme {
     fontSizeSearchBar = 32;
     fontSizeResultHeader = 22;
     fontSizeKeyLabel = 22;
+    fontSizeSortBtn = 18;
+    fontSizeSortLabel = 26;
+    fontSizeGenreTileLabel = 24;
+
+    // ── Detail header / sort button sizes ────────────────────────────────────
+    detailBackBtnW = 140;
+    detailBackBtnH = 52;
+    sortBtnW = 170;
+    sortBtnH = 42;
 
     // ── AlbumViewCard track list ───────────────────────────────────────────────
     //
@@ -361,6 +370,15 @@ public class LayoutTheme {
       fontSizeSearchBar = 32;
       fontSizeResultHeader = 22;
       fontSizeKeyLabel = 22;
+      fontSizeSortBtn = 18;
+      fontSizeSortLabel = 26;
+      fontSizeGenreTileLabel = 24;
+
+      // Detail header / sort button sizes — same as landscape for portrait
+      detailBackBtnW = 140;
+      detailBackBtnH = 52;
+      sortBtnW = 170;
+      sortBtnH = 42;
 
       // AlbumViewCard track list — same row height and page size as original landscape defaults
       albumViewRowH = 72; // portrait: keep full row height (same as resultRowMaxH)
@@ -394,7 +412,7 @@ public class LayoutTheme {
       // the number of rows that are both rendered and fully visible.
       //
       hotHerePreviewCount = 7; // landscape default: 10
-      genreDetailPreviewCount = 9;
+      // genreDetailPreviewCount is set further down alongside the other genre detail fields.
       screenPaddingHorizontal = 60;
 
       albumTileInnerPad = 1;
@@ -529,6 +547,38 @@ public class LayoutTheme {
       fontSizeSearchBar = 18; // landscape default: 32 (scaled for 45px bar height)
       fontSizeResultHeader = 16; // landscape default: 22 (Item 2.2: smaller header labels)
       fontSizeKeyLabel = 16; // Item 2: smaller key label font (landscape default: 22)
+
+      // ── Genre / sort header — compact for 1024 × 768 ─────────────────────────
+      //
+      // Genre tile label (Item 1.1): reduce from 24pt to 14pt so "Classic Rock"
+      // and similar two-word names display without clipping.
+      //
+      fontSizeGenreTileLabel = 14; // landscape default: 24 (Item 1.1: much smaller)
+      //
+      // "Sort By:" label (Item 2.3): reduce from 26pt to 16pt.
+      //
+      fontSizeSortLabel = 16; // landscape default: 26 (Item 2.3)
+      //
+      // Sort buttons (Item 2.4): narrower, shorter, smaller font.
+      // 3 buttons × 120px + "Sort By:" label ~80px + BACK ~105px + image ~45px
+      // + genre name label = fits in ~1024px header.
+      //
+      fontSizeSortBtn = 13; // landscape default: 18 (Item 2.4)
+      sortBtnW = 120; // landscape default: 170 (Item 2.4)
+      sortBtnH = 32; // landscape default: 42 (Item 2.4)
+      //
+      // BACK button (Item 2.2): 25% narrower (140 × 0.75 = 105px).
+      //
+      detailBackBtnW = 105; // landscape default: 140 (Item 2.2: −25%)
+      detailBackBtnH = 52; // height unchanged
+      //
+      // Genre detail preview count (Items 3.1 + 3.2): 8 visible rows per page.
+      //
+      // Available height for genre detail columns:
+      // 606px total - ~75px header = 531px
+      // 8 rows × 54px + 7 seps + 8 rowsPad + 8 headerPad + ~30px label + 36 navPanel = 491px ✓
+      //
+      genreDetailPreviewCount = 8; // landscape default: 9 (Items 3.1 + 3.2)
 
       // ── Keyboard — fit all keys within 1024px wide screen ────────────────────
       //
@@ -1441,10 +1491,10 @@ public class LayoutTheme {
    * Preferred width of the back button inside DetailHeaderPanel (and AlbumDetailCard footer,
    * LoginToAdminPanelCard).
    */
-  public final int detailBackBtnW = 140;
+  public final int detailBackBtnW;
 
   /** Preferred height of the back button inside DetailHeaderPanel / AlbumDetailCard footer. */
-  public final int detailBackBtnH = 52;
+  public final int detailBackBtnH;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GENRE PANEL (GenrePanel)
@@ -1502,10 +1552,16 @@ public class LayoutTheme {
   public final int genreDetailPreviewCount;
 
   /** Preferred width of each sort button in the genre detail header. */
-  public final int sortBtnW = 170;
+  public final int sortBtnW;
 
   /** Preferred height of each sort button in the genre detail header. */
-  public final int sortBtnH = 42;
+  public final int sortBtnH;
+
+  /**
+   * Font size for the "Sort By:" label in the genre detail header. Landscape: 26 pt.
+   * Small-landscape: reduced to fit alongside the sort buttons.
+   */
+  public final int fontSizeSortLabel;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HOT HERE PANEL (HotHerePanel)
@@ -1881,7 +1937,7 @@ public class LayoutTheme {
   public final int fontSizeAlbumLabel; // AlbumGridPanel tile album name
   public final int fontSizeArtistLabel = 12; // AlbumGridPanel tile artist name
   public final int fontSizePageLabel = 15; // Pagination page labels
-  public final int fontSizeSortBtn = 18; // GenreDetailPanel sort buttons
+  public final int fontSizeSortBtn; // GenreDetailPanel sort buttons
 
   // Search
   public final int fontSizeSearchHero = 42; // SearchPanel hero label
@@ -1928,5 +1984,5 @@ public class LayoutTheme {
   public final int fontSizeLoginBtn = 18; // LoginToAdminPanelCard buttons
 
   // Genre
-  public final int fontSizeGenreTileLabel = 24; // GenrePanel tile text label
+  public final int fontSizeGenreTileLabel; // GenrePanel tile text label
 }
