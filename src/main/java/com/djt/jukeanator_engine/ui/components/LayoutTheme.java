@@ -951,9 +951,14 @@ public class LayoutTheme {
    *        symmetry)
    * @param nowPlayingWrapperH height of the now-playing wrapper
    * @param iconSize square pixel size for the location-logo and cover-art icons
+   * @param logoH height of the centre JukeANator logo image; logo width is {@code logoH * 3}. Kept
+   *        separate from {@code iconSize} so the logo can be enlarged independently of the
+   *        side-panel icons. On canonical 1920 × 1080 this is larger than {@code iconSize}; on all
+   *        other orientations it equals {@code iconSize}.
    */
   public record TopPanelProfile(int creditsPanelW, int creditsPanelH, int nowPlayingPanelW,
-      int nowPlayingPanelH, int nowPlayingWrapperW, int nowPlayingWrapperH, int iconSize) {
+      int nowPlayingPanelH, int nowPlayingWrapperW, int nowPlayingWrapperH, int iconSize,
+      int logoH) {
   }
 
   /**
@@ -1000,11 +1005,18 @@ public class LayoutTheme {
     int icon = panelH - TOP_PANEL_ICON_V_MARGIN;
     icon = Math.max(TOP_PANEL_ICON_MIN, Math.min(icon, TOP_PANEL_ICON_MAX));
 
+    // Logo height — on canonical 1920 × 1080 landscape the logo is bumped up slightly
+    // so it has more visual presence in the centre of the wide top panel.
+    // On portrait (1080 × 1920) and small-landscape (≤ 1280 × 800) it equals iconSize
+    // so those orientations are completely unaffected.
+    boolean canonicalLandscape = screenW >= 1920 && screenH >= 1080 && screenW >= screenH;
+    int logoH = canonicalLandscape ? Math.min(panelH, (int) Math.round(icon * 1.25)) : icon;
+
     // The inner now-playing panel fills its wrapper exactly.
     return new TopPanelProfile(sideW, panelH, // credits panel (WEST)
         sideW, panelH, // now-playing panel (inner) — same dims as wrapper
         sideW, panelH, // now-playing wrapper (EAST)
-        icon);
+        icon, logoH);
   }
 
   /**
