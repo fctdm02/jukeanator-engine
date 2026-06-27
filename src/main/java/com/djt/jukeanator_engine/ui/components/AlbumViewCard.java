@@ -236,13 +236,14 @@ public class AlbumViewCard extends JPanel {
     JPanel headerLeftCluster = new JPanel(new BorderLayout(6, 0));
     headerLeftCluster.setOpaque(false);
 
-    JLabel popHeaderLabel = new JLabel("# Plays");
+    JLabel popHeaderLabel = new JLabel("Plays");
     popHeaderLabel.setForeground(TEXT_SECONDARY);
     popHeaderLabel
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
     popHeaderLabel.setPreferredSize(new Dimension(PLAYS_COLUMN_WIDTH, 30));
+    popHeaderLabel.setHorizontalAlignment(SwingConstants.LEFT);
 
-    JLabel trackHeaderLabel = new JLabel("Trk #");
+    JLabel trackHeaderLabel = new JLabel("Track");
     trackHeaderLabel.setForeground(TEXT_SECONDARY);
     trackHeaderLabel
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));

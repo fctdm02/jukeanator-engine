@@ -214,6 +214,12 @@ public class LayoutTheme {
     albumViewRowH = 56; // was implicitly 72 (=resultRowMaxH); reduced to fit 12 rows
     albumViewTracksPerPage = 12; // was 15 (pre-fix) / 10 (interim fix); now matches 12 visible rows
     albumViewRowPadV = 10; // top+bottom EmptyBorder padding inside each track row
+    albumViewPlaysColW = 64;
+    albumViewTrkNumColW = 48;
+    albumViewCompilationArtistW = 260;
+    albumViewCompilationSongW = 520;
+    fontSizeTrackSong = 17;
+    fontSizeTrackArtist = 14;
 
     // ── Derived Dimension fields ───────────────────────────────────────────────
     // Must be initialised after the primitives they depend on.
@@ -308,6 +314,12 @@ public class LayoutTheme {
       albumViewRowH = 72; // portrait: keep full row height (same as resultRowMaxH)
       albumViewTracksPerPage = 15;
       albumViewRowPadV = 10; // portrait: same top+bottom row padding as landscape
+      albumViewPlaysColW = 64;
+      albumViewTrkNumColW = 48;
+      albumViewCompilationArtistW = 260;
+      albumViewCompilationSongW = 520;
+      fontSizeTrackSong = 17;
+      fontSizeTrackArtist = 14;
 
     } else {
       // ── SMALL_LANDSCAPE (1024 × 768 and similar) ────────────────────────────
@@ -468,6 +480,33 @@ public class LayoutTheme {
       albumViewRowH = 44; // landscape default: 56; empirically derived for 1024×768
       albumViewTracksPerPage = 10; // landscape default: 12
       albumViewRowPadV = 4; // landscape default: 10 (EmptyBorder top+bottom)
+
+      // ── AlbumViewCard column widths ───────────────────────────────────────────
+      //
+      // Task 1 — "# Plays" column: halved from 64 px to 32 px.
+      // The popularity bars are only ~30 px wide (3 bars × 6 px + gaps); the
+      // original 64 px column wasted ~34 px of horizontal space. Halving reclaims
+      // that space for the song/artist columns.
+      //
+      albumViewPlaysColW = 32; // landscape default: 64
+      albumViewTrkNumColW = 48; // unchanged
+      //
+      // Task 2 — Compilation artist column: reduced by 30 % (260 × 0.70 = 182 px).
+      // The freed 78 px flows directly into the song column (520 + 78 = 598 px),
+      // maximising the visible area for long song titles.
+      //
+      albumViewCompilationArtistW = 182; // landscape default: 260 (−30%)
+      albumViewCompilationSongW = 598; // landscape default: 520 (+78 px, reclaimed from artist)
+
+      // ── AlbumViewCard track-list font sizes ───────────────────────────────────
+      //
+      // Task 3 — Smaller fonts for all track-list columns on 1024 × 768.
+      // At 44 px row height (8 px top+bottom padding → 36 px content), 17/14 pt
+      // fonts sit too large relative to the compressed rows. Reducing to 13/11 pt
+      // keeps text readable while fitting comfortably within the 36 px content area.
+      //
+      fontSizeTrackSong = 13; // landscape default: 17
+      fontSizeTrackArtist = 11; // landscape default: 14
     }
 
     // Derived Dimension fields — always computed last from the primitives set above.
@@ -1218,21 +1257,23 @@ public class LayoutTheme {
   public final int albumViewRowPadV;
 
   /** Width allocated for the "# Plays" (popularity bars) column header and cells. */
-  public final int albumViewPlaysColW = 64;
+  public final int albumViewPlaysColW;
 
   /** Width allocated for the track-number column. */
-  public final int albumViewTrkNumColW = 48;
+  public final int albumViewTrkNumColW;
 
   /**
    * Width of the artist column when displaying a compilation album (column is split: artist |
-   * song).
+   * song). On small-landscape (1024 × 768) this is reduced by ~30 % to give more horizontal room to
+   * the song column.
    */
-  public final int albumViewCompilationArtistW = 260;
+  public final int albumViewCompilationArtistW;
 
   /**
-   * Width of the song column when displaying a compilation album.
+   * Width of the song column when displaying a compilation album. On small-landscape (1024 × 768)
+   * this grows to absorb the space saved from the narrower artist column.
    */
-  public final int albumViewCompilationSongW = 520;
+  public final int albumViewCompilationSongW;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // NAVIGATION / PAGE BUTTONS (AlbumGridPanel, GenrePanel, ButtonFactory)
@@ -1673,8 +1714,8 @@ public class LayoutTheme {
   public final int fontSizeSearchBtn = 22; // Manual search button
 
   // Track list / result rows
-  public final int fontSizeTrackSong = 17; // AlbumViewCard song label
-  public final int fontSizeTrackArtist = 14; // AlbumViewCard artist/header label
+  public final int fontSizeTrackSong; // AlbumViewCard song label
+  public final int fontSizeTrackArtist; // AlbumViewCard artist/header label
 
   /**
    * Font size for the song name and artist name labels in the now-playing top panel. In landscape
