@@ -199,6 +199,22 @@ public class LayoutTheme {
     resultNavBtnH = 45;
     resultNavBorderV = 20; // 8px top + 12px bottom (original EmptyBorder(8,12,12,12))
 
+    // ── Search panel sizing ───────────────────────────────────────────────────
+    searchBarHeight = 90;
+    searchHeroHeight = 300;
+    searchBtnW = 180;
+    searchBtnH = 60;
+    columnInternalEdgeGap = 10;
+    searchBarWrapperPadV = 12; // top + bottom padding around the search bar wrapper
+    resultHeaderPadV = 12; // top + bottom padding of the column header in ResultsColumnPanel
+
+    // ── Result row / ResultsColumnPanel ──────────────────────────────────────
+    resultRowMaxH = 72;
+    resultThumbSize = 56;
+    resultNumLabelW = 36;
+    resultColumnPadH = 10;
+    resultNavBtnW = 75;
+
     // ── AlbumViewCard track list ───────────────────────────────────────────────
     //
     // On 1920 × 1080 the AlbumViewCard body height available for rows is:
@@ -310,6 +326,22 @@ public class LayoutTheme {
       resultNavBtnH = 45;
       resultNavBorderV = 20;
 
+      // Search panel sizing — same as landscape for portrait
+      searchBarHeight = 90;
+      searchHeroHeight = 300;
+      searchBtnW = 180;
+      searchBtnH = 60;
+      columnInternalEdgeGap = 10;
+      searchBarWrapperPadV = 12;
+      resultHeaderPadV = 12;
+
+      // Result row / ResultsColumnPanel — same as landscape for portrait
+      resultRowMaxH = 72;
+      resultThumbSize = 56;
+      resultNumLabelW = 36;
+      resultColumnPadH = 10;
+      resultNavBtnW = 75;
+
       // AlbumViewCard track list — same row height and page size as original landscape defaults
       albumViewRowH = 72; // portrait: keep full row height (same as resultRowMaxH)
       albumViewTracksPerPage = 15;
@@ -328,17 +360,7 @@ public class LayoutTheme {
       // keep their standard landscape defaults (set by the field initialisers
       // above the constructors) because those screens exist only in landscape.
 
-      keyboardHeight = 260;
-      keyboardPaddingHorizontal = 60;
-      keyLetterW = 70;
-      keyLetterH = 60;
-      keyClearW = 140;
-      keyBackspaceW = 100;
-      keyModeToggleW = 140;
-      keySpaceW = 420;
-      keyRowGap = 10;
-      keyColGap = 8;
-      keyboardInnerPad = 20;
+      // Keyboard fields are set further down in the dedicated keyboard section.
 
       searchPreviewCount = 5;
       // ── HotHere row count — reduced to match visible rows on 1024 × 768 ────────
@@ -453,6 +475,64 @@ public class LayoutTheme {
       //
       resultNavBtnH = 32; // landscape default: 45
       resultNavBorderV = 4; // landscape default: 20 (8px top + 12px bottom)
+
+      // ── Search screen — maximise results area on 1024 × 768 ──────────────────
+      //
+      // On 1024 × 768 the usable content height (after top panel 110px + tab bar
+      // 52px) is 606px. The three panels that stack vertically in CARD_RESULTS are:
+      // (1) search bar wrapper: searchBarHeight + 2×searchBarWrapperPadV
+      // (2) results columns (CENTER — takes all remaining space)
+      // (3) keyboard panel: keyboardHeight
+      //
+      // Reducing searchBarWrapperPadV from 12px to 4px saves 16px.
+      // Reducing searchBarHeight from 90px to 60px saves another 30px.
+      // Reducing keyboardHeight from 260px to 220px saves 40px.
+      // Total headroom freed for the results area: +86px.
+      //
+      // The column header padding (resultHeaderPadV) is also reduced from 12px to
+      // 4px (saves 16px per column header, giving more room to visible rows).
+      //
+      searchBarHeight = 60; // landscape default: 90
+      searchBarWrapperPadV = 4; // landscape default: 12
+      resultHeaderPadV = 4; // landscape default: 12
+      searchHeroHeight = 300; // unchanged (hero only shown on entry card, not results)
+      searchBtnW = 180; // unchanged
+      searchBtnH = 60; // unchanged
+      columnInternalEdgeGap = 10; // unchanged
+
+      // ── Keyboard — fit all keys within 1024px wide screen ────────────────────
+      //
+      // The keyboard wrapper has keyboardPaddingHorizontal on each side, then
+      // keyboardInnerPad inside. Usable width for keys + gaps:
+      // 1024 - 2×20 (wrapper padding) - 2×10 (inner pad) = 964 px
+      //
+      // Row 1: 10 letters + CLEAR + BACKSPACE + 12 gaps
+      // 10×54 + 94 + 76 + 12×6 = 782 px ✓ (fits in 964px, centred)
+      //
+      // Row 2: 10 letters (incl apostrophe) + 123@ + ABC + 12 gaps
+      // 10×54 + 2×94 + 12×6 = 800 px ✓
+      //
+      // Row 3: 9 letters + SPACE + 9 gaps
+      // 9×54 + 300 + 9×6 = 840 px ✓
+      //
+      keyboardHeight = 220; // landscape default: 260
+      keyboardPaddingHorizontal = 20; // landscape default: 60
+      keyLetterW = 54; // landscape default: 70
+      keyLetterH = 54; // landscape default: 60
+      keyClearW = 94; // landscape default: 140
+      keyBackspaceW = 76; // landscape default: 100
+      keyModeToggleW = 94; // landscape default: 140
+      keySpaceW = 300; // landscape default: 420
+      keyRowGap = 8; // landscape default: 10
+      keyColGap = 6; // landscape default: 8
+      keyboardInnerPad = 10; // landscape default: 20
+
+      // ── Result row sizing — unchanged from landscape defaults ─────────────────
+      resultRowMaxH = 72; // unchanged
+      resultThumbSize = 56; // unchanged
+      resultNumLabelW = 36; // unchanged
+      resultColumnPadH = 10; // unchanged
+      resultNavBtnW = 75; // unchanged
 
       // ── AlbumViewCard track list ────────────────────────────────────────────
       //
@@ -1398,7 +1478,7 @@ public class LayoutTheme {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /** Preferred height of the search bar panel (query display + optional search button). */
-  public final int searchBarHeight = 90;
+  public final int searchBarHeight;
 
   /**
    * Number of result rows visible per column page in search results. Tune this value if the screen
@@ -1419,16 +1499,29 @@ public class LayoutTheme {
    * used in {@code ResultsColumnPanel}. Used in SearchPanel to compute the unified column padding:
    * {@code screenPaddingHorizontal - columnInternalEdgeGap}.
    */
-  public final int columnInternalEdgeGap = 10;
+  public final int columnInternalEdgeGap;
 
   /** Preferred height of the hero / entry-state panel in the Search tab. */
-  public final int searchHeroHeight = 300;
+  public final int searchHeroHeight;
 
   /** Preferred width of the search button (manual search mode). */
-  public final int searchBtnW = 180;
+  public final int searchBtnW;
 
   /** Preferred height of the search button. */
-  public final int searchBtnH = 60;
+  public final int searchBtnH;
+
+  /**
+   * Top + bottom padding (px each) of the search bar wrapper panel in {@code SearchPanel}. Controls
+   * how much vertical space the search bar consumes above and below itself. Landscape: 12 px.
+   * Small-landscape (1024×768): 4 px to reclaim space for the results area.
+   */
+  public final int searchBarWrapperPadV;
+
+  /**
+   * Top + bottom padding (px each) of the column header panel in {@code ResultsColumnPanel}.
+   * Landscape: 12 px. Small-landscape (1024×768): 4 px to keep the header tight.
+   */
+  public final int resultHeaderPadV;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // KEYBOARD PANEL (KeyboardPanel)
@@ -1503,19 +1596,19 @@ public class LayoutTheme {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /** Maximum row height for items in a results column (ResultsColumnPanel). */
-  public final int resultRowMaxH = 72;
+  public final int resultRowMaxH;
 
   /** Thumbnail image size (square) displayed in each result row. */
-  public final int resultThumbSize = 56;
+  public final int resultThumbSize;
 
   /** Width reserved for the row number label. */
-  public final int resultNumLabelW = 36;
+  public final int resultNumLabelW;
 
   /** Result column outer left/right padding. */
-  public final int resultColumnPadH = 10;
+  public final int resultColumnPadH;
 
   /** Nav button preferred size — width (up/down arrows in result columns). */
-  public final int resultNavBtnW = 75;
+  public final int resultNavBtnW;
 
   /** Nav button preferred size — height. */
   public final int resultNavBtnH;

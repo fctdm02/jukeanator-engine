@@ -1045,15 +1045,39 @@ DONE - Logins aren't working for OWNER/ADMIN
 
 
 
-- JukeANator.oos isn't loading/storing with OS suffix like it's supposed to
+DONE JukeANator.oos isn't loading/storing with OS suffix like it's supposed to
 
 - After a rescan on an empty library, the home page is empty
 
-- After a restart after a rescan on an empty library, the song player is attempting to play music from R:\ (need to delete playlist after rescan?)
+DONE After a restart after a rescan on an empty library, the song player is attempting to play music from R:\ (need to delete playlist after rescan?)
 
 
 
 
 
 
+
+This whole session will be about supporting a 1024x768 display, while at the same time, 
+NOT CHANGING ANYTHING ELSE for any other resolution, be it landscape or portrait display 
+(right now, 1920x1080 - landscape and 1080x1920 portrait render acceptably).
+
+For 1024x768 (a.k.a. small landscape), the search scren has the following issues: 
+
+Item 1: The keyboard panel is not showing all of the keys that it is supposed to (see attached screenshot).
+You probably need to reduce the padding to the left/right so that all keys are visible.
+
+Item 2: The search results area, which is the main content area of this screen (above the keyboard panel 
+and below the search for text panel), and as such, get the extra screen real estate when available for 
+higher screen resolutions, is much too short.  So, all of the extra padding above/below the keyboard panel
+should be removed. Since the search for text field is not directly editable by the user, it can be made shorter
+than it is now.  Along with that, the spacing for Artists/Albums/Songs can be reduced above/below
+
+In general, you need to make as much room as possible for the search results area.
+
+Again, this is ONLY for small landscape mode when the resolution is 1024x768.
+
+ 
+In conjunction with that, change the pagination behavior to show the next/prev 10 items when 
+the down/up navigation arrow buttons are pressed.  For example, page 1 shows items 1-10, 
+pressing page down will result in items 11-20 being shown.
 

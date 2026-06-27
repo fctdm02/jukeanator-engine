@@ -233,7 +233,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private JPanel buildSearchBarPanel(boolean forResults) {
     JPanel wrapper = new JPanel(new BorderLayout());
     wrapper.setOpaque(false);
-    wrapper.setBorder(new EmptyBorder(12, LayoutTheme.get().screenPaddingHorizontal, 12,
+    wrapper.setBorder(new EmptyBorder(LayoutTheme.get().searchBarWrapperPadV,
+        LayoutTheme.get().screenPaddingHorizontal, LayoutTheme.get().searchBarWrapperPadV,
         LayoutTheme.get().screenPaddingHorizontal));
 
     JPanel bar = new JPanel(new BorderLayout(10, 0));
