@@ -227,6 +227,10 @@ public class LayoutTheme {
     fontSizeSortBtn = 18;
     fontSizeSortLabel = 26;
     fontSizeGenreTileLabel = 24;
+    fontSizeNavBtn = 18;
+    fontSizeResultLine1 = 17;
+    fontSizeResultLine2 = 13;
+    fontSizeResultNum = 16;
 
     // ── Detail header / sort button sizes ────────────────────────────────────
     detailBackBtnW = 140;
@@ -373,6 +377,10 @@ public class LayoutTheme {
       fontSizeSortBtn = 18;
       fontSizeSortLabel = 26;
       fontSizeGenreTileLabel = 24;
+      fontSizeNavBtn = 18;
+      fontSizeResultLine1 = 17;
+      fontSizeResultLine2 = 13;
+      fontSizeResultNum = 16;
 
       // Detail header / sort button sizes — same as landscape for portrait
       detailBackBtnW = 140;
@@ -553,32 +561,22 @@ public class LayoutTheme {
       // Genre tile label (Item 1.1): reduce from 24pt to 14pt so "Classic Rock"
       // and similar two-word names display without clipping.
       //
-      fontSizeGenreTileLabel = 14; // landscape default: 24 (Item 1.1: much smaller)
-      //
-      // "Sort By:" label (Item 2.3): reduce from 26pt to 16pt.
-      //
+      fontSizeGenreTileLabel = 11; // landscape default: 24 (Item 1.1: reduced further)
       fontSizeSortLabel = 16; // landscape default: 26 (Item 2.3)
-      //
-      // Sort buttons (Item 2.4): narrower, shorter, smaller font.
-      // 3 buttons × 120px + "Sort By:" label ~80px + BACK ~105px + image ~45px
-      // + genre name label = fits in ~1024px header.
-      //
       fontSizeSortBtn = 13; // landscape default: 18 (Item 2.4)
       sortBtnW = 120; // landscape default: 170 (Item 2.4)
       sortBtnH = 32; // landscape default: 42 (Item 2.4)
-      //
-      // BACK button (Item 2.2): 25% narrower (140 × 0.75 = 105px).
-      //
       detailBackBtnW = 105; // landscape default: 140 (Item 2.2: −25%)
-      detailBackBtnH = 52; // height unchanged
-      //
-      // Genre detail preview count (Items 3.1 + 3.2): 8 visible rows per page.
-      //
-      // Available height for genre detail columns:
-      // 606px total - ~75px header = 531px
-      // 8 rows × 54px + 7 seps + 8 rowsPad + 8 headerPad + ~30px label + 36 navPanel = 491px ✓
-      //
+      detailBackBtnH = 36; // landscape default: 52 (Item 2.3: shorter header)
+      fontSizeNavBtn = 14; // landscape default: 18 (Item 2.1: fit "← BACK" in btn)
       genreDetailPreviewCount = 8; // landscape default: 9 (Items 3.1 + 3.2)
+
+      // ── Result row font sizes — reduced for small-landscape (Item 2.2) ─────────
+      // Smaller fonts allow text to breathe within the 54px resultRowMaxH rows and
+      // apply consistently across Search, Hot Here, and Genre Results screens.
+      fontSizeResultLine1 = 14; // landscape default: 17
+      fontSizeResultLine2 = 11; // landscape default: 13
+      fontSizeResultNum = 13; // landscape default: 16
 
       // ── Keyboard — fit all keys within 1024px wide screen ────────────────────
       //
@@ -1929,7 +1927,7 @@ public class LayoutTheme {
   // ═══════════════════════════════════════════════════════════════════════════
 
   // Navigation & header
-  public final int fontSizeNavBtn = 18; // ButtonFactory, AlbumDetailCard back button
+  public final int fontSizeNavBtn; // ButtonFactory, AlbumDetailCard back button
   public final int fontSizeDetailTitle; // DetailHeaderPanel title label
   public final int fontSizeDetailSubtitle = 14; // DetailHeaderPanel subtitle label
   public final int fontSizeAdminHeader = 22; // AdminPanel header title
@@ -1954,9 +1952,9 @@ public class LayoutTheme {
    * label size ({@link #fontSizeAlbumLabel}) so the text fits without clipping.
    */
   public final int fontSizeNowPlayingSong; // now-playing panel song / artist label
-  public final int fontSizeResultLine1 = 17; // ResultsColumnPanel primary line
-  public final int fontSizeResultLine2 = 13; // ResultsColumnPanel secondary line
-  public final int fontSizeResultNum = 16; // ResultsColumnPanel row number label
+  public final int fontSizeResultLine1; // ResultsColumnPanel primary line
+  public final int fontSizeResultLine2; // ResultsColumnPanel secondary line
+  public final int fontSizeResultNum; // ResultsColumnPanel row number label
   public final int fontSizeResultHeader; // ResultsColumnPanel column header
 
   // Queue / overlay cards

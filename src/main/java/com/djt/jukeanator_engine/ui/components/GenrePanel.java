@@ -409,7 +409,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
       imageLabel.setText(name);
     }
 
-    JLabel textLabel = new JLabel(name.toUpperCase(), SwingConstants.CENTER);
+    JLabel textLabel = new JLabel(name, SwingConstants.CENTER);
     textLabel.setForeground(ColorTheme.get().textPrimary);
     textLabel
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeGenreTileLabel));
