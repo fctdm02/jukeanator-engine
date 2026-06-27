@@ -218,7 +218,8 @@ public class SongQueueCard extends JPanel {
   private JPanel buildMainPanel() {
     JPanel main = new JPanel(new BorderLayout(0, 0));
     main.setBackground(BG_PANEL);
-    main.setBorder(BorderFactory.createEmptyBorder(16, 28, 14, 28));
+    main.setBorder(
+        BorderFactory.createEmptyBorder(LayoutTheme.get().songQueueCardPadTop, 28, 14, 28));
 
     main.add(buildNowPlayingSection(), BorderLayout.NORTH);
     main.add(buildDivider(), BorderLayout.CENTER);
@@ -327,7 +328,7 @@ public class SongQueueCard extends JPanel {
     JPanel section = new JPanel(new BorderLayout(0, 8));
     section.setOpaque(false);
     // Extra top margin separates this section visually from Now Playing
-    section.setBorder(new EmptyBorder(15, 0, 0, 0));
+    section.setBorder(new EmptyBorder(LayoutTheme.get().songQueueSectionPadTop, 0, 0, 0));
 
     // Header row: label on the left, priority legend aligned to the right
     JPanel headerRow = new JPanel(new BorderLayout(8, 0));
@@ -378,12 +379,13 @@ public class SongQueueCard extends JPanel {
   // ── Action area (buttons + timeout row) ──────────────────────────────────
 
   private JPanel buildActionArea() {
-    JPanel area = new JPanel(new BorderLayout(0, 10));
+    int gap = LayoutTheme.get().songQueueActionAreaGap;
+    JPanel area = new JPanel(new BorderLayout(0, gap));
     area.setOpaque(false);
-    area.setBorder(new EmptyBorder(10, 0, 0, 0));
+    area.setBorder(new EmptyBorder(gap, 0, 0, 0));
 
     // Three management buttons
-    JPanel buttons = new JPanel(new GridLayout(1, 3, 16, 0));
+    JPanel buttons = new JPanel(new GridLayout(1, 3, gap * 2, 0));
     buttons.setOpaque(false);
 
     moveUpButton = createActionButton("Move Song Up", 0, ACCENT_BLUE, e -> doMoveUp());
