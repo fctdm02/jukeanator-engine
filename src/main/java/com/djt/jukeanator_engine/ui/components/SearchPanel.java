@@ -184,8 +184,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
     // Outer alignment container shell ensuring margins allow background gradient to pass through
     JPanel heroWrapper = new JPanel(new BorderLayout());
     heroWrapper.setOpaque(false);
-    heroWrapper.setBorder(new EmptyBorder(0, LayoutTheme.get().screenPaddingHorizontal, 0,
-        LayoutTheme.get().screenPaddingHorizontal));
+    heroWrapper.setBorder(new EmptyBorder(0, LayoutTheme.get().searchPanelPaddingHorizontal, 0,
+        LayoutTheme.get().searchPanelPaddingHorizontal));
 
     // Enhanced inner panel incorporating the exact same frosted glass lighten execution as the
     // keyboard panel
@@ -222,7 +222,22 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
     root.add(searchBar, BorderLayout.NORTH);
     root.add(heroWrapper, BorderLayout.CENTER);
-    root.add(entryKeyboard, BorderLayout.SOUTH);
+
+    // Item 1.3: small spacer between hero area and keyboard panel (small-landscape only;
+    // zero height on other resolutions so no visual change elsewhere).
+    int spacerH = LayoutTheme.get().searchHeroSpacerH;
+    if (spacerH > 0) {
+      JPanel spacer = new JPanel();
+      spacer.setOpaque(false);
+      spacer.setPreferredSize(new Dimension(1, spacerH));
+      JPanel southStack = new JPanel(new BorderLayout());
+      southStack.setOpaque(false);
+      southStack.add(spacer, BorderLayout.NORTH);
+      southStack.add(entryKeyboard, BorderLayout.CENTER);
+      root.add(southStack, BorderLayout.SOUTH);
+    } else {
+      root.add(entryKeyboard, BorderLayout.SOUTH);
+    }
     return root;
   }
 
@@ -234,8 +249,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
     JPanel wrapper = new JPanel(new BorderLayout());
     wrapper.setOpaque(false);
     wrapper.setBorder(new EmptyBorder(LayoutTheme.get().searchBarWrapperPadV,
-        LayoutTheme.get().screenPaddingHorizontal, LayoutTheme.get().searchBarWrapperPadV,
-        LayoutTheme.get().screenPaddingHorizontal));
+        LayoutTheme.get().searchPanelPaddingHorizontal, LayoutTheme.get().searchBarWrapperPadV,
+        LayoutTheme.get().searchPanelPaddingHorizontal));
 
     JPanel bar = new JPanel(new BorderLayout(10, 0));
     bar.setBackground(Color.BLACK);
@@ -374,10 +389,12 @@ public class SearchPanel extends JPanel implements TabNavigator {
     JPanel columnsLayoutContainer = new JPanel(new GridLayout(1, 3, 0, 0));
     columnsLayoutContainer.setOpaque(false);
 
-    // MATHEMATICAL FIX: By subtracting columnInternalEdgeGap (10px) from
-    // screenPaddingHorizontal (60px), the outer edges expand to line up cleanly.
+    // MATHEMATICAL FIX: By subtracting columnInternalEdgeGap (10px) from the panel's
+    // horizontal padding, the outer column edges expand to line up with the screen edges
+    // at the same indent as the keyboard and search bar panels.
+    // Uses searchPanelPaddingHorizontal so all three panels share the same left/right indent.
     int unifiedPaddingCalculation =
-        LayoutTheme.get().screenPaddingHorizontal - LayoutTheme.get().columnInternalEdgeGap;
+        LayoutTheme.get().searchPanelPaddingHorizontal - LayoutTheme.get().columnInternalEdgeGap;
     columnsLayoutContainer
         .setBorder(new EmptyBorder(10, unifiedPaddingCalculation, 10, unifiedPaddingCalculation));
 

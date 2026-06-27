@@ -207,6 +207,8 @@ public class LayoutTheme {
     columnInternalEdgeGap = 10;
     searchBarWrapperPadV = 12; // top + bottom padding around the search bar wrapper
     resultHeaderPadV = 12; // top + bottom padding of the column header in ResultsColumnPanel
+    searchHeroSpacerH = 0; // no spacer in landscape
+    searchPanelPaddingHorizontal = 60; // matches screenPaddingHorizontal in landscape
 
     // ── Result row / ResultsColumnPanel ──────────────────────────────────────
     resultRowMaxH = 72;
@@ -214,6 +216,10 @@ public class LayoutTheme {
     resultNumLabelW = 36;
     resultColumnPadH = 10;
     resultNavBtnW = 75;
+
+    // ── Font sizes assigned in constructor ────────────────────────────────────
+    fontSizeSearchBar = 32;
+    fontSizeResultHeader = 22;
 
     // ── AlbumViewCard track list ───────────────────────────────────────────────
     //
@@ -334,6 +340,8 @@ public class LayoutTheme {
       columnInternalEdgeGap = 10;
       searchBarWrapperPadV = 12;
       resultHeaderPadV = 12;
+      searchHeroSpacerH = 0;
+      searchPanelPaddingHorizontal = 30; // matches screenPaddingHorizontal in portrait
 
       // Result row / ResultsColumnPanel — same as landscape for portrait
       resultRowMaxH = 72;
@@ -341,6 +349,10 @@ public class LayoutTheme {
       resultNumLabelW = 36;
       resultColumnPadH = 10;
       resultNavBtnW = 75;
+
+      // Font sizes assigned in constructor
+      fontSizeSearchBar = 32;
+      fontSizeResultHeader = 22;
 
       // AlbumViewCard track list — same row height and page size as original landscape defaults
       albumViewRowH = 72; // portrait: keep full row height (same as resultRowMaxH)
@@ -492,40 +504,54 @@ public class LayoutTheme {
       // The column header padding (resultHeaderPadV) is also reduced from 12px to
       // 4px (saves 16px per column header, giving more room to visible rows).
       //
-      searchBarHeight = 60; // landscape default: 90
+      searchBarHeight = 45; // landscape default: 90 (Item 1.6: ~50% reduction)
       searchBarWrapperPadV = 4; // landscape default: 12
       resultHeaderPadV = 4; // landscape default: 12
-      searchHeroHeight = 300; // unchanged (hero only shown on entry card, not results)
+      searchHeroHeight = 300; // unchanged (hero only shown on entry card)
       searchBtnW = 180; // unchanged
       searchBtnH = 60; // unchanged
       columnInternalEdgeGap = 10; // unchanged
+      searchHeroSpacerH = 8; // Item 1.3: small spacer below hero area
+      searchPanelPaddingHorizontal = 20; // Items 1.4/1.5/2.1: matches keyboardPaddingHorizontal
+
+      // Font sizes for search screen
+      fontSizeSearchBar = 18; // landscape default: 32 (scaled for 45px bar height)
+      fontSizeResultHeader = 16; // landscape default: 22 (Item 2.2: smaller header labels)
 
       // ── Keyboard — fit all keys within 1024px wide screen ────────────────────
       //
-      // The keyboard wrapper has keyboardPaddingHorizontal on each side, then
+      // The keyboard wrapper has keyboardPaddingHorizontal (20px) on each side, then
       // keyboardInnerPad inside. Usable width for keys + gaps:
-      // 1024 - 2×20 (wrapper padding) - 2×10 (inner pad) = 964 px
+      // 1024 - 2×20 (wrapper padding) - 2×7 (inner pad) = 970 px
       //
-      // Row 1: 10 letters + CLEAR + BACKSPACE + 12 gaps
-      // 10×54 + 94 + 76 + 12×6 = 782 px ✓ (fits in 964px, centred)
+      // Key sizes are the previous values (W=54, H=54, etc.) reduced by 15% (×0.85):
+      // keyLetterW: 54 × 0.85 = 45.9 → 46 px
+      // keyLetterH: 54 × 0.85 = 45.9 → 46 px
+      // keyClearW: 94 × 0.85 = 79.9 → 80 px
+      // keyBackspaceW: 76 × 0.85 = 64.6 → 65 px
+      // keyModeToggleW:94 × 0.85 = 79.9 → 80 px
+      // keySpaceW: 300 × 0.85 = 255 → 255 px
       //
-      // Row 2: 10 letters (incl apostrophe) + 123@ + ABC + 12 gaps
-      // 10×54 + 2×94 + 12×6 = 800 px ✓
+      // Row 1 check: 10×46 + 80 + 65 + 12×5 = 460+80+65+60 = 665 px ✓
+      // Row 2 check: 10×46 + 2×80 + 12×5 = 460+160+60 = 680 px ✓
+      // Row 3 check: 9×46 + 255 + 9×5 = 414+255+45 = 714 px ✓
       //
-      // Row 3: 9 letters + SPACE + 9 gaps
-      // 9×54 + 300 + 9×6 = 840 px ✓
+      // keyboardInnerPad reduced by 30%: 10 × 0.70 = 7 px
       //
-      keyboardHeight = 220; // landscape default: 260
+      // keyboardHeight: 3 rows × 46 + 2 row-gaps × 8 + 2 × 7 (inner pad) = 138 + 16 + 14 = 168 px
+      // Adding a little breathing room → 185 px.
+      //
+      keyboardHeight = 185; // landscape default: 260 (Items 1.1+1.2)
       keyboardPaddingHorizontal = 20; // landscape default: 60
-      keyLetterW = 54; // landscape default: 70
-      keyLetterH = 54; // landscape default: 60
-      keyClearW = 94; // landscape default: 140
-      keyBackspaceW = 76; // landscape default: 100
-      keyModeToggleW = 94; // landscape default: 140
-      keySpaceW = 300; // landscape default: 420
-      keyRowGap = 8; // landscape default: 10
-      keyColGap = 6; // landscape default: 8
-      keyboardInnerPad = 10; // landscape default: 20
+      keyLetterW = 46; // landscape default: 70 (Item 1.1: ×0.85)
+      keyLetterH = 46; // landscape default: 60 (Item 1.1: ×0.85)
+      keyClearW = 80; // landscape default: 140 (Item 1.1: ×0.85)
+      keyBackspaceW = 65; // landscape default: 100 (Item 1.1: ×0.85)
+      keyModeToggleW = 80; // landscape default: 140 (Item 1.1: ×0.85)
+      keySpaceW = 255; // landscape default: 420 (Item 1.1: ×0.85)
+      keyRowGap = 7; // landscape default: 10 (Item 1.2: ×0.70)
+      keyColGap = 5; // landscape default: 8 (Item 1.2: ×0.70)
+      keyboardInnerPad = 7; // landscape default: 20 (Item 1.2: ×0.70)
 
       // ── Result row sizing — unchanged from landscape defaults ─────────────────
       resultRowMaxH = 72; // unchanged
@@ -1523,6 +1549,21 @@ public class LayoutTheme {
    */
   public final int resultHeaderPadV;
 
+  /**
+   * Height of the small vertical spacer injected between the hero body and the keyboard panel on
+   * the Search entry card. Landscape / portrait: 0 (no spacer). Small-landscape (1024×768): a small
+   * value (e.g. 8 px) to visually separate the frosted-glass hero area from the keyboard.
+   */
+  public final int searchHeroSpacerH;
+
+  /**
+   * Horizontal left/right padding applied to the search bar wrapper and hero wrapper panels. On
+   * landscape and portrait this matches {@link #screenPaddingHorizontal}. On small-landscape
+   * (1024×768) it is set equal to {@link #keyboardPaddingHorizontal} so all three panels (search
+   * bar, hero/results, keyboard) share the same left/right indent.
+   */
+  public final int searchPanelPaddingHorizontal;
+
   // ═══════════════════════════════════════════════════════════════════════════
   // KEYBOARD PANEL (KeyboardPanel)
   // Origin: KeyboardPanel
@@ -1803,7 +1844,7 @@ public class LayoutTheme {
 
   // Search
   public final int fontSizeSearchHero = 42; // SearchPanel hero label
-  public final int fontSizeSearchBar = 32; // Search bar query display
+  public final int fontSizeSearchBar; // Search bar query display
   public final int fontSizeSearchBtn = 22; // Manual search button
 
   // Track list / result rows
@@ -1819,7 +1860,7 @@ public class LayoutTheme {
   public final int fontSizeResultLine1 = 17; // ResultsColumnPanel primary line
   public final int fontSizeResultLine2 = 13; // ResultsColumnPanel secondary line
   public final int fontSizeResultNum = 16; // ResultsColumnPanel row number label
-  public final int fontSizeResultHeader = 22; // ResultsColumnPanel column header
+  public final int fontSizeResultHeader; // ResultsColumnPanel column header
 
   // Queue / overlay cards
   public final int fontSizeAddSongTitle = 32; // AddSongToQueueCard song title

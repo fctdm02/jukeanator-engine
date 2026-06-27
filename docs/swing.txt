@@ -1077,7 +1077,7 @@ In general, you need to make as much room as possible for the search results are
 Again, this is ONLY for small landscape mode when the resolution is 1024x768.
 
  
-In conjunction with that, change the pagination behavior to show the next/prev 10 items when 
-the down/up navigation arrow buttons are pressed.  For example, page 1 shows items 1-10, 
-pressing page down will result in items 11-20 being shown.
+In conjunction with that, change the pagination behavior to should be to show the next/prev 5 items when 
+the down/up navigation arrow buttons are pressed.  For example, again, I want page 1 to shows items 1-5, 
+so pressing page down will result in items 6-10 being shown.
 
