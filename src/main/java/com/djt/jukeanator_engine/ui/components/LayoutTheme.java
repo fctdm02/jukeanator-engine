@@ -167,6 +167,13 @@ public class LayoutTheme {
     albumTileInnerPad = 1;
     genreTileInnerPad = 16;
 
+    // ── Genre grid gaps and page padding ──────────────────────────────────────
+    genreGridGapH = 20;
+    genreGridGapV = 20;
+    genrePagePadH = 60;
+    genrePagePadV = 30;
+    genreImageSize = 240;
+
     // ── Album grid gaps ────────────────────────────────────────────────────────
     albumGridGapH = 10;
     albumGridGapV = 10;
@@ -320,6 +327,13 @@ public class LayoutTheme {
       genreTileInnerPad = 8;
       genrePortraitImgReduction = 1.20;
 
+      // Genre grid gaps and page padding — same as landscape for portrait
+      genreGridGapH = 20;
+      genreGridGapV = 20;
+      genrePagePadH = 60;
+      genrePagePadV = 30;
+      genreImageSize = 240;
+
       // Album grid gaps — same as landscape for portrait
       albumGridGapH = 10;
       albumGridGapV = 10;
@@ -451,6 +465,25 @@ public class LayoutTheme {
       albumGridGapH = 4; // landscape default: 10
       albumGridGapV = 4; // landscape default: 10
 
+      // ── Genre grid — maximise tile art on 1024 × 768 ─────────────────────────
+      //
+      // Item 1.1: Match album tile gaps (4px) so inter-tile spacing is identical.
+      //
+      genreGridGapH = 4; // landscape default: 20 (Item 1.1: match albumGridGapH)
+      genreGridGapV = 4; // landscape default: 20 (Item 1.1: match albumGridGapV)
+      //
+      // Item 1.2: Align genre grid left/right padding with the top panel edge
+      // (TOP_PANEL_H_PADDING / 2 = 20px), matching the credits panel left indent.
+      //
+      genrePagePadH = 20; // landscape default: 60 (Item 1.2: align with top panel)
+      genrePagePadV = 10; // landscape default: 30 (tighter top/bottom)
+      //
+      // Item 1.3: genreImageSize feeds the scale formula in computeLandscapeGenreProfile.
+      // The reduced paddings/gaps already free enough space; keeping the canonical
+      // 240px base lets the profile auto-scale to fill all the reclaimed area.
+      //
+      genreImageSize = 240; // unchanged — profile calculation uses available area
+
       // ── Item 1 : Now-playing panel -- narrow animated GIF, wider text area ────
       //
       // At 1024 x 768 the now-playing wrapper is ~345 px wide (35 % of 984 usable).
@@ -474,8 +507,8 @@ public class LayoutTheme {
       // Reducing it from 72 x 72 to 40 x 40 shrinks the header bar height by ~32 px,
       // handing that space back to the album grid.
       //
-      detailHeaderImageW = 40; // landscape default: 72
-      detailHeaderImageH = 40; // landscape default: 72
+      detailHeaderImageW = 48; // landscape default: 72; previous: 40; +20% (Item 2.1)
+      detailHeaderImageH = 48; // landscape default: 72; previous: 40; +20% (Item 2.1)
 
       // ── "ALL ALBUMS" header horizontal padding ────────────────────────────────
       //
@@ -1511,22 +1544,22 @@ public class LayoutTheme {
   public final int genreGridRows = 2;
 
   /** Horizontal gap between genre tiles. */
-  public final int genreGridGapH = 20;
+  public final int genreGridGapH;
 
   /** Vertical gap between genre tiles. */
-  public final int genreGridGapV = 20;
+  public final int genreGridGapV;
 
   /** Outer horizontal padding for the genre grid page wrapper. */
-  public final int genrePagePadH = 60;
+  public final int genrePagePadH;
 
   /** Outer vertical (top) padding for the genre grid page wrapper. */
-  public final int genrePagePadV = 30;
+  public final int genrePagePadV;
 
   /** Inner padding (all sides) inside each genre tile. */
   public final int genreTileInnerPad;
 
   /** Pixel size (square) of the genre image loaded and displayed in each tile. */
-  public final int genreImageSize = 240;
+  public final int genreImageSize;
 
   /**
    * Width and height for the prev/next wrapper panels in the genre pagination row. Matches
