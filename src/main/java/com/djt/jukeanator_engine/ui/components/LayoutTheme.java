@@ -1101,8 +1101,32 @@ public class LayoutTheme {
   public GenreGridProfile genreGridProfile(int screenW, int screenH) {
 
     boolean portrait = screenH > screenW;
+    // Small-landscape (≤ 1280 × 800): fix the grid at exactly 5 columns × 3 rows so all
+    // 15 canonical genres fit on one page. imageSize is back-calculated to fill the
+    // available tile area; the height constraint is always the binding one on 1024 × 768.
+    boolean smallLandscape = !portrait && screenW <= 1280 && screenH <= 800;
+    if (smallLandscape) {
+      return computeSmallLandscapeFixedGenreProfile(screenW, screenH);
+    }
     return portrait ? computePortraitGenreProfile(screenW, screenH)
         : computeLandscapeGenreProfile(screenW, screenH);
+  }
+
+  private GenreGridProfile computeSmallLandscapeFixedGenreProfile(int screenW, int screenH) {
+    final int FIXED_COLS = 5;
+    final int FIXED_ROWS = 3;
+
+    // Available area after removing top panel, tab bar, page padding, and label row.
+    int availH = screenH - topPanelHeight - tabHeight - (genrePagePadV * 2) - GENRE_LABEL_H;
+    int availW = screenW - (genrePagePadH * 2);
+
+    // Back-calculate imageSize so each tile fits exactly in its cell, using the
+    // more restrictive (smaller) of the width and height constraints.
+    int imageSizeFromW = (availW / FIXED_COLS) - genreGridGapH;
+    int imageSizeFromH = (availH / FIXED_ROWS) - genreGridGapV - GENRE_LABEL_H;
+    int imageSize = roundEven(Math.max(1, Math.min(imageSizeFromW, imageSizeFromH)));
+
+    return new GenreGridProfile(FIXED_COLS, FIXED_ROWS, imageSize);
   }
 
   // ── Landscape ─────────────────────────────────────────────────────────────

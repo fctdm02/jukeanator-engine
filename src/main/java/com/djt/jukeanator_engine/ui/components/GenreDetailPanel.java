@@ -91,7 +91,14 @@ public class GenreDetailPanel extends JPanel {
     ImageIcon genreImage = null;
     try {
       String resourceName = genre.getGenreName() + ".png";
-      genreImage = imageLoader.loadImage(resourceName, 72, 72);
+      int imgW = LayoutTheme.get().detailHeaderImageW;
+      int imgH = LayoutTheme.get().detailHeaderImageH;
+      genreImage = imageLoader.loadImage(resourceName, imgW, imgH);
+      if (genreImage != null) {
+        java.awt.Image transparentStrippedImage =
+            ImageLoader.createTransparentImage(genreImage.getImage(), true, 245);
+        genreImage = new ImageIcon(transparentStrippedImage);
+      }
     } catch (Exception ignored) {
     }
 
