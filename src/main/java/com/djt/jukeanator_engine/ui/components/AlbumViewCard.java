@@ -496,7 +496,8 @@ public class AlbumViewCard extends JPanel {
 
     JPanel row = new JPanel(new BorderLayout(10, 0));
     row.setOpaque(false);
-    row.setBorder(new EmptyBorder(10, 16, 10, 16));
+    row.setBorder(new EmptyBorder(LayoutTheme.get().albumViewRowPadV, 16,
+        LayoutTheme.get().albumViewRowPadV, 16));
 
     // Give BoxLayout a complete height contract: preferred, minimum, and maximum
     // are all set to the same value so the row height is fully determined and

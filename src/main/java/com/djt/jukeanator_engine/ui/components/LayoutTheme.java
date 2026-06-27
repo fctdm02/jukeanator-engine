@@ -213,6 +213,7 @@ public class LayoutTheme {
     // so page-down always advances by exactly the number of visible rows.
     albumViewRowH = 56; // was implicitly 72 (=resultRowMaxH); reduced to fit 12 rows
     albumViewTracksPerPage = 12; // was 15 (pre-fix) / 10 (interim fix); now matches 12 visible rows
+    albumViewRowPadV = 10; // top+bottom EmptyBorder padding inside each track row
 
     // ── Derived Dimension fields ───────────────────────────────────────────────
     // Must be initialised after the primitives they depend on.
@@ -306,6 +307,7 @@ public class LayoutTheme {
       // AlbumViewCard track list — same row height and page size as original landscape defaults
       albumViewRowH = 72; // portrait: keep full row height (same as resultRowMaxH)
       albumViewTracksPerPage = 15;
+      albumViewRowPadV = 10; // portrait: same top+bottom row padding as landscape
 
     } else {
       // ── SMALL_LANDSCAPE (1024 × 768 and similar) ────────────────────────────
@@ -442,15 +444,30 @@ public class LayoutTheme {
 
       // ── AlbumViewCard track list ────────────────────────────────────────────
       //
-      // With resultNavBorderV=4 and resultNavBtnH=32 the nav panel is 36px tall.
-      // In practice 6 track rows are fully visible on 1024x768 (the 7th is clipped
-      // by the surrounding AlbumDetailCard chrome not accounted for in the formula).
-      // Setting albumViewTracksPerPage=6 ensures TRACKS_PER_PAGE=6, so 6 rows are
-      // rendered, lastRenderedCount=6, and the page jump is correct: page 1 shows
-      // rows 1-6, page 2 shows rows 7-12, etc.
+      // Target: 10 fully visible track rows on 1024 × 768.
       //
-      albumViewRowH = 72; // small-landscape: keep full row height (same as resultRowMaxH)
-      albumViewTracksPerPage = 6; // landscape default: 15
+      // Empirical calibration from v2 screenshot:
+      // - 9 rows of 50px are confirmed fully visible (9×50 + 8 sep + 8 pad = 466px fits)
+      // - 10 rows at 50px (517px) do NOT fit — the 10th is clipped by AlbumDetailCard
+      // footer chrome (← BACK button + add-to-queue bar) that was not in the original
+      // formula.
+      //
+      // The trackRowsPanel visible height is therefore in the range [466, 516] px.
+      //
+      // To guarantee 10 rows fit inside the proven lower bound of 466px:
+      // 10 rows + 9 separators (1px) + 8px panel border = 10×H + 17 ≤ 466
+      // → H ≤ 44.9 → albumViewRowH = 44 px
+      // check: 10×44 + 9 + 8 = 457 px (fits with 9px headroom) ✓
+      //
+      // albumViewRowPadV=4 gives 8px total vertical padding per row, leaving
+      // 36px of content height — sufficient for popularity bars + track labels.
+      //
+      // albumViewTracksPerPage=10 ensures TRACKS_PER_PAGE=10 == lastRenderedCount,
+      // so page-down always jumps by exactly 10: page 1 → 1-10, page 2 → 11-20.
+      //
+      albumViewRowH = 44; // landscape default: 56; empirically derived for 1024×768
+      albumViewTracksPerPage = 10; // landscape default: 12
+      albumViewRowPadV = 4; // landscape default: 10 (EmptyBorder top+bottom)
     }
 
     // Derived Dimension fields — always computed last from the primitives set above.
@@ -1175,6 +1192,31 @@ public class LayoutTheme {
   /** Number of track rows shown per page in the paginated track listing. */
   public final int albumViewTracksPerPage;
 
+  /**
+   * Fixed height of each track row in the AlbumViewCard track list (px). This is the combined
+   * height of the row content plus its top+bottom {@code EmptyBorder} padding. BoxLayout is given
+   * this value as both preferred, minimum, and maximum so rows never compress.
+   *
+   * <p>
+   * Landscape (1920 × 1080): 56 px — fits 12 rows in the ~764px body. Small-landscape (1024 × 768):
+   * 44 px — fits 10 rows; empirically derived: 9 rows of 50px were confirmed visible, so
+   * trackRowsPanel height ∈ [466, 516] px; 10×44+9+8=457px ✓. Portrait (1080 × 1920): 72 px —
+   * matches the original resultRowMaxH.
+   */
+  public final int albumViewRowH;
+
+  /**
+   * Top and bottom {@code EmptyBorder} padding (px) applied to each track row inside
+   * {@link AlbumViewCard}. Reducing this on small-landscape screens allows more rows to fit without
+   * sacrificing the row height contract enforced by {@link #albumViewRowH}.
+   *
+   * <p>
+   * Landscape default: 10 px (gives 20px total vertical padding, matching the original
+   * {@code EmptyBorder(10,16,10,16)}). Small-landscape: 6 px (gives 12px total, leaving 38px of
+   * content height inside the 50px row).
+   */
+  public final int albumViewRowPadV;
+
   /** Width allocated for the "# Plays" (popularity bars) column header and cells. */
   public final int albumViewPlaysColW = 64;
 
@@ -1421,22 +1463,6 @@ public class LayoutTheme {
 
   /** Maximum row height for items in a results column (ResultsColumnPanel). */
   public final int resultRowMaxH = 72;
-
-  /**
-   * Row height used exclusively by {@link AlbumViewCard} track rows.
-   *
-   * <p>
-   * Kept separate from {@link #resultRowMaxH} so it can be tuned per-orientation without affecting
-   * the {@code ResultsColumnPanel} row height.
-   *
-   * <ul>
-   * <li><b>Canonical landscape (1920 × 1080):</b> 56 px — allows 12 full rows to fit in the
-   * available ~764 px body height (12 × 56 + 11 sep + 8 panel pad = 691 px).</li>
-   * <li><b>Portrait / small-landscape:</b> 72 px — matches the original {@link #resultRowMaxH} so
-   * those orientations are unaffected.</li>
-   * </ul>
-   */
-  public final int albumViewRowH;
 
   /** Thumbnail image size (square) displayed in each result row. */
   public final int resultThumbSize = 56;
