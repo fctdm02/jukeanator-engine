@@ -262,7 +262,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
     lbl.setForeground(Color.WHITE);
     lbl.setOpaque(true);
     lbl.setBackground(Color.BLACK);
-    lbl.setBorder(new EmptyBorder(8, 16, 8, 16));
+    lbl.setBorder(new EmptyBorder(LayoutTheme.get().searchBarLabelPadV, 16,
+        LayoutTheme.get().searchBarLabelPadV, 16));
     lbl.setHorizontalAlignment(SwingConstants.CENTER);
     lbl.setText(searchBuffer.length() == 0 ? " " : searchBuffer.toString());
 
@@ -396,7 +397,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
     int unifiedPaddingCalculation =
         LayoutTheme.get().searchPanelPaddingHorizontal - LayoutTheme.get().columnInternalEdgeGap;
     columnsLayoutContainer
-        .setBorder(new EmptyBorder(10, unifiedPaddingCalculation, 10, unifiedPaddingCalculation));
+        .setBorder(new EmptyBorder(LayoutTheme.get().searchResultsTopPad, unifiedPaddingCalculation,
+            LayoutTheme.get().searchResultsTopPad, unifiedPaddingCalculation));
 
     int previewCount = LayoutTheme.get().searchPreviewCount;
 

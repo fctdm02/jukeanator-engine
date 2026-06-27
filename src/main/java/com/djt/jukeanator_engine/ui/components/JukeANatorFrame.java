@@ -578,6 +578,18 @@ public class JukeANatorFrame extends JFrame {
       }
 
       @Override
+      protected java.awt.Insets getContentBorderInsets(int tabPlacement) {
+        int topInset = LayoutTheme.get().tabContentTopInset;
+        if (topInset > 0) {
+          // Small-landscape: collapse the top content border to the configured value;
+          // leave left/bottom/right at 0 so nothing else is affected.
+          return new java.awt.Insets(topInset, 0, 0, 0);
+        }
+        // All other resolutions: let the default LAF supply its own insets.
+        return super.getContentBorderInsets(tabPlacement);
+      }
+
+      @Override
       protected void paintContentBorder(Graphics g, int tabPlacement, int selectedIndex) {
         // Paint the same screen gradient into the content border area so that
         // both the tabs view and the overlay cards share a consistent background.

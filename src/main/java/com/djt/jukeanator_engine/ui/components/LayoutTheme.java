@@ -209,6 +209,9 @@ public class LayoutTheme {
     resultHeaderPadV = 12; // top + bottom padding of the column header in ResultsColumnPanel
     searchHeroSpacerH = 0; // no spacer in landscape
     searchPanelPaddingHorizontal = 60; // matches screenPaddingHorizontal in landscape
+    searchBarLabelPadV = 8; // internal top+bottom padding of the search text label
+    searchResultsTopPad = 10; // top+bottom padding of the results columns container
+    tabContentTopInset = 0; // no override — default LAF content border insets apply
 
     // ── Result row / ResultsColumnPanel ──────────────────────────────────────
     resultRowMaxH = 72;
@@ -220,6 +223,7 @@ public class LayoutTheme {
     // ── Font sizes assigned in constructor ────────────────────────────────────
     fontSizeSearchBar = 32;
     fontSizeResultHeader = 22;
+    fontSizeKeyLabel = 22;
 
     // ── AlbumViewCard track list ───────────────────────────────────────────────
     //
@@ -342,6 +346,9 @@ public class LayoutTheme {
       resultHeaderPadV = 12;
       searchHeroSpacerH = 0;
       searchPanelPaddingHorizontal = 30; // matches screenPaddingHorizontal in portrait
+      searchBarLabelPadV = 8; // unchanged from landscape
+      searchResultsTopPad = 10; // unchanged from landscape
+      tabContentTopInset = 0; // no override in portrait
 
       // Result row / ResultsColumnPanel — same as landscape for portrait
       resultRowMaxH = 72;
@@ -353,6 +360,7 @@ public class LayoutTheme {
       // Font sizes assigned in constructor
       fontSizeSearchBar = 32;
       fontSizeResultHeader = 22;
+      fontSizeKeyLabel = 22;
 
       // AlbumViewCard track list — same row height and page size as original landscape defaults
       albumViewRowH = 72; // portrait: keep full row height (same as resultRowMaxH)
@@ -373,8 +381,8 @@ public class LayoutTheme {
       // above the constructors) because those screens exist only in landscape.
 
       // Keyboard fields are set further down in the dedicated keyboard section.
+      // searchPreviewCount is set further down alongside resultRowMaxH.
 
-      searchPreviewCount = 5;
       // ── HotHere row count — reduced to match visible rows on 1024 × 768 ────────
       //
       // The content area height on 1024 × 768 (after top panel and tab bar) is 606px.
@@ -513,10 +521,14 @@ public class LayoutTheme {
       columnInternalEdgeGap = 10; // unchanged
       searchHeroSpacerH = 8; // Item 1.3: small spacer below hero area
       searchPanelPaddingHorizontal = 20; // Items 1.4/1.5/2.1: matches keyboardPaddingHorizontal
+      searchBarLabelPadV = 5; // Item 3: 8px × 0.60 = 4.8 → 5px (−40%)
+      searchResultsTopPad = 4; // Item 4: reduce top/bottom gap above/below columns
+      tabContentTopInset = 2; // Item 1: override JTabbedPane content top inset
 
       // Font sizes for search screen
       fontSizeSearchBar = 18; // landscape default: 32 (scaled for 45px bar height)
       fontSizeResultHeader = 16; // landscape default: 22 (Item 2.2: smaller header labels)
+      fontSizeKeyLabel = 16; // Item 2: smaller key label font (landscape default: 22)
 
       // ── Keyboard — fit all keys within 1024px wide screen ────────────────────
       //
@@ -553,10 +565,19 @@ public class LayoutTheme {
       keyColGap = 5; // landscape default: 8 (Item 1.2: ×0.70)
       keyboardInnerPad = 7; // landscape default: 20 (Item 1.2: ×0.70)
 
-      // ── Result row sizing — unchanged from landscape defaults ─────────────────
-      resultRowMaxH = 72; // unchanged
-      resultThumbSize = 56; // unchanged
-      resultNumLabelW = 36; // unchanged
+      // ── Result row sizing — tuned for 5 visible rows on 1024 × 768 ────────────
+      //
+      // Available height for the results CENTER area (approx):
+      // 606px total - 53px (search bar+wrapper) - 185px (keyboard) = 368px
+      // Deduct: 8px rowsPanel border + 8px header pad (4+4) + ~30px header label
+      // + 40px navPanel (4+32+4) = ~86px overhead
+      // Remaining for 5 rows + 4 separators: 368 - 86 = 282px
+      // 5×H + 4 ≤ 282 → H ≤ 55.6 → resultRowMaxH = 54 (with 8px headroom)
+      //
+      resultRowMaxH = 54; // landscape default: 72 (Item 5)
+      searchPreviewCount = 5; // Items 5+6: show exactly 5 rows per page
+      resultThumbSize = 40; // landscape default: 56 (scaled with row height)
+      resultNumLabelW = 30; // landscape default: 36
       resultColumnPadH = 10; // unchanged
       resultNavBtnW = 75; // unchanged
 
@@ -1564,6 +1585,26 @@ public class LayoutTheme {
    */
   public final int searchPanelPaddingHorizontal;
 
+  /**
+   * Top and bottom internal padding (px each) of the search bar text label inside the black bar.
+   * Hardcoded as 8px in all orientations previously. Small-landscape reduces this by 40% to 5px to
+   * shrink the overall bar height without changing the font.
+   */
+  public final int searchBarLabelPadV;
+
+  /**
+   * Top and bottom padding (px) of the results columns container in CARD_RESULTS. Landscape /
+   * portrait: 10 px. Small-landscape: 4 px to give more vertical room to rows.
+   */
+  public final int searchResultsTopPad;
+
+  /**
+   * Top inset (px) applied to the JTabbedPane content area via a {@code getContentBorderInsets}
+   * override. Landscape / portrait: 0 (no override — default LAF insets apply). Small-landscape:
+   * set to a small value to push the content flush against the top panel.
+   */
+  public final int tabContentTopInset;
+
   // ═══════════════════════════════════════════════════════════════════════════
   // KEYBOARD PANEL (KeyboardPanel)
   // Origin: KeyboardPanel
@@ -1870,7 +1911,7 @@ public class LayoutTheme {
   public final int fontSizeTimeoutLabel = 13; // Countdown "Closes in Xs" label
 
   // Keyboard
-  public final int fontSizeKeyLabel = 22; // KeyboardPanel key labels
+  public final int fontSizeKeyLabel; // KeyboardPanel key labels
 
   // Admin
   public final int fontSizeAdminAlbum = 15; // AdminPanel album list cell
