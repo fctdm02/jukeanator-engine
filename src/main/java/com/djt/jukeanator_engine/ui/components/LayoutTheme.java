@@ -200,7 +200,19 @@ public class LayoutTheme {
     resultNavBorderV = 20; // 8px top + 12px bottom (original EmptyBorder(8,12,12,12))
 
     // ── AlbumViewCard track list ───────────────────────────────────────────────
-    albumViewTracksPerPage = 15;
+    //
+    // On 1920 × 1080 the AlbumViewCard body height available for rows is:
+    // 1080 - 110 (top panel) - 96 (tab bar) - 45 (track-list header) - 65 (nav panel:
+    // 20px border + 45px btn) = 764 px (trackRowsPanel occupies this as BorderLayout CENTER).
+    //
+    // Target: 12 fully visible rows.
+    // albumViewRowH=56: 12 × 56 + 11 sep (1 px each) + 8 (rowsPanel EmptyBorder 4+4) = 691 px
+    // 691 < 764 ✓ — fits with 73 px headroom, no clipping.
+    //
+    // albumViewTracksPerPage=12 ensures TRACKS_PER_PAGE == lastRenderedCount == 12,
+    // so page-down always advances by exactly the number of visible rows.
+    albumViewRowH = 56; // was implicitly 72 (=resultRowMaxH); reduced to fit 12 rows
+    albumViewTracksPerPage = 12; // was 15 (pre-fix) / 10 (interim fix); now matches 12 visible rows
 
     // ── Derived Dimension fields ───────────────────────────────────────────────
     // Must be initialised after the primitives they depend on.
@@ -291,7 +303,8 @@ public class LayoutTheme {
       resultNavBtnH = 45;
       resultNavBorderV = 20;
 
-      // AlbumViewCard track list — same as landscape for portrait
+      // AlbumViewCard track list — same row height and page size as original landscape defaults
+      albumViewRowH = 72; // portrait: keep full row height (same as resultRowMaxH)
       albumViewTracksPerPage = 15;
 
     } else {
@@ -436,6 +449,7 @@ public class LayoutTheme {
       // rendered, lastRenderedCount=6, and the page jump is correct: page 1 shows
       // rows 1-6, page 2 shows rows 7-12, etc.
       //
+      albumViewRowH = 72; // small-landscape: keep full row height (same as resultRowMaxH)
       albumViewTracksPerPage = 6; // landscape default: 15
     }
 
@@ -1393,8 +1407,24 @@ public class LayoutTheme {
   // Origin: ResultsColumnPanel
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /** Maximum row height for items in a results column. */
+  /** Maximum row height for items in a results column (ResultsColumnPanel). */
   public final int resultRowMaxH = 72;
+
+  /**
+   * Row height used exclusively by {@link AlbumViewCard} track rows.
+   *
+   * <p>
+   * Kept separate from {@link #resultRowMaxH} so it can be tuned per-orientation without affecting
+   * the {@code ResultsColumnPanel} row height.
+   *
+   * <ul>
+   * <li><b>Canonical landscape (1920 × 1080):</b> 56 px — allows 12 full rows to fit in the
+   * available ~764 px body height (12 × 56 + 11 sep + 8 panel pad = 691 px).</li>
+   * <li><b>Portrait / small-landscape:</b> 72 px — matches the original {@link #resultRowMaxH} so
+   * those orientations are unaffected.</li>
+   * </ul>
+   */
+  public final int albumViewRowH;
 
   /** Thumbnail image size (square) displayed in each result row. */
   public final int resultThumbSize = 56;

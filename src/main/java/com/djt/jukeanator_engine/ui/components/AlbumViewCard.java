@@ -63,11 +63,10 @@ public class AlbumViewCard extends JPanel {
   private int trackOffset = 0;
   /**
    * The number of track rows actually rendered on the most recent call to
-   * {@link #rebuildTrackRows()}.  Used as the page-jump size for the prev/next
-   * buttons so that the navigation always advances by exactly as many rows as
-   * are visible — regardless of the {@code TRACKS_PER_PAGE} constant, which
-   * may differ from the visible count when the panel height is constrained
-   * (e.g. on a 1024 × 768 display).
+   * {@link #rebuildTrackRows()}. Used as the page-jump size for the prev/next buttons so that the
+   * navigation always advances by exactly as many rows as are visible — regardless of the
+   * {@code TRACKS_PER_PAGE} constant, which may differ from the visible count when the panel height
+   * is constrained (e.g. on a 1024 × 768 display).
    */
   private int lastRenderedCount = TRACKS_PER_PAGE;
   private List<SongDto> trackSongs;
@@ -505,9 +504,9 @@ public class AlbumViewCard extends JPanel {
     // panel has less vertical space than the sum of row heights. Without a
     // minimum/preferred, BoxLayout is free to shrink rows toward 0 px, which
     // causes the text from one row to be painted on top of the next.
-    Dimension rowSize = new Dimension(Integer.MAX_VALUE, LayoutTheme.get().resultRowMaxH);
+    Dimension rowSize = new Dimension(Integer.MAX_VALUE, LayoutTheme.get().albumViewRowH);
     row.setPreferredSize(rowSize);
-    row.setMinimumSize(new Dimension(0, LayoutTheme.get().resultRowMaxH));
+    row.setMinimumSize(new Dimension(0, LayoutTheme.get().albumViewRowH));
     row.setMaximumSize(rowSize);
 
     if (listener != null) {
