@@ -167,6 +167,36 @@ public class AlbumGridPanel extends JPanel {
     refresh();
   }
 
+  /** Returns the currently highlighted letter button's key (e.g. "#" or "A"-"Z"). */
+  public String getSelectedLetter() {
+    return selectedLetter;
+  }
+
+  /**
+   * Returns how many pages into the currently selected letter's bucket the visible page is — 0 for
+   * the bucket's first page, 1 for its second page, etc. Used to restore the same relative page when
+   * rebuilding this panel under a different sort order.
+   */
+  public int getPageOffsetWithinLetter() {
+    int pageSize = albumGridProfile.cols() * albumGridProfile.rows();
+    int letterStart = letterStartIndex(selectedLetter);
+    return Math.max(0, (startIndex - letterStart) / pageSize);
+  }
+
+  /**
+   * Selects {@code letter} (falling back to the first available letter if it has no bucket here)
+   * and jumps {@code pageOffset} pages into that bucket, clamped to the album list's bounds.
+   */
+  public void selectLetterAtPage(String letter, int pageOffset) {
+    if (letterMap.isEmpty())
+      return;
+
+    selectedLetter = letterMap.containsKey(letter) ? letter : letterMap.keySet().iterator().next();
+    int pageSize = albumGridProfile.cols() * albumGridProfile.rows();
+    startIndex = letterStartIndex(selectedLetter) + pageOffset * pageSize;
+    refresh();
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE RENDERING
   // ─────────────────────────────────────────────────────────────────────────

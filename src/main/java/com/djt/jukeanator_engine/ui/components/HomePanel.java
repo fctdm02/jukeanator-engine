@@ -87,6 +87,10 @@ public class HomePanel extends JPanel implements TabNavigator {
   // ── Live grid container (the AlbumGridPanel inside is swapped on sort change) ──
   private final JPanel gridContainer = new JPanel(new BorderLayout());
 
+  // ── The AlbumGridPanel currently shown in gridContainer — tracked so its selected
+  // letter/page can be carried over when the sort order is toggled. ──────────
+  private AlbumGridPanel currentGridPanel;
+
   // ── Sort toggle buttons — kept to allow repainting active state ──────────
   private JButton btnTitle;
   private JButton btnArtist;
@@ -172,6 +176,17 @@ public class HomePanel extends JPanel implements TabNavigator {
     cardLayout.show(rootPanel, detailReturnCard);
   }
 
+  /**
+   * Resets the Home tab to the root album grid. Unlike the other tabs' resetToDefaultView(), this
+   * does not reset the page or selected letter — it shows the grid exactly as the user left it,
+   * at whatever page/letter and sort order were last active.
+   */
+  public void resetToDefaultView() {
+    currentDetailCard = null;
+    detailReturnCard = CARD_GRID;
+    cardLayout.show(rootPanel, CARD_GRID);
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // ARTIST CARD
   // ─────────────────────────────────────────────────────────────────────────
@@ -238,7 +253,8 @@ public class HomePanel extends JPanel implements TabNavigator {
     }
 
     gridContainer.setOpaque(false);
-    gridContainer.add(buildAlbumGridPanel(currentSort), BorderLayout.CENTER);
+    currentGridPanel = buildAlbumGridPanel(currentSort);
+    gridContainer.add(currentGridPanel, BorderLayout.CENTER);
     card.add(gridContainer, BorderLayout.CENTER);
     return card;
   }
@@ -347,6 +363,12 @@ public class HomePanel extends JPanel implements TabNavigator {
 
     if (mode == currentSort)
       return;
+
+    // Capture the currently selected letter/page so the user lands on the same
+    // letter and relative page after the grid is rebuilt under the new sort order.
+    String selectedLetter = currentGridPanel != null ? currentGridPanel.getSelectedLetter() : "#";
+    int pageOffset = currentGridPanel != null ? currentGridPanel.getPageOffsetWithinLetter() : 0;
+
     currentSort = mode;
 
     for (JButton btn : new JButton[] {btnTitle, btnArtist}) {
@@ -361,8 +383,11 @@ public class HomePanel extends JPanel implements TabNavigator {
       activeBtn.repaint();
     }
 
+    currentGridPanel = buildAlbumGridPanel(mode);
+    currentGridPanel.selectLetterAtPage(selectedLetter, pageOffset);
+
     gridContainer.removeAll();
-    gridContainer.add(buildAlbumGridPanel(mode), BorderLayout.CENTER);
+    gridContainer.add(currentGridPanel, BorderLayout.CENTER);
     gridContainer.revalidate();
     gridContainer.repaint();
   }

@@ -733,12 +733,13 @@ public class JukeANatorFrame extends JFrame {
         return;
       lastSelectedTabIndex = selected;
       switch (selected) {
+        case 1 -> homePanel.resetToDefaultView();
         case 2 -> searchPanel.resetToDefaultView();
         case 3 -> hotHerePanel.resetToDefaultView();
         case 4 -> genrePanel.resetToDefaultView();
         case 5 -> queuePanel.onShown();
         default -> {
-          /* HOME, DUMMY, and ADMIN require no reset */ }
+          /* DUMMY and ADMIN require no reset */ }
       }
     });
 
