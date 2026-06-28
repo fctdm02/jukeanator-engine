@@ -427,7 +427,19 @@ public class JukeANatorFrame extends JFrame {
       hibernationTimer.setInitialDelay(5_000);
       hibernationTimer.start();
     }
-    requestFocusInWindow();
+
+    // requestFocusInWindow() here is a no-op — the frame isn't displayable yet
+    // (setVisible(true) hasn't been called by the caller). On Windows this
+    // left the incrementCreditsKey listener (WHEN_IN_FOCUSED_WINDOW) without
+    // focus at startup, so the first bill-acceptor pulses were silently
+    // dropped. windowOpened() fires once the frame is actually shown, so the
+    // request lands reliably there instead.
+    addWindowListener(new java.awt.event.WindowAdapter() {
+      @Override
+      public void windowOpened(java.awt.event.WindowEvent e) {
+        requestFocusInWindow();
+      }
+    });
   }
 
   /**
