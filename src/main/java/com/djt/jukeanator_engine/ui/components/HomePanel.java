@@ -53,7 +53,7 @@ public class HomePanel extends JPanel implements TabNavigator {
   private final CardLayout cardLayout = new CardLayout();
   private final JPanel rootPanel = new JPanel(cardLayout);
 
-  // ── Active detail card (tracked so its timer can be stopped) ─────────────
+  // ── Active detail card ──────────────────────────────────────────────────
   private AlbumDetailCard currentDetailCard;
 
   // ── Tracks which card to return to when the detail card's BACK button is
@@ -139,8 +139,7 @@ public class HomePanel extends JPanel implements TabNavigator {
 
   /**
    * Fetches the full album (with songs), builds an {@link AlbumDetailCard}, places it in the DETAIL
-   * card slot, and flips to it. Any previously active detail card has its timer stopped first so
-   * there are no dangling Swing timers.
+   * card slot, and flips to it.
    */
   @Override
   public void pushAlbumDetail(AlbumDto album) {
@@ -154,10 +153,6 @@ public class HomePanel extends JPanel implements TabNavigator {
     // grid or the artist detail panel).
     detailReturnCard = currentVisibleCard();
 
-    if (currentDetailCard != null) {
-      currentDetailCard.dismiss(); // stop the countdown timer
-    }
-
     currentDetailCard =
         new AlbumDetailCard(owner, full, imageLoader, songQueueService, priorityCostMultiplier,
             popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey); // TabNavigator
@@ -168,17 +163,12 @@ public class HomePanel extends JPanel implements TabNavigator {
   }
 
   /**
-   * Stops the detail card's countdown timer and returns to the previously visible card (either the
-   * root grid or the artist detail panel). Safe to call even when no detail card is currently
-   * active.
+   * Returns to the previously visible card (either the root grid or the artist detail panel).
    */
   @Override
   public void popToRoot() {
 
-    if (currentDetailCard != null) {
-      currentDetailCard.dismiss();
-      currentDetailCard = null;
-    }
+    currentDetailCard = null;
     cardLayout.show(rootPanel, detailReturnCard);
   }
 

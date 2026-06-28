@@ -1364,22 +1364,14 @@ public class JukeANatorFrame extends JFrame {
       return; // cannot show detail without album data
     }
 
-    // Capture the tab index to restore when the card is dismissed or times out
+    // Capture the tab index to restore when the card is dismissed
     final int returnTabIndex = contentPanelTabs.getSelectedIndex();
-
-    // Stop any previously active now-playing album card timer before replacing it
-    if (nowPlayingAlbumCard != null) {
-      nowPlayingAlbumCard.dismiss();
-    }
 
     // TabNavigator whose popToRoot restores the previously-active tab
     TabNavigator navigator = new TabNavigator() {
       @Override
       public void popToRoot() {
-        if (nowPlayingAlbumCard != null) {
-          nowPlayingAlbumCard.dismiss();
-          nowPlayingAlbumCard = null;
-        }
+        nowPlayingAlbumCard = null;
         hideOverlay();
         overlayTransitionInProgress = true;
         contentPanelTabs.setSelectedIndex(returnTabIndex);

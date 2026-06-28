@@ -145,9 +145,6 @@ public class SearchPanel extends JPanel implements TabNavigator {
     // results or the artist detail panel).
     detailReturnCard = currentVisibleCard();
 
-    if (currentDetailCard != null)
-      currentDetailCard.dismiss();
-
     currentDetailCard =
         new AlbumDetailCard(owner, full, imageLoader, songQueueService, priorityCostMultiplier,
             popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey);
@@ -158,10 +155,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
   @Override
   public void popToRoot() {
-    if (currentDetailCard != null) {
-      currentDetailCard.dismiss();
-      currentDetailCard = null;
-    }
+    currentDetailCard = null;
     cardLayout.show(rootPanel, detailReturnCard);
   }
 

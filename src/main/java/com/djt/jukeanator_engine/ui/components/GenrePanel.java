@@ -171,10 +171,6 @@ public class GenrePanel extends JPanel implements TabNavigator {
     // album list or the artist detail panel).
     detailReturnCard = currentVisibleCard();
 
-    if (currentDetailCard != null) {
-      currentDetailCard.dismiss();
-    }
-
     currentDetailCard =
         new AlbumDetailCard(owner, full, imageLoader, songQueueService, priorityCostMultiplier,
             popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey);
@@ -185,10 +181,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
   @Override
   public void popToRoot() {
-    if (currentDetailCard != null) {
-      currentDetailCard.dismiss();
-      currentDetailCard = null;
-    }
+    currentDetailCard = null;
     cardLayout.show(rootPanel, detailReturnCard);
   }
 
@@ -197,10 +190,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
    * tab.
    */
   public void resetToDefaultView() {
-    if (currentDetailCard != null) {
-      currentDetailCard.dismiss();
-      currentDetailCard = null;
-    }
+    currentDetailCard = null;
     detailReturnCard = CARD_GENRES;
     currentPage = 0;
     refreshGenresUI();

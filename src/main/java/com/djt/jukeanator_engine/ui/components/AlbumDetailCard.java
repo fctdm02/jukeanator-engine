@@ -11,10 +11,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import javax.swing.JButton;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JProgressBar;
-import javax.swing.Timer;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
@@ -22,15 +19,6 @@ import com.djt.jukeanator_engine.ui.model.CreditManager;
 public class AlbumDetailCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
-
-  // ── Timeout — sourced from LayoutTheme ───────────────────────────────────
-  // Previously: private static final int TIMEOUT_SECONDS = 120;
-
-  private int secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
-  private final Timer countdownTimer;
-  private final JLabel timeoutLabel = new JLabel();
-  private final JProgressBar timeoutBar =
-      new JProgressBar(0, LayoutTheme.get().overlayTimeoutSeconds);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -44,32 +32,16 @@ public class AlbumDetailCard extends JPanel {
     setOpaque(false);
 
     AlbumViewCard.SongClickListener songClick = song -> {
-      secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
-      updateTimeout();
       if (owner instanceof JukeANatorFrame frame) {
         frame.showAddSongToQueueCard(song);
       }
     };
-
 
     AlbumViewCard albumView =
         new AlbumViewCard(album, imageLoader, threshold1, threshold2, threshold3, songClick);
 
     add(albumView, BorderLayout.CENTER);
     add(buildFooter(navigator), BorderLayout.SOUTH);
-
-    countdownTimer = new Timer(1000, e -> {
-      if (--secondsRemaining <= 0)
-        navigator.popToRoot();
-      else
-        updateTimeout();
-    });
-    countdownTimer.start();
-  }
-
-  /** Must be called when the card is removed from view so the timer doesn't leak. */
-  public void dismiss() {
-    countdownTimer.stop();
   }
 
   private JPanel buildFooter(TabNavigator navigator) {
@@ -86,27 +58,7 @@ public class AlbumDetailCard extends JPanel {
     JButton backButton = createBackButton("← BACK", navigator::popToRoot);
     buttons.add(backButton);
 
-    //
-    // TIMEOUT
-    //
-    JPanel timeoutSection = new JPanel(new BorderLayout(8, 0));
-    timeoutSection.setOpaque(false);
-
-    timeoutBar.setValue(LayoutTheme.get().overlayTimeoutSeconds);
-    timeoutBar.setForeground(ColorTheme.get().accentBlue);
-    timeoutBar.setOpaque(false);
-    timeoutBar.setBorderPainted(false);
-    timeoutBar.setStringPainted(false);
-
-    timeoutLabel.setForeground(ColorTheme.get().textSecondary);
-
-    updateTimeout();
-
-    timeoutSection.add(timeoutBar, BorderLayout.CENTER);
-    timeoutSection.add(timeoutLabel, BorderLayout.EAST);
-
     footer.add(buttons, BorderLayout.WEST);
-    footer.add(timeoutSection, BorderLayout.CENTER);
 
     return footer;
   }
@@ -169,10 +121,5 @@ public class AlbumDetailCard extends JPanel {
     button.addActionListener(e -> action.run());
 
     return button;
-  }
-
-  private void updateTimeout() {
-    timeoutBar.setValue(secondsRemaining);
-    timeoutLabel.setText("Closes in " + secondsRemaining + "s");
   }
 }

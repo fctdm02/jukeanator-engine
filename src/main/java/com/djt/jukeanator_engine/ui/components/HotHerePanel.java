@@ -355,10 +355,6 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     // columns or the artist detail panel).
     detailReturnCard = currentVisibleCard();
 
-    if (currentDetailCard != null) {
-      currentDetailCard.dismiss();
-    }
-
     currentDetailCard =
         new AlbumDetailCard(owner, full, imageLoader, songQueueService, priorityCostMultiplier,
             popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey);
@@ -370,10 +366,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   @Override
   public void popToRoot() {
 
-    if (currentDetailCard != null) {
-      currentDetailCard.dismiss();
-      currentDetailCard = null;
-    }
+    currentDetailCard = null;
     cardLayout.show(rootPanel, detailReturnCard);
   }
 
@@ -384,13 +377,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
    * refreshed data.
    */
   public void resetToDefaultView() {
-    // Stop any active album-detail countdown timer before clearing state so it
-    // cannot fire popToRoot() after the tab has already been reset (mirrors
-    // GenrePanel.resetToDefaultView()).
-    if (currentDetailCard != null) {
-      currentDetailCard.dismiss();
-      currentDetailCard = null;
-    }
+    currentDetailCard = null;
     artistsOffset = 0;
     albumsOffset = 0;
     songsOffset = 0;
