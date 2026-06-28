@@ -58,13 +58,10 @@ public class QueuePanel extends JPanel {
   }
 
   // ── Colours ───────────────────────────────────────────────────────────────
-  private static final Color BG_PANEL = new Color(22, 22, 28);
   private static final Color ACCENT_BLUE = new Color(0, 210, 255);
   private static final Color ACCENT_GOLD = new Color(255, 200, 0);
   private static final Color TEXT_PRIMARY = Color.WHITE;
   private static final Color AM_WARN_BORDER = new Color(220, 40, 40);
-  private static final Color LIST_BG = new Color(10, 12, 18);
-  private static final Color SEPARATOR = new Color(40, 44, 60);
 
   // ── 3-D button palette (mirrors AddSongToQueueCard) ─────────────────────
   private static final Color BTN3D_FACE_TOP = new Color(28, 45, 72);
@@ -116,35 +113,12 @@ public class QueuePanel extends JPanel {
     this.popularityT2 = popularityT2;
     this.popularityT3 = popularityT3;
 
-    // Transparent so our paintComponent can render the gradient cleanly
+    // Transparent so the frame's own diagonal gradient shows through, matching Home / Hot
+    // Here / Genre Details, instead of duplicating and then covering it with an opaque panel.
     setOpaque(false);
     // Fills the entire tab, edge-to-edge, matching the other tabs' layout
     setLayout(new BorderLayout());
     add(buildMainPanel(), BorderLayout.CENTER);
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // BACKGROUND — matches the frame-level diagonal gradient exactly
-  // ─────────────────────────────────────────────────────────────────────────
-  @Override
-  protected void paintComponent(Graphics g) {
-    Graphics2D g2 = (Graphics2D) g.create();
-    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-    int w = getWidth();
-    int h = getHeight();
-
-    // Base dark fill
-    g2.setColor(ColorTheme.get().appBgBase);
-    g2.fillRect(0, 0, w, h);
-
-    // Diagonal rainbow overlay — top-left to bottom-right
-    g2.setPaint(new LinearGradientPaint(new Point2D.Float(0, 0), new Point2D.Float(w, h),
-        ColorTheme.get().appGradFractions(), ColorTheme.get().appGradColors()));
-    g2.fillRect(0, 0, w, h);
-
-    g2.dispose();
-    // Do NOT call super — we own the background entirely
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -165,12 +139,23 @@ public class QueuePanel extends JPanel {
     requestFocusInWindow();
   }
 
+  /**
+   * Resets the Queue tab to its default view: clears the current row selection and refreshes the
+   * queue list, matching the {@code resetToDefaultView()} contract used by Home / Search / Hot
+   * Here / Genres when the tab is switched to.
+   */
+  public void resetToDefaultView() {
+    selectedIndex = -1;
+    queueList.clearSelection();
+    refreshQueueListModel();
+    requestFocusInWindow();
+  }
+
   // ── Layout ────────────────────────────────────────────────────────────────
 
   private JPanel buildMainPanel() {
     JPanel main = new JPanel(new BorderLayout(0, 0));
-    main.setBackground(BG_PANEL);
-    main.setOpaque(true);
+    main.setOpaque(false);
     main.setBorder(
         BorderFactory.createEmptyBorder(LayoutTheme.get().songQueueCardPadTop, 0, 14, 0));
 
@@ -220,11 +205,13 @@ public class QueuePanel extends JPanel {
     // Populate model (up to MAX_QUEUE_VISIBLE entries)
     refreshQueueListModel();
 
-    SongTrackCellRenderer.installWithPriority(queueList, popularityT1, popularityT2, popularityT3);
-    queueList.setOpaque(true);
-    queueList.setBackground(LIST_BG);
+    SongTrackCellRenderer.installWithPriority(queueList, popularityT1, popularityT2, popularityT3,
+        imageLoader);
+    // Transparent so the underlying screen gradient shows through, matching the Search / Hot
+    // Here / Genre result lists — no opaque black list/row backgrounds.
+    queueList.setOpaque(false);
     queueList.setForeground(TEXT_PRIMARY);
-    queueList.setSelectionBackground(new Color(0, 60, 80));
+    queueList.setSelectionBackground(ColorTheme.get().bgListSelected);
     queueList.setSelectionForeground(Color.WHITE);
     queueList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
     queueList.addListSelectionListener(e -> {
@@ -240,10 +227,26 @@ public class QueuePanel extends JPanel {
     queueList.setMinimumSize(new Dimension(0, listH));
     queueList.setMaximumSize(new Dimension(Integer.MAX_VALUE, listH));
 
-    // Plain bordered wrapper — no JScrollPane so no scroll bar can appear.
-    JPanel listWrapper = new JPanel(new BorderLayout());
+    // Rounded gradient card backdrop — identical paint to ResultsColumnPanel's
+    // innerColumnBody, so the queue list reads exactly like a Hot Here / Search /
+    // Genre result column. No JScrollPane, so no scroll bar can appear.
+    JPanel listWrapper = new JPanel(new BorderLayout()) {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      protected void paintComponent(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setPaint(new LinearGradientPaint(new Point2D.Float(0, 0),
+            new Point2D.Float(0, getHeight()), new float[] {0.0f, 1.0f},
+            new Color[] {ColorTheme.get().columnGradTop, ColorTheme.get().columnGradBottom}));
+        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
+        g2.dispose();
+        super.paintComponent(g);
+      }
+    };
     listWrapper.setOpaque(false);
-    listWrapper.setBorder(BorderFactory.createLineBorder(SEPARATOR, 1));
+    listWrapper.setBorder(new EmptyBorder(4, 0, 4, 0));
     listWrapper.add(queueList, BorderLayout.CENTER);
 
     section.add(listWrapper, BorderLayout.CENTER);

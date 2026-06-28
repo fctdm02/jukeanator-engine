@@ -7,9 +7,13 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 
@@ -41,7 +45,8 @@ public class SongTrackCellRenderer extends JPanel
 
   // ── Priority-based row colours (queue views only) ─────────────────────────
   /** Row background colours keyed by queue priority (index = priority level). */
-  public static final Color[] PRIORITY_COLORS = {new Color(90, 90, 90), // 0 — gray
+  public static final Color[] PRIORITY_COLORS = {
+      new Color(130, 130, 130), // 0 — gray
       new Color(220, 220, 220), // 1 — white
       new Color(200, 170, 0), // 2 — yellow
       new Color(200, 100, 0), // 3 — orange
@@ -62,8 +67,11 @@ public class SongTrackCellRenderer extends JPanel
 
   // ── Sub-widgets ───────────────────────────────────────────────────────────
   private final PopularityBarsPanel barsPanel;
+  private final JLabel numLabel = new JLabel();
+  private final JLabel thumb = new JLabel();
   private final JLabel song = new JLabel();
   private final JLabel sub = new JLabel();
+  private final ImageLoader imageLoader;
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -73,37 +81,70 @@ public class SongTrackCellRenderer extends JPanel
    * @param t2 Minimum plays for 2 bars.
    * @param t3 Minimum plays for 3 bars.
    * @param usePriorityColor When {@code true}, row background is coloured by queue-entry priority.
+   * @param imageLoader Used to load the album-art thumbnail (matching the Search / Hot Here / Genre
+   *        result rows). May be {@code null}, in which case the thumbnail stays a blank swatch.
    */
-  public SongTrackCellRenderer(int t1, int t2, int t3, boolean usePriorityColor) {
+  public SongTrackCellRenderer(int t1, int t2, int t3, boolean usePriorityColor,
+      ImageLoader imageLoader) {
     this.t1 = t1;
     this.t2 = t2;
     this.t3 = t3;
     this.usePriorityColor = usePriorityColor;
+    this.imageLoader = imageLoader;
 
     barsPanel = new PopularityBarsPanel(0);
 
-    setLayout(new BorderLayout(6, 0));
-    setBorder(new EmptyBorder(4, 8, 4, 8));
+    setLayout(new BorderLayout(8, 0));
+    setBorder(new EmptyBorder(8, 14, 8, 14));
 
     // Popularity bars — width derived from LayoutTheme bar geometry
     barsPanel.setPreferredSize(new Dimension(3 * (BAR_WIDTH + BAR_GAP) + 6, BAR_MAX_H + 4));
     barsPanel.setOpaque(false);
 
-    // Text cluster
-    JPanel text = new JPanel(new BorderLayout(0, 1));
-    text.setOpaque(false);
-    song.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackSong));
-    sub.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackArtist));
-    text.add(song, BorderLayout.CENTER);
-    text.add(sub, BorderLayout.SOUTH);
+    // Row number — same style as the Search / Hot Here / Genre result rows.
+    numLabel.setForeground(ColorTheme.get().textResultsSecondary);
+    numLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeResultNum));
+    numLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
-    add(barsPanel, BorderLayout.WEST);
+    // Thumbnail — same square-swatch style as the Search / Hot Here / Genre result rows,
+    // sized to fit within the fixed queue cell height.
+    int thumbSize = Math.max(24, CELL_HEIGHT - 8);
+    numLabel.setPreferredSize(new Dimension(LayoutTheme.get().resultNumLabelW, thumbSize));
+    thumb.setPreferredSize(new Dimension(thumbSize, thumbSize));
+    thumb.setHorizontalAlignment(SwingConstants.CENTER);
+    thumb.setOpaque(true);
+    thumb.setBackground(ColorTheme.get().bgThumb);
+
+    JPanel numAndThumb = new JPanel(new BorderLayout(8, 0));
+    numAndThumb.setOpaque(false);
+    numAndThumb.add(numLabel, BorderLayout.WEST);
+    numAndThumb.add(thumb, BorderLayout.CENTER);
+
+    JPanel left = new JPanel(new BorderLayout(8, 0));
+    left.setOpaque(false);
+    left.add(barsPanel, BorderLayout.WEST);
+    left.add(numAndThumb, BorderLayout.CENTER);
+
+    // Text cluster — bold song name (line1) over muted artist/album (line2), matching the
+    // result-row two-line text block.
+    JPanel text = new JPanel();
+    text.setOpaque(false);
+    text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+    song.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeResultLine1));
+    sub.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeResultLine2));
+    text.add(Box.createVerticalGlue());
+    text.add(song);
+    text.add(Box.createVerticalStrut(3));
+    text.add(sub);
+    text.add(Box.createVerticalGlue());
+
+    add(left, BorderLayout.WEST);
     add(text, BorderLayout.CENTER);
   }
 
-  /** Backward-compatible overload — no priority colouring (used by non-queue views). */
+  /** Backward-compatible overload — no priority colouring, no thumbnail (used by AdminPanel). */
   public SongTrackCellRenderer(int t1, int t2, int t3) {
-    this(t1, t2, t3, false);
+    this(t1, t2, t3, false, null);
   }
 
   @Override
@@ -115,17 +156,43 @@ public class SongTrackCellRenderer extends JPanel
     int active = barsForPlays(plays, t1, t2, t3);
     barsPanel.setActiveBars(active);
 
+    // ── Row number ─────────────────────────────────────────────────────────
+    numLabel.setText(String.format("%02d", index + 1));
+
     // ── Song / sub text ────────────────────────────────────────────────────
     song.setText(entry.getSong().getSongName());
     sub.setText(entry.getSong().getArtistName() + "  •  " + entry.getSong().getAlbumName());
 
-    // Background and sub-label foreground are always the standard theme colours.
-    // Only the song-name foreground is tinted by priority when the flag is set.
+    // Bottom separator line — matches the JSeparator drawn between rows in the
+    // Search / Hot Here / Genre result columns. Omitted on the last row.
+    boolean isLast = index == list.getModel().getSize() - 1;
+    setBorder(isLast ? new EmptyBorder(8, 14, 8, 14)
+        : javax.swing.BorderFactory.createCompoundBorder(
+            javax.swing.BorderFactory.createMatteBorder(0, 0, 1, 0,
+                ColorTheme.get().colorColumnSeparator),
+            new EmptyBorder(8, 14, 7, 14)));
+
+    // ── Thumbnail ──────────────────────────────────────────────────────────
+    thumb.setIcon(null);
+    String coverPath = entry.getSong().getCoverArtPath();
+    if (coverPath != null && imageLoader != null) {
+      int thumbSize = thumb.getPreferredSize().width;
+      ImageIcon icon = imageLoader.loadFilesystemImage(coverPath, thumbSize, thumbSize);
+      if (icon != null) {
+        thumb.setIcon(icon);
+      }
+    }
+
+    // Row background is transparent (letting the screen gradient show through, matching the
+    // Search / Hot Here / Genre result rows) except when selected, which gets a translucent
+    // highlight. Sub-label foreground is always the standard theme colour; only the song-name
+    // foreground is tinted by priority when the flag is set.
     if (isSelected) {
+      setOpaque(true);
       setBackground(ColorTheme.get().bgListSelected);
       song.setForeground(ColorTheme.get().accentBlue);
     } else {
-      setBackground(index % 2 == 0 ? ColorTheme.get().bgList : ColorTheme.get().bgListRowAlt);
+      setOpaque(false);
       if (usePriorityColor) {
         int priority = entry.getPriority() == null ? 0 : entry.getPriority();
         int slot = Math.min(priority, PRIORITY_COLORS.length - 1);
@@ -135,7 +202,6 @@ public class SongTrackCellRenderer extends JPanel
       }
     }
     sub.setForeground(ColorTheme.get().textMuted);
-    setOpaque(true);
     return this;
   }
 
@@ -212,10 +278,22 @@ public class SongTrackCellRenderer extends JPanel
 
   /**
    * Like {@link #install} but enables priority-based row colouring — intended for
-   * {@code SongQueueCard} and {@code AdminPanel} queue lists.
+   * {@code SongQueueCard} and {@code AdminPanel} queue lists. No thumbnail is shown since no
+   * {@link ImageLoader} is supplied.
    */
   public static void installWithPriority(JList<SongQueueEntryDto> list, int t1, int t2, int t3) {
-    list.setCellRenderer(new SongTrackCellRenderer(t1, t2, t3, true));
+    list.setCellRenderer(new SongTrackCellRenderer(t1, t2, t3, true, null));
+    list.setFixedCellHeight(CELL_HEIGHT);
+  }
+
+  /**
+   * Like {@link #installWithPriority(JList, int, int, int)} but also renders the album-art
+   * thumbnail (matching the Search / Hot Here / Genre result rows) using the given
+   * {@link ImageLoader}. Used by {@code QueuePanel}.
+   */
+  public static void installWithPriority(JList<SongQueueEntryDto> list, int t1, int t2, int t3,
+      ImageLoader imageLoader) {
+    list.setCellRenderer(new SongTrackCellRenderer(t1, t2, t3, true, imageLoader));
     list.setFixedCellHeight(CELL_HEIGHT);
   }
 

@@ -64,6 +64,7 @@ public class AdminPanel extends JPanel {
   private final SongPlayerService songPlayerService;
   private final CreditManager creditManager;
   private final Frame ownerFrame;
+  private final ImageLoader imageLoader;
 
   // ── Album list ────────────────────────────────────────────────────────────
   private final DefaultListModel<AlbumDto> albumListModel = new DefaultListModel<>();
@@ -89,13 +90,14 @@ public class AdminPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   public AdminPanel(Frame ownerFrame, SongLibraryService songLibraryService,
       SongQueueService songQueueService, SongPlayerService songPlayerService,
-      CreditManager creditManager) {
+      CreditManager creditManager, ImageLoader imageLoader) {
 
     this.ownerFrame = ownerFrame;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
     this.creditManager = creditManager;
+    this.imageLoader = imageLoader;
 
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
@@ -187,7 +189,8 @@ public class AdminPanel extends JPanel {
     queueList.setSelectionBackground(ColorTheme.get().bgListSelected);
     queueList.setSelectionForeground(ColorTheme.get().textPrimary);
     queueList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-    SongTrackCellRenderer.installWithPriority(queueList, popularityT1, popularityT2, popularityT3);
+    SongTrackCellRenderer.installWithPriority(queueList, popularityT1, popularityT2, popularityT3,
+        imageLoader);
 
     JPanel queuePane = new JPanel(new BorderLayout(0, 4));
     queuePane.setOpaque(false);

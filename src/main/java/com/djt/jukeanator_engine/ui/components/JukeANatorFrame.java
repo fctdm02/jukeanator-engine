@@ -746,7 +746,7 @@ public class JukeANatorFrame extends JFrame {
         case 2 -> searchPanel.resetToDefaultView();
         case 3 -> hotHerePanel.resetToDefaultView();
         case 4 -> genrePanel.resetToDefaultView();
-        case 5 -> queuePanel.onShown();
+        case 5 -> queuePanel.resetToDefaultView();
         default -> {
           /* DUMMY and ADMIN require no reset */ }
       }
@@ -870,7 +870,7 @@ public class JukeANatorFrame extends JFrame {
   private AdminPanel buildAdminPanel() {
 
     return new AdminPanel(this, songLibraryService, songQueueService, songPlayerService,
-        creditManager);
+        creditManager, imageLoader);
   }
 
   // ============================================================

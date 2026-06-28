@@ -249,7 +249,8 @@ public class LayoutTheme {
     detailBackBtnH = sortBtnH; // matches the Order By buttons' height
 
     // ── SongQueueCard ─────────────────────────────────────────────────────────
-    songQueueMaxVisible = 7;
+    songQueueMaxVisible = 10; // business invariant — queue never holds more than 10 entries
+    songTrackCellHeight = resultRowMaxH;
     songQueueActionBtnW = 200;
     songQueueActionBtnH = 80;
     songQueueCardPadTop = 16;
@@ -418,7 +419,8 @@ public class LayoutTheme {
       detailBackBtnH = sortBtnH; // matches the Order By buttons' height
 
       // SongQueueCard — same as landscape for portrait
-      songQueueMaxVisible = 7;
+      songQueueMaxVisible = 10; // business invariant — queue never holds more than 10 entries
+      songTrackCellHeight = resultRowMaxH;
       songQueueActionBtnW = 200;
       songQueueActionBtnH = 80;
       songQueueCardPadTop = 16;
@@ -745,7 +747,8 @@ public class LayoutTheme {
       songQueueCardPadTop = 8; // landscape default: 16
       // Removing the now-playing display and folding the "Queued Songs:" row into
       // the DetailHeaderPanel frees up enough vertical room for 10 rows on 1024 x 768.
-      songQueueMaxVisible = 10; // landscape/portrait default: 7
+      songQueueMaxVisible = 10; // business invariant — queue never holds more than 10 entries
+      songTrackCellHeight = resultRowMaxH; // matches the 54px small-landscape result row height
       // Inner usable width now spans the full tab width (no left/right card padding).
       // Action buttons: (fullWidth - 2x16 gap) / 3, rounded down to a clean value.
       songQueueActionBtnW = 250;
@@ -1871,8 +1874,8 @@ public class LayoutTheme {
   /** Maximum height of the tallest (3rd) popularity bar. */
   public final int popularityBarMaxH = 18;
 
-  /** Fixed cell height for the queue/song-track list renderer. */
-  public final int songTrackCellHeight = 44;
+  /** Fixed cell height for the queue/song-track list renderer — matches {@link #resultRowMaxH}. */
+  public final int songTrackCellHeight;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ADD SONG TO QUEUE CARD (AddSongToQueueCard)
