@@ -73,7 +73,9 @@ public class BackgroundMusicHelper extends FileSystemHelper {
       int index = ThreadLocalRandom.current().nextInt(this.notPlayedSongs.size());
       songPathName = this.notPlayedSongs.get(index);
     }
+    
     this.notPlayedSongs.remove(songPathName);
+    this.playedSongs.add(songPathName);
 
     // Normalize rootPathWindows in case the config value was loaded with a double backslash
     // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
@@ -102,11 +104,11 @@ public class BackgroundMusicHelper extends FileSystemHelper {
 
   public void update(String rootPath) throws IOException {
 
-    String notPlayedSongsPathName = rootPath + File.separator + BACKGROUND_MUSIC_NOT_PLAYED;
-    writeLines(notPlayedSongsPathName, notPlayedSongs);
-
     String playedSongsPathName = rootPath + File.separator + BACKGROUND_MUSIC_PLAYED;
     writeLines(playedSongsPathName, playedSongs);
+    
+    String notPlayedSongsPathName = rootPath + File.separator + BACKGROUND_MUSIC_NOT_PLAYED;
+    writeLines(notPlayedSongsPathName, notPlayedSongs);
   }
 
   public void createBackgroundMusicFromTopSongs(String rootPath, List<String> topSongPathNames)
