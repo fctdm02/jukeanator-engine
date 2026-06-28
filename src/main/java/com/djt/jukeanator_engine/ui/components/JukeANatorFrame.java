@@ -24,6 +24,7 @@ import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 import javax.swing.SwingConstants;
@@ -98,7 +99,6 @@ public class JukeANatorFrame extends JFrame {
 
   // ── OVERLAY CARD SYSTEM (replaces former JDialog popups) ───────────────────
   private static final String CARD_TABS = "TABS";
-  private static final String CARD_ADD_SONG = "ADD_SONG";
   private static final String CARD_SONG_QUEUE = "SONG_QUEUE";
   private static final String CARD_EDIT_ALBUM = "EDIT_ALBUM";
   private static final String CARD_LOGIN = "LOGIN";
@@ -130,6 +130,17 @@ public class JukeANatorFrame extends JFrame {
     }
   };
   private JTabbedPane contentPanelTabs;
+
+  // ── ADD-SONG GLASS OVERLAY ───────────────────────────────────────────────
+  // AddSongToQueueCard is layered above overlayRoot (rather than swapped in via
+  // overlayCardLayout) so the JTabbedPane's tab strip — and whichever overlay
+  // card happens to be showing underneath — stays visible/clickable while the
+  // card is up. The glass pane is sized to stop exactly at the top of the tab
+  // strip, so its height is recomputed from the live JTabbedPane geometry and
+  // therefore adapts automatically across landscape, portrait, and
+  // small-landscape display modes.
+  private final JLayeredPane mainLayeredPane = new JLayeredPane();
+  private final JPanel addSongGlassPane = new JPanel(new GridBagLayout());
 
   // Guards the tab ChangeListener against spurious resets that fire when the
   // overlay card system shows or hides — neither action is a genuine tab switch.
@@ -276,14 +287,27 @@ public class JukeANatorFrame extends JFrame {
     contentPanelTabs = buildContentPanelTabs();
 
     overlayRoot.add(contentPanelTabs, CARD_TABS);
-    overlayRoot.add(placeholder(), CARD_ADD_SONG);
     overlayRoot.add(placeholder(), CARD_SONG_QUEUE);
     overlayRoot.add(placeholder(), CARD_EDIT_ALBUM);
     overlayRoot.add(placeholder(), CARD_LOGIN);
     overlayRoot.add(placeholder(), CARD_NOW_PLAYING_ALBUM);
     overlayCardLayout.show(overlayRoot, CARD_TABS);
 
-    getContentPane().add(overlayRoot, BorderLayout.CENTER);
+    // addSongGlassPane floats above overlayRoot at all times, but stays
+    // invisible (and therefore inert) until showAddSongToQueueCard() is called.
+    addSongGlassPane.setOpaque(false);
+    addSongGlassPane.setVisible(false);
+
+    mainLayeredPane.add(overlayRoot, JLayeredPane.DEFAULT_LAYER);
+    mainLayeredPane.add(addSongGlassPane, JLayeredPane.PALETTE_LAYER);
+    mainLayeredPane.addComponentListener(new java.awt.event.ComponentAdapter() {
+      @Override
+      public void componentResized(java.awt.event.ComponentEvent e) {
+        syncOverlayLayerBounds();
+      }
+    });
+
+    getContentPane().add(mainLayeredPane, BorderLayout.CENTER);
 
     //
     // CREDIT MANAGER AND KEYBOARD LISTENER
@@ -1183,35 +1207,46 @@ public class JukeANatorFrame extends JFrame {
     return p;
   }
 
+  /**
+   * Keeps {@code overlayRoot} and {@code addSongGlassPane} sized to fill
+   * {@code mainLayeredPane}, with the glass pane stopping just above the
+   * JTabbedPane's tab strip so the tabs always remain visible/clickable while
+   * the Add-Song card is showing.
+   */
+  private void syncOverlayLayerBounds() {
+    int w = mainLayeredPane.getWidth();
+    int h = mainLayeredPane.getHeight();
+    if (w <= 0 || h <= 0) {
+      return;
+    }
+    overlayRoot.setBounds(0, 0, w, h);
+    overlayRoot.validate();
+    int tabStripHeight = computeTabStripHeight();
+    addSongGlassPane.setBounds(0, 0, w, Math.max(0, h - tabStripHeight));
+  }
+
+  /**
+   * Measures the height of the JTabbedPane's bottom tab strip from its live,
+   * already-laid-out geometry, so the Add-Song glass overlay can stop exactly
+   * above it on any display mode (landscape, portrait, small-landscape)
+   * without hard-coding per-mode pixel values.
+   */
+  private int computeTabStripHeight() {
+    java.awt.Component content = contentPanelTabs.getSelectedComponent();
+    int paneHeight = contentPanelTabs.getHeight();
+    if (content == null || paneHeight <= 0) {
+      // Layout hasn't happened yet — fall back to the theme's nominal tab
+      // height so the first paint isn't grossly wrong.
+      return LayoutTheme.get().tabHeight;
+    }
+    int contentBottom = content.getY() + content.getHeight();
+    return Math.max(0, paneHeight - contentBottom);
+  }
+
   /** Returns to the TABS card — the previously-active tab/state is preserved as-is. */
   private void hideOverlay() {
     overlayTransitionInProgress = true;
     overlayCardLayout.show(overlayRoot, CARD_TABS);
-    overlayTransitionInProgress = false;
-    requestFocusInWindow();
-  }
-
-  /**
-   * Returns the name of the overlay card currently visible in {@code overlayRoot}, falling back to
-   * {@code CARD_TABS} if none is marked visible (e.g. before the first layout pass).
-   */
-  private String currentVisibleOverlayCard() {
-    for (java.awt.Component c : overlayRoot.getComponents()) {
-      if (c.isVisible()) {
-        String name = c.getName();
-        return name != null ? name : CARD_TABS;
-      }
-    }
-    return CARD_TABS;
-  }
-
-  /**
-   * Shows the named overlay card. Used to return to a specific overlay (e.g. the now-playing album
-   * detail) after a nested overlay such as {@code CARD_ADD_SONG} is dismissed.
-   */
-  private void showOverlayCard(String cardName) {
-    overlayTransitionInProgress = true;
-    overlayCardLayout.show(overlayRoot, cardName);
     overlayTransitionInProgress = false;
     requestFocusInWindow();
   }
@@ -1248,13 +1283,14 @@ public class JukeANatorFrame extends JFrame {
       addSongToQueueCard.teardown();
     }
 
-    // ── Capture caller so dismiss returns here, not always to TABS ────────
-    // If the song was opened from a nested overlay (e.g. the now-playing album
-    // detail card) we want to go back to that overlay when the user closes the
-    // add-song card, not all the way back to the tab content area.
-    final String callerCard = currentVisibleOverlayCard();
-    Runnable onDismiss =
-        CARD_TABS.equals(callerCard) ? this::hideOverlay : () -> showOverlayCard(callerCard);
+    // ── Dismiss just hides the glass pane ──────────────────────────────────
+    // The card floats above overlayRoot rather than replacing its content, so
+    // whatever was visible underneath (the tabs, or a nested overlay such as
+    // the now-playing album detail card) is untouched and simply reappears.
+    Runnable onDismiss = () -> {
+      addSongGlassPane.setVisible(false);
+      requestFocusInWindow();
+    };
 
     // ── Eligibility check (normal play = priority 1) ──────────────────────
     // getHighestPriority() returns the next available priority; normal plays
@@ -1271,10 +1307,12 @@ public class JukeANatorFrame extends JFrame {
       addSongToQueueCard.showConstraintPanel(reason);
     }
 
-    replaceOverlayCard(CARD_ADD_SONG, addSongToQueueCard);
-    overlayTransitionInProgress = true;
-    overlayCardLayout.show(overlayRoot, CARD_ADD_SONG);
-    overlayTransitionInProgress = false;
+    addSongGlassPane.removeAll();
+    addSongGlassPane.add(addSongToQueueCard);
+    syncOverlayLayerBounds();
+    addSongGlassPane.setVisible(true);
+    addSongGlassPane.revalidate();
+    addSongGlassPane.repaint();
     addSongToQueueCard.onShown();
   }
 
