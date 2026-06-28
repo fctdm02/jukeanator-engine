@@ -69,14 +69,6 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
   }
 
   @Override
-  public SearchResultDto getGenreMusicByReleaseDate(String genreName) {
-
-    return restClient.get().uri(uriBuilder -> uriBuilder
-        .path("/api/song-library/genres/releaseDate").queryParam("genreName", genreName).build())
-        .retrieve().body(SearchResultDto.class);
-  }
-
-  @Override
   public List<ArtistDto> getArtists() {
 
     return restClient.get().uri("/api/song-library/artists").retrieve()

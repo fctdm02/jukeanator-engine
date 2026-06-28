@@ -73,12 +73,6 @@ public class SongLibraryController implements SongLibraryService {
   }
 
   @Override
-  @GetMapping("/genres/releaseDate")
-  public SearchResultDto getGenreMusicByReleaseDate(@RequestParam String genreName) {
-    return songLibraryService.getGenreMusicByReleaseDate(genreName);
-  }
-
-  @Override
   @GetMapping("/artists")
   public List<ArtistDto> getArtists() {
     return songLibraryService.getArtists();

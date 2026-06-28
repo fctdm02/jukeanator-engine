@@ -143,7 +143,7 @@ public class SongLibraryServiceImpl
 
   /** Controls how results returned from {@link #getMusic} are ordered. */
   private enum SortOrder {
-    POPULARITY, TITLE, RELEASE_DATE
+    POPULARITY, TITLE
   }
 
   private String stripNonKeyboardCharacters(String value) {
@@ -191,12 +191,6 @@ public class SongLibraryServiceImpl
     return getMusic(genreName, null, SortOrder.TITLE);
   }
 
-  @Override
-  public SearchResultDto getGenreMusicByReleaseDate(String genreName) {
-
-    return getMusic(genreName, null, SortOrder.RELEASE_DATE);
-  }
-
   /**
    * Central query worker for all music-retrieval service methods.
    *
@@ -207,8 +201,6 @@ public class SongLibraryServiceImpl
    * exact/prefix/suffix/contains matches above raw popularity. If weights match, higher play counts
    * break the tie.</li>
    * <li>{@link SortOrder#TITLE} — ascending alphabetical on {@link LibraryItem#getTitle()}.</li>
-   * <li>{@link SortOrder#RELEASE_DATE} — most recent first on {@link LibraryItem#getReleaseDate()},
-   * nulls last.</li>
    * </ul>
    */
   private SearchResultDto getMusic(String genreName, String searchFor, SortOrder sortOrder) {
@@ -238,9 +230,6 @@ public class SongLibraryServiceImpl
 
       case TITLE -> Comparator.comparing(LibraryItem::getTitle,
           Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
-
-      case RELEASE_DATE -> Comparator.comparing(LibraryItem::getReleaseDate,
-          Comparator.nullsLast(Comparator.reverseOrder()));
 
       case POPULARITY -> {
         if (searchFor != null) {

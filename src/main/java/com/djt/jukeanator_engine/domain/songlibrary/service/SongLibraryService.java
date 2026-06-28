@@ -53,12 +53,6 @@ public interface SongLibraryService {
   SearchResultDto getGenreMusicByTitle(String genreName);
 
   /**
-   * @param genreName
-   * @return
-   */
-  SearchResultDto getGenreMusicByReleaseDate(String genreName);
-
-  /**
    * 
    * @return
    */

@@ -30,7 +30,7 @@ public class GenreDetailPanel extends JPanel {
 
   // ── Sort mode ─────────────────────────────────────────────────────────────
   public enum SortMode {
-    POPULARITY, TITLE, RELEASE_DATE
+    POPULARITY, TITLE
   }
 
   // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
@@ -124,7 +124,6 @@ public class GenreDetailPanel extends JPanel {
   /** Holds references to the three sort buttons so we can repaint active state. */
   private JButton btnPopularity;
   private JButton btnTitle;
-  private JButton btnReleaseDate;
 
   private JPanel buildSortButtonPanel() {
 
@@ -139,11 +138,9 @@ public class GenreDetailPanel extends JPanel {
 
     btnPopularity = sortButton("Popularity", SortMode.POPULARITY);
     btnTitle = sortButton("Title", SortMode.TITLE);
-    btnReleaseDate = sortButton("Release Date", SortMode.RELEASE_DATE);
 
     row.add(btnPopularity);
     row.add(btnTitle);
-    row.add(btnReleaseDate);
 
     JPanel wrapper = new JPanel();
     wrapper.setLayout(new javax.swing.BoxLayout(wrapper, javax.swing.BoxLayout.Y_AXIS));
@@ -223,7 +220,6 @@ public class GenreDetailPanel extends JPanel {
       SearchResultDto fresh = switch (mode) {
         case POPULARITY -> songLibraryService.getGenreMusicByPopularity(genre.getGenreName());
         case TITLE -> songLibraryService.getGenreMusicByTitle(genre.getGenreName());
-        case RELEASE_DATE -> songLibraryService.getGenreMusicByReleaseDate(genre.getGenreName());
       };
       if (fresh == null)
         fresh = new SearchResultDto();
@@ -237,7 +233,7 @@ public class GenreDetailPanel extends JPanel {
     albumsOffset = 0;
     songsOffset = 0;
 
-    for (JButton btn : new JButton[] {btnPopularity, btnTitle, btnReleaseDate}) {
+    for (JButton btn : new JButton[] {btnPopularity, btnTitle}) {
       if (btn != null) {
         btn.setForeground(ColorTheme.get().textMuted);
         btn.repaint();
@@ -246,7 +242,6 @@ public class GenreDetailPanel extends JPanel {
     JButton activeBtn = switch (mode) {
       case POPULARITY -> btnPopularity;
       case TITLE -> btnTitle;
-      case RELEASE_DATE -> btnReleaseDate;
     };
     if (activeBtn != null) {
       activeBtn.setForeground(ColorTheme.get().textPrimary);
