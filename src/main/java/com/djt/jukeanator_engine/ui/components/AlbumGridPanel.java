@@ -124,6 +124,35 @@ public class AlbumGridPanel extends JPanel {
     add(navPanel, BorderLayout.SOUTH);
 
     refresh();
+    preloadAllPagesInBackground();
+  }
+
+  /**
+   * Warms the shared {@link ImageLoader} cache with every album's cover art at this grid's tile
+   * size, on a background daemon thread, so flipping to a page that hasn't been visited yet still
+   * finds its art already decoded and scaled in {@link ImageLoader#cache} instead of stalling the
+   * EDT on disk I/O and image scaling.
+   */
+  private void preloadAllPagesInBackground() {
+
+    if (albums.isEmpty()) {
+      return;
+    }
+
+    Thread preloader = new Thread(() -> {
+      for (AlbumDto album : albums) {
+        if (album.getCoverArtPath() != null) {
+          try {
+            imageLoader.loadFilesystemImage(album.getCoverArtPath(), albumGridProfile.artW(),
+                albumGridProfile.artH());
+          } catch (Exception ignored) {
+          }
+        }
+      }
+    }, "album-art-preloader");
+    preloader.setDaemon(true);
+    preloader.setPriority(Thread.MIN_PRIORITY);
+    preloader.start();
   }
 
   // ── Public API ────────────────────────────────────────────────────────────

@@ -832,9 +832,9 @@ DONE 19: For Edit Album, change artist from Compilations to Various Artists
 
 20: Make re-sizable in Landscape mode, need to expose many private constants that are tied to specific resolution, such as number of listings per page
 
-21: Need to support Portrait mode
+DONE 21: Need to support Portrait mode
 
-22: Need to add UserEntity/DTO and concept of service authentication, with Swing UI being a special "Local User"
+DONE 22: Need to add UserEntity/DTO and concept of service authentication, with Swing UI being a special "Local User"
 
 23: Need to add concept of multi-tenancy for when deployed to jukeanator.com
 
@@ -846,7 +846,7 @@ DONE 19: For Edit Album, change artist from Compilations to Various Artists
 
 DONE 27: Need to develop a screensaver
 
-28: Need to implement authentication for service calls
+DONE 28: Need to implement authentication for service calls
 
 DONE 29: Need to define User entity (name, email address, credits, play history, playlists), Swing UI will have singleton LocalUser
 
@@ -868,12 +868,12 @@ DONE - Change Song Queue to render song name by priority (0: gray, 1: white, 2: 
 
 DONE - On startup for JukeANatorFrame, do not flip to a letter button if there aren't enough albums to fill up the number of album tiles for the screen
 
-- Refactor all services:
+DONE Refactor all services:
     + service methods to take in an authentication principle for all methods
     + create logging interceptor to log auth principle, method name as well as any parameters
     + deal with exception handling
     
- - Implement hibernation with the following properties:
+DONE Implement hibernation with the following properties:
 EnableHibernation=false
 HibernateBegin=3
 HibernateEnd=14
@@ -890,10 +890,10 @@ DONE Investigate issue with artist results for Buckcherry, make sure either type
 
 - Make git repo for installer that contains demo music with 30 second song clips
 
-- When AddSongToQueueCard is dismissed, especially from a constraint warning, the PREVIOUS panel that was showing before
+DONE When AddSongToQueueCard is dismissed, especially from a constraint warning, the PREVIOUS panel that was showing before
   the card was showing needs to be displayed.
   
-- Investigate Winamp DLL for Windows that does song player
+DONE Investigate Winamp DLL for Windows that does song player
 
 - Investigate issues with startup on a fresh machine (song library root not found, throws exceptions now)
 
@@ -905,7 +905,7 @@ DONE Investigate issue with artist results for Buckcherry, make sure either type
   
 - Add a copy protection / license renewal screen that is equivalent to what is in place now (JukeANator.CTL and License.CTL)  
 
-- Refactor services so that they all use the same rootPath property from the main application config
+DONE Refactor services so that they all use the same rootPath property from the main application config
 
 DONE Refine song constraint warnings to give specific details
 
@@ -917,15 +917,15 @@ DONE When the user clicks on the now playing song in the upper right hand corner
 
 DONE When the user cancels on add song to queue card, they should be taken back to the screen/panel that they were looking at before
   
-- Change SongQueueRoot to have song play history (and artist consecutive play history) be transient, so they are not persisted
+DONE Change SongQueueRoot to have song play history (and artist consecutive play history) be transient, so they are not persisted
 
-- Change album listing on AdminPanel to be text only (so it renders faster)
+DONE Change album listing on AdminPanel to be text only (so it renders faster)
 
-- Albums are not sorted by popularity for artist detail panel
+DONE Albums are not sorted by popularity for artist detail panel
 
 - Random songs that should be excluded are not being excluded (Crazy Bitch)
 
-- Song queue is still not being auto-populated correctly
+DONE Song queue is still not being auto-populated correctly
 
   
 36: Move over the most relevant features from:
@@ -970,114 +970,3 @@ RandomByGenre=false
 RandomByCD=false
  
  
- 
-ISSUE #1: I keep on getting warnings that songs have already been played in last 60 minutes, even though the app just started
-
-ISSUE #2: The song queue is not auto-populating on startup, nor on dequeue()
-
-ISSUE #3: The SongQueueueCard is still displaying the currently playing song in the song queue
-
-I think these regressions might be related to the changes made in oder to support Hibernation Mode, in that the song player will
-lock the queue when hibernating, then unlock it, and resume playing/auto-populating the queue when it wakes up.
-
-Please investigate and resolve.
-
-DONE: Add event handling for song queue card for when the queue changes
-
-- Auto-populate picked a song for the queue that should not have been eligible, Crazy Bitch by Buckcherry, because it has explicit lyrics
-
-
-
-
-
-
-Right now, the application has been developed for a screen resolution of 1920 x 1080 pixels (i.e. Landscape mode with a 16:9 aspect ratio).
-
-If the physical monitor was rotated 90 degrees and the operating system was set to be in "Portrait Mode", we would have a screen resolution of
-1080 × 1920 pixels with a 9:16 aspect ratio.
-
-What would it take to develop a layout system that:
-
-1: Handles screen resolutions different than 1920 x 1080 pixels for Landscape mode, such as 1024 x 768 for old 15" touchscreen monitors?
-For example, if 1920 x 1080 is the canonical screen resolution, then that could be used to scale to higher/lower resolutions.
-
-2: Handle portrait mode, where the screen height is greater than the screen width?
-In general, you would think that with border layout system, some panels would be a fixed size, whereas the "content" panels would take up the gap.
-
-
-
-
-
-package com.djt.jukeanator_engine.domain.songlibrary.service;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-// ... your other imports
-
-public class SongLibraryServiceImpl implements SongLibraryService {
-
-    private static final Logger logger = LoggerFactory.getLogger(SongLibraryServiceImpl.class);
-
-    // Your existing constructor and fields...
-
-    @Override
-    public Object someLibraryMethod(Object arg) {
-        logger.info("Service Call Start: SongLibraryService.someLibraryMethod() with args: [{}]", arg);
-        long startTime = System.currentTimeMillis();
-        try {
-            // Your actual business logic execution goes here
-            Object result = "example"; 
-            
-            logger.info("Service Call Success: SongLibraryService.someLibraryMethod() | Time Taken: {} ms", (System.currentTimeMillis() - startTime));
-            return result;
-        } catch (Exception ex) {
-            logger.error("Service Call Failure: SongLibraryService.someLibraryMethod() failed after {} ms. Error: {}", 
-                    (System.currentTimeMillis() - startTime), ex.getMessage(), ex);
-            throw ex;
-        }
-    }
-}
-
-
-        
-        
-DONE - Logins aren't working for OWNER/ADMIN        
-
-
-
-DONE JukeANator.oos isn't loading/storing with OS suffix like it's supposed to
-
-- After a rescan on an empty library, the home page is empty
-
-DONE After a restart after a rescan on an empty library, the song player is attempting to play music from R:\ (need to delete playlist after rescan?)
-
-
-
-
-
-
-
-This whole session will be about supporting a 1024x768 display, while at the same time, 
-NOT CHANGING ANYTHING ELSE for any other resolution, be it landscape or portrait display 
-(right now, 1920x1080 - landscape and 1080x1920 portrait render acceptably).
-
-For 1024x768 (a.k.a. small landscape), the search scren has the following issues: 
-
-Item 1: The keyboard panel is not showing all of the keys that it is supposed to (see attached screenshot).
-You probably need to reduce the padding to the left/right so that all keys are visible.
-
-Item 2: The search results area, which is the main content area of this screen (above the keyboard panel 
-and below the search for text panel), and as such, get the extra screen real estate when available for 
-higher screen resolutions, is much too short.  So, all of the extra padding above/below the keyboard panel
-should be removed. Since the search for text field is not directly editable by the user, it can be made shorter
-than it is now.  Along with that, the spacing for Artists/Albums/Songs can be reduced above/below
-
-In general, you need to make as much room as possible for the search results area.
-
-Again, this is ONLY for small landscape mode when the resolution is 1024x768.
-
- 
-In conjunction with that, change the pagination behavior to should be to show the next/prev 8 items when 
-the down/up navigation arrow buttons are pressed.  For example, again, I want page 1 to shows items 1-8, 
-so pressing page down will result in items 9-16 being shown.
-
