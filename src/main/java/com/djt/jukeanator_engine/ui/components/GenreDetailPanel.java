@@ -108,6 +108,10 @@ public class GenreDetailPanel extends JPanel {
     headerPanel = new DetailHeaderPanel(backLabel, onBack, genreImage, "♪", genre.getGenreName(),
         subtitle, buildSortButtonPanel());
     headerPanel.setOpaque(false);
+    // Matches the border used by HomePanel's and HotHerePanel's headers so all three
+    // detail-header panels render at the same height.
+    int hbH = LayoutTheme.get().homeHeaderBorderH;
+    headerPanel.setBorder(new javax.swing.border.EmptyBorder(4, hbH, 4, hbH));
     add(headerPanel, BorderLayout.NORTH);
 
     // ── Columns ───────────────────────────────────────────────────────────

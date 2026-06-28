@@ -51,7 +51,18 @@ public class DetailHeaderPanel extends JPanel {
       JButton backBtn = createBackButton(buttonText);
       backBtn.addActionListener(e -> onBack.run());
 
-      add(backBtn, BorderLayout.WEST);
+      // BorderLayout.WEST stretches its component to the container's full height,
+      // which would override the button's preferredSize. Wrapping it in a
+      // vertically-centred BoxLayout (matching the sort-button wrapper below) keeps
+      // it pinned to its own preferred height instead.
+      JPanel backBtnWrapper = new JPanel();
+      backBtnWrapper.setLayout(new BoxLayout(backBtnWrapper, BoxLayout.Y_AXIS));
+      backBtnWrapper.setOpaque(false);
+      backBtnWrapper.add(Box.createVerticalGlue());
+      backBtnWrapper.add(backBtn);
+      backBtnWrapper.add(Box.createVerticalGlue());
+
+      add(backBtnWrapper, BorderLayout.WEST);
     }
 
     //

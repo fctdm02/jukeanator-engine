@@ -244,9 +244,9 @@ public class LayoutTheme {
 
     // ── Detail header / sort button sizes ────────────────────────────────────
     detailBackBtnW = 140;
-    detailBackBtnH = 52;
     sortBtnW = 170;
     sortBtnH = 42;
+    detailBackBtnH = sortBtnH; // matches the Order By buttons' height
 
     // ── SongQueueCard ─────────────────────────────────────────────────────────
     songQueueCardW = 900;
@@ -417,9 +417,9 @@ public class LayoutTheme {
 
       // Detail header / sort button sizes — same as landscape for portrait
       detailBackBtnW = 140;
-      detailBackBtnH = 52;
       sortBtnW = 170;
       sortBtnH = 42;
+      detailBackBtnH = sortBtnH; // matches the Order By buttons' height
 
       // SongQueueCard — same as landscape for portrait
       songQueueCardW = 900;
@@ -630,7 +630,7 @@ public class LayoutTheme {
       sortBtnW = 120; // landscape default: 170 (Item 2.4)
       sortBtnH = 32; // landscape default: 42 (Item 2.4)
       detailBackBtnW = 105; // landscape default: 140 (Item 2.2: −25%)
-      detailBackBtnH = 36; // landscape default: 52 (Item 2.3: shorter header)
+      detailBackBtnH = sortBtnH; // matches the Order By buttons' height
       fontSizeNavBtn = 14; // landscape default: 18 (Item 2.1: fit "← BACK" in btn)
       genreDetailPreviewCount = 8; // landscape default: 9 (Items 3.1 + 3.2)
 
