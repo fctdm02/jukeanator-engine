@@ -16,6 +16,8 @@ public class SongQueueProperties {
 
   private String repositoryType; // "filesystem" or "postgres"
   
+  private boolean resetQueueAtStartup = true;
+  
   // BACKGROUND MUSIC (THROUGH LINE IN AUDIO JACK)
   private boolean enableBackgroundMusic = false;
   private String preferredMixerName = "Line In";
@@ -35,6 +37,14 @@ public class SongQueueProperties {
 
   public void setRepositoryType(String repositoryType) {
     this.repositoryType = repositoryType;
+  }
+
+  public boolean isResetQueueAtStartup() {
+    return resetQueueAtStartup;
+  }
+
+  public void setResetQueueAtStartup(boolean resetQueueAtStartup) {
+    this.resetQueueAtStartup = resetQueueAtStartup;
   }
 
   public boolean isEnableBackgroundMusic() {

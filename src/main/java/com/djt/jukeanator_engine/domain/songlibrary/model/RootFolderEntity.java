@@ -1,12 +1,7 @@
 package com.djt.jukeanator_engine.domain.songlibrary.model;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -17,23 +12,28 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.ThreadLocalRandom;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
+import com.djt.jukeanator_engine.domain.songlibrary.model.utils.BackgroundMusicHelper;
+import com.djt.jukeanator_engine.domain.songlibrary.model.utils.FileSystemHelper;
 
 public class RootFolderEntity extends FolderEntity {
+
   private static final long serialVersionUID = 2L;
 
-  private static final String CD_STATS_FILE = "CDStats.TXT";
-  private static final String CD_STATS_BACKUP_FILE = "CDStats_backup.TXT";
-  private static final String BACKGROUND_MUSIC_FILE = "BackgroundMusic.TXT";
-  private static final String BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE =
-      "BackgroundMusic_YetToBePlayed.TXT";
+  private static final String CD_STATS = "CDStats.TXT";
+  private static final String CD_STATS_BACKUP = "CDStats_backup.TXT";
 
-  private String rootPathWindows;
-  private String rootPathUnix;
+  // Used to read/write CDStats file
+  private static final FileSystemHelper fileSystemHelper = new FileSystemHelper();
+
+  // Used only when background music is enabled
+  private static final BackgroundMusicHelper backgroundMusicHelper = new BackgroundMusicHelper();
+
+
   private Set<ArtistFromSongEntity> artistsFromSongs = new TreeSet<ArtistFromSongEntity>();
+
 
   private transient Map<Integer, GenreFolderEntity> genresMap;
   private transient Map<GenreFolderEntity, Set<AlbumFolderEntity>> albumsByGenreMap;
@@ -42,14 +42,11 @@ public class RootFolderEntity extends FolderEntity {
   private transient Map<Integer, AlbumFolderEntity> albumsMap;
   private transient Map<String, SongFileEntity> songsMap;
 
-  // Used only by SongQueueService.loadPlaylistIntoQueue()
-  private transient Map<String, SongFileEntity> songsByPathMap;
-  private transient List<String> backgroundSongsYetToBePlayedList;
+  // Used to load playlists into the queue
+  private transient Map<String, SongFileEntity> songsByPath;
 
-  public RootFolderEntity(String rootPath, String rootPathWindows, String rootPathUnix) {
+  public RootFolderEntity(String rootPath) {
     super(null, rootPath);
-    this.rootPathWindows = rootPathWindows;
-    this.rootPathUnix = rootPathUnix;
   }
 
   public void initialize() {
@@ -111,12 +108,6 @@ public class RootFolderEntity extends FolderEntity {
       for (SongFileEntity song : album.getChildSongs()) {
         this.songsMap.put(buildSongKey(albumId, song.getPersistentIdentity()), song);
       }
-    }
-
-    try {
-      initializeBackgroundSongsYetToBePlayedList(getName());
-    } catch (Exception e) {
-      System.err.println("initializeBackgroundSongsYetToBePlayedList: " + e.getMessage());
     }
   }
 
@@ -297,127 +288,41 @@ public class RootFolderEntity extends FolderEntity {
         "Song with songId: [" + songId + "] and albumId: [" + albumId + "] not found.");
   }
 
+  private String buildSongKey(Integer albumId, Integer songId) {
+
+    return albumId.toString() + "__" + songId.toString();
+  }
+
   public SongFileEntity getSongByPath(String songPathName) throws EntityDoesNotExistException {
 
-    if (songsByPathMap == null) {
-      initializeSongsByPathMap();
+    if (songsByPath == null) {
+      initializeSongsByPath();
     }
 
-    SongFileEntity entity = songsByPathMap.get(songPathName.replace(":\\\\", ":\\"));
+    SongFileEntity entity = songsByPath.get(songPathName.replace(":\\\\", ":\\"));
     if (entity != null) {
       return entity;
     }
     throw new EntityDoesNotExistException("Song with path: [" + songPathName + "] not found.");
   }
 
-  private void initializeSongsByPathMap() {
-    
-    this.songsByPathMap = new HashMap<>();
+  private void initializeSongsByPath() {
+
+    this.songsByPath = new HashMap<>();
     for (SongFileEntity song : this.songsMap.values()) {
       String songPathName = song.getNaturalIdentity().replace(":\\\\", ":\\");
-      if (songPathName != null && !this.songsByPathMap.containsKey(songPathName)) {
-        this.songsByPathMap.put(songPathName, song);
+      if (songPathName != null && !this.songsByPath.containsKey(songPathName)) {
+        this.songsByPath.put(songPathName, song);
       }
     }
   }
 
-  private String buildSongKey(Integer albumId, Integer songId) {
-
-    return albumId.toString() + "__" + songId.toString();
-  }
-
-  private void copyBackgroundMusicPlaylist(String rootPath) {
-
-    try {
-      Files.copy(Path.of(rootPath + File.separator + RootFolderEntity.BACKGROUND_MUSIC_FILE),
-          Path.of(rootPath + RootFolderEntity.BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE),
-          java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to copy background music playlist.", e);
-    }
-  }
-
-  private void initializeBackgroundSongsYetToBePlayedList(String rootPath) {
-
-    String pathname =
-        rootPath + File.separator + RootFolderEntity.BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE;
-    Path file = Path.of(pathname);
-    Path primaryPlaylistFile =
-        Path.of(rootPath + File.separator + RootFolderEntity.BACKGROUND_MUSIC_FILE);
-
-    try {
-
-      if (!Files.exists(primaryPlaylistFile)) {
-        createBackgroundMusicPlaylistFromTopSongs(rootPath, rootPathWindows, rootPathUnix);
-      }
-
-      if (!Files.exists(file)) {
-        try {
-          copyBackgroundMusicPlaylist(rootPath);
-        } catch (Exception e) {
-          createBackgroundMusicPlaylistFromTopSongs(rootPath, rootPathWindows, rootPathUnix);
-          copyBackgroundMusicPlaylist(rootPath);
-        }
-      }
-
-      List<String> songs = new ArrayList<>();
-      try {
-        songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
-            .filter(line -> !line.isEmpty()).toList();
-      } catch (IOException e) {
-        createBackgroundMusicPlaylistFromTopSongs(rootPath, rootPathWindows, rootPathUnix);
-        copyBackgroundMusicPlaylist(rootPath);
-        songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
-            .filter(line -> !line.isEmpty()).toList();
-      }
-
-      if (songs.isEmpty()) {
-        try {
-          copyBackgroundMusicPlaylist(rootPath);
-          songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
-              .filter(line -> !line.isEmpty()).toList();
-        } catch (Exception e) {
-          // Keep try-catch standalone block logic matching original intent
-        }
-
-        if (songs.isEmpty()) {
-          createBackgroundMusicPlaylistFromTopSongs(rootPath, rootPathWindows, rootPathUnix);
-          copyBackgroundMusicPlaylist(rootPath);
-          songs = Files.readAllLines(file, StandardCharsets.UTF_8).stream().map(String::trim)
-              .filter(line -> !line.isEmpty()).toList();
-        }
-      }
-
-      this.backgroundSongsYetToBePlayedList = new ArrayList<>(songs);
-
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to initialize background music playlist.", e);
-    }
-  }
-
-  private void writeBackgroundSongsYetToBePlayed(String rootPath) {
-
-    try (BufferedWriter writer = Files.newBufferedWriter(
-        Path.of(
-            rootPath + File.separator + RootFolderEntity.BACKGROUND_MUSIC_YET_TO_BE_PLAYED_FILE),
-        StandardCharsets.UTF_8)) {
-
-      for (String song : this.backgroundSongsYetToBePlayedList) {
-        writer.write(song);
-        writer.newLine();
-      }
-
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to write background music playlist.", e);
-    }
-  }
-
+  // CD STATS RELATED
   public int restoreSongStatisticsForRootPath(String rootPath, String rootPathWindows,
       String rootPathUnix) {
 
-    String cdStatsPathName = rootPath + File.separator + RootFolderEntity.CD_STATS_FILE;
-    Path statsFile = Path.of(cdStatsPathName);
-    if (!Files.exists(statsFile)) {
+    String cdStatsPathName = rootPath + File.separator + RootFolderEntity.CD_STATS;
+    if (!fileSystemHelper.exists(cdStatsPathName)) {
 
       System.err.println("CD stats file does not exist: " + cdStatsPathName);
       return 0;
@@ -428,7 +333,7 @@ public class RootFolderEntity extends FolderEntity {
     if (numRestored == 0) {
 
       numRestored = restoreSongStatisticsForFile(rootPath, rootPathWindows, rootPathUnix,
-          rootPath + File.separator + RootFolderEntity.CD_STATS_BACKUP_FILE);
+          rootPath + File.separator + RootFolderEntity.CD_STATS_BACKUP);
     }
     return numRestored;
   }
@@ -443,8 +348,7 @@ public class RootFolderEntity extends FolderEntity {
 
     OSType osType = OperatingSystemDetector.getOperatingSystem();
 
-    Path statsFile = Path.of(filename);
-    if (!Files.exists(statsFile)) {
+    if (!fileSystemHelper.exists(filename)) {
       System.err.println("CD stats file does not exist: " + filename);
       return 0;
     }
@@ -466,12 +370,12 @@ public class RootFolderEntity extends FolderEntity {
     // OLD FORMAT
     // <numPlays> <ignored> <ignored> <songPath>
     int restoredCount = 0;
-    try (BufferedReader reader = Files.newBufferedReader(statsFile, StandardCharsets.UTF_8)) {
+    try {
+      List<String> lines = fileSystemHelper.readNonBlankLines(filename);
 
-      String line;
-      while ((line = reader.readLine()) != null) {
+      for (String rawLine : lines) {
 
-        line = line.trim();
+        String line = rawLine.trim();
         if (line.isEmpty()) {
           continue;
         }
@@ -537,163 +441,75 @@ public class RootFolderEntity extends FolderEntity {
 
   public void storeSongStatistics(String rootPath) {
 
-    String cdStatsPathName = rootPath + RootFolderEntity.CD_STATS_FILE;
+    String cdStatsPathName = rootPath + RootFolderEntity.CD_STATS;
 
     List<SongFileEntity> songs = new ArrayList<>(this.songsMap.values());
 
     songs.sort(
         Comparator.comparing(SongFileEntity::getNaturalIdentity, String.CASE_INSENSITIVE_ORDER));
 
-    Path statsFile = Path.of(cdStatsPathName);
+    List<String> lines = new ArrayList<>();
+    for (SongFileEntity song : songs) {
 
-    try (BufferedWriter writer = Files.newBufferedWriter(statsFile, StandardCharsets.UTF_8)) {
-
-      for (SongFileEntity song : songs) {
-
-        String songPath = song.getNaturalIdentity();
-        if (songPath == null || songPath.isBlank()) {
-          continue;
-        }
-
-        writer.write(song.getNumPlays() + " " + songPath);
-        writer.newLine();
+      String songPath = song.getNaturalIdentity();
+      if (songPath == null || songPath.isBlank()) {
+        continue;
       }
 
-      System.out.println("Stored num plays for " + songs.size() + " songs to " + cdStatsPathName);
+      lines.add(song.getNumPlays() + " " + songPath);
+    }
 
+    try {
+      fileSystemHelper.writeLines(cdStatsPathName, lines);
+      System.out.println("Stored num plays for " + songs.size() + " songs to " + cdStatsPathName);
     } catch (IOException e) {
       System.err.println("Failed to store song num plays to CD Stats file: " + cdStatsPathName);
       e.printStackTrace();
     }
   }
 
-  public SongFileEntity getRandomSongFromBackgroundMusicPlaylist(String rootPath,
-      String rootPathWindows, String rootPathUnix) {
+  // BACKGROUND MUSIC RELATED
+  public void initializeBackgroundMusic(String rootPath, String rootPathWindows,
+      String rootPathUnix) throws IOException {
 
-    // Normalize rootPathWindows in case the config value was loaded with a double backslash
-    // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
-    String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
-
-    OSType osType = OperatingSystemDetector.getOperatingSystem();
-
-    if (this.songsMap == null) {
-      initialize();
-    }
-
-    if (this.backgroundSongsYetToBePlayedList == null
-        || this.backgroundSongsYetToBePlayedList.isEmpty()) {
-
-      initializeBackgroundSongsYetToBePlayedList(rootPath);
-    }
-
-    String songPathName = null;
-
-    if (this.backgroundSongsYetToBePlayedList.size() == 1) {
-      songPathName = this.backgroundSongsYetToBePlayedList.remove(0);
-    } else {
-      int index = ThreadLocalRandom.current().nextInt(this.backgroundSongsYetToBePlayedList.size());
-      songPathName = this.backgroundSongsYetToBePlayedList.remove(index);
-    }
-
-    // See if we need to fix up song pathnames that we read in.
-    boolean switchToUnixFormat = false;
-    boolean switchToWindowsFormat = false;
-    if (osType == OSType.WINDOWS && !songPathName.contains(normalizedRootPathWindows)) {
-      switchToWindowsFormat = true;
-    } else if ((osType == OSType.LINUX || osType == OSType.MACOS)
-        && !songPathName.contains(rootPathUnix)) {
-      switchToUnixFormat = true;
-    }
-
-    if (switchToUnixFormat) {
-      songPathName =
-          songPathName.replace(normalizedRootPathWindows, rootPathUnix).replace("\\", "/");
-    } else if (switchToWindowsFormat) {
-      songPathName =
-          songPathName.replace(rootPathUnix, normalizedRootPathWindows).replace("/", "\\");
-    }
-
-    writeBackgroundSongsYetToBePlayed(rootPath);
-
-    if (this.backgroundSongsYetToBePlayedList.isEmpty()) {
-      initializeBackgroundSongsYetToBePlayedList(rootPath);
-    }
-
-    try {
-      return getSongByPath(songPathName);
-    } catch (EntityDoesNotExistException e) {
-      throw new IllegalStateException("Background music song not found in library: " + songPathName,
-          e);
-    }
+    backgroundMusicHelper.initializeBackgroundMusic(rootPath);
   }
 
-  private void createBackgroundMusicPlaylistFromTopSongs(String rootPath, String rootPathWindows,
-      String rootPathUnix) {
+  public SongFileEntity getRandomSongFromBackgroundMusicPlaylist(String rootPath,
+      String rootPathWindows, String rootPathUnix) throws IOException {
 
-    // Normalize rootPathWindows in case the config value was loaded with a double backslash
-    // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
-    String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
-
-    OSType osType = OperatingSystemDetector.getOperatingSystem();
-
-    if (this.songsMap == null) {
-      initialize();
+    String songPathName = backgroundMusicHelper.getRandomSongFromBackgroundMusicPlaylist(rootPath,
+        rootPathWindows, rootPathUnix);
+    
+    if (this.songsByPath == null) {
+      initializeSongsByPath();
     }
 
-    String backgroundMusicPathname =
-        rootPath + File.separator + RootFolderEntity.BACKGROUND_MUSIC_FILE;
+    SongFileEntity song = this.songsByPath.get(songPathName);
+    if (song != null) {
+
+      backgroundMusicHelper.update(rootPath);
+      return song;
+    }
+    throw new IllegalStateException("Could not find song: " + songPathName);
+  }
+
+  public void createBackgroundMusicFromTopSongs(String rootPath) throws IOException {
 
     List<SongFileEntity> songs = new ArrayList<>(this.songsMap.values());
 
     songs.sort((s1, s2) -> Integer.compare(s2.getNumPlays() == null ? 0 : s2.getNumPlays(),
         s1.getNumPlays() == null ? 0 : s1.getNumPlays()));
 
-    try (BufferedWriter writer =
-        Files.newBufferedWriter(Path.of(backgroundMusicPathname), StandardCharsets.UTF_8)) {
+    List<String> topSongPathNames = new ArrayList<>();
+    for (SongFileEntity song : songs) {
 
-      int count = 0;
-      for (SongFileEntity song : songs) {
+      topSongPathNames.add(song.getNaturalIdentity());
 
-        String songPathName = song.getNaturalIdentity();
-
-        // See if we need to fix up song pathnames that we read in.
-        boolean switchToUnixFormat = false;
-        boolean switchToWindowsFormat = false;
-        if (osType == OSType.WINDOWS && !songPathName.contains(normalizedRootPathWindows)) {
-          switchToWindowsFormat = true;
-        } else if ((osType == OSType.LINUX || osType == OSType.MACOS)
-            && !songPathName.contains(rootPathUnix)) {
-          switchToUnixFormat = true;
-        }
-
-        if (switchToUnixFormat) {
-          songPathName =
-              songPathName.replace(normalizedRootPathWindows, rootPathUnix).replace("\\", "/");
-        } else if (switchToWindowsFormat) {
-          songPathName =
-              songPathName.replace(rootPathUnix, normalizedRootPathWindows).replace("/", "\\");
-        }
-
-        if (songPathName == null || songPathName.isBlank()) {
-          continue;
-        }
-
-        writer.write(songPathName);
-        writer.newLine();
-
-        count++;
-
-        if (count >= 500) {
-          break;
-        }
+      if (topSongPathNames.size() >= 500) {
+        break;
       }
-
-      System.out.println("Created background music playlist containing " + count + " songs: "
-          + backgroundMusicPathname);
-
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to create background music playlist: "
-          + backgroundMusicPathname + ", error: " + e.getMessage());
     }
+    backgroundMusicHelper.createBackgroundMusicFromTopSongs(rootPath, topSongPathNames);
   }
 }

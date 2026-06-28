@@ -16,28 +16,26 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
   // Declaring the static constant for Jan 1st, 2020 at midnight UTC
   public static final Instant JAN_1_2020 = Instant.parse("2020-01-01T00:00:00Z");
 
-  private ArrayList<SongQueueEntryEntity> queueEntries;
+  private ArrayList<SongQueueEntryEntity> queueEntries = new ArrayList<>();
   private String rootPath;
 
-  public SongQueueRootEntity(String rootPath, boolean resetQueuedAtTime) {
+  public SongQueueRootEntity(String rootPath) {
 
     super(null);
     requireNonNull(rootPath, "rootPath cannot be null");
     this.rootPath = rootPath;
-
-    initialize(resetQueuedAtTime);
   }
 
-  public void initialize(boolean resetQueuedAtTime) {
+  public void resetQueuedAtTime() {
 
-    queueEntries = new ArrayList<>();
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
 
     // Set the queuedAt time to be 01-01-2020, as we don't
     // care about the play history after a restart
-    if (resetQueuedAtTime) {
-      for (SongQueueEntryEntity song : queueEntries) {
-        song.setQueuedAtTime(JAN_1_2020);
-      }
+    for (SongQueueEntryEntity song : queueEntries) {
+      song.setQueuedAtTime(JAN_1_2020);
     }
   }
 
@@ -55,6 +53,10 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
   }
 
   public boolean isQueueEmpty() {
+
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
     return this.queueEntries.isEmpty();
   }
 
@@ -74,6 +76,10 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
    */
   public SongQueueEntryEntity addSongToQueue(String username, SongFileEntity song,
       Integer priority) {
+
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
 
     SongQueueEntryEntity entry = new SongQueueEntryEntity(username, song, priority);
 
@@ -99,6 +105,9 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
    */
   public Integer flushQueue() {
 
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
     Integer numSongsFlushed = Integer.valueOf(this.queueEntries.size());
     this.queueEntries.clear();
     return numSongsFlushed;
@@ -110,6 +119,9 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
    */
   public Integer randomizeQueue() {
 
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
     Collections.shuffle(queueEntries);
     return Integer.valueOf(this.queueEntries.size());
   }
@@ -123,6 +135,9 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
    */
   public Integer moveSongUpInQueue(SongFileEntity song) {
 
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
     int index = getIndexForSongQueueEntry(song);
     if (index > 0) {
 
@@ -144,6 +159,9 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
    */
   public Integer moveSongDownInQueue(SongFileEntity song) {
 
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
     int index = getIndexForSongQueueEntry(song);
     if (index > 0) {
 
@@ -163,6 +181,9 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
    */
   public Integer removeSongFromQueue(SongFileEntity song) {
 
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
     int index = getIndexForSongQueueEntry(song);
     if (index >= 0) {
 
@@ -181,11 +202,17 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
    */
   public boolean removeSongFromQueue(SongQueueEntryEntity songQueueEntry) {
 
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
     return this.queueEntries.remove(songQueueEntry);
   }
 
   private int getIndexForSongQueueEntry(SongFileEntity song) {
 
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
     for (SongQueueEntryEntity entry : queueEntries) {
       if (entry.getSong().equals(song)) {
         return queueEntries.indexOf(entry);

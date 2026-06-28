@@ -8,27 +8,25 @@ import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
  * @author tmyers
  */
 public final class SongQueueRepositoryPostgresImpl implements SongQueueRepository {
-  
-  public SongQueueRepositoryPostgresImpl() {
-  }
-  
+
+  public SongQueueRepositoryPostgresImpl() {}
+
   @Override
   public SongQueueRootEntity loadAggregateRoot(String naturalIdentity)
       throws EntityDoesNotExistException {
 
     // TODO: TDM:
-    boolean resetQueuedAtTime = true;
-    return new SongQueueRootEntity(naturalIdentity, resetQueuedAtTime);
-    //throw new SongLibraryException("Not implemented yet!");
+    return new SongQueueRootEntity(naturalIdentity);
+    // throw new SongLibraryException("Not implemented yet!");
   }
-  
+
   @Override
   public SongQueueRootEntity loadAggregateRoot(int persistentIdentity)
       throws EntityDoesNotExistException {
 
     throw new SongLibraryException("Not implemented yet!");
   }
-  
+
   @Override
   public void storeAggregateRoot(SongQueueRootEntity root) {
 

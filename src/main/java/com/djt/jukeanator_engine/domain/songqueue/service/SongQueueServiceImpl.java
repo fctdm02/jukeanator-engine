@@ -54,6 +54,7 @@ public class SongQueueServiceImpl
   private final ApplicationEventPublisher eventPublisher;
   private final SongLibraryService songLibraryService;
   private final SongQueueRepository songQueueRepository;
+  private final boolean resetQueueAtStartup;
 
   // BACKGROUND MUSIC (THROUGH LINE IN AUDIO JACK)
   private boolean enableBackgroundMusic;
@@ -100,6 +101,8 @@ public class SongQueueServiceImpl
     this.songQueueRepository = songQueueRepository;
     this.eventPublisher = eventPublisher;
 
+    this.resetQueueAtStartup = songQueueProperties.isResetQueueAtStartup();
+
     this.enableBackgroundMusic = songQueueProperties.isEnableBackgroundMusic();
     this.preferredMixerName = songQueueProperties.getPreferredMixerName();
     this.lineInVolume = songQueueProperties.getLineInVolume();
@@ -117,18 +120,25 @@ public class SongQueueServiceImpl
 
   private synchronized void initialize() {
 
-    boolean resetQueuedAtTime = true;
-
     this.songLibraryRoot = this.songLibraryService.getSongLibraryRoot();
 
-    try {
-      this.songQueueRoot =
-          this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
-    } catch (EntityDoesNotExistException ednee) {
-      log.error("Could not load song queue from: " + rootPath
-          + ", using empty song library root for now, error: " + ednee.getMessage());
-      this.songQueueRoot =
-          new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME, resetQueuedAtTime);
+    if (resetQueueAtStartup) {
+
+      this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
+
+    } else {
+      try {
+
+        this.songQueueRoot =
+            this.songQueueRepository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
+
+      } catch (EntityDoesNotExistException ednee) {
+
+        log.error("Could not load song queue from: " + rootPath
+            + ", using empty song library root for now, error: " + ednee.getMessage());
+
+        this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
+      }
     }
 
     if (!this.rootPath.equals(this.songLibraryRoot.getRootPath())) {
@@ -140,23 +150,10 @@ public class SongQueueServiceImpl
     if (!this.rootPath.equals(this.songQueueRoot.getRootPath())) {
 
       this.songQueueRoot.setRootPath(this.rootPath);
-      this.songQueueRoot.initialize(true);
+      this.songQueueRoot.resetQueuedAtTime();
     }
 
-    // Seed the queue with background music if it is below the minimum threshold.
-    // This handles the cold-start case where there are no persisted songs in the queue,
-    // so playback can begin immediately without waiting for dequeueNextSong() to be called first.
-    try {
-      if (enableBackgroundMusic) {
-        autoPopulateQueue();
-      }
-    } catch (Exception e) {
-      log.error(
-          "Unable to auto-populate song queue for background music, error: " + e.getMessage());
-      this.enableBackgroundMusic = false;
-      this.minimumNumberSongsToKeepInQueue = 0;
-    }
-
+    log.info("resetQueueAtStartup: " + this.resetQueueAtStartup);
     log.info("rootPath: " + this.rootPath);
     log.info("rootPathWindows: " + this.rootPathWindows);
     log.info("rootPathUnix: " + this.rootPathUnix);
@@ -171,6 +168,42 @@ public class SongQueueServiceImpl
     log.info("allowExplicitSongsAtAllTimes: " + this.allowExplicitSongsAtAllTimes);
     log.info("allowExplicitSongsBegin: " + this.allowExplicitSongsBegin);
     log.info("allowExplicitSongsEnd: " + this.allowExplicitSongsEnd);
+
+    // Seed the queue with background music if it is below the minimum threshold.
+    // This handles the cold-start case where there are no persisted songs in the queue,
+    // so playback can begin immediately without waiting for dequeueNextSong() to be called first.
+    if (enableBackgroundMusic) {
+
+      // Try first to load from a file called BackgroundMusic.TXT
+      try {
+
+        this.songLibraryRoot.initializeBackgroundMusic(this.rootPath, this.rootPathWindows,
+            this.rootPathUnix);
+
+        autoPopulateQueue();
+
+      } catch (Exception e1) {
+
+        e1.printStackTrace();
+
+        // If that files, use the top 500 songs as BackgroundMusic.TXT
+        log.error(
+            "Unable to auto-populate song queue for background music, error: " + e1.getMessage());
+        try {
+
+          this.songLibraryRoot.createBackgroundMusicFromTopSongs(this.rootPath);
+
+          autoPopulateQueue();
+
+        } catch (Exception e) {
+          log.error(
+              "Unable to auto-populate song queue for background music with top songs, error: "
+                  + e.getMessage());
+          this.enableBackgroundMusic = false;
+          this.minimumNumberSongsToKeepInQueue = 0;
+        }
+      }
+    }
   }
 
   @Override
@@ -235,11 +268,13 @@ public class SongQueueServiceImpl
     while (songQueueRoot.getSongs().size() < minimumNumberSongsToKeepInQueue && attempts < 50) {
 
       attempts++;
-      SongFileEntity randomSong = this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(
-          this.rootPath, this.rootPathWindows, this.rootPathUnix);
-
-      if (randomSong == null) {
-        break; // Background-music playlist is empty; nothing more we can do.
+      SongFileEntity randomSong = null;
+      try {
+        randomSong = this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(this.rootPath,
+            this.rootPathWindows, this.rootPathUnix);
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Cannot get random song from background music playlist, error: " + e.getMessage(), e);
       }
 
       Integer albumId = randomSong.getAlbum().getPersistentIdentity();
@@ -250,7 +285,7 @@ public class SongQueueServiceImpl
         addSongToQueue("BACKGROUND_MUSIC", albumId, songId, 0);
       } else {
         System.err
-            .println(randomSong + "not eligible for queueing because: " + reasonForIneligibility);
+            .println(randomSong + " not eligible for queueing because: " + reasonForIneligibility);
       }
     }
 
@@ -311,9 +346,7 @@ public class SongQueueServiceImpl
 
         boolean isSameSong = (targetSongName.equals(queuedSongName)
             && (targetSongArtistName.equals(queuedSongArtistName)
-                || targetAlbumArtistName.equals(queuedSongAlbumArtistName)))
-            || (targetSong.getPersistentIdentity() != null
-                && targetSong.getPersistentIdentity().equals(queuedSong.getPersistentIdentity()));
+                || targetAlbumArtistName.equals(queuedSongAlbumArtistName)));
 
         if (isSameSong) {
 
@@ -350,18 +383,17 @@ public class SongQueueServiceImpl
       }
 
       // C. Build a prioritized sandbox mirror of the queue to simulate placement
-      boolean resetQueuedAtTime = false;
-      SongQueueRootEntity mirrorQueue =
-          new SongQueueRootEntity(songQueueRoot.getRootPath(), resetQueuedAtTime);
+      SongQueueRootEntity mirrorSongQueueRoot =
+          new SongQueueRootEntity(songQueueRoot.getRootPath());
       for (SongQueueEntryEntity existingEntry : songQueueRoot.getSongs()) {
-        mirrorQueue.getSongs().add(existingEntry);
+        mirrorSongQueueRoot.getSongs().add(existingEntry);
       }
 
       // Simulate inserting the incoming candidate using the real prioritization logic
-      mirrorQueue.addSongToQueue("ELIGIBILITY_CHECK", targetSong, priority);
+      mirrorSongQueueRoot.addSongToQueue("ELIGIBILITY_CHECK", targetSong, priority);
 
       // Append the sorted queue state onto our timeline
-      for (SongQueueEntryEntity entry : mirrorQueue.getSongs()) {
+      for (SongQueueEntryEntity entry : mirrorSongQueueRoot.getSongs()) {
         fullTimeline.add(entry.getSong());
       }
 
