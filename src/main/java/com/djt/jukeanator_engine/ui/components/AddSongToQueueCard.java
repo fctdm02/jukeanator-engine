@@ -16,13 +16,10 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JProgressBar;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
@@ -63,11 +60,6 @@ public class AddSongToQueueCard extends JPanel {
 
   /** Container that holds both inner cards. */
   private JPanel innerCardRoot; // assigned in buildBorderPanel()
-  private final Timer countdownTimer;
-  private int secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
-  private final JLabel timeoutLabel = new JLabel();
-  private final JProgressBar timeoutBar =
-      new JProgressBar(0, LayoutTheme.get().overlayTimeoutSeconds);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -88,26 +80,12 @@ public class AddSongToQueueCard extends JPanel {
     sized.setPreferredSize(
         new Dimension(LayoutTheme.get().addSongCardW, LayoutTheme.get().addSongCardH));
     add(sized);
-
-    countdownTimer = new Timer(1000, e -> {
-      secondsRemaining--;
-      updateTimeout();
-      if (secondsRemaining <= 0) {
-        dismiss();
-      }
-    });
-    countdownTimer.start();
   }
 
   // Background is painted by overlayRoot in JukeANatorFrame — no paintComponent override needed.
 
-  /** Called whenever this card is shown — restarts the countdown and resets focus. */
+  /** Called whenever this card is shown — resets focus. */
   public void onShown() {
-    secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
-    updateTimeout();
-    if (!countdownTimer.isRunning()) {
-      countdownTimer.start();
-    }
     requestFocusInWindow();
   }
 
@@ -203,16 +181,10 @@ public class AddSongToQueueCard extends JPanel {
     okRow.setOpaque(false);
     okRow.add(okButton);
 
-    // ── Timeout row ───────────────────────────────────────────────────────
-    // Re-use the shared timeout widgets so the countdown runs on the
-    // constraint panel exactly as it does on the main panel.
-    JComponent timeoutRow = buildTimeoutRow();
-
     JPanel bottomSection = new JPanel(new BorderLayout(0, 8));
     bottomSection.setOpaque(false);
     bottomSection.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
     bottomSection.add(okRow, BorderLayout.CENTER);
-    bottomSection.add(timeoutRow, BorderLayout.SOUTH);
 
     panel.add(iconLabel, BorderLayout.NORTH);
     panel.add(messagePanel, BorderLayout.CENTER);
@@ -367,47 +339,13 @@ public class AddSongToQueueCard extends JPanel {
     cancelRow.setOpaque(false);
     cancelRow.add(cancel);
 
-    JComponent timeoutRow = buildTimeoutRow();
-
     bottom.add(buttons, BorderLayout.NORTH);
     bottom.add(cancelRow, BorderLayout.CENTER);
-    bottom.add(timeoutRow, BorderLayout.SOUTH);
 
     return bottom;
   }
 
-  private JComponent buildTimeoutRow() {
-    // Identical layout preservation from original source
-    JPanel row = new JPanel(new BorderLayout(10, 0));
-    row.setOpaque(false);
-    row.setBorder(new EmptyBorder(6, 0, 0, 0));
-
-    timeoutLabel.setForeground(ColorTheme.get().textSecondary);
-    timeoutLabel
-        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTimeoutLabel));
-    timeoutLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-    updateTimeout();
-
-    timeoutBar.setValue(LayoutTheme.get().overlayTimeoutSeconds);
-    timeoutBar.setForeground(ColorTheme.get().accentBlue);
-    timeoutBar.setBackground(ColorTheme.get().timeoutBarTrack);
-    timeoutBar.setBorderPainted(false);
-    timeoutBar.setStringPainted(false);
-    timeoutBar.setPreferredSize(new Dimension(0, 4));
-
-    row.add(timeoutBar, BorderLayout.CENTER);
-    row.add(timeoutLabel, BorderLayout.EAST);
-
-    return row;
-  }
-
-  private void updateTimeout() {
-    timeoutBar.setValue(secondsRemaining);
-    timeoutLabel.setText("Closes in " + secondsRemaining + "s");
-  }
-
   private void dismiss() {
-    countdownTimer.stop();
     if (onDismiss != null) {
       SwingUtilities.invokeLater(onDismiss);
     }
@@ -654,7 +592,6 @@ public class AddSongToQueueCard extends JPanel {
 
   /** Must be called when this card is permanently discarded so listeners don't leak. */
   public void teardown() {
-    countdownTimer.stop();
     if (creditListener != null) {
       creditManager.removeListener(creditListener);
     }

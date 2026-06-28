@@ -17,15 +17,12 @@ import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
-import javax.swing.JProgressBar;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
@@ -104,13 +101,6 @@ public class SongQueueCard extends JPanel {
   private JButton removeButton;
   private Runnable creditListener;
 
-  // ── Timeout ───────────────────────────────────────────────────────────────
-  private final Timer countdownTimer;
-  private int secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
-  private final JLabel timeoutLabel = new JProgressLabel();
-  private final JProgressBar timeoutBar =
-      new JProgressBar(0, LayoutTheme.get().overlayTimeoutSeconds);
-
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
@@ -134,15 +124,6 @@ public class SongQueueCard extends JPanel {
     sized.setPreferredSize(
         new Dimension(LayoutTheme.get().songQueueCardW, LayoutTheme.get().songQueueCardH));
     add(sized);
-
-    countdownTimer = new Timer(1000, e -> {
-      secondsRemaining--;
-      updateTimeout();
-      if (secondsRemaining <= 0)
-        dismiss();
-    });
-    countdownTimer.start();
-
   }
 
   /** Updates the live queue reference — call before {@link #onShown()} if it may have changed. */
@@ -154,13 +135,8 @@ public class SongQueueCard extends JPanel {
     });
   }
 
-  /** Called whenever this card is shown — rebuilds the queue list, restarts the countdown. */
+  /** Called whenever this card is shown — rebuilds the queue list. */
   public void onShown() {
-    secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
-    updateTimeout();
-    if (!countdownTimer.isRunning()) {
-      countdownTimer.start();
-    }
     refreshNowPlaying();
     refreshQueueListModel();
     requestFocusInWindow();
@@ -440,12 +416,8 @@ public class SongQueueCard extends JPanel {
     cancelRow.setOpaque(false);
     cancelRow.add(cancel);
 
-    // Timeout bar
-    JComponent timeoutRow = buildTimeoutRow();
-
     area.add(buttons, BorderLayout.NORTH);
     area.add(cancelRow, BorderLayout.CENTER);
-    area.add(timeoutRow, BorderLayout.SOUTH);
 
     // Hook credit listener so buttons update when credits change
     creditListener = this::updateButtonStates;
@@ -591,37 +563,6 @@ public class SongQueueCard extends JPanel {
     button.setEnabled(state == ButtonState.NORMAL);
   }
 
-  // ── Timeout row ──────────────────────────────────────────────────────────
-
-  private JComponent buildTimeoutRow() {
-    JPanel row = new JPanel(new BorderLayout(10, 0));
-    row.setOpaque(false);
-    row.setBorder(new EmptyBorder(6, 0, 0, 0));
-
-    timeoutLabel.setForeground(TEXT_SECONDARY);
-    timeoutLabel
-        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTimeoutLabel));
-    timeoutLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-    updateTimeout();
-
-    timeoutBar.setValue(LayoutTheme.get().overlayTimeoutSeconds);
-    timeoutBar.setForeground(ACCENT_BLUE);
-    timeoutBar.setBackground(new Color(40, 40, 55));
-    timeoutBar.setBorderPainted(false);
-    timeoutBar.setStringPainted(false);
-    timeoutBar.setPreferredSize(new Dimension(0, 4));
-
-    row.add(timeoutBar, BorderLayout.CENTER);
-    row.add(timeoutLabel, BorderLayout.EAST);
-
-    return row;
-  }
-
-  private void updateTimeout() {
-    timeoutBar.setValue(secondsRemaining);
-    timeoutLabel.setText("Closes in " + secondsRemaining + "s");
-  }
-
   /**
    * Rebuilds the queue list model from the (live) queue reference — used at construction and
    * onShown().
@@ -638,7 +579,6 @@ public class SongQueueCard extends JPanel {
   }
 
   private void dismiss() {
-    countdownTimer.stop();
     if (onDismiss != null) {
       SwingUtilities.invokeLater(onDismiss);
     }
@@ -895,14 +835,8 @@ public class SongQueueCard extends JPanel {
     return l;
   }
 
-  /** Tiny inner class so we can use JLabel as the timeout text without a name conflict. */
-  private static class JProgressLabel extends JLabel {
-    private static final long serialVersionUID = 1L;
-  }
-
   /** Must be called when this card is permanently discarded so listeners don't leak. */
   public void teardown() {
-    countdownTimer.stop();
     if (creditListener != null) {
       creditManager.removeListener(creditListener);
     }
