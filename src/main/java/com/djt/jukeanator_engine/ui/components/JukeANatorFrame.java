@@ -99,7 +99,6 @@ public class JukeANatorFrame extends JFrame {
 
   // ── OVERLAY CARD SYSTEM (replaces former JDialog popups) ───────────────────
   private static final String CARD_TABS = "TABS";
-  private static final String CARD_SONG_QUEUE = "SONG_QUEUE";
   private static final String CARD_EDIT_ALBUM = "EDIT_ALBUM";
   private static final String CARD_LOGIN = "LOGIN";
   private static final String CARD_NOW_PLAYING_ALBUM = "NOW_PLAYING_ALBUM";
@@ -148,7 +147,6 @@ public class JukeANatorFrame extends JFrame {
   private int lastSelectedTabIndex = -1;
 
   private AddSongToQueueCard addSongToQueueCard;
-  private SongQueueCard songQueueCard;
   private EditAlbumCard editAlbumCard;
   private LoginToAdminPanelCard loginToAdminPanelCard;
   private AlbumDetailCard nowPlayingAlbumCard;
@@ -287,7 +285,6 @@ public class JukeANatorFrame extends JFrame {
     contentPanelTabs = buildContentPanelTabs();
 
     overlayRoot.add(contentPanelTabs, CARD_TABS);
-    overlayRoot.add(placeholder(), CARD_SONG_QUEUE);
     overlayRoot.add(placeholder(), CARD_EDIT_ALBUM);
     overlayRoot.add(placeholder(), CARD_LOGIN);
     overlayRoot.add(placeholder(), CARD_NOW_PLAYING_ALBUM);
@@ -319,7 +316,7 @@ public class JukeANatorFrame extends JFrame {
 
     // Hardware Bill Acceptor Key Bindings
     // Use WHEN_IN_FOCUSED_WINDOW so the keystroke is caught regardless of which
-    // child component (e.g. SongQueueCard) currently holds keyboard focus.
+    // child component currently holds keyboard focus.
     // A raw KeyListener on JFrame would silently stop working the moment any
     // child panel calls requestFocusInWindow().
     javax.swing.KeyStroke billAcceptorStroke =
@@ -880,20 +877,13 @@ public class JukeANatorFrame extends JFrame {
   // QUEUE PANEL
   // ============================================================
   /**
-   * A transparent panel that hosts the SongQueueCard content inline as a proper tab, painting the
-   * same diagonal gradient as the rest of the screen so the background appears seamless. The
-   * SongQueueCard is created once and reused; calling {@link QueuePanel#onShown()} refreshes the
-   * list and restarts the countdown.
+   * Builds the QUEUE tab. Calling {@link QueuePanel#onShown()} refreshes the list and restarts the
+   * countdown.
    */
   private QueuePanel buildQueuePanel() {
 
-    return new QueuePanel(songPlayerService, currentQueue, songQueueService, creditManager,
-        imageLoader, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3,
-        /* onDismiss — Cancel button navigates back to HOME (index 1) */
-        () -> SwingUtilities.invokeLater(() -> {
-          contentPanelTabs.setSelectedIndex(1);
-          lastSelectedTabIndex = 1;
-        }));
+    return new QueuePanel(currentQueue, songQueueService, creditManager, imageLoader,
+        POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3);
   }
 
   // ============================================================
@@ -1145,12 +1135,6 @@ public class JukeANatorFrame extends JFrame {
         adminPanel.setQueue(queue);
       }
       queuePanel.setQueue(currentQueue);
-      // Keep the overlay SongQueueCard's reference in sync even when it is not
-      // currently visible. Without this, the card would show a stale list
-      // (including the now-playing song) until the user closed and reopened it.
-      if (songQueueCard != null) {
-        songQueueCard.setQueue(currentQueue);
-      }
     });
   }
 
@@ -1327,33 +1311,6 @@ public class JukeANatorFrame extends JFrame {
     addSongGlassPane.revalidate();
     addSongGlassPane.repaint();
     addSongToQueueCard.onShown();
-  }
-
-  /**
-   * Shows the Song Queue overlay. Used by the Now Playing panel. Disabled while the Admin tab is
-   * active, since AdminPanel already has song-queue functionality.
-   */
-  public void showSongQueueCard() {
-
-    if ((adminPanel != null && contentPanelTabs.getSelectedComponent() == adminPanel)
-        || contentPanelTabs.getSelectedComponent() == queuePanel) {
-      return; // disabled on Admin and Queue tabs (Queue tab has its own embedded view)
-    }
-
-    if (songQueueCard == null) {
-      songQueueCard = new SongQueueCard(songPlayerService, currentQueue, songQueueService,
-          creditManager, imageLoader, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
-          POPULARITY_THRESHOLD_3, this::hideOverlay);
-      replaceOverlayCard(CARD_SONG_QUEUE, songQueueCard);
-    }
-
-    songQueueCard.setOpaque(false);
-
-    songQueueCard.setQueue(currentQueue);
-    overlayTransitionInProgress = true;
-    overlayCardLayout.show(overlayRoot, CARD_SONG_QUEUE);
-    overlayTransitionInProgress = false;
-    songQueueCard.onShown();
   }
 
   /**

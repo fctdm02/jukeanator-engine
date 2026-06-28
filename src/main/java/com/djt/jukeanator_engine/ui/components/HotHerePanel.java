@@ -222,7 +222,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
         artistCount + " artists  •  " + albumCount + " albums  •  " + songCount + " songs";
 
     headerPanel = new DetailHeaderPanel(null, null, hotHereIcon, "🔥", "Hot Here", subtitle,
-        buildSortButtonPanel());
+        buildSortButtonPanel(), ColorTheme.get().frameTabAccentHotHere);
     headerPanel.setOpaque(false);
     int hbH = LayoutTheme.get().homeHeaderBorderH;
     headerPanel.setBorder(new javax.swing.border.EmptyBorder(4, hbH, 4, hbH));

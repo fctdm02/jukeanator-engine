@@ -35,6 +35,18 @@ public class DetailHeaderPanel extends JPanel {
 
   public DetailHeaderPanel(String buttonText, Runnable onBack, Icon image, String fallbackText,
       String title, String subtitle, JPanel eastPanel) {
+    this(buttonText, onBack, image, fallbackText, title, subtitle, eastPanel,
+        ColorTheme.get().detailHeaderImageFg);
+  }
+
+  /**
+   * Full constructor. {@code fallbackColor} lets a caller tint the fallback glyph (used when
+   * {@code image} is {@code null}) with its own tab's accent colour instead of the generic neutral
+   * gray — e.g. Hot Here's fire emoji or the Song Queue's note glyph should read in that tab's
+   * theme colour rather than looking washed-out/grayscale.
+   */
+  public DetailHeaderPanel(String buttonText, Runnable onBack, Icon image, String fallbackText,
+      String title, String subtitle, JPanel eastPanel, Color fallbackColor) {
 
     setLayout(new BorderLayout(16, 0));
     setOpaque(false);
@@ -84,7 +96,7 @@ public class DetailHeaderPanel extends JPanel {
     } else {
 
       imageLabel.setText(fallbackText);
-      imageLabel.setForeground(ColorTheme.get().detailHeaderImageFg);
+      imageLabel.setForeground(fallbackColor);
       imageLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 32)); // fallback symbol — not scaled
     }
 
@@ -98,15 +110,28 @@ public class DetailHeaderPanel extends JPanel {
     JLabel titleLabel = new JLabel(title != null ? title : "");
     titleLabel.setForeground(ColorTheme.get().textPrimary);
     titleLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeDetailTitle));
-
-    JLabel subtitleLabel = new JLabel(subtitle != null ? subtitle : "");
-    subtitleLabel.setForeground(ColorTheme.get().textSecondary);
-    subtitleLabel
-        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeDetailSubtitle));
-
     textBlock.add(titleLabel);
-    textBlock.add(Box.createVerticalStrut(4));
-    textBlock.add(subtitleLabel);
+
+    // Subtitle row is skipped entirely when there's nothing to show (e.g. the Song Queue
+    // header), rather than reserving its height as dead space below the title.
+    if (subtitle != null && !subtitle.isEmpty()) {
+      JLabel subtitleLabel = new JLabel(subtitle);
+      subtitleLabel.setForeground(ColorTheme.get().textSecondary);
+      subtitleLabel
+          .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeDetailSubtitle));
+      textBlock.add(Box.createVerticalStrut(4));
+      textBlock.add(subtitleLabel);
+    }
+
+    // BorderLayout.CENTER stretches textWrapper to the image's full height; the glue
+    // above/below centres the (shorter) text block within that height instead of letting it
+    // sit pinned to the top.
+    JPanel textWrapper = new JPanel();
+    textWrapper.setOpaque(false);
+    textWrapper.setLayout(new BoxLayout(textWrapper, BoxLayout.Y_AXIS));
+    textWrapper.add(Box.createVerticalGlue());
+    textWrapper.add(textBlock);
+    textWrapper.add(Box.createVerticalGlue());
 
     //
     // CLUSTER
@@ -115,7 +140,7 @@ public class DetailHeaderPanel extends JPanel {
     infoCluster.setOpaque(false);
 
     infoCluster.add(imageLabel, BorderLayout.WEST);
-    infoCluster.add(textBlock, BorderLayout.CENTER);
+    infoCluster.add(textWrapper, BorderLayout.CENTER);
 
     add(infoCluster, BorderLayout.CENTER);
 

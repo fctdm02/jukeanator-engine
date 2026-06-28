@@ -249,16 +249,12 @@ public class LayoutTheme {
     detailBackBtnH = sortBtnH; // matches the Order By buttons' height
 
     // ── SongQueueCard ─────────────────────────────────────────────────────────
-    songQueueCardW = 900;
-    songQueueCardH = 660;
+    songQueueMaxVisible = 7;
     songQueueActionBtnW = 200;
     songQueueActionBtnH = 80;
-    songQueueCancelBtnW = 200;
-    songQueueCancelBtnH = 52;
     songQueueCardPadTop = 16;
     songQueueSectionPadTop = 15;
     songQueueActionAreaGap = 10;
-    songQueueHeaderRowH = 28; // natural label height — no extra spacing
     fontSizeQueueBtn = 17;
     fontSizeQueueCancelBtn = 20;
 
@@ -422,16 +418,12 @@ public class LayoutTheme {
       detailBackBtnH = sortBtnH; // matches the Order By buttons' height
 
       // SongQueueCard — same as landscape for portrait
-      songQueueCardW = 900;
-      songQueueCardH = 660;
+      songQueueMaxVisible = 7;
       songQueueActionBtnW = 200;
       songQueueActionBtnH = 80;
-      songQueueCancelBtnW = 200;
-      songQueueCancelBtnH = 52;
       songQueueCardPadTop = 16;
       songQueueSectionPadTop = 15;
       songQueueActionAreaGap = 10;
-      songQueueHeaderRowH = 28; // natural label height — no extra spacing
       fontSizeQueueBtn = 17;
       fontSizeQueueCancelBtn = 20;
 
@@ -748,36 +740,20 @@ public class LayoutTheme {
 
       // ── SongQueueCard — tuned for 1024 × 768 ─────────────────────────────────
       //
-      // Item 1: Reduce top padding to bring now-playing section closer to top of card.
+      // Reduce top padding to bring the header section closer to the top of the card.
       //
       songQueueCardPadTop = 8; // landscape default: 16
-      //
-      // Item 2: Widen card ~20% so action buttons fit their label text.
-      // 980px keeps the card inside 1024px (22px margin each side).
-      // Inner usable width: 980 - 2×28 padding = 924px.
-      // Action buttons: (924 - 2×16 gap) / 3 = 297px → 290px (round down).
-      // Action button height matches Cancel button height (52px).
-      //
-      // Item 2: Card width 850px (22px margin each side at 1024px).
-      songQueueCardW = 850;
-      // Inner usable width: 850 - 2x28 padding = 794px.
-      // Action buttons: (794 - 2x12 gap) / 3 = 256px -> 250px (round down).
+      // Removing the now-playing display and folding the "Queued Songs:" row into
+      // the DetailHeaderPanel frees up enough vertical room for 10 rows on 1024 x 768.
+      songQueueMaxVisible = 10; // landscape/portrait default: 7
+      // Inner usable width now spans the full tab width (no left/right card padding).
+      // Action buttons: (fullWidth - 2x16 gap) / 3, rounded down to a clean value.
       songQueueActionBtnW = 250;
       songQueueActionBtnH = 52;
-      // Item 1: Cancel button same size as action buttons, centered.
-      songQueueCancelBtnW = 250; // same as songQueueActionBtnW
-      songQueueCancelBtnH = 52; // same as songQueueActionBtnH
-      songQueueSectionPadTop = 0; // Item 3: header row is now its own panel between sections
+      songQueueSectionPadTop = 0; // header row is now its own panel between sections
       songQueueActionAreaGap = 6;
-      // Item 3: songQueueHeaderRowH drives the fixed height of the standalone
-      // header row that sits between the now-playing card and the queue list.
-      // 36px is enough for the label + a few px of breathing room below.
-      songQueueHeaderRowH = 36;
       fontSizeQueueBtn = 13;
       fontSizeQueueCancelBtn = 13;
-      // Card height: now-playing (~110px) + header row (36px) + list (5x44=220px)
-      // + action area (~130px) + paddings (~50px) = ~546px -> use 600px for comfort.
-      songQueueCardH = 600;
     }
 
     // Derived Dimension fields — always computed last from the primitives set above.
@@ -1928,32 +1904,17 @@ public class LayoutTheme {
   // Origin: SongQueueCard
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /** Preferred width of the SongQueueCard panel. */
-  public final int songQueueCardW;
-
-  /** Preferred height of the SongQueueCard panel. */
-  public final int songQueueCardH;
-
   /**
    * Maximum number of queued song entries visible at once in the SongQueueCard list. Determines the
    * fixed list height (no scroll bar).
    */
-  public final int songQueueMaxVisible = 5;
-
-  /** Size (square) of the now-playing cover-art icon in SongQueueCard. */
-  public final int songQueueCoverSize = 96;
+  public final int songQueueMaxVisible;
 
   /** Preferred width of the move-up/move-down/remove action buttons in SongQueueCard. */
   public final int songQueueActionBtnW;
 
   /** Preferred height of the action buttons. */
   public final int songQueueActionBtnH;
-
-  /** Preferred width of the Cancel button in SongQueueCard. */
-  public final int songQueueCancelBtnW;
-
-  /** Preferred height of the Cancel button. */
-  public final int songQueueCancelBtnH;
 
   /**
    * Top padding (px) of the SongQueueCard main panel ({@code buildMainPanel}). Landscape /
@@ -1975,15 +1936,6 @@ public class LayoutTheme {
    * Small-landscape: reduced to tighten internal spacing.
    */
   public final int songQueueActionAreaGap;
-
-  /**
-   * Fixed height (px) of the "Queued Songs:" / priority-legend header row. Setting this taller than
-   * the natural label height causes both labels to sit at the bottom of the row via a BoxLayout
-   * with a vertical strut, placing the visual gap above them (between the now-playing card and the
-   * labels) rather than below. Landscape / portrait: 28 px (natural label height — no extra space).
-   * Small-landscape: 44 px to push labels visually away from the now-playing panel.
-   */
-  public final int songQueueHeaderRowH;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ADMIN PANEL (AdminPanel)
