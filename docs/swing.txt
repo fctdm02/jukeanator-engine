@@ -970,3 +970,10 @@ RandomByGenre=false
 RandomByCD=false
  
  
+
+ 
+ Item 1: Right now, SongLibraryService has a method called getAlbums(), which returns albums sorted by album name.  Rename this method on the service interface, as well as everywhere else, to be called getAlbumsByTitle()
+
+
+
+Item 2: Related to Item 1, define, and implement, a new method on SongLibraryService called getAlbumsByArtist().  The controller endpoints should be updated to reflect the method name, and be sure to  modify the web security config as well.

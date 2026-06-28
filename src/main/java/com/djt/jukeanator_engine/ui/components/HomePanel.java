@@ -2,14 +2,23 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
+import java.awt.Cursor;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
+import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
@@ -23,6 +32,11 @@ import com.djt.jukeanator_engine.ui.model.CreditManager;
 public class HomePanel extends JPanel implements TabNavigator {
 
   private static final long serialVersionUID = 1L;
+
+  // ── Sort mode ─────────────────────────────────────────────────────────────
+  public enum SortMode {
+    TITLE, ARTIST
+  }
 
   // ── Default grid config ───────────────────────────────────────────────────
   // public static final int DEFAULT_COLS = 4;
@@ -60,6 +74,22 @@ public class HomePanel extends JPanel implements TabNavigator {
 
   // ── Resolution-aware grid profile for the album sub-grid (artist detail) ──
   private final LayoutTheme.GridProfile albumGridProfile;
+
+  // ── Albums, fetched ONCE at startup and kept in memory in two sorted views.
+  // Switching the "Order By" selection never re-queries SongLibraryService —
+  // it only swaps which of these already-sorted lists/letter-maps is shown. ──
+  private List<AlbumDto> albumsByTitle = List.of();
+  private List<AlbumDto> albumsByArtist = List.of();
+  private Map<String, List<AlbumDto>> letterMapByTitle = Map.of();
+  private Map<String, List<AlbumDto>> letterMapByArtist = Map.of();
+  private SortMode currentSort = SortMode.TITLE;
+
+  // ── Live grid container (the AlbumGridPanel inside is swapped on sort change) ──
+  private final JPanel gridContainer = new JPanel(new BorderLayout());
+
+  // ── Sort toggle buttons — kept to allow repainting active state ──────────
+  private JButton btnTitle;
+  private JButton btnArtist;
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -177,6 +207,8 @@ public class HomePanel extends JPanel implements TabNavigator {
     JPanel card = new JPanel(new BorderLayout());
     card.setOpaque(false);
 
+    // Fetch the album list ONCE. All sort-order switching below operates
+    // purely on the two in-memory lists built from this single call.
     List<AlbumDto> rawAlbums;
     try {
       rawAlbums = songLibraryService.getAlbums();
@@ -184,20 +216,10 @@ public class HomePanel extends JPanel implements TabNavigator {
       rawAlbums = List.of();
     }
 
-    // ── Item #1: Sort albums alphabetically by name, symbols/numbers first ──
-    List<AlbumDto> allAlbums = new ArrayList<>(rawAlbums);
-    allAlbums.sort(Comparator.comparing(a -> {
-      String name = a.getAlbumName();
-      if (name == null || name.isBlank())
-        return "\uFFFF"; // push blanks to end
-      char first = Character.toUpperCase(name.charAt(0));
-      // Letters sort after symbols/digits by prefixing letters with '~'
-      // so that symbol/digit names sort before A–Z naturally.
-      return Character.isLetter(first) ? ("~" + name.toUpperCase()) : name.toUpperCase();
-    }));
-
-    // ── Item #2: Build ordered letter→albums map (#, A–Z) ───────────────────
-    Map<String, List<AlbumDto>> letterMap = buildLetterMap(allAlbums);
+    albumsByTitle = sortAlbums(rawAlbums, AlbumDto::getAlbumName);
+    albumsByArtist = sortAlbums(rawAlbums, AlbumDto::getArtistName);
+    letterMapByTitle = buildLetterMap(albumsByTitle, AlbumDto::getAlbumName);
+    letterMapByArtist = buildLetterMap(albumsByArtist, AlbumDto::getArtistName);
 
     // Icon size is read from LayoutTheme so that the header shrinks on small-landscape
     // displays (1024x768) where detailHeaderImageW/H are reduced to 40px, keeping the
@@ -206,7 +228,7 @@ public class HomePanel extends JPanel implements TabNavigator {
     ImageIcon allAlbumsIcon =
         imageLoader.loadImage("AllAlbumsLogo.png", headerIconSize, headerIconSize);
     DetailHeaderPanel header = new DetailHeaderPanel(null, null, allAlbumsIcon, "♫", "All Albums",
-        allAlbums.size() + " albums");
+        albumsByTitle.size() + " albums", buildSortButtonPanel());
     header.setOpaque(false);
     // Left/right padding matches the album grid's own horizontal border so the header
     // icon/text aligns on the y-axis with the tile columns below it.
@@ -215,34 +237,177 @@ public class HomePanel extends JPanel implements TabNavigator {
     int hbH = LayoutTheme.get().homeHeaderBorderH;
     header.setBorder(new javax.swing.border.EmptyBorder(4, hbH, 4, hbH));
 
-    if (allAlbums.isEmpty()) {
+    card.add(header, BorderLayout.NORTH);
+
+    if (albumsByTitle.isEmpty()) {
       JLabel empty = new JLabel("No albums found.", SwingConstants.CENTER);
       empty.setForeground(ColorTheme.get().textSecondary);
       empty.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 22));
-      card.add(header, BorderLayout.NORTH);
       card.add(empty, BorderLayout.CENTER);
       return card;
     }
 
-    AlbumGridPanel grid = new AlbumGridPanel(allAlbums, letterMap, imageLoader, albumGridProfile,
-        album -> pushAlbumDetail(album), true); // TabNavigator path
-
-    card.add(header, BorderLayout.NORTH);
-    card.add(grid, BorderLayout.CENTER);
+    gridContainer.setOpaque(false);
+    gridContainer.add(buildAlbumGridPanel(currentSort), BorderLayout.CENTER);
+    card.add(gridContainer, BorderLayout.CENTER);
     return card;
   }
 
+  /** Builds an {@link AlbumGridPanel} bound to the already-sorted list/letter-map for {@code mode}. */
+  private AlbumGridPanel buildAlbumGridPanel(SortMode mode) {
+    List<AlbumDto> albums = mode == SortMode.TITLE ? albumsByTitle : albumsByArtist;
+    Map<String, List<AlbumDto>> letterMap =
+        mode == SortMode.TITLE ? letterMapByTitle : letterMapByArtist;
+    return new AlbumGridPanel(albums, letterMap, imageLoader, albumGridProfile,
+        album -> pushAlbumDetail(album), true); // TabNavigator path
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ORDER BY TOGGLE BUTTONS
+  // ─────────────────────────────────────────────────────────────────────────────
+  private JPanel buildSortButtonPanel() {
+
+    JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
+    row.setOpaque(false);
+    row.setBorder(BorderFactory.createEmptyBorder(0, 16, 0, 8));
+
+    JLabel sortLabel = new JLabel("Order By: ");
+    sortLabel.setForeground(ColorTheme.get().textPrimary);
+    sortLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSortLabel));
+    row.add(sortLabel);
+
+    btnTitle = sortButton("Title", SortMode.TITLE);
+    btnArtist = sortButton("Artist", SortMode.ARTIST);
+
+    row.add(btnTitle);
+    row.add(btnArtist);
+
+    JPanel wrapper = new JPanel();
+    wrapper.setLayout(new javax.swing.BoxLayout(wrapper, javax.swing.BoxLayout.Y_AXIS));
+    wrapper.setOpaque(false);
+    wrapper.add(javax.swing.Box.createVerticalGlue());
+    wrapper.add(row);
+    wrapper.add(javax.swing.Box.createVerticalGlue());
+
+    return wrapper;
+  }
+
+  private JButton sortButton(String label, SortMode mode) {
+
+    JButton btn = new JButton(label) {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      protected void paintComponent(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        boolean active = (currentSort == mode);
+
+        if (active) {
+          g2.setPaint(new GradientPaint(0, 0, ColorTheme.get().navBtnGradTop, 0, getHeight(),
+              ColorTheme.get().navBtnGradBottom));
+        } else {
+          g2.setColor(ColorTheme.get().sortBtnIdleBg);
+        }
+        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+
+        g2.setColor(active ? ColorTheme.get().accentBlue : ColorTheme.get().detailHeaderBorder);
+        g2.setStroke(new java.awt.BasicStroke(active ? 1.5f : 1.0f));
+        g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
+
+        g2.dispose();
+        super.paintComponent(g);
+      }
+    };
+
+    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSortBtn));
+    btn.setForeground(
+        currentSort == mode ? ColorTheme.get().textPrimary : ColorTheme.get().textMuted);
+    btn.setContentAreaFilled(false);
+    btn.setBorderPainted(false);
+    btn.setFocusPainted(false);
+    btn.setOpaque(false);
+    btn.setPreferredSize(new Dimension(LayoutTheme.get().sortBtnW, LayoutTheme.get().sortBtnH));
+    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+    btn.addActionListener(e -> applySortMode(mode));
+
+    btn.addMouseListener(new java.awt.event.MouseAdapter() {
+      @Override
+      public void mouseEntered(java.awt.event.MouseEvent e) {
+        btn.repaint();
+      }
+
+      @Override
+      public void mouseExited(java.awt.event.MouseEvent e) {
+        btn.repaint();
+      }
+    });
+
+    return btn;
+  }
+
   /**
-   * Builds an ordered map whose keys are "#" (numbers/symbols) followed by "A"–"Z", and whose
-   * values are the albums whose names start with that key. Keys with no matching albums are
-   * omitted.
+   * Switches the displayed order between title and artist. Never re-queries
+   * {@link SongLibraryService} -- both lists/letter-maps were built once at startup in
+   * {@link #buildGridCard()}; this only swaps which already-sorted view is shown.
+   */
+  private void applySortMode(SortMode mode) {
+
+    if (mode == currentSort)
+      return;
+    currentSort = mode;
+
+    for (JButton btn : new JButton[] {btnTitle, btnArtist}) {
+      if (btn != null) {
+        btn.setForeground(ColorTheme.get().textMuted);
+        btn.repaint();
+      }
+    }
+    JButton activeBtn = mode == SortMode.TITLE ? btnTitle : btnArtist;
+    if (activeBtn != null) {
+      activeBtn.setForeground(ColorTheme.get().textPrimary);
+      activeBtn.repaint();
+    }
+
+    gridContainer.removeAll();
+    gridContainer.add(buildAlbumGridPanel(mode), BorderLayout.CENTER);
+    gridContainer.revalidate();
+    gridContainer.repaint();
+  }
+
+  /**
+   * Returns a new list of {@code rawAlbums} sorted alphabetically by the value returned by
+   * {@code keyExtractor}, symbols/numbers first. Blank/null keys sort to the end.
+   */
+  private List<AlbumDto> sortAlbums(List<AlbumDto> rawAlbums,
+      Function<AlbumDto, String> keyExtractor) {
+    List<AlbumDto> sorted = new ArrayList<>(rawAlbums);
+    sorted.sort(Comparator.comparing(a -> {
+      String key = keyExtractor.apply(a);
+      if (key == null || key.isBlank())
+        return "￿"; // push blanks to end
+      char first = Character.toUpperCase(key.charAt(0));
+      // Letters sort after symbols/digits by prefixing letters with '~'
+      // so that symbol/digit names sort before A-Z naturally.
+      return Character.isLetter(first) ? ("~" + key.toUpperCase()) : key.toUpperCase();
+    }));
+    return sorted;
+  }
+
+  /**
+   * Builds an ordered map whose keys are "#" (numbers/symbols) followed by "A"-"Z", and whose
+   * values are the albums whose {@code keyExtractor} value starts with that key. Keys with no
+   * matching albums are omitted.
    *
    * <p>
    * The input list must already be sorted in the desired display order.
    */
-  private Map<String, List<AlbumDto>> buildLetterMap(List<AlbumDto> sortedAlbums) {
+  private Map<String, List<AlbumDto>> buildLetterMap(List<AlbumDto> sortedAlbums,
+      Function<AlbumDto, String> keyExtractor) {
 
-    // Pre-seed all keys in order so iteration order is always #, A, B, …, Z.
+    // Pre-seed all keys in order so iteration order is always #, A, B, ..., Z.
     Map<String, List<AlbumDto>> map = new LinkedHashMap<>();
     map.put("#", new ArrayList<>());
     for (char c = 'A'; c <= 'Z'; c++) {
@@ -250,12 +415,12 @@ public class HomePanel extends JPanel implements TabNavigator {
     }
 
     for (AlbumDto album : sortedAlbums) {
-      String name = album.getAlbumName();
-      if (name == null || name.isBlank()) {
+      String key = keyExtractor.apply(album);
+      if (key == null || key.isBlank()) {
         map.get("#").add(album);
         continue;
       }
-      char first = Character.toUpperCase(name.charAt(0));
+      char first = Character.toUpperCase(key.charAt(0));
       if (Character.isLetter(first)) {
         map.get(String.valueOf(first)).add(album);
       } else {
