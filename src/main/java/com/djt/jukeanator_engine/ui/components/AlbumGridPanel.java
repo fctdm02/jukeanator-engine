@@ -113,7 +113,7 @@ public class AlbumGridPanel extends JPanel {
     setOpaque(false);
 
     gridPanel.setOpaque(false);
-    navPanel.setBorder(new EmptyBorder(4, 16, 4, 16));
+    navPanel.setBorder(new EmptyBorder(4, 0, 4, 0)); // edge-to-edge: was (4, 16, 4, 16)
     navPanel.setOpaque(false);
     // Lock nav panel height to nav-button height + top/bottom padding
     int navH = LayoutTheme.get().navBtnH + 4 + 4;
@@ -188,7 +188,7 @@ public class AlbumGridPanel extends JPanel {
     gridPanel.removeAll();
     gridPanel.setLayout(new GridLayout(albumGridProfile.rows(), albumGridProfile.cols(),
         LayoutTheme.get().albumGridGapH, LayoutTheme.get().albumGridGapV));
-    gridPanel.setBorder(new EmptyBorder(8, 12, 4, 12));
+    gridPanel.setBorder(new EmptyBorder(8, 0, 4, 0)); // edge-to-edge: was (8, 12, 4, 12)
 
     for (int i = start; i < end; i++) {
       gridPanel.add(buildTile(albums.get(i)));

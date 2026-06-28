@@ -866,7 +866,7 @@ public class JukeANatorFrame extends JFrame {
 
     JPanel panel = new JPanel(new BorderLayout());
     panel.setOpaque(false);
-    panel.setBorder(new EmptyBorder(10, 20, 10, 20));
+    panel.setBorder(new EmptyBorder(10, 0, 10, 0)); // edge-to-edge: was (10, 20, 10, 20)
 
     //
     // LEFT : CREDITS

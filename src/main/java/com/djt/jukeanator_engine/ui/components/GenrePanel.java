@@ -220,7 +220,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
         LayoutTheme.get().genrePagePadH));
     pageWrapper.add(genresGridPanel, BorderLayout.CENTER);
 
-    genresPaginationPanel.setBorder(new EmptyBorder(4, 16, 4, 16));
+    genresPaginationPanel.setBorder(new EmptyBorder(4, 0, 4, 0)); // edge-to-edge: was (4, 16, 4, 16)
     genresPaginationPanel.setOpaque(false);
 
     JPanel card = new JPanel(new BorderLayout());

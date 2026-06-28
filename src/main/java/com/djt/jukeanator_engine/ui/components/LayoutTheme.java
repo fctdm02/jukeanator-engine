@@ -140,7 +140,7 @@ public class LayoutTheme {
 
     // ── Keyboard ──────────────────────────────────────────────────────────────
     keyboardHeight = 260;
-    keyboardPaddingHorizontal = 60;
+    keyboardPaddingHorizontal = 0; // landscape default before edge-to-edge: 60
     keyLetterW = 70;
     keyLetterH = 60;
     keyClearW = 140;
@@ -173,7 +173,7 @@ public class LayoutTheme {
     // ── Genre grid gaps and page padding ──────────────────────────────────────
     genreGridGapH = 20;
     genreGridGapV = 20;
-    genrePagePadH = 60;
+    genrePagePadH = 0; // landscape default before edge-to-edge: 60
     genrePagePadV = 30;
     genreImageSize = 240;
 
@@ -218,7 +218,7 @@ public class LayoutTheme {
     searchBarWrapperPadV = 12; // top + bottom padding around the search bar wrapper
     resultHeaderPadV = 12; // top + bottom padding of the column header in ResultsColumnPanel
     searchHeroSpacerH = 0; // no spacer in landscape
-    searchPanelPaddingHorizontal = 60; // matches screenPaddingHorizontal in landscape
+    searchPanelPaddingHorizontal = 0; // landscape default before edge-to-edge: 60
     searchBarLabelPadV = 8; // internal top+bottom padding of the search text label
     searchResultsTopPad = 10; // top+bottom padding of the results columns container
     tabContentTopInset = 0; // no override — default LAF content border insets apply
@@ -313,7 +313,7 @@ public class LayoutTheme {
     if (orientation == Orientation.PORTRAIT) {
       // ── Issue 1 : Keyboard rows clipped ─────────────────────────────────────
       keyboardHeight = 320;
-      keyboardPaddingHorizontal = 20;
+      keyboardPaddingHorizontal = 0; // portrait default before edge-to-edge: 20
       keyLetterW = 60;
       keyLetterH = 64;
       keyClearW = 110;
@@ -349,7 +349,7 @@ public class LayoutTheme {
       // Genre grid gaps and page padding — same as landscape for portrait
       genreGridGapH = 20;
       genreGridGapV = 20;
-      genrePagePadH = 60;
+      genrePagePadH = 0; // portrait default before edge-to-edge: 60
       genrePagePadV = 30;
       genreImageSize = 240;
 
@@ -391,7 +391,7 @@ public class LayoutTheme {
       searchBarWrapperPadV = 12;
       resultHeaderPadV = 12;
       searchHeroSpacerH = 0;
-      searchPanelPaddingHorizontal = 30; // matches screenPaddingHorizontal in portrait
+      searchPanelPaddingHorizontal = 0; // portrait default before edge-to-edge: 30
       searchBarLabelPadV = 8; // unchanged from landscape
       searchResultsTopPad = 10; // unchanged from landscape
       tabContentTopInset = 0; // no override in portrait
@@ -502,10 +502,10 @@ public class LayoutTheme {
       genreGridGapH = 4; // landscape default: 20 (Item 1.1: match albumGridGapH)
       genreGridGapV = 4; // landscape default: 20 (Item 1.1: match albumGridGapV)
       //
-      // Item 1.2: Align genre grid left/right padding with the top panel edge
-      // (TOP_PANEL_H_PADDING / 2 = 20px), matching the credits panel left indent.
+      // Item 1.2: Genre grid is now edge-to-edge, matching the top panel's credits/
+      // now-playing boxes which were also moved flush to the screen edges.
       //
-      genrePagePadH = 20; // landscape default: 60 (Item 1.2: align with top panel)
+      genrePagePadH = 0; // landscape default: 60; small-landscape before edge-to-edge: 20
       genrePagePadV = 10; // landscape default: 30 (tighter top/bottom)
       //
       // Item 1.3: genreImageSize feeds the scale formula in computeLandscapeGenreProfile.
@@ -609,7 +609,7 @@ public class LayoutTheme {
       searchBtnH = 60; // unchanged
       columnInternalEdgeGap = 10; // unchanged
       searchHeroSpacerH = 8; // Item 1.3: small spacer below hero area
-      searchPanelPaddingHorizontal = 20; // Items 1.4/1.5/2.1: matches keyboardPaddingHorizontal
+      searchPanelPaddingHorizontal = 0; // small-landscape before edge-to-edge: 20
       searchBarLabelPadV = 5; // Item 3: 8px × 0.60 = 4.8 → 5px (−40%)
       searchResultsTopPad = 4; // Item 4: reduce top/bottom gap above/below columns
       tabContentTopInset = 2; // Item 1: override JTabbedPane content top inset
@@ -665,7 +665,7 @@ public class LayoutTheme {
       // Adding a little breathing room → 185 px.
       //
       keyboardHeight = 185; // landscape default: 260 (Items 1.1+1.2)
-      keyboardPaddingHorizontal = 20; // landscape default: 60
+      keyboardPaddingHorizontal = 0; // landscape default: 60; small-landscape before edge-to-edge: 20
       keyLetterW = 46; // landscape default: 70 (Item 1.1: ×0.85)
       keyLetterH = 46; // landscape default: 60 (Item 1.1: ×0.85)
       keyClearW = 80; // landscape default: 140 (Item 1.1: ×0.85)
@@ -1380,9 +1380,9 @@ public class LayoutTheme {
 
   /**
    * Total left+right {@code EmptyBorder} padding on the top panel (px). Matches
-   * {@code new EmptyBorder(10, 20, 10, 20)} → left 20 + right 20 = 40.
+   * {@code new EmptyBorder(10, 0, 10, 0)} → left 0 + right 0 = 0 (edge-to-edge).
    */
-  private static final int TOP_PANEL_H_PADDING = 40;
+  private static final int TOP_PANEL_H_PADDING = 0;
 
   /**
    * Total top+bottom {@code EmptyBorder} padding on the top panel (px). Matches

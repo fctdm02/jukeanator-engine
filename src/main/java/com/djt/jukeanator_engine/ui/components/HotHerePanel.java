@@ -116,6 +116,13 @@ public class HotHerePanel extends JPanel implements TabNavigator {
 
     contentPanel.setOpaque(false);
     columnsPanel.setOpaque(false);
+    // Each ResultsColumnPanel adds its own resultColumnPadH on both edges (for the gap
+    // between adjacent columns). Applying a matching negative margin here cancels that
+    // out on the outermost left/right edges only, so the first/last columns sit flush
+    // with the screen edges — mirroring the technique used by GenreDetailPanel and
+    // SearchPanel's results columns.
+    int edgeOffset = -LayoutTheme.get().resultColumnPadH;
+    columnsPanel.setBorder(new javax.swing.border.EmptyBorder(0, edgeOffset, 0, edgeOffset));
     contentPanel.add(columnsPanel, BorderLayout.CENTER);
     rootPanel.setOpaque(false);
     add(rootPanel, BorderLayout.CENTER);
