@@ -2,9 +2,22 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Frame;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.RenderingHints;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import javax.swing.BorderFactory;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
@@ -19,6 +32,11 @@ public class HotHerePanel extends JPanel implements TabNavigator {
 
   private static final long serialVersionUID = 1L;
 
+  // ── Sort mode ─────────────────────────────────────────────────────────────
+  public enum SortMode {
+    POPULARITY, TITLE
+  }
+
   // ── Preview row count — sourced from LayoutTheme ──────────────────────────
   // Previously: private static final int PREVIEW_COUNT = 10;
 
@@ -31,6 +49,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   private final CardLayout cardLayout = new CardLayout();
   private final JPanel rootPanel = new JPanel(cardLayout);
   private final JPanel contentPanel = new JPanel(new BorderLayout());
+  private final JPanel columnsPanel = new JPanel(new GridLayout(1, 3, 2, 0));
 
   // ── Offset state per column ───────────────────────────────────────────────
   private int artistsOffset = 0;
@@ -45,8 +64,19 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // CARD_ARTIST if it was opened from the artist detail panel. ────────────────
   private String detailReturnCard = CARD_CONTENT;
 
-  // ── Popularity data (loaded once at construction) ─────────────────────────
-  private SearchResultDto results;
+  // ── Popularity data (loaded once at construction, refreshed periodically by
+  // the event-driven popularity update path). A title-sorted view is derived
+  // from it in memory each time it refreshes — switching "Order By" never
+  // re-queries SongLibraryService, it only swaps which of these two views is
+  // shown. ────────────────────────────────────────────────────────────────────
+  private SearchResultDto resultsByPopularity = new SearchResultDto();
+  private SearchResultDto resultsByTitle = new SearchResultDto();
+  private SortMode currentSort = SortMode.POPULARITY;
+
+  // ── Header (kept to allow rebuilding on data refresh) ─────────────────────
+  private DetailHeaderPanel headerPanel;
+  private JButton btnPopularity;
+  private JButton btnTitle;
 
   // ── Dependencies ──────────────────────────────────────────────────────────
   private final char incrementCreditsKey;
@@ -85,6 +115,8 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     setOpaque(false);
 
     contentPanel.setOpaque(false);
+    columnsPanel.setOpaque(false);
+    contentPanel.add(columnsPanel, BorderLayout.CENTER);
     rootPanel.setOpaque(false);
     add(rootPanel, BorderLayout.CENTER);
 
@@ -105,11 +137,19 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   public void refreshMusicByPopularityResults() {
 
     try {
-      this.results = songLibraryService.getMusicByPopularity();
+      this.resultsByPopularity = songLibraryService.getMusicByPopularity();
     } catch (Exception e) {
       throw new RuntimeException("Could not get music by popularity, error: " + e.getMessage(), e);
     }
+    if (this.resultsByPopularity == null) {
+      this.resultsByPopularity = new SearchResultDto();
+    }
 
+    // Derive the title-sorted view in memory from the same popularity payload —
+    // no additional SongLibraryService calls are made.
+    this.resultsByTitle = sortByTitle(this.resultsByPopularity);
+
+    rebuildHeaderPanel();
     rebuildColumnsPanel();
 
     // Only navigate to the content card if the user is already there.
@@ -119,6 +159,178 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     if (CARD_CONTENT.equals(currentVisibleCard())) {
       cardLayout.show(rootPanel, CARD_CONTENT);
     }
+  }
+
+  /**
+   * Builds a new {@link SearchResultDto} whose artists/albums/songs are copies of
+   * {@code source}'s lists, sorted alphabetically by name (artist name, album name, song name
+   * respectively). Blank/null names sort to the end.
+   */
+  private SearchResultDto sortByTitle(SearchResultDto source) {
+
+    List<ArtistDto> artists = new ArrayList<>(safeList(source.getArtists()));
+    artists.sort(Comparator.comparing(a -> titleSortKey(a.getArtistName())));
+
+    List<AlbumDto> albums = new ArrayList<>(safeList(source.getAlbums()));
+    albums.sort(Comparator.comparing(a -> titleSortKey(a.getAlbumName())));
+
+    List<SongDto> songs = new ArrayList<>(safeList(source.getSongs()));
+    songs.sort(Comparator.comparing(s -> titleSortKey(s.getSongName())));
+
+    return new SearchResultDto(songs, artists, albums);
+  }
+
+  /**
+   * Returns a sort key for {@code name}: blank/null names sort to the end, letters sort after
+   * symbols/digits (prefixed with '~') so symbol/digit names sort before A–Z naturally.
+   */
+  private static String titleSortKey(String name) {
+    if (name == null || name.isBlank())
+      return "￿";
+    char first = Character.toUpperCase(name.charAt(0));
+    return Character.isLetter(first) ? ("~" + name.toUpperCase()) : name.toUpperCase();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // HEADER (image art, title, counts, Order By) — mirrors the Genre Results
+  // screen's DetailHeaderPanel + sort-button layout.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** (Re)builds the header to reflect the latest counts and current sort state. */
+  private void rebuildHeaderPanel() {
+
+    SearchResultDto current = currentSort == SortMode.POPULARITY ? resultsByPopularity : resultsByTitle;
+    int artistCount = safeList(current.getArtists()).size();
+    int albumCount = safeList(current.getAlbums()).size();
+    int songCount = safeList(current.getSongs()).size();
+
+    // Icon size/sizing matches the Home screen's "All Albums" header. No dedicated
+    // Hot Here artwork exists yet, so the load falls through to the "🔥" fallback
+    // glyph that already represents this tab on the JukeboxTabComponent.
+    int headerIconSize = LayoutTheme.get().detailHeaderImageW;
+    ImageIcon hotHereIcon =
+        imageLoader.loadImage("HotHereLogo.png", headerIconSize, headerIconSize);
+
+    String subtitle =
+        artistCount + " artists  •  " + albumCount + " albums  •  " + songCount + " songs";
+
+    headerPanel = new DetailHeaderPanel(null, null, hotHereIcon, "🔥", "Hot Here", subtitle,
+        buildSortButtonPanel());
+    headerPanel.setOpaque(false);
+    int hbH = LayoutTheme.get().homeHeaderBorderH;
+    headerPanel.setBorder(new javax.swing.border.EmptyBorder(4, hbH, 4, hbH));
+
+    // Replace whatever header is currently in the NORTH slot (none on first build).
+    for (java.awt.Component c : contentPanel.getComponents()) {
+      if (c instanceof DetailHeaderPanel) {
+        contentPanel.remove(c);
+        break;
+      }
+    }
+    contentPanel.add(headerPanel, BorderLayout.NORTH);
+    contentPanel.revalidate();
+  }
+
+  private JPanel buildSortButtonPanel() {
+
+    JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
+    row.setOpaque(false);
+    row.setBorder(BorderFactory.createEmptyBorder(0, 16, 0, 8));
+
+    JLabel sortLabel = new JLabel("Order By: ");
+    sortLabel.setForeground(ColorTheme.get().textPrimary);
+    sortLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSortLabel));
+    row.add(sortLabel);
+
+    btnPopularity = sortButton("Popularity", SortMode.POPULARITY);
+    btnTitle = sortButton("Title", SortMode.TITLE);
+
+    row.add(btnPopularity);
+    row.add(btnTitle);
+
+    JPanel wrapper = new JPanel();
+    wrapper.setLayout(new javax.swing.BoxLayout(wrapper, javax.swing.BoxLayout.Y_AXIS));
+    wrapper.setOpaque(false);
+    wrapper.add(javax.swing.Box.createVerticalGlue());
+    wrapper.add(row);
+    wrapper.add(javax.swing.Box.createVerticalGlue());
+
+    return wrapper;
+  }
+
+  private JButton sortButton(String label, SortMode mode) {
+
+    JButton btn = new JButton(label) {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      protected void paintComponent(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        boolean active = (currentSort == mode);
+
+        if (active) {
+          g2.setPaint(new GradientPaint(0, 0, ColorTheme.get().navBtnGradTop, 0, getHeight(),
+              ColorTheme.get().navBtnGradBottom));
+        } else {
+          g2.setColor(ColorTheme.get().sortBtnIdleBg);
+        }
+        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+
+        g2.setColor(active ? ColorTheme.get().accentBlue : ColorTheme.get().detailHeaderBorder);
+        g2.setStroke(new java.awt.BasicStroke(active ? 1.5f : 1.0f));
+        g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
+
+        g2.dispose();
+        super.paintComponent(g);
+      }
+    };
+
+    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSortBtn));
+    btn.setForeground(
+        currentSort == mode ? ColorTheme.get().textPrimary : ColorTheme.get().textMuted);
+    btn.setContentAreaFilled(false);
+    btn.setBorderPainted(false);
+    btn.setFocusPainted(false);
+    btn.setOpaque(false);
+    btn.setPreferredSize(new Dimension(LayoutTheme.get().sortBtnW, LayoutTheme.get().sortBtnH));
+    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+    btn.addActionListener(e -> applySortMode(mode));
+
+    btn.addMouseListener(new java.awt.event.MouseAdapter() {
+      @Override
+      public void mouseEntered(java.awt.event.MouseEvent e) {
+        btn.repaint();
+      }
+
+      @Override
+      public void mouseExited(java.awt.event.MouseEvent e) {
+        btn.repaint();
+      }
+    });
+
+    return btn;
+  }
+
+  /**
+   * Switches between popularity and title ordering. Never re-queries
+   * {@link SongLibraryService} — both views were already built in memory by
+   * {@link #refreshMusicByPopularityResults()}; this only swaps which one is displayed.
+   */
+  private void applySortMode(SortMode mode) {
+
+    if (mode == currentSort)
+      return;
+    currentSort = mode;
+
+    artistsOffset = 0;
+    albumsOffset = 0;
+    songsOffset = 0;
+
+    rebuildHeaderPanel();
+    rebuildColumnsPanel();
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -185,38 +397,35 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // ─────────────────────────────────────────────────────────────────────────
   private void rebuildColumnsPanel() {
 
-    contentPanel.removeAll();
+    columnsPanel.removeAll();
 
-    List<ArtistDto> artists = safeList(results.getArtists());
-    List<AlbumDto> albums = safeList(results.getAlbums());
-    List<SongDto> songs = safeList(results.getSongs());
-
-    JPanel columns = new JPanel(new GridLayout(1, 3, 2, 0));
-    columns.setOpaque(false);
+    SearchResultDto current = currentSort == SortMode.POPULARITY ? resultsByPopularity : resultsByTitle;
+    List<ArtistDto> artists = safeList(current.getArtists());
+    List<AlbumDto> albums = safeList(current.getAlbums());
+    List<SongDto> songs = safeList(current.getSongs());
 
     int previewCount = LayoutTheme.get().hotHerePreviewCount;
 
-    columns.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, previewCount,
+    columnsPanel.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, previewCount,
         imageLoader, newOffset -> {
           artistsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("ARTISTS", item)));
 
-    columns.add(ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, previewCount, imageLoader,
-        newOffset -> {
+    columnsPanel.add(ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, previewCount,
+        imageLoader, newOffset -> {
           albumsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("ALBUMS", item)));
 
-    columns.add(ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount, imageLoader,
-        newOffset -> {
+    columnsPanel.add(ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount,
+        imageLoader, newOffset -> {
           songsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("SONGS", item)));
 
-    contentPanel.add(columns, BorderLayout.CENTER);
-    contentPanel.revalidate();
-    contentPanel.repaint();
+    columnsPanel.revalidate();
+    columnsPanel.repaint();
   }
 
   // ─────────────────────────────────────────────────────────────────────────

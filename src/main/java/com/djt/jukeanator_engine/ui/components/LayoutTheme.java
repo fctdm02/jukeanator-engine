@@ -153,7 +153,10 @@ public class LayoutTheme {
 
     // ── Result columns ────────────────────────────────────────────────────────
     searchPreviewCount = 5;
-    hotHerePreviewCount = 10;
+    // Hot Here now carries a DetailHeaderPanel + sort-button row identical to the
+    // Genre Results screen, so it loses the same amount of vertical space —
+    // matching genreDetailPreviewCount keeps the two screens' row counts in sync.
+    hotHerePreviewCount = 9; // landscape default before header: 10
     genreDetailPreviewCount = 9;
     screenPaddingHorizontal = 60;
 
@@ -323,7 +326,9 @@ public class LayoutTheme {
 
       // ── Issue 2 : Result columns show too few rows ───────────────────────────
       searchPreviewCount = 14;
-      hotHerePreviewCount = 16;
+      // Hot Here now has the same DetailHeaderPanel + sort-button header as Genre
+      // Results, so it loses the same vertical space — matching genreDetailPreviewCount.
+      hotHerePreviewCount = 15; // landscape default before header: 16
       genreDetailPreviewCount = 15;
       screenPaddingHorizontal = 30;
 
@@ -454,14 +459,11 @@ public class LayoutTheme {
       // ── HotHere row count — reduced to match visible rows on 1024 × 768 ────────
       //
       // The content area height on 1024 × 768 (after top panel and tab bar) is 606px.
-      // With resultRowMaxH=72, 1px separators, a ~53px column header, 8px rowsPanel
-      // border, and the new compact navPanel (resultNavBorderV=4 + resultNavBtnH=32
-      // = 36px total), exactly 7 full rows fit:
-      // 606 - 53 (header) - 8 (rowsPad) - 36 (nav) = 509px / 73 = 6.97 rows → 7
-      // Setting previewCount=7 ensures the pagination jumps by exactly 7, which is
-      // the number of rows that are both rendered and fully visible.
-      //
-      hotHerePreviewCount = 7; // landscape default: 10
+      // Hot Here now carries the same DetailHeaderPanel + sort-button row as Genre
+      // Results (detailHeaderImageH=48 + 8px border = 56px), so the row math matches
+      // genreDetailPreviewCount's derivation exactly. Set alongside the other genre
+      // detail fields further down — see genreDetailPreviewCount = 8 below.
+      hotHerePreviewCount = 8; // landscape default before header: 10
       // genreDetailPreviewCount is set further down alongside the other genre detail fields.
       screenPaddingHorizontal = 60;
 
