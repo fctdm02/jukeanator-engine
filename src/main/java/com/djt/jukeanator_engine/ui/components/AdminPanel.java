@@ -74,9 +74,6 @@ public class AdminPanel extends JPanel {
   private final DefaultListModel<SongQueueEntryDto> queueListModel = new DefaultListModel<>();
   private final JList<SongQueueEntryDto> queueList = new JList<>(queueListModel);
 
-  // ── Header credit label (refreshed on change) ─────────────────────────────
-  private JLabel creditCountLabel;
-
   // ── Popularity thresholds (passed through to the queue cell renderer) ─────
   private int popularityT1 = 1;
   private int popularityT2 = 5;
@@ -102,7 +99,6 @@ public class AdminPanel extends JPanel {
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
 
-    add(buildHeaderBar(), BorderLayout.NORTH);
     add(buildLibraryButtons(), BorderLayout.WEST);
     add(buildListsCenter(), BorderLayout.CENTER);
     add(buildQueueButtons(), BorderLayout.EAST);
@@ -111,49 +107,6 @@ public class AdminPanel extends JPanel {
     setQueue(songQueueService.getQueuedSongs());
 
     requestFocusInWindow();
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // HEADER BAR
-  // ─────────────────────────────────────────────────────────────────────────
-  private JPanel buildHeaderBar() {
-
-    JPanel bar = new JPanel(new BorderLayout(16, 0)) {
-      private static final long serialVersionUID = 1L;
-
-      @Override
-      protected void paintComponent(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setColor(ColorTheme.get().bgAdminHeader);
-        g2.fillRect(0, 0, getWidth(), getHeight());
-        g2.setColor(ColorTheme.get().colorAdminSeparator);
-        g2.fillRect(0, getHeight() - 1, getWidth(), 1);
-        g2.dispose();
-        super.paintComponent(g);
-      }
-    };
-    bar.setOpaque(false);
-    bar.setBorder(new EmptyBorder(10, 14, 10, 14));
-
-    JLabel title = new JLabel("⚙  ADMIN PANEL");
-    title.setForeground(ColorTheme.get().accentGold);
-    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminHeader));
-
-    JPanel creditBadge = new JPanel(new BorderLayout(6, 0));
-    creditBadge.setOpaque(false);
-    JLabel crLabel = new JLabel("CREDITS:");
-    crLabel.setForeground(ColorTheme.get().textMuted);
-    crLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
-    creditCountLabel = new JLabel(String.valueOf(creditManager.getCredits()));
-    creditCountLabel.setForeground(ColorTheme.get().accentGold);
-    creditCountLabel
-        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminHeader));
-    creditBadge.add(crLabel, BorderLayout.WEST);
-    creditBadge.add(creditCountLabel, BorderLayout.CENTER);
-
-    bar.add(title, BorderLayout.WEST);
-    bar.add(creditBadge, BorderLayout.EAST);
-    return bar;
   }
 
   // ─────────────────────────────────────────────────────────────────────────

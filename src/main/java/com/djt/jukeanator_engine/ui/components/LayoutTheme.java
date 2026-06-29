@@ -946,10 +946,13 @@ public class LayoutTheme {
    *
    * <h3>Column count</h3> Rows are fixed at {@link #GRID_MAX_ROWS_SMALL_LANDSCAPE} (2) — these are
    * compact touch displays where a tall tile beats a tall page. Columns scale linearly with screen
-   * width relative to the canonical {@value #SMALL_LANDSCAPE_BASE_W} px reference (where the
-   * canonical column count is {@link #GRID_MAX_COLS_SMALL_LANDSCAPE}, 3), then round to the nearest
-   * integer: {@code cols = round(screenW / 1024 * 3)}. This yields 3 cols at 1024 × 768 and 4 cols at
-   * 1280 × 1024 ({@code round(1280/1024*3) = round(3.75) = 4}) without hard-coding either case.
+   * width relative to the canonical {@value #SMALL_LANDSCAPE_BASE_W} px reference
+   * ({@code cols = round(screenW / 1024 * 3)}), then are floored at
+   * {@link #GRID_MIN_COLS_SMALL_LANDSCAPE} (4) and capped at {@link #GRID_MAX_COLS_SMALL_LANDSCAPE_CAP}
+   * (5). The floor — not the slope — is what actually governs the whole small-landscape band: it
+   * yields 4 cols at both 1024 × 768 ({@code round(3) = 3 → floored to 4}) and 1280 × 1024
+   * ({@code round(3.75) = 4}); the slope only overtakes the floor for hypothetically wider "small"
+   * screens.
    *
    * <h3>Height calculation</h3>
    * <ol>
@@ -970,7 +973,7 @@ public class LayoutTheme {
   private GridProfile computeSmallLandscapeProfile(int screenW, int screenH) {
 
     int cols = Math.round(screenW / (float) SMALL_LANDSCAPE_BASE_W * GRID_MAX_COLS_SMALL_LANDSCAPE);
-    cols = Math.max(GRID_MAX_COLS_SMALL_LANDSCAPE, Math.min(cols, GRID_MAX_COLS_SMALL_LANDSCAPE_CAP));
+    cols = Math.max(GRID_MIN_COLS_SMALL_LANDSCAPE, Math.min(cols, GRID_MAX_COLS_SMALL_LANDSCAPE_CAP));
     final int rows = GRID_MAX_ROWS_SMALL_LANDSCAPE; // 2
 
     // ── Height axis ────────────────────────────────────────────────────────────
@@ -1094,8 +1097,21 @@ public class LayoutTheme {
    */
   private static final int SMALL_LANDSCAPE_BASE_W = 1024;
 
-  /** Canonical column count for small landscape at {@link #SMALL_LANDSCAPE_BASE_W} (1024 × 768). */
+  /**
+   * Slope reference for the small-landscape column-scaling formula: columns grow at this rate per
+   * {@link #SMALL_LANDSCAPE_BASE_W} px of screen width. Deliberately lower than the actual minimum
+   * column count ({@link #GRID_MIN_COLS_SMALL_LANDSCAPE}) so the floor — not this slope — is what
+   * determines the column count across the whole small-landscape band (1024–1366 px wide); the
+   * slope only takes over for hypothetically wider "small" screens.
+   */
   private static final int GRID_MAX_COLS_SMALL_LANDSCAPE = 3;
+
+  /**
+   * Minimum column count for every small-landscape screen, canonically at 1024 × 768. 4 columns × 2
+   * rows keeps tiles tappable while always showing the full, square cover art (art is scaled down,
+   * never cropped, to fit).
+   */
+  private static final int GRID_MIN_COLS_SMALL_LANDSCAPE = 4;
 
   /** Rows are fixed for every small-landscape screen — these are 2-row touch grids. */
   private static final int GRID_MAX_ROWS_SMALL_LANDSCAPE = 2;
@@ -2092,7 +2108,7 @@ public class LayoutTheme {
   public final int fontSizeKeyLabel; // KeyboardPanel key labels
 
   // Admin
-  public final int fontSizeAdminAlbum = 15; // AdminPanel album list cell
+  public final int fontSizeAdminAlbum = 12; // AdminPanel album list cell
   public final int fontSizeAdminArtist = 12; // AdminPanel album list sub-label
   public final int fontSizeAdminSideBtn1 = 13; // AdminPanel side button line 1 (symbol)
   public final int fontSizeAdminSideBtn2 = 10; // AdminPanel side button line 2 (text)
