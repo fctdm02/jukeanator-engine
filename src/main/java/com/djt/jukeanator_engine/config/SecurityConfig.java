@@ -36,6 +36,11 @@ public class SecurityConfig {
             // ── Public: auth endpoints ────────────────────────────────────────
             .requestMatchers("/api/users/register", "/api/users/login").permitAll()
 
+            // ── Public: static web UI assets and the websocket handshake ─────
+            .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/images/**",
+                "/favicon.ico", "/ws/**")
+            .permitAll()
+
             // ── Public: read-only music browsing ─────────────────────────────
             .requestMatchers(HttpMethod.GET, "/api/song-library/popular",
                 "/api/song-library/search", "/api/song-library/genres",

@@ -1,8 +1,18 @@
 package com.djt.jukeanator_engine.domain.songlibrary.controller;
 
 import static java.util.Objects.requireNonNull;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -100,6 +110,33 @@ public class SongLibraryController implements SongLibraryService {
   @GetMapping("/albums/{id}")
   public AlbumDto getAlbumById(@PathVariable Integer id) {
     return songLibraryService.getAlbumById(id);
+  }
+
+  @GetMapping("/albums/{id}/coverArt")
+  public ResponseEntity<Resource> getAlbumCoverArt(@PathVariable Integer id) {
+
+    AlbumDto album = songLibraryService.getAlbumById(id);
+    if (album == null || album.getCoverArtPath() == null) {
+      return ResponseEntity.notFound().build();
+    }
+
+    Path coverArtPath = Paths.get(album.getCoverArtPath());
+    if (!Files.isRegularFile(coverArtPath)) {
+      return ResponseEntity.notFound().build();
+    }
+
+    MediaType contentType;
+    try {
+      String probed = Files.probeContentType(coverArtPath);
+      contentType = probed != null ? MediaType.parseMediaType(probed) : MediaType.APPLICATION_OCTET_STREAM;
+    } catch (IOException e) {
+      contentType = MediaType.APPLICATION_OCTET_STREAM;
+    }
+
+    return ResponseEntity.ok()
+        .contentType(contentType)
+        .cacheControl(CacheControl.maxAge(Duration.ofDays(1)))
+        .body(new FileSystemResource(coverArtPath));
   }
 
   @Override

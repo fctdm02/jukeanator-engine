@@ -897,7 +897,9 @@ DONE Investigate Winamp DLL for Windows that does song player
 
 - Investigate issues with startup on a fresh machine (song library root not found, throws exceptions now)
 
-- Possibly add Sort By title or release date for Search and Genre screens
+DONE - Add Sort By title for Genre screen
+
+DONE - Add Sort By artist for Home screen
 
 - Possibly add a "addedOn" date to when the album was added to the jukebox, this would be stored in the album metadata file.
   Default everything now to, say 01-01-2020.  Going forward, whenever a new metadata file is written (so it would be a

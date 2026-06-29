@@ -1,0 +1,144 @@
+:root {
+  color-scheme: dark;
+  --bg: #14151a;
+  --panel: #1f2128;
+  --accent: #ff6b35;
+  --text: #e8e8ee;
+  --muted: #8b8d98;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--panel);
+}
+
+header h1 {
+  margin: 0;
+  color: var(--accent);
+}
+
+#nowPlaying {
+  padding: 1rem 1.5rem;
+  background: #20222a;
+}
+
+#nowPlaying h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+nav {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+}
+
+.tab-btn {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: var(--accent);
+  color: #1a1a1a;
+  border-color: var(--accent);
+}
+
+main {
+  padding: 0 1.5rem 2rem;
+}
+
+.tab[hidden] {
+  display: none;
+}
+
+.album-card, .queue-item, .song-row {
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.album-card {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.album-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+button {
+  background: var(--accent);
+  color: #1a1a1a;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input {
+  background: #14151a;
+  border: 1px solid #333;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+#queueList {
+  list-style: none;
+  padding: 0;
+}
+
+dialog {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+
+dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 260px;
+}
