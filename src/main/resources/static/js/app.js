@@ -45,6 +45,39 @@
     document.getElementById('loginDialog').close();
   });
 
+  document.getElementById('showRegisterBtn').addEventListener('click', () => {
+    document.getElementById('loginDialog').close();
+    document.getElementById('registerDialog').showModal();
+  });
+
+  document.getElementById('registerCancelBtn').addEventListener('click', () => {
+    document.getElementById('registerDialog').close();
+  });
+
+  document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const firstName = document.getElementById('registerFirstName').value;
+    const lastName = document.getElementById('registerLastName').value;
+    const emailAddress = document.getElementById('registerEmail').value;
+    const password = document.getElementById('registerPassword').value;
+    try {
+      const auth = await api('/api/users/register', {
+        method: 'POST',
+        body: JSON.stringify({ firstName, lastName, emailAddress, password }),
+      });
+      state.token = auth.token;
+      state.role = auth.role;
+      state.emailAddress = auth.emailAddress;
+      localStorage.setItem('jwt', auth.token);
+      localStorage.setItem('role', auth.role);
+      localStorage.setItem('emailAddress', auth.emailAddress);
+      document.getElementById('registerDialog').close();
+      refreshAuthUi();
+    } catch (err) {
+      alert('Registration failed');
+    }
+  });
+
   document.getElementById('logoutBtn').addEventListener('click', () => {
     state.token = null;
     state.role = null;
