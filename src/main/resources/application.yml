@@ -41,7 +41,7 @@ song-queue:
   enable-background-music: true # assumes playlist file called BackgroundMusic.TXT exists in rootPath
   enable-smart-background-music-additions: true # will play songs from same artist/album from background music
   smart-background-music-additions-factor: 2 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
-  smart-background-music-additions-begin: 19 # start time for enableSmartBackgroundMusicAdditions
+  smart-background-music-additions-begin: 7 # start time for enableSmartBackgroundMusicAdditions
   smart-background-music-additions-end: 5 # end time for enableSmartBackgroundMusicAdditions
   minimum-number-songs-to-keep-in-queue: 10 # Only used when enableBackgroundMusic is true
   minimum-minutes-between-song-plays: 60

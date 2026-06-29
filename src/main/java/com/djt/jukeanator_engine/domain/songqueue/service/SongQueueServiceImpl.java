@@ -15,7 +15,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResponse;
@@ -150,6 +153,26 @@ public class SongQueueServiceImpl
   }
 
   private synchronized void initialize() {
+
+    /*
+     * This method runs during bean construction (from the constructor), which happens while
+     * Spring is still refreshing the application context — before LocalSecurityContextConfigurer
+     * installs the EDT auth and before any HTTP request has run the JWT filter. Calls into
+     * secured services (e.g. SongLibraryService.getGenreMusicByPopularity() for smart additions)
+     * would otherwise be rejected by ServiceSecurityAspect, so install the SYSTEM principal for
+     * the duration of startup initialization.
+     */
+    SecurityContext startupCtx = SecurityContextHolder.createEmptyContext();
+    startupCtx.setAuthentication(SystemPrincipal.SystemAuthenticationToken.INSTANCE);
+    SecurityContextHolder.setContext(startupCtx);
+    try {
+      initializeInternal();
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  private void initializeInternal() {
 
     this.songLibraryRoot = this.songLibraryService.getSongLibraryRoot();
 

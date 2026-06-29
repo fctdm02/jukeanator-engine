@@ -507,16 +507,16 @@ public class RootFolderEntity extends FolderEntity {
   public SongFileEntity getRandomSmartAdditionSong(String rootPath, String rootPathWindows,
       String rootPathUnix) throws IOException {
 
+    if (this.songsByPath == null) {
+      initializeSongsByPath();
+    }
+    
     String songPathName = backgroundMusicHelper.getRandomSmartAdditionSongPath(rootPath,
-        rootPathWindows, rootPathUnix);
+        rootPathWindows, rootPathUnix).replace(":\\\\", ":\\");
 
     if (songPathName == null) {
       // Pool was exhausted; helper has reset — caller should treat this as a miss.
       return null;
-    }
-
-    if (this.songsByPath == null) {
-      initializeSongsByPath();
     }
 
     SongFileEntity song = this.songsByPath.get(songPathName);
