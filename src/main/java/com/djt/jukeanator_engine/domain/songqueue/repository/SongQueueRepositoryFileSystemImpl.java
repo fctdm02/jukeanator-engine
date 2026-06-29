@@ -6,7 +6,7 @@ import java.io.File;
 import java.io.IOException;
 
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 
 /**
@@ -50,7 +50,7 @@ public final class SongQueueRepositoryFileSystemImpl implements SongQueueReposit
     try {
 		this.objectPersistor.writeSongQueueToDisk(rootFolder, filePath);
     } catch (IOException ioe) {
-      throw new SongLibraryException("Could not write song queue to disk with naturalIdentity: " 
+      throw new SongLibraryServiceException("Could not write song queue to disk with naturalIdentity: " 
           + rootFolder.getNaturalIdentity()
           + " and filePath: "
           + filePath);
@@ -60,6 +60,6 @@ public final class SongQueueRepositoryFileSystemImpl implements SongQueueReposit
   @Override
   public SongQueueRootEntity loadAggregateRoot(int persistentIdentity) throws EntityDoesNotExistException {
 
-    throw new SongLibraryException("This method is unsupported for the file system implementation");
+    throw new SongLibraryServiceException("This method is unsupported for the file system implementation");
   }  
 }

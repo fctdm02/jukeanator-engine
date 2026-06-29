@@ -13,7 +13,7 @@ import com.amilesend.discogs.model.database.SearchResponse;
 import com.amilesend.discogs.model.database.type.SearchResult;
 import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 
 /**
  * @author tmyers
@@ -151,7 +151,7 @@ public final class DiscogsClientWrapper {
           Thread.sleep(waitSeconds * 1000L * attempt);
         } catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
-          throw new SongLibraryException(ie.getMessage(), ie);
+          throw new SongLibraryServiceException(ie.getMessage(), ie);
         }
       }
     }
@@ -161,7 +161,7 @@ public final class DiscogsClientWrapper {
       Thread.sleep(waitSeconds * 1000L);
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
-      throw new SongLibraryException(ie.getMessage(), ie);
+      throw new SongLibraryServiceException(ie.getMessage(), ie);
     }
 
     maxRetries = 5;
@@ -182,11 +182,11 @@ public final class DiscogsClientWrapper {
           Thread.sleep(waitSeconds * 1000L * attempt);
         } catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
-          throw new SongLibraryException(ie.getMessage(), ie);
+          throw new SongLibraryServiceException(ie.getMessage(), ie);
         }
       }
     }
-    throw new SongLibraryException("Max retries exceeded calling Discogs");
+    throw new SongLibraryServiceException("Max retries exceeded calling Discogs");
   }
 
   private SearchResponse doSearch(SearchRequest request) {

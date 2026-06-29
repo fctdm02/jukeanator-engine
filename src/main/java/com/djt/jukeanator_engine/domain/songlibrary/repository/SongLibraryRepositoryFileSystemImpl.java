@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 
 /**
@@ -57,7 +57,7 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
       this.root = root;
       this.songLibraryObjectPersistor.writeSongLibraryToDisk(root, filePath);
     } catch (IOException ioe) {
-      throw new SongLibraryException("Could not write song library to disk with naturalIdentity: " 
+      throw new SongLibraryServiceException("Could not write song library to disk with naturalIdentity: " 
           + root.getNaturalIdentity()
           + " and filePath: "
           + filePath);
@@ -67,7 +67,7 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
   @Override
   public RootFolderEntity loadAggregateRoot(int persistentIdentity) throws EntityDoesNotExistException {
 
-    throw new SongLibraryException("This method is unsupported for the file system implementation");
+    throw new SongLibraryServiceException("This method is unsupported for the file system implementation");
   }
   
   @Override
@@ -80,7 +80,7 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
       try {
         storeAggregateRoot(rootToPersist);
       } catch (Exception e) {
-        throw new SongLibraryException("Could not asynchronously persist song library", e);
+        throw new SongLibraryServiceException("Could not asynchronously persist song library", e);
       }
     });
   }

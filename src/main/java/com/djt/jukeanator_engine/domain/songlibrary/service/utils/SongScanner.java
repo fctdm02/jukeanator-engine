@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFromSongEntity;
@@ -114,7 +114,7 @@ public final class SongScanner {
 
         } else {
 
-          throw new SongLibraryException("useTopFolderForGenre=false not implemented yet!");
+          throw new SongLibraryServiceException("useTopFolderForGenre=false not implemented yet!");
 
         }
       }
@@ -302,7 +302,7 @@ public final class SongScanner {
             process(childFolder);
 
           } catch (EntityAlreadyExistsException eaee) {
-            throw new SongLibraryException(eaee.getMessage(), eaee);
+            throw new SongLibraryServiceException(eaee.getMessage(), eaee);
           }
 
         } else if (parentFolder instanceof RootFolderEntity == false && !isHidden && child.isFile()

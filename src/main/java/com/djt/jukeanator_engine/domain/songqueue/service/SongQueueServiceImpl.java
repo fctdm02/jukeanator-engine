@@ -28,7 +28,7 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
@@ -45,7 +45,7 @@ import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueu
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueEmptyEvent;
-import com.djt.jukeanator_engine.domain.songqueue.exception.SongQueueException;
+import com.djt.jukeanator_engine.domain.songqueue.exception.SongQueueServiceException;
 import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
@@ -155,12 +155,12 @@ public class SongQueueServiceImpl
   private synchronized void initialize() {
 
     /*
-     * This method runs during bean construction (from the constructor), which happens while
-     * Spring is still refreshing the application context — before LocalSecurityContextConfigurer
-     * installs the EDT auth and before any HTTP request has run the JWT filter. Calls into
-     * secured services (e.g. SongLibraryService.getGenreMusicByPopularity() for smart additions)
-     * would otherwise be rejected by ServiceSecurityAspect, so install the SYSTEM principal for
-     * the duration of startup initialization.
+     * This method runs during bean construction (from the constructor), which happens while Spring
+     * is still refreshing the application context — before LocalSecurityContextConfigurer installs
+     * the EDT auth and before any HTTP request has run the JWT filter. Calls into secured services
+     * (e.g. SongLibraryService.getGenreMusicByPopularity() for smart additions) would otherwise be
+     * rejected by ServiceSecurityAspect, so install the SYSTEM principal for the duration of
+     * startup initialization.
      */
     SecurityContext startupCtx = SecurityContextHolder.createEmptyContext();
     startupCtx.setAuthentication(SystemPrincipal.SystemAuthenticationToken.INSTANCE);
@@ -242,11 +242,12 @@ public class SongQueueServiceImpl
 
       } catch (Exception e1) {
 
-        e1.printStackTrace();
+        // NOTE: If unable to load BackgroundMusic.TXT, then fall back to using the most popular songs.
 
         // If that files, use the top 500 songs as BackgroundMusic.TXT
         log.error(
             "Unable to auto-populate song queue for background music, error: " + e1.getMessage());
+        
         try {
 
           this.songLibraryRoot.createBackgroundMusicFromTopSongs(this.rootPath);
@@ -254,9 +255,13 @@ public class SongQueueServiceImpl
           autoPopulateQueue();
 
         } catch (Exception e) {
+          
+          // NOTE: If unable to load the most popular songs, then disable the feature
+          
           log.error(
               "Unable to auto-populate song queue for background music with top songs, error: "
                   + e.getMessage());
+          
           this.enableBackgroundMusic = false;
           this.minimumNumberSongsToKeepInQueue = 0;
         }
@@ -779,10 +784,8 @@ public class SongQueueServiceImpl
           }
         }
       }
-
     } catch (Exception e) {
-      e.printStackTrace();
-      return "Error: " + e.getMessage();
+      throw new SongQueueServiceException("Unable to determine song queue eligibility for albumId: " + albumId + ", songId: " + songId + " and priority: " + priority);
     }
 
     return null;
@@ -820,7 +823,7 @@ public class SongQueueServiceImpl
         }
       }
     } catch (EntityDoesNotExistException e) {
-      throw new SongQueueException("Could not add album to queue: username: " + username
+      throw new SongQueueServiceException("Could not add album to queue: username: " + username
           + ", albumId: " + albumId + ", priority: " + priority);
     }
 
@@ -874,25 +877,31 @@ public class SongQueueServiceImpl
     int albumId = changeSongQueueRequest.getAlbumId();
     int songId = changeSongQueueRequest.getSongId();
 
+    Integer numSongsInQueue = -1;
     try {
       AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
       if (album != null) {
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
-          Integer numSongsInQueue = songQueueRoot.moveSongUpInQueue(song);
+          numSongsInQueue = songQueueRoot.moveSongUpInQueue(song);
           if (numSongsInQueue.intValue() > 0) {
             songQueueRepository.storeAggregateRoot(songQueueRoot);
             eventPublisher.publishEvent(
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }
-          return numSongsInQueue;
+        } else {
+          throw new SongQueueServiceException("Could not add move song up in queue, albumId: " + albumId
+              + ", songId: " + songId + ", error: song does not exist!");
         }
+      } else {
+        throw new SongQueueServiceException("Could not add move song up in queue, albumId: " + albumId
+            + ", songId: " + songId + ", error: album does not exist!");
       }
+      return numSongsInQueue;
     } catch (EntityDoesNotExistException e) {
+      throw new SongQueueServiceException("Could not add move song up in queue, albumId: " + albumId
+          + ", songId: " + songId + ", error: " + e.getMessage(), e);
     }
-
-    throw new SongQueueException(
-        "Could not add move song up in queue, albumId: " + albumId + ", songId: " + songId);
   }
 
   @Override
@@ -900,25 +909,31 @@ public class SongQueueServiceImpl
     int albumId = changeSongQueueRequest.getAlbumId();
     int songId = changeSongQueueRequest.getSongId();
 
+    Integer numSongsInQueue = -1;
     try {
       AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
       if (album != null) {
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
-          Integer numSongsInQueue = songQueueRoot.moveSongDownInQueue(song);
+          numSongsInQueue = songQueueRoot.moveSongDownInQueue(song);
           if (numSongsInQueue.intValue() > 0) {
             songQueueRepository.storeAggregateRoot(songQueueRoot);
             eventPublisher.publishEvent(
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }
-          return numSongsInQueue;
+        } else {
+          throw new SongQueueServiceException("Could not add move song down in queue, albumId: " + albumId
+              + ", songId: " + songId + ", error: song does not exist!");
         }
+      } else {
+        throw new SongQueueServiceException("Could not add move song down in queue, albumId: " + albumId
+            + ", songId: " + songId + ", error: album does not exist!");
       }
+      return numSongsInQueue;
     } catch (EntityDoesNotExistException e) {
+      throw new SongQueueServiceException("Could not add move song down in queue, albumId: " + albumId
+          + ", songId: " + songId + ", error: " + e.getMessage(), e);
     }
-
-    throw new SongQueueException(
-        "Could not add move song down in queue, albumId: " + albumId + ", songId: " + songId);
   }
 
   @Override
@@ -927,12 +942,13 @@ public class SongQueueServiceImpl
     int albumId = changeSongQueueRequest.getAlbumId();
     int songId = changeSongQueueRequest.getSongId();
 
+    Integer numSongsRemoved = 0;
     try {
       AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
       if (album != null) {
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
-          Integer numSongsRemoved = songQueueRoot.removeSongFromQueue(song);
+          numSongsRemoved = songQueueRoot.removeSongFromQueue(song);
           if (numSongsRemoved.intValue() > 0) {
             songQueueRepository.storeAggregateRoot(songQueueRoot);
 
@@ -946,14 +962,19 @@ public class SongQueueServiceImpl
             eventPublisher.publishEvent(
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }
-          return numSongsRemoved;
+        } else {
+          throw new SongQueueServiceException("Could not remove song down in queue, albumId: " + albumId
+              + ", songId: " + songId + ", error: song does not exist!");
         }
+      } else {
+        throw new SongQueueServiceException("Could not remove song down in queue, albumId: " + albumId
+            + ", songId: " + songId + ", error: album does not exist!");
       }
+      return numSongsRemoved;
     } catch (EntityDoesNotExistException e) {
+      throw new SongQueueServiceException("Could not remove song down in queue, albumId: " + albumId
+          + ", songId: " + songId + ", error: " + e.getMessage(), e);
     }
-
-    throw new SongQueueException(
-        "Could not add move song down in queue, albumId: " + albumId + ", songId: " + songId);
   }
 
   @Override
@@ -968,7 +989,7 @@ public class SongQueueServiceImpl
       PlaylistManager.savePlayList(new File(filename), songPathnames);
       return Integer.valueOf(songPathnames.size());
     } catch (Exception e) {
-      throw new SongQueueException("Could not save queue as playlist: " + filename, e);
+      throw new SongQueueServiceException("Could not save queue as playlist: " + filename, e);
     }
   }
 
@@ -993,7 +1014,7 @@ public class SongQueueServiceImpl
       addMultipleSongsToQueue(addMultipleSongsToQueueRequest);
       return Integer.valueOf(songIdentifiers.size());
     } catch (Exception e) {
-      throw new SongQueueException(
+      throw new SongQueueServiceException(
           "Could not load playlist into queue: username: " + username + ", filename: " + filename,
           e);
     }
@@ -1012,10 +1033,11 @@ public class SongQueueServiceImpl
           return SongQueueMapper.toDto(queueEntry);
         }
       }
-    } catch (EntityDoesNotExistException e) {
-      e.printStackTrace();
+    } catch (EntityDoesNotExistException ednee) {
+      throw new SongQueueServiceException("Could not add song to queue, albumId: " + albumId + ", songId: "
+          + songId + ", priority: " + priority, ednee);
     }
-    throw new SongQueueException("Could not add song to queue, albumId: " + albumId + ", songId: "
+    throw new SongQueueServiceException("Could not add song to queue, albumId: " + albumId + ", songId: "
         + songId + ", priority: " + priority);
   }
 
@@ -1038,12 +1060,12 @@ public class SongQueueServiceImpl
 
   @Override
   public CommandResponse processCommand(CommandRequest commandRequest) {
-    throw new SongLibraryException("Not implemented yet!");
+    throw new SongLibraryServiceException("Not implemented yet!");
   }
 
   @Override
   public QueryResponse<QueryRequest, QueryResponseItem> processQuery(QueryRequest queryRequest) {
-    throw new SongLibraryException("Not implemented yet!");
+    throw new SongLibraryServiceException("Not implemented yet!");
   }
 
   @EventListener

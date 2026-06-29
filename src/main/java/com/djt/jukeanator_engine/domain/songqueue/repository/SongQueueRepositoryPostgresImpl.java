@@ -1,7 +1,7 @@
 package com.djt.jukeanator_engine.domain.songqueue.repository;
 
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 
 /**
@@ -17,19 +17,19 @@ public final class SongQueueRepositoryPostgresImpl implements SongQueueRepositor
 
     // TODO: TDM:
     return new SongQueueRootEntity(naturalIdentity);
-    // throw new SongLibraryException("Not implemented yet!");
+    // throw new SongLibraryServiceException("Not implemented yet!");
   }
 
   @Override
   public SongQueueRootEntity loadAggregateRoot(int persistentIdentity)
       throws EntityDoesNotExistException {
 
-    throw new SongLibraryException("Not implemented yet!");
+    throw new SongLibraryServiceException("Not implemented yet!");
   }
 
   @Override
   public void storeAggregateRoot(SongQueueRootEntity root) {
 
-    throw new SongLibraryException("Not implemented yet!");
+    throw new SongLibraryServiceException("Not implemented yet!");
   }
 }

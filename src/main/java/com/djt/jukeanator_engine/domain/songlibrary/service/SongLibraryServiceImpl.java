@@ -35,7 +35,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.SongStatisticsChangedEvent;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.mapper.SongLibraryMapper;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
@@ -167,7 +167,7 @@ public class SongLibraryServiceImpl
   public SearchResultDto getMusicBySearch(String searchFor) {
 
     if (!isInitialized) {
-      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
+      throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
 
     if (searchFor == null || searchFor.strip().isEmpty()) {
@@ -206,7 +206,7 @@ public class SongLibraryServiceImpl
   private SearchResultDto getMusic(String genreName, String searchFor, SortOrder sortOrder) {
 
     if (!isInitialized) {
-      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
+      throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
 
     // ── Filters ───────────────────────────────────────────────────────────
@@ -410,7 +410,7 @@ public class SongLibraryServiceImpl
   public List<GenreDto> getGenres() {
 
     if (!isInitialized) {
-      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
+      throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
     List<GenreDto> dtos = new ArrayList<>();
     for (GenreFolderEntity genre : songLibraryRoot.getGenres()) {
@@ -434,7 +434,7 @@ public class SongLibraryServiceImpl
   public List<ArtistDto> getArtists() {
 
     if (!isInitialized) {
-      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
+      throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
     return SongLibraryMapper.toArtistDtoList(songLibraryRoot.getArtists());
   }
@@ -443,7 +443,7 @@ public class SongLibraryServiceImpl
   public List<AlbumDto> getAlbums() {
 
     if (!isInitialized) {
-      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
+      throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
     return SongLibraryMapper.toAlbumDtoList(songLibraryRoot.getAlbums());
   }
@@ -452,7 +452,7 @@ public class SongLibraryServiceImpl
   public List<AlbumDto> getAlbumsForGenre(Integer genreId) {
 
     if (!isInitialized) {
-      throw new SongLibraryException("SongLibraryService has not been initialized yet!");
+      throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
 
     if (genreId == null) {
@@ -467,8 +467,8 @@ public class SongLibraryServiceImpl
 
     try {
       return SongLibraryMapper.toArtistDto(songLibraryRoot.getArtistByName(artistName));
-    } catch (EntityDoesNotExistException e) {
-      return null;
+    } catch (EntityDoesNotExistException ednee) {
+      throw new SongLibraryServiceException("Could not find artist by name: " + artistName, ednee);
     }
   }
 
@@ -477,8 +477,8 @@ public class SongLibraryServiceImpl
 
     try {
       return SongLibraryMapper.toAlbumDto(songLibraryRoot.getAlbumById(albumId));
-    } catch (EntityDoesNotExistException e) {
-      return null;
+    } catch (EntityDoesNotExistException ednee) {
+      throw new SongLibraryServiceException("Could not find album by id: " + albumId, ednee);
     }
   }
 
@@ -487,8 +487,8 @@ public class SongLibraryServiceImpl
 
     try {
       return SongLibraryMapper.toSongDto(songLibraryRoot.getSongById(albumId, songId));
-    } catch (EntityDoesNotExistException e) {
-      return null;
+    } catch (EntityDoesNotExistException ednee) {
+      throw new SongLibraryServiceException("Could not find song by id: " + albumId, ednee);
     }
   }
 
@@ -499,10 +499,9 @@ public class SongLibraryServiceImpl
       return SongLibraryMapper
           .toSongDto(this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(this.rootPath,
               this.rootPathWindows, this.rootPathUnix));
-    } catch (IOException ioe) {
-      ioe.printStackTrace();
+    } catch (IOException e) {
+      throw new SongLibraryServiceException("Could not get random song from background music playlist", e);
     }
-    return null;
   }
 
 
@@ -550,7 +549,7 @@ public class SongLibraryServiceImpl
           new ScanFileSystemForSongsEvent(rootPath, songLibraryRoot.getAlbums().size()));
 
       return Integer.valueOf(songLibraryRoot.getAlbums().size());
-    } catch (SongLibraryException sle) {
+    } catch (SongLibraryServiceException sle) {
       throw sle;
     } catch (Exception e) {
       throw new SongScanFailedException(
@@ -580,7 +579,7 @@ public class SongLibraryServiceImpl
       return Integer.valueOf(songLibraryRoot.getAlbums().size());
 
     } catch (Exception e) {
-      throw new SongLibraryException("Could not reset song statistics", e);
+      throw new SongLibraryServiceException("Could not reset song statistics", e);
     }
   }
 
@@ -605,7 +604,7 @@ public class SongLibraryServiceImpl
       return Integer.valueOf(songLibraryRoot.getAlbums().size());
 
     } catch (Exception e) {
-      throw new SongLibraryException("Could not restore song statistics from: " + filename, e);
+      throw new SongLibraryServiceException("Could not restore song statistics from: " + filename, e);
     }
   }
 
@@ -621,7 +620,7 @@ public class SongLibraryServiceImpl
       return albumMetadataResults;
 
     } catch (Exception e) {
-      throw new SongLibraryException("Could not search internet for album metadata for artist: "
+      throw new SongLibraryServiceException("Could not search internet for album metadata for artist: "
           + artistName + " and album: " + albumName, e);
     }
   }
@@ -638,7 +637,7 @@ public class SongLibraryServiceImpl
       return albumMetadata;
 
     } catch (Exception e) {
-      throw new SongLibraryException("Could not update metadata for album: " + albumId, e);
+      throw new SongLibraryServiceException("Could not update metadata for album: " + albumId, e);
     }
   }
 
@@ -658,7 +657,7 @@ public class SongLibraryServiceImpl
       return coverArtPath;
 
     } catch (Exception e) {
-      throw new SongLibraryException(
+      throw new SongLibraryServiceException(
           "Could not download cover art for: " + downloadAlbumCoverArtRequest, e);
     }
   }
@@ -706,8 +705,7 @@ public class SongLibraryServiceImpl
       return computedHash.equalsIgnoreCase(storedHash);
 
     } catch (IOException | NoSuchAlgorithmException e) {
-      e.printStackTrace();
-      return Boolean.FALSE;
+      throw new SongLibraryServiceException("Could not authenticate password using hash file: " + hashFileName, e);
     }
   }
 
@@ -749,14 +747,14 @@ public class SongLibraryServiceImpl
   @Override
   public CommandResponse processCommand(CommandRequest commandRequest) {
 
-    throw new SongLibraryException("Not implemented yet!");
+    throw new SongLibraryServiceException("Not implemented yet!");
   }
 
   // Query methods
   @Override
   public QueryResponse<QueryRequest, QueryResponseItem> processQuery(QueryRequest queryRequest) {
 
-    throw new SongLibraryException("Not implemented yet!");
+    throw new SongLibraryServiceException("Not implemented yet!");
   }
 
   // Event handlers
@@ -775,7 +773,7 @@ public class SongLibraryServiceImpl
       this.songLibraryRepository.storeSongLibraryAsync();
 
     } catch (EntityDoesNotExistException ednee) {
-      throw new SongLibraryException("Could not increment num plays for: " + event.queueEntry(),
+      throw new SongLibraryServiceException("Could not increment num plays for: " + event.queueEntry(),
           ednee);
     }
   }
@@ -798,7 +796,7 @@ public class SongLibraryServiceImpl
       this.songLibraryRepository.storeSongLibraryAsync();
 
     } catch (EntityDoesNotExistException ednee) {
-      throw new SongLibraryException("Could not increment num plays for: " + event.queueEntries(),
+      throw new SongLibraryServiceException("Could not increment num plays for: " + event.queueEntries(),
           ednee);
     }
   }

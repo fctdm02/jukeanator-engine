@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.domain.user.model;
 
 import java.util.Collection;
 import java.util.TreeMap;
-import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 public class UserRootEntity extends AbstractPersistentEntity {
@@ -32,13 +31,9 @@ public class UserRootEntity extends AbstractPersistentEntity {
     return this.users.put(user.getEmailAddress(), user);
   }
 
-  public UserEntity getUserByEmailAddress(String emailAddress) throws EntityDoesNotExistException {
+  public UserEntity getUserByEmailAddressNullIfNotExists(String emailAddress) {
 
-    UserEntity user = this.users.get(emailAddress);
-    if (user != null) {
-      return user;
-    }
-    throw new EntityDoesNotExistException("User with emailAddress: [" + emailAddress + "].");
+    return this.users.get(emailAddress);
   }
 }
 

@@ -1,7 +1,7 @@
 package com.djt.jukeanator_engine.domain.user.repository;
 
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 
 /**
@@ -17,19 +17,19 @@ public final class UserRepositoryPostgresImpl implements UserRepository {
 
     // TODO: TDM:
     return new UserRootEntity();
-    // throw new SongLibraryException("Not implemented yet!");
+    // throw new SongLibraryServiceException("Not implemented yet!");
   }
 
   @Override
   public UserRootEntity loadAggregateRoot(int persistentIdentity)
       throws EntityDoesNotExistException {
 
-    throw new SongLibraryException("Not implemented yet!");
+    throw new SongLibraryServiceException("Not implemented yet!");
   }
 
   @Override
   public void storeAggregateRoot(UserRootEntity root) {
 
-    throw new SongLibraryException("Not implemented yet!");
+    throw new SongLibraryServiceException("Not implemented yet!");
   }
 }

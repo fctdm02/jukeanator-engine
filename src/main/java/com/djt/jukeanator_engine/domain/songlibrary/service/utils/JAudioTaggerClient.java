@@ -24,7 +24,7 @@ import org.jaudiotagger.tag.images.Artwork;
 import org.jaudiotagger.tag.images.ArtworkFactory;
 import org.springframework.context.annotation.Bean;
 
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 
 /**
  * @author tmyers
@@ -97,7 +97,7 @@ public final class JAudioTaggerClient {
 		} catch (InvalidAudioFrameException | CannotReadException e) {
 			System.out.println("Skipping invalid audio file: " + songFile);			
 		} catch (Exception e) {
-			throw new SongLibraryException("Could not read audio tag for: " + songFile + ", error: " + e.getMessage(), e);
+			throw new SongLibraryServiceException("Could not read audio tag for: " + songFile + ", error: " + e.getMessage(), e);
 		}
 		return null;
 	}
@@ -125,7 +125,7 @@ public final class JAudioTaggerClient {
 		} catch (InvalidAudioFrameException | CannotReadException e) {
 			System.out.println("Skipping invalid audio file: " + songFile);			
 		} catch (Exception e) {
-			throw new SongLibraryException("Could not determine if cover art tag exists from: " + songFile + ", error: " + e.getMessage(), e);
+			throw new SongLibraryServiceException("Could not determine if cover art tag exists from: " + songFile + ", error: " + e.getMessage(), e);
 		}
 		return false;
 	}
@@ -151,7 +151,7 @@ public final class JAudioTaggerClient {
 		} catch (InvalidAudioFrameException | CannotReadException e) {
 			System.out.println("Skipping invalid audio file: " + songFile);			
 		} catch (Exception e) {
-			throw new SongLibraryException("Could not extract/write cover art image from: " + songFile + ", error: " + e.getMessage(), e);
+			throw new SongLibraryServiceException("Could not extract/write cover art image from: " + songFile + ", error: " + e.getMessage(), e);
 		}
 		return false;
 	}	
@@ -189,7 +189,7 @@ public final class JAudioTaggerClient {
 		} catch (InvalidAudioFrameException | CannotReadException e) {
 			System.out.println("Skipping invalid audio file: " + songFile);			
 		} catch (Exception e) {
-			throw new SongLibraryException("Could not determine if cover art tag exists from: " + songFile + ", error: " + e.getMessage(), e);
+			throw new SongLibraryServiceException("Could not determine if cover art tag exists from: " + songFile + ", error: " + e.getMessage(), e);
 		}
 		return false;
 	}
@@ -240,7 +240,7 @@ public final class JAudioTaggerClient {
 		} catch (InvalidAudioFrameException | CannotReadException e) {
 			System.out.println("Skipping invalid audio file: " + songFile);			
 		} catch (Exception e) {
-			throw new SongLibraryException("Could not extract/write cover art image from: " + songFile + ", error: " + e.getMessage(), e);
+			throw new SongLibraryServiceException("Could not extract/write cover art image from: " + songFile + ", error: " + e.getMessage(), e);
 		}
 		return false;
 	}
@@ -273,7 +273,7 @@ public final class JAudioTaggerClient {
 		} catch (InvalidAudioFrameException | CannotReadException e) {
 			System.out.println("Skipping invalid audio file: " + songFile);			
 		} catch (Exception e) {
-			throw new SongLibraryException("Could not extract/write cover art image from: " + songFile + ", error: " + e.getMessage(), e);
+			throw new SongLibraryServiceException("Could not extract/write cover art image from: " + songFile + ", error: " + e.getMessage(), e);
 		}
 		return false;
 	}
@@ -323,7 +323,7 @@ public final class JAudioTaggerClient {
 		} catch (InvalidAudioFrameException | CannotReadException e) {
 			System.out.println("Skipping invalid audio file: " + songFile);
 		} catch (Exception e) {
-			throw new SongLibraryException("Could not read audio tag for: " + songFile + ", error: " + e.getMessage(), e);
+			throw new SongLibraryServiceException("Could not read audio tag for: " + songFile + ", error: " + e.getMessage(), e);
 		}
 		return null;
 	}

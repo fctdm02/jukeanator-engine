@@ -9,7 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.imageio.ImageIO;
 import org.springframework.web.client.RestClient;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 
 /**
  * @author tmyers
@@ -49,7 +49,7 @@ public final class CoverArtDownloader {
       }      
 
     } catch (IOException ioe) {
-      throw new SongLibraryException(errorMessage + ", error: " + ioe.getMessage(), ioe);
+      throw new SongLibraryServiceException(errorMessage + ", error: " + ioe.getMessage(), ioe);
     }
   }
 

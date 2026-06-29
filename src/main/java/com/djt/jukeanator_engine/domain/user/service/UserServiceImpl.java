@@ -67,16 +67,14 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     this.rootPath = event.scanPath();
     initialize();
   }
-  
+
   // Service methods
   @Override
   public AuthResponse register(RegisterRequest request) {
 
-    try {
-      if (userRoot.getUserByEmailAddress(request.emailAddress()) != null) {
-        throw new IllegalArgumentException("Email already registered");
-      }
-    } catch (EntityDoesNotExistException ednee) {
+    UserEntity check = userRoot.getUserByEmailAddressNullIfNotExists(request.emailAddress());
+    if (check != null) {
+      throw new UserServiceException("Email already registered: " + request.emailAddress());
     }
 
     Integer persistentIdentity = Integer.valueOf(this.userRoot.getUsers().size() + 1);
@@ -95,15 +93,13 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public AuthResponse login(LoginRequest request) {
 
-    UserEntity user = null;
-    try {
-      user = userRoot.getUserByEmailAddress(request.emailAddress());
-    } catch (EntityDoesNotExistException ednee) {
-      throw new IllegalArgumentException("Invalid credentials");
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(request.emailAddress());;
+    if (user == null) {
+      throw new UserServiceException("Invalid credentials");
     }
 
     if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-      throw new IllegalArgumentException("Invalid credentials");
+      throw new UserServiceException("Invalid credentials");
     }
 
     String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole());
@@ -113,11 +109,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public UserProfileDto getProfile(String emailAddress) {
 
-    UserEntity user = null;
-    try {
-      user = userRoot.getUserByEmailAddress(emailAddress);
-    } catch (EntityDoesNotExistException ednee) {
-      throw new IllegalArgumentException("User not found");
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);;
+    if (user == null) {
+      throw new UserServiceException("User not found: " + emailAddress);
     }
 
     return new UserProfileDto(user.getPersistentIdentity(), user.getFirstName(), user.getLastName(),

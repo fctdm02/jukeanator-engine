@@ -5,7 +5,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 
 public class FolderEntity extends AbstractLibraryEntity {
   private static final long serialVersionUID = 1L;
@@ -91,7 +91,7 @@ public class FolderEntity extends AbstractLibraryEntity {
       return albumFolder;
 
     } catch (EntityDoesNotExistException | EntityAlreadyExistsException e) {
-      throw new SongLibraryException("Could not convert child folder to album folder, this: " + this + ", childFolder: " + childFolder + ", error:" + e.getMessage(), e);
+      throw new SongLibraryServiceException("Could not convert child folder to album folder, this: " + this + ", childFolder: " + childFolder + ", error:" + e.getMessage(), e);
     }
   }
 
@@ -118,7 +118,7 @@ public class FolderEntity extends AbstractLibraryEntity {
       return artistFolder;
 
     } catch (EntityDoesNotExistException | EntityAlreadyExistsException e) {
-      throw new SongLibraryException(e.getMessage(), e);
+      throw new SongLibraryServiceException(e.getMessage(), e);
     }
   }
 
@@ -144,7 +144,7 @@ public class FolderEntity extends AbstractLibraryEntity {
       return genreFolder;
 
     } catch (EntityDoesNotExistException | EntityAlreadyExistsException e) {
-      throw new SongLibraryException("Could not convert child folder to genre folder, this: " + this + ", childFolder: " + childFolder + ", error:" + e.getMessage(), e);
+      throw new SongLibraryServiceException("Could not convert child folder to genre folder, this: " + this + ", childFolder: " + childFolder + ", error:" + e.getMessage(), e);
     }
   }
 

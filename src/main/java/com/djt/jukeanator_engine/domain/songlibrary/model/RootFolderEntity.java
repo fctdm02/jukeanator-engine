@@ -12,13 +12,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.utils.BackgroundMusicHelper;
 import com.djt.jukeanator_engine.domain.songlibrary.model.utils.FileSystemHelper;
 
 public class RootFolderEntity extends FolderEntity {
+
+  private static final Logger log = LoggerFactory.getLogger(RootFolderEntity.class);
 
   private static final long serialVersionUID = 2L;
 
@@ -422,18 +427,16 @@ public class RootFolderEntity extends FolderEntity {
           }
 
         } catch (NumberFormatException e) {
-          System.err.println("Could not parse num plays from line: " + line);
+          log.warn("Could not parse num plays from line: {}", line);
         } catch (Exception e) {
-          System.err.println("Could not restore song stats from line: " + line);
-          e.printStackTrace();
+          log.warn("Could not restore song stats from line: {}", line, e);
         }
       }
-      System.out
-          .println("Restored num plays processing completed for " + restoredCount + " log lines.");
+      log.info("Restored num plays processing completed for {} log lines.", restoredCount);
 
     } catch (IOException e) {
-      System.err.println("Failed to restore song num plays from CD Stats file: " + filename);
-      e.printStackTrace();
+      throw new SongLibraryServiceException(
+          "Failed to restore song num plays from CD Stats file: " + filename, e);
     }
 
     return restoredCount;
@@ -461,10 +464,10 @@ public class RootFolderEntity extends FolderEntity {
 
     try {
       fileSystemHelper.writeLines(cdStatsPathName, lines);
-      System.out.println("Stored num plays for " + songs.size() + " songs to " + cdStatsPathName);
+      log.info("Stored num plays for {} songs to {}", songs.size(), cdStatsPathName);
     } catch (IOException e) {
-      System.err.println("Failed to store song num plays to CD Stats file: " + cdStatsPathName);
-      e.printStackTrace();
+      throw new SongLibraryServiceException(
+          "Failed to store song num plays to CD Stats file: " + cdStatsPathName, e);
     }
   }
 

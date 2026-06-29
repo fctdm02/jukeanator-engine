@@ -4,7 +4,7 @@ import static java.util.Objects.requireNonNull;
 import java.io.File;
 import java.io.IOException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 
 /**
@@ -48,7 +48,7 @@ public final class UserRepositoryFileSystemImpl implements UserRepository {
     try {
       this.objectPersistor.writeUserListToDisk(root, filePath);
     } catch (IOException ioe) {
-      throw new SongLibraryException("Could not write user list to disk with naturalIdentity: "
+      throw new SongLibraryServiceException("Could not write user list to disk with naturalIdentity: "
           + root.getNaturalIdentity() + " and filePath: " + filePath);
     }
   }
@@ -57,6 +57,6 @@ public final class UserRepositoryFileSystemImpl implements UserRepository {
   public UserRootEntity loadAggregateRoot(int persistentIdentity)
       throws EntityDoesNotExistException {
 
-    throw new SongLibraryException("This method is unsupported for the file system implementation");
+    throw new SongLibraryServiceException("This method is unsupported for the file system implementation");
   }
 }

@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
-import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 
 public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Serializable {
 
@@ -123,7 +123,7 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
       }
 
     } catch (IOException e) {
-      throw new SongLibraryException("Could not read metadata: " + path, e);
+      throw new SongLibraryServiceException("Could not read metadata: " + path, e);
     }
 
     isLoaded = true;
@@ -171,7 +171,7 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
       isLoaded = true;
 
     } catch (IOException e) {
-      throw new SongLibraryException("Could not write metadata: " + path, e);
+      throw new SongLibraryServiceException("Could not write metadata: " + path, e);
     }
   }
 
