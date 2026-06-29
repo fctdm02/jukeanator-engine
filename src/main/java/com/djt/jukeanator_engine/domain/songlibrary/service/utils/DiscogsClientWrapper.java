@@ -5,27 +5,16 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Bean;
 import com.amilesend.client.connection.ThrottledException;
 import com.amilesend.discogs.Discogs;
 import com.amilesend.discogs.model.database.SearchRequest;
 import com.amilesend.discogs.model.database.SearchResponse;
 import com.amilesend.discogs.model.database.type.SearchResult;
-import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 
 /**
  * @author tmyers
- * 
- *
- *         <pre>
-    Consumer Key    vBSFEvNtGflHQnULBNnL
-    Consumer Secret AOOYhlvSshYkJieLRrdTCUoLcsWACfWW    
-    Request Token URL   https://api.discogs.com/oauth/request_token
-    Authorize URL   https://www.discogs.com/oauth/authorize
-    Access Token URL    https://api.discogs.com/oauth/access_token
- *         </pre>
  */
 public final class DiscogsClientWrapper {
 
@@ -36,12 +25,7 @@ public final class DiscogsClientWrapper {
   private String consumerKey;
   private String consumerSecret;
   private Discogs discogsClient;
-
-  @Bean
-  public DiscogsClientWrapper discogsClientWrapper(SongLibraryProperties props) {
-    return new DiscogsClientWrapper(props.getDiscogs().getConsumerKey(),
-        props.getDiscogs().getConsumerSecret());
-  }
+  private boolean isInitialized = false;
 
   public DiscogsClientWrapper(String consumerKey, String consumerSecret) {
 
@@ -49,9 +33,6 @@ public final class DiscogsClientWrapper {
     requireNonNull(consumerSecret, "consumerSecret cannot be null");
     this.consumerKey = consumerKey;
     this.consumerSecret = consumerSecret;
-
-    discogsClient = Discogs.newKeySecretAuthenticatedInstance(this.consumerKey, this.consumerSecret,
-        USER_AGENT);
   }
 
   public boolean hasValidApiKey() {
@@ -72,6 +53,10 @@ public final class DiscogsClientWrapper {
   public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName, String albumName,
       int limit) {
 
+    if (!isInitialized) {
+      initialize();
+    }
+
     log.info("searchForAlbumMetadata(): artist: {}, album: {}, limit: {}", artistName, albumName,
         limit);
 
@@ -83,7 +68,7 @@ public final class DiscogsClientWrapper {
     SearchResponse response = doSearchWrapper(request);
 
     List<SearchResult> searchResults = response.getResults();
-    for (SearchResult searchResult: searchResults) {
+    for (SearchResult searchResult : searchResults) {
 
       String genre = "";
       List<String> genres = searchResult.getGenre();
@@ -129,6 +114,14 @@ public final class DiscogsClientWrapper {
     }
 
     return albumMetadataResults;
+  }
+
+  private void initialize() {
+
+    this.discogsClient = Discogs.newKeySecretAuthenticatedInstance(this.consumerKey,
+        this.consumerSecret, USER_AGENT);
+
+    this.isInitialized = true;
   }
 
   private SearchResponse doSearchWrapper(SearchRequest request) {

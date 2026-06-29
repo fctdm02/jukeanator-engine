@@ -5,12 +5,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Single-threaded API, virtual-thread executed, fully rate-limited MusicBrainz client. Java 21
+ * @author tmyers
  */
 public class MusicBrainzClientWrapper {
 
@@ -27,33 +27,15 @@ public class MusicBrainzClientWrapper {
 
   private static final String BASE_URL = "https://musicbrainz.org/ws/2";
   public static final String USER_AGENT = "JukeANatorUserAgent/1.0 (tmyers1@yahoo.com)";
-
-  private final RestClient client;
-
-  // Strict global rate limit: 1 request per second
-  private final Semaphore rateLimiter = new Semaphore(1);
-
-  // Refill permit every second
-  private final java.util.concurrent.ScheduledExecutorService scheduler =
-      Executors.newSingleThreadScheduledExecutor();
-
   private static final int MAX_RETRIES = 5;
 
-  @Bean
-  public MusicBrainzClientWrapper musicBrainzClientWrapper() {
-    return new MusicBrainzClientWrapper();
-  }
+  private RestClient client;
+  private Semaphore rateLimiter;
+  private ScheduledExecutorService scheduler;
+  private boolean isInitialized = false;
 
   public MusicBrainzClientWrapper() {
-
-    this.client =
-        RestClient.builder().baseUrl(BASE_URL).defaultHeader("User-Agent", USER_AGENT).build();
-
-    scheduler.scheduleAtFixedRate(() -> {
-      if (rateLimiter.availablePermits() == 0) {
-        rateLimiter.release();
-      }
-    }, 0, 1, TimeUnit.SECONDS);
+    super();
   }
 
   // =========================================================
@@ -61,11 +43,16 @@ public class MusicBrainzClientWrapper {
   // =========================================================
   public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName, String albumName,
       boolean useGenre) {
+
     return searchForAlbumMetadata(artistName, albumName, useGenre, 1);
   }
 
   public List<AlbumMetadataDto> searchForAlbumMetadata(String artistName, String albumName,
       boolean useGenre, int limit) {
+
+    if (!isInitialized) {
+      initialize();
+    }
 
     log.info("searchForAlbumMetadata(): artist: {}, album: {}, limit: {}", artistName, albumName,
         limit);
@@ -113,13 +100,30 @@ public class MusicBrainzClientWrapper {
     return albumMetadataResults;
   }
 
+  private void initialize() {
+
+    this.rateLimiter = new Semaphore(1);
+
+    this.client =
+        RestClient.builder().baseUrl(BASE_URL).defaultHeader("User-Agent", USER_AGENT).build();
+
+    this.scheduler = Executors.newSingleThreadScheduledExecutor();
+
+    this.scheduler.scheduleAtFixedRate(() -> {
+      if (rateLimiter.availablePermits() == 0) {
+        rateLimiter.release();
+      }
+    }, 0, 1, TimeUnit.SECONDS);
+
+    this.isInitialized = true;
+  }
+
   private List<AlbumResult> lookupAlbum(String artist, String album, boolean useGenre, int limit) {
 
     try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
 
-      return executor.submit(() -> executeLookup(artist, album, useGenre, limit)).get(); // correct
-                                                                                         // for
-                                                                                         // Future
+      return executor.submit(() -> executeLookup(artist, album, useGenre, limit)).get();
+
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -193,7 +197,7 @@ public class MusicBrainzClientWrapper {
     return albumResults;
   }
 
-  public Optional<String> findArtistMbid(String artistName) {
+  private Optional<String> findArtistMbid(String artistName) {
 
     ArtistSearchResponse response = executeWithRetry(() -> {
       acquireRateLimit();
@@ -215,7 +219,7 @@ public class MusicBrainzClientWrapper {
         .map(ArtistSummary::id).findFirst();
   }
 
-  public Optional<String> getTopGenreByArtist(String artistMbid) {
+  private Optional<String> getTopGenreByArtist(String artistMbid) {
 
     ArtistResponse response = executeWithRetry(() -> {
       acquireRateLimit();
@@ -236,7 +240,6 @@ public class MusicBrainzClientWrapper {
   // =========================================================
   // RATE LIMIT + RETRY
   // =========================================================
-
   private void acquireRateLimit() {
     try {
       rateLimiter.acquire();
@@ -281,15 +284,13 @@ public class MusicBrainzClientWrapper {
   // =========================================================
   // RESULT MODEL
   // =========================================================
-
   public record AlbumResult(String title, String releaseDate, String label, String genre,
       String coverArtUrl) {
   }
-
+  
   // =========================================================
   // DTOs
   // =========================================================
-
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class ReleaseSearchResponse {
     public List<Release> releases;
