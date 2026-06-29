@@ -36,7 +36,7 @@ public class SongScannerTest {
         useGenre, 
         useTopFolderForGenre,
         acceptedSongFileExtensions);
-    String rootPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder";
+    String rootPath = "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder/";
 
 
     // STEP 2: ACT
