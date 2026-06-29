@@ -863,6 +863,12 @@ ANSWER: yes, per the previous answer
 
 
 
+Create an exception interceptor via @ControllerAdvice/interceptor that catches
+at the controller boundary and log/translate consistently —
+ that's the natural home for all this stderr/println noise to be replaced by one place.
+
+
+
 
 TODO:
 DONE 1: Albums with songs with duplicate track numbers, no track numbers, use song index in album childSongs list as track number.  Do this at scan time

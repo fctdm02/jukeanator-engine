@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -113,25 +114,23 @@ public class SongLibraryController implements SongLibraryService {
   }
 
   @GetMapping("/albums/{id}/coverArt")
-  public ResponseEntity<Resource> getAlbumCoverArt(@PathVariable Integer id) {
+  public ResponseEntity<Resource> getAlbumCoverArt(@PathVariable Integer id)
+      throws EntityDoesNotExistException, IOException {
 
     AlbumDto album = songLibraryService.getAlbumById(id);
-    if (album == null || album.getCoverArtPath() == null) {
-      return ResponseEntity.notFound().build();
+    if (album.getCoverArtPath() == null) {
+      throw new EntityDoesNotExistException("No cover art path set for album: " + id);
     }
 
     Path coverArtPath = Paths.get(album.getCoverArtPath());
     if (!Files.isRegularFile(coverArtPath)) {
-      return ResponseEntity.notFound().build();
+      throw new EntityDoesNotExistException(
+          "Cover art file does not exist for album: " + id + " at path: " + coverArtPath);
     }
 
-    MediaType contentType;
-    try {
-      String probed = Files.probeContentType(coverArtPath);
-      contentType = probed != null ? MediaType.parseMediaType(probed) : MediaType.APPLICATION_OCTET_STREAM;
-    } catch (IOException e) {
-      contentType = MediaType.APPLICATION_OCTET_STREAM;
-    }
+    String probed = Files.probeContentType(coverArtPath);
+    MediaType contentType =
+        probed != null ? MediaType.parseMediaType(probed) : MediaType.APPLICATION_OCTET_STREAM;
 
     return ResponseEntity.ok()
         .contentType(contentType)
