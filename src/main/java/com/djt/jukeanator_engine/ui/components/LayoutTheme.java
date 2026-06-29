@@ -118,10 +118,10 @@ public class LayoutTheme {
     if (screenH > screenW) {
       return new LayoutTheme(Orientation.PORTRAIT);
     }
-    // 1024×768 (and similarly small landscape screens up to ~1280×800) need their own
-    // profile: smaller nav buttons, a tighter grid (3×2), no animated GIF in the
+    // 1024×768 (and similarly small landscape screens up to ~1366×1024, e.g. 1280×1024)
+    // need their own profile: smaller nav buttons, a tighter grid, no animated GIF in the
     // now-playing panel, and wider side-panel allocation so the song text is not clipped.
-    if (screenW <= 1280 && screenH <= 800) {
+    if (screenW <= 1366 && screenH <= 1024) {
       return new LayoutTheme(Orientation.SMALL_LANDSCAPE);
     }
     return new LayoutTheme();
@@ -849,10 +849,10 @@ public class LayoutTheme {
 
     if (portrait) {
       return computePortraitProfile(screenW, screenH);
-    } else if (screenW <= 1280 && screenH <= 800) {
-      // ── Item 2 : 1024 × 768 (and similar small landscape screens) ──────────
-      // Fix: cap at 3 columns × 2 rows so tiles are large enough to be tappable
-      // and album names are not clipped on a 1024 px wide display.
+    } else if (screenW <= 1366 && screenH <= 1024) {
+      // ── Item 2 : 1024 × 768 (and similar small landscape screens, e.g. 1280 × 1024) ──
+      // Fix: derive a tight grid (rows fixed at 2; cols scaled with screen width) so
+      // tiles are large enough to be tappable and album names are not clipped.
       return computeSmallLandscapeProfile(screenW, screenH);
     } else {
       return computeLandscapeProfile(screenW, screenH);
@@ -933,10 +933,10 @@ public class LayoutTheme {
     return new GridProfile(cols, rows, artW, artH);
   }
 
-  // ── Small landscape (≤ 1280 × 800, e.g. 1024 × 768) ──────────────────────
+  // ── Small landscape (≤ 1366 × 1024, e.g. 1024 × 768 or 1280 × 1024) ───────
 
   /**
-   * Grid profile for small landscape screens (≤ 1280 × 800).
+   * Grid profile for small landscape screens (≤ 1366 × 1024).
    *
    * <p>
    * Uses a <em>tile-cell-aware</em> formula that derives the square art size from the actual pixel
@@ -944,7 +944,14 @@ public class LayoutTheme {
    * simplified top-down deduction. This guarantees the art is always square and never overflows its
    * tile.
    *
-   * <h3>Height calculation (binding axis on 1024 × 768)</h3>
+   * <h3>Column count</h3> Rows are fixed at {@link #GRID_MAX_ROWS_SMALL_LANDSCAPE} (2) — these are
+   * compact touch displays where a tall tile beats a tall page. Columns scale linearly with screen
+   * width relative to the canonical {@value #SMALL_LANDSCAPE_BASE_W} px reference (where the
+   * canonical column count is {@link #GRID_MAX_COLS_SMALL_LANDSCAPE}, 3), then round to the nearest
+   * integer: {@code cols = round(screenW / 1024 * 3)}. This yields 3 cols at 1024 × 768 and 4 cols at
+   * 1280 × 1024 ({@code round(1280/1024*3) = round(3.75) = 4}) without hard-coding either case.
+   *
+   * <h3>Height calculation</h3>
    * <ol>
    * <li>{@code gridPanelH = screenH - topPanelH - tabHeight - detailHeaderH - navStripH}</li>
    * <li>{@code tileCellH = (gridPanelH - gapV*(rows-1) - GRID_BORDER_V) / rows}</li>
@@ -962,7 +969,8 @@ public class LayoutTheme {
    */
   private GridProfile computeSmallLandscapeProfile(int screenW, int screenH) {
 
-    final int cols = GRID_MAX_COLS_SMALL_LANDSCAPE; // 3
+    int cols = Math.round(screenW / (float) SMALL_LANDSCAPE_BASE_W * GRID_MAX_COLS_SMALL_LANDSCAPE);
+    cols = Math.max(GRID_MAX_COLS_SMALL_LANDSCAPE, Math.min(cols, GRID_MAX_COLS_SMALL_LANDSCAPE_CAP));
     final int rows = GRID_MAX_ROWS_SMALL_LANDSCAPE; // 2
 
     // ── Height axis ────────────────────────────────────────────────────────────
@@ -1080,9 +1088,20 @@ public class LayoutTheme {
   private static final int GRID_MAX_ROWS_LANDSCAPE = 5;
   private static final int GRID_MAX_COLS_PORTRAIT = 4;
   private static final int GRID_MAX_ROWS_PORTRAIT = 8;
-  /** Hard caps for small landscape (≤ 1280 × 800) — Items 2 & 3. */
+  /**
+   * Canonical reference width for the small-landscape column-count formula — 1024 × 768 is the
+   * resolution {@link #GRID_MAX_COLS_SMALL_LANDSCAPE} was tuned against.
+   */
+  private static final int SMALL_LANDSCAPE_BASE_W = 1024;
+
+  /** Canonical column count for small landscape at {@link #SMALL_LANDSCAPE_BASE_W} (1024 × 768). */
   private static final int GRID_MAX_COLS_SMALL_LANDSCAPE = 3;
+
+  /** Rows are fixed for every small-landscape screen — these are 2-row touch grids. */
   private static final int GRID_MAX_ROWS_SMALL_LANDSCAPE = 2;
+
+  /** Upper bound on small-landscape columns so very wide "small" screens don't over-paginate. */
+  private static final int GRID_MAX_COLS_SMALL_LANDSCAPE_CAP = 5;
 
   // ── Utility ───────────────────────────────────────────────────────────────
 
@@ -1143,10 +1162,10 @@ public class LayoutTheme {
   public GenreGridProfile genreGridProfile(int screenW, int screenH) {
 
     boolean portrait = screenH > screenW;
-    // Small-landscape (≤ 1280 × 800): fix the grid at exactly 5 columns × 3 rows so all
+    // Small-landscape (≤ 1366 × 1024): fix the grid at exactly 5 columns × 3 rows so all
     // 15 canonical genres fit on one page. imageSize is back-calculated to fill the
     // available tile area; the height constraint is always the binding one on 1024 × 768.
-    boolean smallLandscape = !portrait && screenW <= 1280 && screenH <= 800;
+    boolean smallLandscape = !portrait && screenW <= 1366 && screenH <= 1024;
     if (smallLandscape) {
       return computeSmallLandscapeFixedGenreProfile(screenW, screenH);
     }
