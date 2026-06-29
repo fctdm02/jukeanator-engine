@@ -480,7 +480,7 @@ public class RootFolderEntity extends FolderEntity {
 
     String songPathName = backgroundMusicHelper.getRandomSongFromBackgroundMusicPlaylist(rootPath,
         rootPathWindows, rootPathUnix);
-    
+
     if (this.songsByPath == null) {
       initializeSongsByPath();
     }
@@ -492,6 +492,61 @@ public class RootFolderEntity extends FolderEntity {
       return song;
     }
     throw new IllegalStateException("Could not find song: " + songPathName);
+  }
+
+  // SMART ADDITIONS RELATED
+
+  /**
+   * Delegates to {@link BackgroundMusicHelper#getRandomSmartAdditionSongPath} and resolves the
+   * returned path to a {@link SongFileEntity}.
+   *
+   * @return the next smart-addition song, or {@code null} when the pool is exhausted (the helper
+   *         will have reset itself so the next {@link #loadSmartAdditionCandidates} call starts a
+   *         fresh cycle)
+   */
+  public SongFileEntity getRandomSmartAdditionSong(String rootPath, String rootPathWindows,
+      String rootPathUnix) throws IOException {
+
+    String songPathName = backgroundMusicHelper.getRandomSmartAdditionSongPath(rootPath,
+        rootPathWindows, rootPathUnix);
+
+    if (songPathName == null) {
+      // Pool was exhausted; helper has reset — caller should treat this as a miss.
+      return null;
+    }
+
+    if (this.songsByPath == null) {
+      initializeSongsByPath();
+    }
+
+    SongFileEntity song = this.songsByPath.get(songPathName);
+    if (song != null) {
+      backgroundMusicHelper.updateSmartAdditions(rootPath);
+      return song;
+    }
+
+    // Path not found in library — log and return null so caller falls back gracefully (Item 7).
+    System.err.println("getRandomSmartAdditionSong: could not find song for path: " + songPathName);
+    return null;
+  }
+
+  /**
+   * Loads a new set of smart-addition candidates into the not-played pool.
+   *
+   * @param rootPath the root data directory
+   * @param candidatePathNames the full set of candidate paths for this smart-additions cycle
+   */
+  public void loadSmartAdditionCandidates(String rootPath, List<String> candidatePathNames)
+      throws IOException {
+
+    backgroundMusicHelper.loadSmartAdditionCandidates(rootPath, candidatePathNames);
+  }
+
+  /**
+   * Returns the number of smart-addition songs still remaining in the not-played pool.
+   */
+  public int getSmartAdditionsNotPlayedCount() {
+    return backgroundMusicHelper.getSmartAdditionsNotPlayedCount();
   }
 
   public void createBackgroundMusicFromTopSongs(String rootPath) throws IOException {

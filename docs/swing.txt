@@ -781,6 +781,89 @@ a "lineInVolume", which would be between 0-100 with a default value of 75.
 
 
 
+Implement "Smart Background Music Additions" in SongQueueServiceImpl as follows:
+
+OVERVIEW: There are 4 properties:
+  private final boolean enableSmartBackgroundMusicAdditions; // will play songs from same artist/album from background music
+  private final int smartBackgroundMusicAdditionsFactor; // for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
+  private final int smartBackgroundMusicAdditionsBegin; // start time for enableSmartBackgroundMusicAdditions
+  private final int smartBackgroundMusicAdditionsEnd; // end time for enableSmartBackgroundMusicAdditions  
+  
+When enableSmartBackgroundMusicAdditions is true (assuming that enableBackgroundMusic is true), then enhance autoPopulateQueue() to supplant the list of songs being supplied 
+from BackgroundMusic_NotPlayed.TXT as follows:
+
+Item 1: For every song that comes from BackgroundMusic_NotPlayed.TXT, then X songs from "smart additions", where X is equal to smartBackgroundMusicAdditionsFactor shall be
+supplied (NOTE: This value must be from 1 to 10).
+
+Item 2: This "smart" background music feature shall only be enabled between the hours of smartBackgroundMusicAdditionsBegin and smartBackgroundMusicAdditionsEnd (24 hour time, 
+similar to allowExplicitLyricsBegin and End.
+
+Item 3: Since the whole notion of background music is RANDOM music, then whatever the mechanism is, songs being supplied by RootFolderEntity.getRandomSongFromBackgroundMusicPlaylist()
+need to be completely random, even with these smart additions.
+
+Item 4: The idea is to supply songs that are similar to the songs from "BackgroundMusic.TXT" in that they are either from the same album, from the same artist, or from the same genre
+of music AND they are preferably popular songs.
+
+Item 5: We don't want to overpopulate the random background music list with too many songs by the same artist/album, so the mix should be a progression, based on
+smartBackgroundMusicAdditionsFactor as follows:
+For each song in BackgroundMusic.TXT, then supplant with smartBackgroundMusicAdditionsFactor number of songs as follows:
+smartBackgroundMusicAdditionsFactor: 1 - Every other supplanted song comes a different artist/album, that is a popular song, from the same genre as the background music playlist song 
+smartBackgroundMusicAdditionsFactor: 2 - One supplanted song is by the same album/artist (preferring popular songs) and the other supplanted song is from the same genre (again, preferring popular songs)
+smartBackgroundMusicAdditionsFactor: 3 - One supplanted song is by the same album/artist and the other 2 are songs from the same genre
+As smartBackgroundMusicAdditionsFactor gets higher values, then keep the mix at 25% songs from same album/artist and 75% from songs from the same genre (again, preferring popular music)
+
+Item 6: Since the goal of the background music is to NOT hear the same song repeatedly, there is the notion of PLAYED/NOT PLAYED songs.  Keep track of these supplanted songs using this
+mechanism.  Only upon reset of these lists, can the same supplanted song be re-used.
+
+Item 7: There should be a fail-safe in that if a supplanted song cannot be supplied, then it will fall back to just the songs in the background music playlist.
+
+
+Please let me know if you have any questions before proceeding.
+
+
+
+
+
+About the data source for "smart additions":
+
+The smart additions need to find songs by same artist/album/genre that are "preferably popular." Where does this song metadata (artist, album, genre, play count/popularity) come from? 
+Is it stored in RootFolderEntity, a database, or somewhere else in the codebase I don't have access to?
+
+ANSWER:  SongLibraryService is used to get these songs.  The main method will probably be:   SearchResultDto getGenreMusicByPopularity(String genreName);
+SearchResultDTO contains lists of popular artists/albums/songs for a given genreName
+
+
+Similarly, how do we look up songs by artist/album/genre? Is there a service or repository already available in SongQueueServiceImpl for querying the song library?
+YES, Please see answer above
+
+
+About the played/not-played tracking for smart additions (Item 6):
+
+3. Should smart addition songs get their own separate played/not-played .TXT files (similar to BackgroundMusic_Played.TXT / BackgroundMusic_NotPlayed.TXT), or should they share those existing files?
+
+ANSWER:  I would think that these files would be in their own separate files in order to support the begin/end timeframe for smart additions.  Also, that these files be created in reset() in background music helper.
+
+About autoPopulateQueue() and the current flow:
+
+4. I don't have SongQueueServiceImpl.java or RootFolderEntity.java visible — they were listed as uploaded but didn't come through in context. Could you re-paste or confirm those files are accessible? The implementation depends heavily on how autoPopulateQueue() currently calls getRandomSongFromBackgroundMusicPlaylist() and how the queue is built.
+About Item 1 / Item 3 interaction:
+
+5. "For every song from BackgroundMusic_NotPlayed.TXT, X smart addition songs are supplied" — does this mean the final queue interleaves them (1 BG song + X smart songs, shuffled together), or are the smart additions inserted at specific positions relative to the BG song?
+About the time window (Item 2):
+
+ANSWER: They would be interleaved, assuming that the current time is in the "smart additions" window.  Each smart addition song, when requested would be from random from the pool available, subject to the constraints
+for random songs in SongQueueServiceImpl
+
+6. Should the time check use the same pattern as allowExplicitLyricsBegin/End already in the codebase, and does crossing midnight (e.g., begin=22, end=2) need to be supported?
+ANSWER: yes, per the previous answer
+
+
+
+
+
+
+
+
 TODO:
 DONE 1: Albums with songs with duplicate track numbers, no track numbers, use song index in album childSongs list as track number.  Do this at scan time
 
@@ -974,8 +1057,4 @@ RandomByCD=false
  
 
  
- Item 1: Right now, SongLibraryService has a method called getAlbums(), which returns albums sorted by album name.  Rename this method on the service interface, as well as everywhere else, to be called getAlbumsByTitle()
-
-
-
-Item 2: Related to Item 1, define, and implement, a new method on SongLibraryService called getAlbumsByArtist().  The controller endpoints should be updated to reflect the method name, and be sure to  modify the web security config as well.
+ 
