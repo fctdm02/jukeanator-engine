@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlayerStatus;
+import com.djt.jukeanator_engine.domain.songplayer.exception.SongPlayerServiceException;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.platform.win32.WinDef.LPARAM;
@@ -168,18 +169,9 @@ public class WinampMediaPlayer implements Player {
    */
   @Override
   public boolean playSongMedia(String songPath) {
-    if (songPath == null || songPath.isBlank()) {
-      LOG.warning("playSongMedia called with null/blank path");
-      return false;
-    }
-
-    File songFile = new File(songPath);
-    if (!songFile.exists()) {
-      LOG.warning("Song file not found: " + songPath);
-      return false;
-    }
 
     try {
+
       // Stop current song and cancel the existing poll task cleanly.
       cancelPollTask();
       callbackFired.set(false);
@@ -218,14 +210,16 @@ public class WinampMediaPlayer implements Player {
       return true;
 
     } catch (Exception e) {
-      LOG.log(Level.SEVERE, "Failed to start Winamp playback", e);
+
       status.set(SongPlayerStatus.STOPPED);
-      return false;
+      throw new SongPlayerServiceException(
+          "UNABLE TO PLAY: " + songPath + ", error: " + e.getMessage());
     }
   }
 
   @Override
   public void pause() {
+
     HWND hwnd = findWinampWindow();
     if (hwnd == null)
       return;
@@ -242,6 +236,7 @@ public class WinampMediaPlayer implements Player {
 
   @Override
   public void stop() {
+
     HWND hwnd = findWinampWindow();
     if (hwnd != null) {
       sendCommand(hwnd, WINAMP_BUTTON4); // Stop
@@ -252,6 +247,7 @@ public class WinampMediaPlayer implements Player {
 
   @Override
   public void release() {
+
     cancelPollTask();
     scheduler.shutdownNow();
 
@@ -268,6 +264,7 @@ public class WinampMediaPlayer implements Player {
 
   @Override
   public SongPlayerStatus getStatus() {
+
     // Refresh from Winamp in case it was closed externally.
     HWND hwnd = findWinampWindow();
     if (hwnd == null) {
@@ -282,6 +279,7 @@ public class WinampMediaPlayer implements Player {
 
   @Override
   public long getElapsedSeconds() {
+
     HWND hwnd = findWinampWindow();
     if (hwnd == null)
       return 0L;
@@ -292,6 +290,7 @@ public class WinampMediaPlayer implements Player {
 
   @Override
   public long getTotalLengthSeconds() {
+
     if (songLengthMs > 0)
       return songLengthMs / 1000L;
     HWND hwnd = findWinampWindow();
@@ -314,6 +313,7 @@ public class WinampMediaPlayer implements Player {
    */
   @Override
   public int getVolume() {
+
     HWND hwnd = findWinampWindow();
     if (hwnd == null)
       return currentVolume;
@@ -330,6 +330,7 @@ public class WinampMediaPlayer implements Player {
    */
   @Override
   public void setVolume(int volume) {
+
     currentVolume = clampVolume(volume);
     HWND hwnd = findWinampWindow();
     if (hwnd != null) {

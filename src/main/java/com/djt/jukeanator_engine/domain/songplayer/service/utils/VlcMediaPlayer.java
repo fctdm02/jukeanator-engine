@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songplayer.service.utils;
 
 import java.util.concurrent.atomic.AtomicReference;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlayerStatus;
+import com.djt.jukeanator_engine.domain.songplayer.exception.SongPlayerServiceException;
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory;
 import uk.co.caprica.vlcj.player.base.MediaPlayer;
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter;
@@ -20,7 +21,7 @@ public class VlcMediaPlayer implements Player {
   private volatile int currentVolume = 100;
 
   public VlcMediaPlayer(int volume) {
-    
+
     this.currentVolume = volume;
 
     if (isLinux()) {
@@ -36,7 +37,7 @@ public class VlcMediaPlayer implements Player {
       @Override
       public void playing(MediaPlayer mediaPlayer) {
         status.set(SongPlayerStatus.PLAYING);
-        
+
         // FIX: Enforce the tracked volume reliably as soon as the media starts playing
         mediaPlayer.audio().setVolume(currentVolume);
       }
@@ -73,21 +74,16 @@ public class VlcMediaPlayer implements Player {
 
     try {
 
-      System.err.println("PLAY: " + songPath);
-
       status.set(SongPlayerStatus.STOPPED);
       durationMillis = 0;
-
       return mediaPlayer.media().play(songPath);
 
     } catch (Exception e) {
 
-      System.err.println("UNABLE TO PLAY: " + songPath + ", error: " + e.getMessage());
-
       status.set(SongPlayerStatus.STOPPED);
       durationMillis = 0;
-
-      return false;
+      throw new SongPlayerServiceException(
+          "UNABLE TO PLAY: " + songPath + ", error: " + e.getMessage());
     }
   }
 
@@ -98,14 +94,14 @@ public class VlcMediaPlayer implements Player {
 
   @Override
   public int getVolume() {
-    
+
     // If actively playing, get the real-time runtime volume; otherwise return our tracked value
     return status.get() == SongPlayerStatus.PLAYING ? mediaPlayer.audio().volume() : currentVolume;
   }
 
   @Override
   public void setVolume(int volume) {
-    
+
     this.currentVolume = volume;
     // Only attempt to pass it to LibVLC if the media is actively playing to prevent silent drops
     if (status.get() == SongPlayerStatus.PLAYING) {

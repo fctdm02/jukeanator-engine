@@ -5,9 +5,7 @@
     emailAddress: localStorage.getItem('emailAddress'),
   };
 
-  function isAdmin() {
-    return state.role === 'ADMIN';
-  }
+  const contentPanel = document.getElementById('contentPanel');
 
   function authHeaders() {
     return state.token ? { Authorization: `Bearer ${state.token}` } : {};
@@ -25,104 +23,31 @@
     return text ? JSON.parse(text) : null;
   }
 
-  // ── Auth ────────────────────────────────────────────────────────────────
-
-  function refreshAuthUi() {
-    document.getElementById('authStatus').textContent = state.token
-      ? `${state.emailAddress} (${state.role})`
-      : 'Not logged in';
-    document.getElementById('loginBtn').hidden = !!state.token;
-    document.getElementById('logoutBtn').hidden = !state.token;
-    document.getElementById('adminPlayerControls').hidden = !isAdmin();
-    document.getElementById('adminQueueControls').hidden = !isAdmin();
+  function setAuth(auth) {
+    state.token = auth.token;
+    state.role = auth.role;
+    state.emailAddress = auth.emailAddress;
+    localStorage.setItem('jwt', auth.token);
+    localStorage.setItem('role', auth.role);
+    localStorage.setItem('emailAddress', auth.emailAddress);
   }
 
-  document.getElementById('loginBtn').addEventListener('click', () => {
-    document.getElementById('loginDialog').showModal();
-  });
-
-  document.getElementById('loginCancelBtn').addEventListener('click', () => {
-    document.getElementById('loginDialog').close();
-  });
-
-  document.getElementById('showRegisterBtn').addEventListener('click', () => {
-    document.getElementById('loginDialog').close();
-    document.getElementById('registerDialog').showModal();
-  });
-
-  document.getElementById('registerCancelBtn').addEventListener('click', () => {
-    document.getElementById('registerDialog').close();
-  });
-
-  document.getElementById('registerForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const firstName = document.getElementById('registerFirstName').value;
-    const lastName = document.getElementById('registerLastName').value;
-    const emailAddress = document.getElementById('registerEmail').value;
-    const password = document.getElementById('registerPassword').value;
-    try {
-      const auth = await api('/api/users/register', {
-        method: 'POST',
-        body: JSON.stringify({ firstName, lastName, emailAddress, password }),
-      });
-      state.token = auth.token;
-      state.role = auth.role;
-      state.emailAddress = auth.emailAddress;
-      localStorage.setItem('jwt', auth.token);
-      localStorage.setItem('role', auth.role);
-      localStorage.setItem('emailAddress', auth.emailAddress);
-      document.getElementById('registerDialog').close();
-      refreshAuthUi();
-    } catch (err) {
-      alert('Registration failed');
-    }
-  });
-
-  document.getElementById('logoutBtn').addEventListener('click', () => {
+  function clearAuth() {
     state.token = null;
     state.role = null;
     state.emailAddress = null;
     localStorage.removeItem('jwt');
     localStorage.removeItem('role');
     localStorage.removeItem('emailAddress');
-    refreshAuthUi();
-  });
+  }
 
-  document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const emailAddress = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    try {
-      const auth = await api('/api/users/login', {
-        method: 'POST',
-        body: JSON.stringify({ emailAddress, password }),
-      });
-      state.token = auth.token;
-      state.role = auth.role;
-      state.emailAddress = auth.emailAddress;
-      localStorage.setItem('jwt', auth.token);
-      localStorage.setItem('role', auth.role);
-      localStorage.setItem('emailAddress', auth.emailAddress);
-      document.getElementById('loginDialog').close();
-      refreshAuthUi();
-    } catch (err) {
-      alert('Login failed');
-    }
-  });
+  // ── Album grid rendering ────────────────────────────────────────────────
 
-  // ── Tabs ────────────────────────────────────────────────────────────────
-
-  document.querySelectorAll('.tab-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
-      document.querySelectorAll('.tab').forEach((t) => (t.hidden = true));
-      btn.classList.add('active');
-      document.getElementById(btn.dataset.tab).hidden = false;
-    });
-  });
-  document.querySelector('.tab-btn').classList.add('active');
-
-  // ── Rendering helpers ───────────────────────────────────────────────────
+  const homeGrid = {
+    albums: [],
+    sort: 'title',
+    letter: null,
+  };
 
   function albumCard(album) {
     const div = document.createElement('div');
@@ -132,193 +57,305 @@
     img.alt = album.albumName;
     img.onerror = () => img.remove();
     div.appendChild(img);
+    const titleLine = album.genreName ? `${album.albumName} (${album.genreName})` : album.albumName;
     div.insertAdjacentHTML('beforeend', `
-      <strong>${album.albumName}</strong>
+      <strong>${titleLine}</strong>
       <span>${album.artistName}</span>
     `);
     return div;
   }
 
-  function songRow(song, onAdd) {
-    const div = document.createElement('div');
-    div.className = 'song-row';
-    div.innerHTML = `<span>${song.trackNumber ?? ''} ${song.songName} — ${song.artistName}</span>`;
-    if (onAdd) {
-      const btn = document.createElement('button');
-      btn.textContent = 'Queue';
-      btn.addEventListener('click', () => onAdd(song));
-      div.appendChild(btn);
-    }
-    return div;
+  function sortKey(value) {
+    if (!value || !value.trim()) return '￿';
+    const first = value.trim()[0].toUpperCase();
+    return /[A-Z]/.test(first) ? `~${value.toUpperCase()}` : value.toUpperCase();
   }
 
-  async function addSongToQueue(song) {
-    if (!state.token) {
-      alert('Log in to add songs to the queue');
-      return;
-    }
-    try {
-      const priority = await api('/api/song-queue/highestPriority');
-      await api('/api/song-queue/addSong', {
-        method: 'POST',
-        body: JSON.stringify({
-          username: state.emailAddress,
-          albumId: song.albumId,
-          songId: song.songId,
-          priority,
-        }),
+  function letterFor(value) {
+    if (!value || !value.trim()) return '#';
+    const first = value.trim()[0].toUpperCase();
+    return /[A-Z]/.test(first) ? first : '#';
+  }
+
+  function sortedAlbums() {
+    const field = homeGrid.sort === 'title' ? 'albumName' : 'artistName';
+    return [...homeGrid.albums].sort((a, b) =>
+      sortKey(a[field]).localeCompare(sortKey(b[field])),
+    );
+  }
+
+  function availableLetters(albums) {
+    const field = homeGrid.sort === 'title' ? 'albumName' : 'artistName';
+    const letters = new Set(albums.map((a) => letterFor(a[field])));
+    const ordered = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
+    return ordered.filter((l) => letters.has(l));
+  }
+
+  function renderAlbumGridHeader(container, albums) {
+    const header = document.createElement('div');
+    header.className = 'album-grid-header';
+    header.innerHTML = `
+      <div class="album-grid-title">
+        <span class="icon">♫</span>
+        <div>
+          <div class="title">All Albums</div>
+          <div class="subtitle">${albums.length} albums</div>
+        </div>
+      </div>
+      <div class="sort-toggle">
+        <span class="sort-toggle-label">Order By:</span>
+        <button class="sort-btn" data-sort="title">Title</button>
+        <button class="sort-btn" data-sort="artist">Artist</button>
+      </div>
+    `;
+    header.querySelectorAll('.sort-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.sort === homeGrid.sort);
+      btn.addEventListener('click', () => {
+        if (homeGrid.sort === btn.dataset.sort) return;
+        homeGrid.sort = btn.dataset.sort;
+        homeGrid.letter = null;
+        renderHomeGrid(container);
       });
-    } catch (err) {
-      alert('Could not add song to queue');
-    }
-  }
-
-  // ── Popular tab ─────────────────────────────────────────────────────────
-
-  async function loadPopular() {
-    const result = await api('/api/song-library/popular');
-    renderPopular(result);
-  }
-
-  function renderPopular(result) {
-    const container = document.getElementById('popularTab');
-    container.innerHTML = '';
-    const grid = document.createElement('div');
-    grid.className = 'album-grid';
-    (result.albums || []).forEach((album) => grid.appendChild(albumCard(album)));
-    container.appendChild(grid);
-  }
-
-  // ── Search tab ──────────────────────────────────────────────────────────
-
-  document.getElementById('searchBtn').addEventListener('click', async () => {
-    const query = document.getElementById('searchInput').value.trim();
-    if (!query) return;
-    const result = await api(`/api/song-library/search?searchFor=${encodeURIComponent(query)}`);
-    const container = document.getElementById('searchResults');
-    container.innerHTML = '';
-    (result.songs || []).forEach((song) => container.appendChild(songRow(song, addSongToQueue)));
-    const grid = document.createElement('div');
-    grid.className = 'album-grid';
-    (result.albums || []).forEach((album) => grid.appendChild(albumCard(album)));
-    container.appendChild(grid);
-  });
-
-  // ── Genres tab ──────────────────────────────────────────────────────────
-
-  async function loadGenres() {
-    const genres = await api('/api/song-library/genres');
-    renderGenres(genres);
-  }
-
-  function renderGenres(genres) {
-    const list = document.getElementById('genreList');
-    list.innerHTML = '';
-    genres.forEach((genre) => {
-      const btn = document.createElement('button');
-      btn.textContent = `${genre.genreName} (${genre.numPlays})`;
-      btn.addEventListener('click', async () => {
-        const albums = await api(`/api/song-library/genres/${genre.genreId}/albums`);
-        const albumsContainer = document.getElementById('genreAlbums');
-        albumsContainer.innerHTML = '';
-        const grid = document.createElement('div');
-        grid.className = 'album-grid';
-        albums.forEach((album) => grid.appendChild(albumCard(album)));
-        albumsContainer.appendChild(grid);
-      });
-      list.appendChild(btn);
     });
+    container.appendChild(header);
   }
 
-  // ── Queue tab ───────────────────────────────────────────────────────────
+  function renderLetterNav(container, letters) {
+    const nav = document.createElement('div');
+    nav.className = 'letter-nav';
 
-  function renderQueue(queue) {
-    const list = document.getElementById('queueList');
-    list.innerHTML = '';
-    queue.forEach((entry) => {
-      const li = document.createElement('li');
-      li.className = 'queue-item';
-      const song = entry.song;
-      li.innerHTML = `<span>#${entry.priority} ${song.songName} — ${song.artistName}</span>`;
-      if (isAdmin()) {
-        const removeBtn = document.createElement('button');
-        removeBtn.textContent = 'Remove';
-        removeBtn.addEventListener('click', () =>
-          api('/api/song-queue/removeSongDownFromQueue', {
-            method: 'POST',
-            body: JSON.stringify({ albumId: song.albumId, songId: song.songId }),
-          }),
-        );
-        li.appendChild(removeBtn);
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'letter-nav-arrow';
+    prevBtn.textContent = '‹';
+    nav.appendChild(prevBtn);
+
+    const buttons = document.createElement('div');
+    buttons.className = 'letter-buttons';
+    letters.forEach((letter) => {
+      const btn = document.createElement('button');
+      btn.className = 'letter-btn';
+      btn.textContent = letter;
+      btn.classList.toggle('active', letter === homeGrid.letter);
+      btn.addEventListener('click', () => {
+        homeGrid.letter = letter;
+        renderHomeGrid(container);
+      });
+      buttons.appendChild(btn);
+    });
+    nav.appendChild(buttons);
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'letter-nav-arrow';
+    nextBtn.textContent = '›';
+    nav.appendChild(nextBtn);
+
+    function stepLetter(delta) {
+      const idx = letters.indexOf(homeGrid.letter);
+      const nextIdx = idx === -1 ? 0 : (idx + delta + letters.length) % letters.length;
+      homeGrid.letter = letters[nextIdx];
+      renderHomeGrid(container);
+    }
+    prevBtn.addEventListener('click', () => stepLetter(-1));
+    nextBtn.addEventListener('click', () => stepLetter(1));
+
+    container.appendChild(nav);
+  }
+
+  function renderHomeGrid(homeContent) {
+    homeContent.innerHTML = '';
+
+    const albums = sortedAlbums();
+    renderAlbumGridHeader(homeContent, albums);
+
+    const letters = availableLetters(albums);
+    if (!homeGrid.letter || !letters.includes(homeGrid.letter)) {
+      homeGrid.letter = letters[0] || null;
+    }
+
+    const field = homeGrid.sort === 'title' ? 'albumName' : 'artistName';
+    const visibleAlbums = homeGrid.letter
+      ? albums.filter((a) => letterFor(a[field]) === homeGrid.letter)
+      : albums;
+
+    const grid = document.createElement('div');
+    grid.className = 'album-grid';
+    visibleAlbums.forEach((album) => grid.appendChild(albumCard(album)));
+    homeContent.appendChild(grid);
+
+    if (letters.length) {
+      renderLetterNav(homeContent, letters);
+    }
+  }
+
+  async function loadAlbumGrid(homeContent) {
+    homeGrid.albums = await api('/api/song-library/albums');
+    renderHomeGrid(homeContent);
+  }
+
+  // ── Views ───────────────────────────────────────────────────────────────
+
+  function renderLogin(errorMessage) {
+    contentPanel.innerHTML = `
+      <div class="centered-view">
+        <div class="auth-box">
+          <h1>JukeANator</h1>
+          <form id="loginForm">
+            ${errorMessage ? `<div class="error-msg">${errorMessage}</div>` : ''}
+            <label>Email <input type="email" id="loginEmail" required></label>
+            <label>Password <input type="password" id="loginPassword" required></label>
+            <button type="submit">Log in</button>
+            <div class="secondary-actions">
+              <button type="button" id="loginCancelBtn" class="link-btn">Cancel</button>
+              <button type="button" id="showRegisterBtn" class="link-btn">Create Account</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('loginCancelBtn').addEventListener('click', () => renderLogin());
+    document.getElementById('showRegisterBtn').addEventListener('click', () => renderRegister());
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const emailAddress = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      try {
+        const auth = await api('/api/users/login', {
+          method: 'POST',
+          body: JSON.stringify({ emailAddress, password }),
+        });
+        setAuth(auth);
+        renderHome();
+      } catch (err) {
+        renderLogin('Login failed. Check your email and password.');
       }
-      list.appendChild(li);
     });
   }
 
-  document.getElementById('randomizeBtn').addEventListener('click', () =>
-    api('/api/song-queue/randomizeQueue', { method: 'POST' }),
-  );
-  document.getElementById('flushBtn').addEventListener('click', () =>
-    api('/api/song-queue/flushQueue', { method: 'POST' }),
-  );
+  function renderRegister(errorMessage) {
+    contentPanel.innerHTML = `
+      <div class="centered-view">
+        <div class="auth-box">
+          <h1>Create Account</h1>
+          <form id="registerForm">
+            ${errorMessage ? `<div class="error-msg">${errorMessage}</div>` : ''}
+            <label>First name <input type="text" id="registerFirstName" required></label>
+            <label>Last name <input type="text" id="registerLastName" required></label>
+            <label>Email <input type="email" id="registerEmail" required></label>
+            <label>Password <input type="password" id="registerPassword" required></label>
+            <button type="submit">Register</button>
+            <div class="secondary-actions">
+              <button type="button" id="registerCancelBtn" class="link-btn">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
 
-  // ── Now playing / player controls ──────────────────────────────────────
+    document.getElementById('registerCancelBtn').addEventListener('click', () => renderLogin());
 
-  function renderNowPlaying(song) {
-    const content = document.getElementById('nowPlayingContent');
-    content.textContent = song ? `${song.songName} — ${song.artistName}` : 'Nothing playing';
-  }
-
-  function renderPlaybackStatus(status) {
-    document.getElementById('playbackStatus').textContent = status
-      ? `${status.status} (${status.elapsedSeconds ?? 0}s / ${status.totalSeconds ?? 0}s)`
-      : '';
-  }
-
-  document.getElementById('pauseBtn').addEventListener('click', () =>
-    api('/api/song-player/pause', { method: 'POST' }),
-  );
-  document.getElementById('nextBtn').addEventListener('click', () =>
-    api('/api/song-player/next', { method: 'POST' }),
-  );
-  document.getElementById('stopBtn').addEventListener('click', () =>
-    api('/api/song-player/stop', { method: 'POST' }),
-  );
-
-  // ── WebSocket live updates ──────────────────────────────────────────────
-
-  function connectWebSocket() {
-    const socket = new SockJS('/ws');
-    const client = Stomp.over(socket);
-    client.debug = null;
-    client.connect({}, () => {
-      client.subscribe('/topic/queue', (msg) => renderQueue(JSON.parse(msg.body)));
-      client.subscribe('/topic/now-playing', (msg) => renderNowPlaying(JSON.parse(msg.body).song));
-      client.subscribe('/topic/playback-status', (msg) => renderPlaybackStatus(JSON.parse(msg.body)));
-      client.subscribe('/topic/genres', (msg) => renderGenres(JSON.parse(msg.body)));
-      client.subscribe('/topic/popularity', (msg) => renderPopular(JSON.parse(msg.body)));
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const firstName = document.getElementById('registerFirstName').value;
+      const lastName = document.getElementById('registerLastName').value;
+      const emailAddress = document.getElementById('registerEmail').value;
+      const password = document.getElementById('registerPassword').value;
+      try {
+        const auth = await api('/api/users/register', {
+          method: 'POST',
+          body: JSON.stringify({ firstName, lastName, emailAddress, password }),
+        });
+        setAuth(auth);
+        renderHome();
+      } catch (err) {
+        renderLogin('Could not create account. That email may already be registered.');
+      }
     });
+  }
+
+  async function loadNowPlaying(widget) {
+    try {
+      const song = await api('/api/song-player/nowPlayingSong');
+      if (!song) {
+        widget.innerHTML = '<div class="now-playing-text"><span class="artist-name">Nothing playing</span></div>';
+        return;
+      }
+      widget.innerHTML = `
+        <img src="/api/song-library/albums/${song.albumId}/coverArt" alt="${song.albumName || ''}"
+             onerror="this.remove()">
+        <div class="now-playing-text">
+          <div class="song-name">${song.songName}</div>
+          <div class="artist-name">${song.artistName}</div>
+          <div class="album-name">${song.albumName || ''}</div>
+        </div>
+      `;
+    } catch (err) {
+      widget.innerHTML = '<div class="now-playing-text"><span class="artist-name">Nothing playing</span></div>';
+    }
+  }
+
+  async function loadCredits(widget) {
+    try {
+      const profile = await api('/api/users/me');
+      widget.textContent = profile.numCredits ?? 0;
+    } catch (err) {
+      widget.textContent = '0';
+    }
+  }
+
+  async function renderHome() {
+    contentPanel.innerHTML = `
+      <div class="app-frame">
+        <header class="top-bar">
+          <div class="credits-widget">
+            <span class="credits-label">CREDITS</span>
+            <span class="credits-value" id="creditsValue">0</span>
+          </div>
+          <h1 class="app-banner">JukeANator</h1>
+          <div class="now-playing-widget" id="nowPlayingWidget"></div>
+          <button id="logoutBtn" class="link-btn">Log out</button>
+        </header>
+
+        <main class="home-content" id="homeContent"></main>
+
+        <nav class="bottom-tabs">
+          <button class="bottom-tab active" data-tab="home">
+            <span class="tab-icon">⌂</span><span>HOME</span>
+          </button>
+          <button class="bottom-tab" data-tab="search" disabled>
+            <span class="tab-icon">⌕</span><span>SEARCH</span>
+          </button>
+          <button class="bottom-tab" data-tab="hot" disabled>
+            <span class="tab-icon">♨</span><span>HOT HERE</span>
+          </button>
+          <button class="bottom-tab" data-tab="genres" disabled>
+            <span class="tab-icon">▦</span><span>GENRES</span>
+          </button>
+          <button class="bottom-tab" data-tab="queue" disabled>
+            <span class="tab-icon">♫</span><span>QUEUE</span>
+          </button>
+        </nav>
+      </div>
+    `;
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      clearAuth();
+      renderLogin();
+    });
+
+    await Promise.all([
+      loadCredits(document.getElementById('creditsValue')),
+      loadNowPlaying(document.getElementById('nowPlayingWidget')),
+      loadAlbumGrid(document.getElementById('homeContent')),
+    ]);
   }
 
   // ── Init ────────────────────────────────────────────────────────────────
 
-  async function init() {
-    refreshAuthUi();
-    connectWebSocket();
-    await loadPopular();
-    await loadGenres();
-    try {
-      renderQueue(await api('/api/song-queue/queuedSongs'));
-    } catch (err) {
-      // queue not available yet
-    }
-    try {
-      renderNowPlaying(await api('/api/song-player/nowPlayingSong'));
-      renderPlaybackStatus(await api('/api/song-player/playbackStatus'));
-    } catch (err) {
-      // nothing playing yet
-    }
+  if (state.token) {
+    renderHome();
+  } else {
+    renderLogin();
   }
-
-  init();
 })();
