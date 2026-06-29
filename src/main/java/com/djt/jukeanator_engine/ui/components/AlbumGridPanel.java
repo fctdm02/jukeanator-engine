@@ -12,6 +12,7 @@ import java.awt.LinearGradientPaint;
 import java.awt.RenderingHints;
 import java.util.List;
 import java.util.Map;
+import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -27,6 +28,9 @@ public class AlbumGridPanel extends JPanel {
   private static final long serialVersionUID = 1L;
 
   // ── Palette — sourced from ColorTheme.get() ──────────────────────────────
+
+  /** Matches {@code AlbumViewCard.ACCENT_EXPLICIT} so the badge looks identical everywhere. */
+  private static final Color ACCENT_EXPLICIT = new Color(220, 60, 60);
 
   // ─────────────────────────────────────────────────────────────────────────
   // SHARED DISPLAY HELPER
@@ -555,7 +559,36 @@ public class AlbumGridPanel extends JPanel {
       artLabel.setPreferredSize(new Dimension(albumGridProfile.artW(), albumGridProfile.artH()));
     }
 
-    artWrapper.add(artLabel);
+    java.awt.GridBagConstraints artGbc = new java.awt.GridBagConstraints();
+    artGbc.gridx = 0;
+    artGbc.gridy = 0;
+    artWrapper.add(artLabel, artGbc);
+
+    // ── Explicit badge — overlaid on top of the cover art, same style as AlbumViewCard ──
+    if (Boolean.TRUE.equals(album.getHasExplicit())) {
+      JLabel explicit = new JLabel("EXPLICIT");
+      explicit.setOpaque(true);
+      explicit.setBackground(Color.WHITE);
+      explicit.setForeground(ACCENT_EXPLICIT);
+      explicit.setFont(
+          new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
+      explicit.setBorder(BorderFactory.createCompoundBorder(
+          BorderFactory.createLineBorder(ACCENT_EXPLICIT, 1), new EmptyBorder(2, 6, 2, 6)));
+
+      // Same cell as artLabel (gridx=0, gridy=0) — GridBagLayout lets multiple
+      // components share a cell. Anchor NORTH centers the badge horizontally
+      // within the column's full width (driven by artLabel's preferred size)
+      // and pins it to the top edge.
+      java.awt.GridBagConstraints badgeGbc = new java.awt.GridBagConstraints();
+      badgeGbc.gridx = 0;
+      badgeGbc.gridy = 0;
+      badgeGbc.anchor = java.awt.GridBagConstraints.NORTH;
+      badgeGbc.insets = new java.awt.Insets(12, 0, 0, 0);
+      artWrapper.add(explicit, badgeGbc);
+      // Component z-order index 0 is painted LAST (i.e. on top) — push the
+      // badge to index 0 so it renders over artLabel instead of underneath it.
+      artWrapper.setComponentZOrder(explicit, 0);
+    }
 
     // ── Text panel ────────────────────────────────────────────────────────
     // BoxLayout Y_AXIS lets the HTML album-name label expand to two lines
