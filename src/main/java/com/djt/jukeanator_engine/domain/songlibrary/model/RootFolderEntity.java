@@ -515,12 +515,14 @@ public class RootFolderEntity extends FolderEntity {
     }
     
     String songPathName = backgroundMusicHelper.getRandomSmartAdditionSongPath(rootPath,
-        rootPathWindows, rootPathUnix).replace(":\\\\", ":\\");
+        rootPathWindows, rootPathUnix);
 
     if (songPathName == null) {
       // Pool was exhausted; helper has reset — caller should treat this as a miss.
       return null;
     }
+
+    songPathName = songPathName.replace(":\\\\", ":\\");
 
     SongFileEntity song = this.songsByPath.get(songPathName);
     if (song != null) {

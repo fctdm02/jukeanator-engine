@@ -248,6 +248,6 @@ public class BackgroundMusicHelper extends FileSystemHelper {
       return songPathName.replace(rootPathUnix, normalizedRootPathWindows).replace("/", "\\");
     }
 
-    return songPathName;
+    return songPathName.replace(":\\\\", ":\\");
   }
 }

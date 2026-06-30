@@ -385,19 +385,19 @@ public class SongQueueServiceImpl
         continue;
       }
 
-      // Ensure the smart-additions pool is populated for this core song's genre / artist / album.
-      buildSmartAdditionPool(coreSong, factor);
-
       for (int i = 0; i < factor; i++) {
 
         if (songQueueRoot.getSongs().size() >= minimumNumberSongsToKeepInQueue) {
           break;
         }
 
+        // Rebuild the pool before each draw so it is never empty while candidates exist.
+        buildSmartAdditionPool(coreSong, factor);
+
         SongFileEntity smartSong = getNextSmartAdditionSong(coreSong);
         if (smartSong == null) {
-          // Fail-safe (Item 7): pool exhausted or song lookup failed — skip this slot.
-          log.debug("autoPopulateQueue: smart-addition pool exhausted for {}, skipping slot {}",
+          // No candidates available at all — skip remaining slots.
+          log.debug("autoPopulateQueue: no smart-addition candidates available for {}, skipping slot {}",
               coreSong, i);
           break;
         }
