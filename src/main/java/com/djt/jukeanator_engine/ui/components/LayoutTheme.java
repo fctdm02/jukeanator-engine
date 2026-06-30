@@ -182,7 +182,6 @@ public class LayoutTheme {
     albumGridGapV = 10;
 
     // ── Portrait art/image reduction factors ──────────────────────────────────
-    portraitArtReduction = 0.85; // landscape default (not used in landscape path)
     genrePortraitImgReduction = 0.80; // landscape default (not used in landscape path)
 
     // ── Now-playing panel ─────────────────────────────────────────────────────
@@ -338,7 +337,6 @@ public class LayoutTheme {
 
       // ── Item 1.2 : Album cover art tiles — remove excess padding ────────────
       albumTileInnerPad = 1;
-      portraitArtReduction = 1.05;
 
       // ── Item 2.1 : Genre tile images — remove excess padding ────────────────
       genreTileInnerPad = 8;
@@ -360,10 +358,12 @@ public class LayoutTheme {
       nowPlayingGifW = 52;
       fontSizeNowPlayingSong = 14;
 
-      // Detail header font, album label font — same as landscape for portrait
+      // Detail header font, album label font — larger than landscape for portrait
+      // because portrait tiles are ~2× wider (2 cols vs 4 cols), giving much
+      // more room for the artist/album text beneath the cover art.
       fontSizeDetailTitle = 26;
-      fontSizeAlbumLabel = 14;
-      fontSizeArtistLabel = 12;
+      fontSizeAlbumLabel = 18;
+      fontSizeArtistLabel = 15;
 
       // Tab bar — same as landscape for portrait
       tabWidth = 200;
@@ -464,7 +464,6 @@ public class LayoutTheme {
       screenPaddingHorizontal = 60;
 
       albumTileInnerPad = 1;
-      portraitArtReduction = 0.85;
       genreTileInnerPad = 16;
       genrePortraitImgReduction = 0.80;
 
@@ -910,34 +909,24 @@ public class LayoutTheme {
 
   private GridProfile computePortraitProfile(int screenW, int screenH) {
 
-    // In portrait mode the short axis is screenW; scale the art relative to that.
-    // We still compare against CANONICAL_W so "the same 1920-wide monitor rotated
-    // to 1080-wide portrait" produces a tile roughly the same absolute pixel size
-    // as the landscape version, just fewer cols and more rows.
-    double scale = (double) screenW / CANONICAL_W;
-    scale = Math.max(GRID_SCALE_MIN, Math.min(scale, GRID_SCALE_MAX));
+    // Portrait grid is always 2 columns × 4 rows regardless of resolution.
+    final int cols = 2;
+    final int rows = 4;
 
-    // In portrait the art is a bit smaller than in landscape so more rows fit.
-    int artW = roundEven((int) Math.round(homeArtW * scale * portraitArtReduction));
-    int artH = artW; // keep square thumbnails
+    // Derive art size cell-aware (same formula as computeSmallLandscapeProfile)
+    // so tiles always fill their cells and art is never over- or under-sized.
+    int detailHeaderH = detailHeaderImageH + DETAIL_HEADER_BORDER_V;
+    int gridPanelH = screenH - topPanelHeight - tabHeight - detailHeaderH - LETTER_NAV_H;
+    int tileCellH = (gridPanelH - GRID_BORDER_V - albumGridGapV * (rows - 1)) / rows;
+    int artH = tileCellH - TILE_TEXT_H - TILE_BORDER_V;
 
-    // Available area — same fixed-chrome deductions as landscape.
-    // In portrait mode the top panel and tab bar heights may eventually be
-    // different, but for now we reuse the same constants; override in a
-    // portrait-specific LayoutTheme subclass if they differ.
-    int availH = screenH - topPanelHeight - tabHeight - LETTER_NAV_H - TILE_TEXT_H - GRID_PADDING_V;
-    int availW = screenW - GRID_PADDING_H;
+    int tileCellW = (screenW - GRID_BORDER_H - albumGridGapH * (cols - 1)) / cols;
+    int artW = tileCellW - TILE_BORDER_H;
 
-    int tileW = artW + albumGridGapH;
-    int tileH = artH + albumGridGapV;
+    int artSize = roundEven(Math.min(artH, artW));
+    artSize = Math.max(artSize, 80); // safety floor
 
-    int cols = Math.max(1, availW / tileW);
-    int rows = Math.max(1, availH / tileH);
-
-    cols = Math.min(cols, GRID_MAX_COLS_PORTRAIT);
-    rows = Math.min(rows, GRID_MAX_ROWS_PORTRAIT);
-
-    return new GridProfile(cols, rows, artW, artH);
+    return new GridProfile(cols, rows, artSize, artSize);
   }
 
   // ── Small landscape (≤ 1366 × 1024, e.g. 1024 × 768 or 1280 × 1024) ───────
@@ -1051,12 +1040,6 @@ public class LayoutTheme {
 
   // Adjust these if the fixed-chrome heights change or the aesthetics need tuning.
 
-  /** Minimum allowed scale factor — prevents tiles becoming unusably tiny. */
-  private static final double GRID_SCALE_MIN = 0.40;
-
-  /** Maximum allowed scale factor — prevents tiles becoming comically large. */
-  private static final double GRID_SCALE_MAX = 1.50;
-
   /**
    * Height consumed by the AlbumGridPanel letter-navigation strip (nav buttons + padding). Matches
    * the 36px button height + 4px top + 4px bottom padding in AlbumGridPanel.
@@ -1076,28 +1059,9 @@ public class LayoutTheme {
    */
   private static final int SMALL_LANDSCAPE_TILE_TEXT_H = 36;
 
-  /**
-   * Total vertical padding of the grid panel ({@code EmptyBorder(8,12,4,12)} = 12px top+bottom).
-   */
-  private static final int GRID_PADDING_V = 12;
-
-  /**
-   * Total horizontal padding of the grid panel ({@code EmptyBorder(8,12,4,12)} = 24px left+right).
-   */
-  private static final int GRID_PADDING_H = 24;
-
-  /**
-   * Additional art-size reduction factor applied in portrait mode so that tiles are proportionally
-   * narrower to match the shorter portrait width. Landscape: not used. Portrait: 1.0 (no extra
-   * reduction — the short-axis scale already constrains tile size).
-   */
-  private final double portraitArtReduction;
-
-  // Maximum grid dimensions (prevents absurdly large pages on 4 K+ or portrait 4 K displays)
+  // Maximum grid dimensions for landscape
   private static final int GRID_MAX_COLS_LANDSCAPE = 4;
   private static final int GRID_MAX_ROWS_LANDSCAPE = 2;
-  private static final int GRID_MAX_COLS_PORTRAIT = 4;
-  private static final int GRID_MAX_ROWS_PORTRAIT = 8;
   /**
    * Canonical reference width for the small-landscape column-count formula — 1024 × 768 is the
    * resolution {@link #GRID_MAX_COLS_SMALL_LANDSCAPE} was tuned against.

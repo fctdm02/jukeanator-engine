@@ -290,8 +290,12 @@ public class HomePanel extends JPanel implements TabNavigator {
     List<AlbumDto> albums = mode == SortMode.TITLE ? albumsByTitle : albumsByArtist;
     Map<String, List<AlbumDto>> letterMap =
         mode == SortMode.TITLE ? letterMapByTitle : letterMapByArtist;
+    // Pass the same key extractor that was used to build the letter map so that
+    // letterForIndex() highlights the correct letter when ❮/❯ paginate across buckets.
+    java.util.function.Function<AlbumDto, String> keyExtractor =
+        mode == SortMode.TITLE ? AlbumDto::getAlbumName : AlbumDto::getArtistName;
     return new AlbumGridPanel(albums, letterMap, imageLoader, albumGridProfile,
-        album -> pushAlbumDetail(album), true); // TabNavigator path
+        album -> pushAlbumDetail(album), true, keyExtractor);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

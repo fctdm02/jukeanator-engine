@@ -106,7 +106,7 @@ public class AlbumViewCard extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   private JPanel buildSidebar(AlbumDto album, ImageLoader imageLoader) {
 
-    JPanel sidebar = new JPanel(new BorderLayout(0, 0));
+    JPanel sidebar = new JPanel(new GridBagLayout());
     sidebar.setOpaque(false);
     sidebar.setPreferredSize(new Dimension(LEFT_PANEL_WIDTH, 0));
     sidebar.setMinimumSize(new Dimension(LEFT_PANEL_WIDTH, 0));
@@ -170,7 +170,6 @@ public class AlbumViewCard extends JPanel {
     meta.setOpaque(false);
     meta.setLayout(new BoxLayout(meta, BoxLayout.Y_AXIS));
     meta.setBorder(new EmptyBorder(14, 14, 14, 14));
-
     // Album name — wraps if long
     meta.add(wrappingMetaLabel(
         AlbumGridPanel.albumDisplayName(album.getAlbumName(), album.getGenreName()), Font.BOLD,
@@ -214,10 +213,21 @@ public class AlbumViewCard extends JPanel {
     meta.add(singleLineMetaLabel(formattedPlayCount + " plays", Font.PLAIN,
         LayoutTheme.get().fontSizeTrackArtist, TEXT_SECONDARY));
 
-    // Art in NORTH so it stays at full sidebar width; meta fills the remaining
-    // space in CENTER, stretching to the full sidebar width so labels never clip.
-    sidebar.add(artWrapper, BorderLayout.NORTH);
-    sidebar.add(meta, BorderLayout.CENTER);
+    // BorderLayout: artWrapper in NORTH (natural size), meta in CENTER (full width).
+    // This guarantees meta always fills the entire sidebar width regardless of
+    // cover art size or screen orientation.
+    JPanel content = new JPanel(new BorderLayout());
+    content.setOpaque(false);
+    content.add(artWrapper, BorderLayout.NORTH);
+    content.add(meta, BorderLayout.CENTER);
+
+    java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
+    gbc.gridx = 0;
+    gbc.gridy = 0;
+    gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+    gbc.weightx = 1.0;
+    gbc.anchor = java.awt.GridBagConstraints.NORTH;
+    sidebar.add(content, gbc);
 
     return sidebar;
   }

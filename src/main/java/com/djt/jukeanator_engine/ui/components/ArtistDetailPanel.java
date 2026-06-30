@@ -44,7 +44,7 @@ public class ArtistDetailPanel extends JPanel {
 
     // Unpack the profile here — AlbumGridPanel still receives four ints so its
     // own API is unchanged. Only the call-site (ArtistDetailPanel) simplifies.
-    add(new AlbumGridPanel(albums, null, imageLoader, albumGridProfile, onAlbumClicked, false),
+    add(new AlbumGridPanel(albums, null, imageLoader, albumGridProfile, onAlbumClicked, false, null),
         BorderLayout.CENTER);
   }
 }

@@ -12,6 +12,7 @@ import java.awt.LinearGradientPaint;
 import java.awt.RenderingHints;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -49,6 +50,10 @@ public class AlbumGridPanel extends JPanel {
   private final ImageLoader imageLoader;
   private final AlbumClickListener listener;
   private final boolean showLetterNav; // true only for the full "All Albums" grid in HomePanel
+  // Extracts the sort key (artist name or album title) from an album — used to
+  // resolve which letter a given album belongs to when ❮/❯ pages across buckets.
+  // Null when showLetterNav is false (no letter navigation needed).
+  private final Function<AlbumDto, String> letterKeyExtractor;
 
   private int startIndex = 0; // index of the album in the upper-left corner of the grid
   private String selectedLetter = "#"; // which letter button is highlighted
@@ -70,7 +75,8 @@ public class AlbumGridPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   public AlbumGridPanel(List<AlbumDto> albums, Map<String, List<AlbumDto>> letterMap,
       ImageLoader imageLoader, LayoutTheme.GridProfile albumGridProfile,
-      AlbumClickListener listener, boolean showLetterNav) {
+      AlbumClickListener listener, boolean showLetterNav,
+      Function<AlbumDto, String> letterKeyExtractor) {
 
     this.albums = albums != null ? albums : List.of();
     this.letterMap = letterMap != null ? letterMap : Map.of();
@@ -78,6 +84,7 @@ public class AlbumGridPanel extends JPanel {
     this.albumGridProfile = albumGridProfile;
     this.listener = listener;
     this.showLetterNav = showLetterNav;
+    this.letterKeyExtractor = letterKeyExtractor;
 
     // Pick a random letter from the available buckets at startup (only when letter nav is shown)
     if (showLetterNav && !this.letterMap.isEmpty()) {
@@ -334,11 +341,12 @@ public class AlbumGridPanel extends JPanel {
     if (bucket == null || bucket.isEmpty())
       return 0;
 
-    String targetName = bucket.get(0).getAlbumName();
+    // Match by album ID (unique) so duplicate album names across different artists
+    // never resolve to the wrong album in the master list.
+    Integer targetId = bucket.get(0).getAlbumId();
 
     for (int i = 0; i < albums.size(); i++) {
-      String name = albums.get(i).getAlbumName();
-      if (targetName == null ? name == null : targetName.equals(name)) {
+      if (targetId != null && targetId.equals(albums.get(i).getAlbumId())) {
         return i;
       }
     }
@@ -354,7 +362,10 @@ public class AlbumGridPanel extends JPanel {
       return selectedLetter;
 
     AlbumDto albumAtIdx = albums.get(idx);
-    String name = albumAtIdx.getAlbumName();
+    // Use the same key extractor that was used to build the letter map so
+    // the highlighted letter always matches the active sort field (artist or title).
+    String name = letterKeyExtractor != null ? letterKeyExtractor.apply(albumAtIdx)
+        : albumAtIdx.getAlbumName();
 
     if (name == null || name.isBlank())
       return "#";
@@ -614,18 +625,10 @@ public class AlbumGridPanel extends JPanel {
     // Tooltip shows the full untruncated name when the tile is too narrow.
     albumLabel.setToolTipText(albumDisplayName(album.getAlbumName(), album.getGenreName()));
 
-    // Only the full "All Albums" grid (HomePanel, showLetterNav) defaults to browsing
-    // by artist, so it leads with the artist line. The per-artist grid (ArtistDetailPanel)
-    // already shows one artist's albums, so it keeps the album title on top.
-    if (showLetterNav) {
-      textPanel.add(artistLabel);
-      textPanel.add(Box.createVerticalStrut(2));
-      textPanel.add(albumLabel);
-    } else {
-      textPanel.add(albumLabel);
-      textPanel.add(Box.createVerticalStrut(2));
-      textPanel.add(artistLabel);
-    }
+    // Artist first, album title second — consistent across Home and ArtistDetailPanel.
+    textPanel.add(artistLabel);
+    textPanel.add(Box.createVerticalStrut(2));
+    textPanel.add(albumLabel);
 
     tile.add(artWrapper, BorderLayout.CENTER);
     tile.add(textPanel, BorderLayout.SOUTH);
