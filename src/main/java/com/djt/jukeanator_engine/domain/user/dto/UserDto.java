@@ -1,10 +1,13 @@
 package com.djt.jukeanator_engine.domain.user.dto;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
-public final class UserDto {
+public final class UserDto implements Serializable {
+  
+  private static final long serialVersionUID = 1L;
 
   public UserDto(String firstName, String lastName, String emailAddress, String passwordHash,
       Integer numCredits, List<SongIdentifier> songPlayHistory, String role) {

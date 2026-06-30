@@ -1,9 +1,12 @@
 package com.djt.jukeanator_engine.domain.songqueue.dto;
 
+import java.io.Serializable;
 import java.util.Objects;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 
-public class SongQueueEntryDto {
+public class SongQueueEntryDto implements Serializable {
+  
+  private static final long serialVersionUID = 1L;
 
   private String username;
   private SongDto song;

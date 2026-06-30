@@ -592,6 +592,14 @@ public class JukeANatorFrame extends JFrame {
         return LayoutTheme.get().tabHeight;
       }
 
+      @Override
+      protected java.awt.Insets getTabInsets(int tabPlacement, int tabIndex) {
+        // Zero horizontal insets so paintTabBackground fills the full tab width
+        // and the highlight never clips the leftmost/rightmost label characters.
+        java.awt.Insets base = super.getTabInsets(tabPlacement, tabIndex);
+        return new java.awt.Insets(base.top, 0, base.bottom, 0);
+      }
+
       //
       // CENTER the tab group horizontally.
       //
@@ -836,7 +844,7 @@ public class JukeANatorFrame extends JFrame {
           g2.setColor(
               new Color(accentColor.getRed(), accentColor.getGreen(), accentColor.getBlue(), 60));
 
-          g2.fillRoundRect(6, 6, getWidth() - 12, getHeight() - 12, 18, 18);
+          g2.fillRoundRect(0, 0, getWidth(), getHeight(), 18, 18);
         }
       }
 

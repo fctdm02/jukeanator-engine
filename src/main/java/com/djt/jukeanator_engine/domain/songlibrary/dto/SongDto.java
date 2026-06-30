@@ -1,8 +1,11 @@
 package com.djt.jukeanator_engine.domain.songlibrary.dto;
 
+import java.io.Serializable;
 import java.util.Objects;
 
-public class SongDto {
+public class SongDto implements Serializable {
+  
+  private static final long serialVersionUID = 1L;
 
   private final Integer genreId;
   private final String genreName;

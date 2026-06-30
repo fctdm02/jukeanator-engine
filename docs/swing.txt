@@ -1059,14 +1059,5 @@ RandomPlayListFilePath=Top50Songs.PL
 RandomByGenre=false
 RandomByCD=false
  
-37: Handle the following error:
-2026-06-30 14:36:09.630 [main] WARN  c.d.j.d.s.s.SongQueueServiceImpl - 
-getNextSmartAdditionSong: failed for core song 
-R:\\Rock_On_Third\Rock\The Smithereens\Blown To Smithereens - The Best Of The Smithereens\The Smithereens-11-Blues Before & After.mp3
-Cannot invoke "String.replace(java.lang.CharSequence, java.lang.CharSequence)" because the return value of 
-"com.djt.jukeanator_engine.domain.songlibrary.model.utils.BackgroundMusicHelper.getRandomSmartAdditionSongPath(String, String, String)" is null
  
- 
-
- 
- 
+ 37. On AdminPanel, Move Song Up does not work
