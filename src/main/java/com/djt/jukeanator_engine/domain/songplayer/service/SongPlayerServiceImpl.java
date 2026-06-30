@@ -47,7 +47,11 @@ public class SongPlayerServiceImpl implements SongPlayerService {
    * ONE AND ONLY ONE queue-processing thread.
    */
   private final ExecutorService queueExecutor =
-      Executors.newSingleThreadExecutor(Thread.ofPlatform().name("song-queue-thread").factory());
+      Executors.newSingleThreadExecutor(r -> {
+        Thread t = Thread.ofPlatform().name("song-queue-thread").unstarted(r);
+        t.setPriority(Thread.MAX_PRIORITY);
+        return t;
+      });
 
   private final String playerType;
   private final int playerVolume;

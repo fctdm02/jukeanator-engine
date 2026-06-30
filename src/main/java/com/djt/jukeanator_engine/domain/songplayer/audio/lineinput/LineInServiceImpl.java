@@ -63,6 +63,7 @@ public class LineInServiceImpl implements LineInService {
       monitorTask = new LineInMonitorTask(mixerInfo, volumePercent, signalPresent);
       monitorThread = new Thread(monitorTask, "line-in-monitor");
       monitorThread.setDaemon(true);
+      monitorThread.setPriority(Thread.MAX_PRIORITY);
       monitorThread.start();
     }
   }

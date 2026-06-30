@@ -104,6 +104,7 @@ public class WinampMediaPlayer implements Player {
       Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "winamp-poll");
         t.setDaemon(true);
+        t.setPriority(Thread.MAX_PRIORITY);
         return t;
       });
 
