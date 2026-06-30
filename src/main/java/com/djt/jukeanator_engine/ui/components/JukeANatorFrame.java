@@ -141,6 +141,10 @@ public class JukeANatorFrame extends JFrame {
   private final JLayeredPane mainLayeredPane = new JLayeredPane();
   private final JPanel addSongGlassPane = new JPanel(new GridBagLayout());
 
+  // Set by AdminPanel before it calls setState(ICONIFIED) so the window-state
+  // listener knows not to fight the intentional minimize.
+  private boolean adminMinimizeRequested = false;
+
   // Guards the tab ChangeListener against spurious resets that fire when the
   // overlay card system shows or hides — neither action is a genuine tab switch.
   private boolean overlayTransitionInProgress = false;
@@ -435,6 +439,21 @@ public class JukeANatorFrame extends JFrame {
       @Override
       public void windowOpened(java.awt.event.WindowEvent e) {
         requestFocusInWindow();
+      }
+    });
+
+    // Keep the jukebox visible on the primary display when the operator works on
+    // a second display. The only legitimate minimize path is AdminPanel.doMinimize(),
+    // which sets adminMinimizeRequested before calling setState(ICONIFIED).
+    setAlwaysOnTop(true);
+    addWindowStateListener(e -> {
+      boolean nowIconified = (e.getNewState() & java.awt.Frame.ICONIFIED) != 0;
+      if (nowIconified) {
+        if (adminMinimizeRequested) {
+          adminMinimizeRequested = false;
+        } else {
+          SwingUtilities.invokeLater(() -> setState(java.awt.Frame.NORMAL));
+        }
       }
     });
   }
@@ -1111,6 +1130,11 @@ public class JukeANatorFrame extends JFrame {
     GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
 
     gd.setFullScreenWindow(this);
+  }
+
+  /** Called by AdminPanel immediately before it iconifies the window. */
+  public void setAdminMinimizeRequested(boolean requested) {
+    adminMinimizeRequested = requested;
   }
 
   // HOT HERE

@@ -308,6 +308,7 @@ public class AdminPanel extends JPanel {
       GraphicsDevice gd =
           GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
       gd.setFullScreenWindow(null);
+      ownerFrame.setAdminMinimizeRequested(true);
       ownerFrame.setState(JFrame.ICONIFIED);
     });
   }
