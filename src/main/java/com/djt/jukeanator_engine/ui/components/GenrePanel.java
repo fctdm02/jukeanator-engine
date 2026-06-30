@@ -421,7 +421,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
       results = new SearchResultDto();
     }
 
-    GenreDetailPanel detailPanel = new GenreDetailPanel(genre, results, imageLoader, "← BACK",
+    GenreDetailPanel detailPanel = new GenreDetailPanel(genre, results, imageLoader, "← Back",
         () -> cardLayout.show(rootPanel, CARD_GENRES), album -> pushAlbumDetail(album),
         artist -> pushArtistFromGenre(artist), songLibraryService);
 
@@ -452,7 +452,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     // Pass the albumGridProfile directly — ArtistDetailPanel now accepts a GridProfile
     // instead of four raw ints, keeping the call-site clean.
-    ArtistDetailPanel panel = new ArtistDetailPanel(full, imageLoader, albumGridProfile, "← BACK",
+    ArtistDetailPanel panel = new ArtistDetailPanel(full, imageLoader, albumGridProfile, "← Back",
         () -> cardLayout.show(rootPanel, CARD_ALBUMS), album -> pushAlbumDetail(album));
 
     replaceCard(CARD_ARTIST, panel);

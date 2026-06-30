@@ -377,7 +377,21 @@ public class AlbumViewCard extends JPanel {
     // Initial population.
     rebuildTrackRows();
 
-    return wrapper;
+    // Centering container — GridBagLayout with HORIZONTAL fill only (no weighty / VERTICAL fill)
+    // lets wrapper sit at its natural content height and be centered vertically in whatever
+    // space the outer BorderLayout.CENTER hands it. This eliminates the dead zone below the
+    // last track row in portrait mode (and on any screen where rows don't fill the full height).
+    JPanel centeringContainer = new JPanel(new GridBagLayout());
+    centeringContainer.setOpaque(false);
+    java.awt.GridBagConstraints cgbc = new java.awt.GridBagConstraints();
+    cgbc.gridx = 0;
+    cgbc.gridy = 0;
+    cgbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+    cgbc.weightx = 1.0;
+    // No weighty or VERTICAL fill — wrapper keeps its preferred height, centered.
+    centeringContainer.add(wrapper, cgbc);
+
+    return centeringContainer;
   }
 
   /**

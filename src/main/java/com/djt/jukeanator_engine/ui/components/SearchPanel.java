@@ -455,7 +455,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
       throw new IllegalStateException("Could not get artist: [" + artistName + "]", e);
     }
 
-    ArtistDetailPanel panel = new ArtistDetailPanel(full, imageLoader, albumGridProfile, "← BACK",
+    ArtistDetailPanel panel = new ArtistDetailPanel(full, imageLoader, albumGridProfile, "← Back",
         () -> cardLayout.show(rootPanel, CARD_RESULTS), album -> pushAlbumDetail(album));
 
     replaceCard(CARD_ARTIST, panel);

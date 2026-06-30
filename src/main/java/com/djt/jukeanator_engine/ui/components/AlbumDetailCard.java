@@ -55,7 +55,7 @@ public class AlbumDetailCard extends JPanel {
     JPanel buttons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 12, 0));
     buttons.setOpaque(false);
 
-    JButton backButton = createBackButton("← BACK", navigator::popToRoot);
+    JButton backButton = createBackButton("← Back", navigator::popToRoot);
     buttons.add(backButton);
 
     footer.add(buttons, BorderLayout.WEST);

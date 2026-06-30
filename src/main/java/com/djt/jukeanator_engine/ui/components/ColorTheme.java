@@ -212,7 +212,7 @@ public final class ColorTheme {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // NAVIGATION BUTTON GRADIENT (ButtonFactory / AlbumDetailCard / DetailHeaderPanel)
-  // A consistent set used for the standard "← BACK" and page-nav buttons.
+  // A consistent set used for the standard "← Back" and page-nav buttons.
   // ═══════════════════════════════════════════════════════════════════════════
 
   /** Top of the navigation button gradient (idle). */
