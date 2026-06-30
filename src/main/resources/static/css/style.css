@@ -39,20 +39,11 @@ html, body {
   align-items: center;
   justify-content: center;
   min-height: 852px;
-  background-color: #0a0a0a;
-  background-image: linear-gradient(
-    to bottom right,
-    rgba(140, 50,  50,  0.35) 0%,
-    rgba(140, 90,  30,  0.31) 20%,
-    rgba(80,  110, 40,  0.27) 42%,
-    rgba(30,  100, 110, 0.27) 62%,
-    rgba(40,  60,  140, 0.31) 82%,
-    rgba(100, 30,  140, 0.35) 100%
-  );
+  background: #000;
 }
 
 .auth-box {
-  background: rgba(0,0,0,0.45);
+  background: rgba(0,0,0,0.65);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 12px;
   padding: 2rem;
@@ -70,6 +61,13 @@ html, body {
   height: auto;
 }
 
+.auth-box h1 {
+  margin: 0 0 1.5rem;
+  color: #fff;
+  font-size: 1.6rem;
+  text-align: center;
+}
+
 .auth-box form {
   display: flex;
   flex-direction: column;
@@ -83,23 +81,30 @@ html, body {
   gap: 0.5rem;
 }
 
+.auth-box form label input {
+  width: 100%;
+}
+
 .auth-box .error-msg {
   color: #ff6b6b;
   font-size: 0.85rem;
 }
 
-.auth-box .secondary-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
+/* Blue gradient button — matches JFC/Swing "Back" nav button palette */
+.auth-btn {
+  width: 100%;
+  background: linear-gradient(to bottom, #00a0d2, #005082);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.65rem 0.8rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
 }
 
-.link-btn {
-  background: none;
-  color: var(--muted);
-  font-weight: normal;
-  padding: 0.4rem 0;
-  flex-shrink: 0;
+.auth-btn:hover {
+  background: linear-gradient(to bottom, #00bed0, #006496);
 }
 
 /* ── App frame ─────────────────────────────────────────────────────────── */
@@ -325,6 +330,39 @@ html, body {
   font-size: 1rem;
   letter-spacing: 0.05em;
   padding: 2rem;
+}
+
+/* ── Home sections ──────────────────────────────────────────────────────── */
+
+.home-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.75rem 0;
+}
+
+.home-section {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.home-section-title {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.home-section .stub-placeholder {
+  flex: unset;
+  padding: 1rem;
+  font-size: 0.85rem;
 }
 
 /* ── Sub-screens ────────────────────────────────────────────────────────── */

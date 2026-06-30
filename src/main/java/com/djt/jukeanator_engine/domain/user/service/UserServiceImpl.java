@@ -25,6 +25,7 @@ import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
+import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
@@ -116,6 +117,23 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
         java.math.BigDecimal.valueOf(CREDITS_PER_DOLLAR), 2, java.math.RoundingMode.HALF_UP);
     return new UserProfileDto(user.getPersistentIdentity(), user.getFirstName(), user.getLastName(),
         user.getEmailAddress(), user.getNumCredits(), balanceUsd, user.getSongPlayHistory());
+  }
+
+  @Override
+  public UserHomePageDto getHomePage(String emailAddress) {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new UserServiceException("User not found: " + emailAddress);
+    }
+
+    // Placeholder — all content lists are empty until the underlying features are built.
+    return new UserHomePageDto(
+        List.of(),       // (a) myRecentPlays
+        List.of(),       // (b) myPlaylists
+        List.of(),       // (c) artistsHotHere
+        List.of(),       // (d) songsHotHere
+        user.getSearchHistory());
   }
 
   @Override

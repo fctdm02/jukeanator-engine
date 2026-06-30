@@ -4,9 +4,10 @@
     token: localStorage.getItem('jwt'),
     role: localStorage.getItem('role'),
     emailAddress: localStorage.getItem('emailAddress'),
-    pendingScreen: null, // { screen, params } to navigate to after login
-    navStack: [],        // { screen, params } entries for back navigation
+    pendingScreen: null,   // { screen, params } to navigate to after login
+    navStack: [],          // { screen, params } entries for back navigation
     currentMainTab: 'music',
+    searchHistory: null,   // cached from GET /api/users/home; null = not yet loaded
   };
 
   const contentPanel = document.getElementById('contentPanel');
@@ -123,9 +124,7 @@
           </div>
         </div>
 
-        <main class="home-content" id="homeContent">
-          ${tab === 'music' ? '<div class="stub-placeholder">HOME — coming soon</div>' : ''}
-        </main>
+        <main class="home-content" id="homeContent"></main>
 
         <nav class="bottom-tabs">
           <button class="bottom-tab ${tab === 'music' ? 'active' : ''}" id="tabMusic">
@@ -166,9 +165,52 @@
       loadNowPlaying(document.getElementById('nowPlayingWidget')),
     ]);
 
-    if (tab === 'addfunds') {
-      loadAddFunds(document.getElementById('homeContent'));
+    const homeContent = document.getElementById('homeContent');
+    if (tab === 'music') {
+      loadHomePage(homeContent);
+    } else if (tab === 'addfunds') {
+      loadAddFunds(homeContent);
     }
+  }
+
+  async function loadHomePage(container) {
+    if (!container) return;
+
+    if (!state.token) {
+      container.innerHTML = '<div class="stub-placeholder">HOME — coming soon</div>';
+      return;
+    }
+
+    let homePage;
+    try {
+      homePage = await api('/api/users/home');
+    } catch {
+      container.innerHTML = '<div class="stub-placeholder">HOME — coming soon</div>';
+      return;
+    }
+
+    // Cache search history so the search page can use it without a second round-trip.
+    state.searchHistory = homePage.searchHistory || [];
+
+    container.innerHTML = `
+      <div class="home-sections">
+        <section class="home-section">
+          <h2 class="home-section-title">My Recent Plays</h2>
+          <div class="home-section-body stub-placeholder">Coming soon</div>
+        </section>
+        <section class="home-section">
+          <h2 class="home-section-title">My Playlists</h2>
+          <div class="home-section-body stub-placeholder">Coming soon</div>
+        </section>
+        <section class="home-section">
+          <h2 class="home-section-title">Artists Hot Here</h2>
+          <div class="home-section-body stub-placeholder">Coming soon</div>
+        </section>
+        <section class="home-section">
+          <h2 class="home-section-title">Songs Hot Here</h2>
+          <div class="home-section-body stub-placeholder">Coming soon</div>
+        </section>
+      </div>`;
   }
 
   // ── Header data loaders ─────────────────────────────────────────────────
@@ -529,15 +571,14 @@
       <div class="centered-view">
         <div class="auth-box">
           <div class="auth-logo"><img src="/images/JukeANatorLogo.png" alt="JukeANator"></div>
+          <h1>Login</h1>
           <form id="loginForm">
             ${errorMessage ? `<div class="error-msg">${errorMessage}</div>` : ''}
-            <label>Email <input type="email" id="loginEmail" required></label>
-            <label>Password <input type="password" id="loginPassword" required></label>
-            <button type="submit">Log in</button>
-            <div class="secondary-actions">
-              <button type="button" id="loginCancelBtn" class="link-btn">Cancel</button>
-              <button type="button" id="showRegisterBtn" class="link-btn">Create Account</button>
-            </div>
+            <label>Email <input type="email" id="loginEmail" autocomplete="email" required></label>
+            <label>Password <input type="password" id="loginPassword" autocomplete="current-password" required></label>
+            <button type="submit" class="auth-btn">Login</button>
+            <button type="button" id="showRegisterBtn" class="auth-btn">Create Account</button>
+            <button type="button" id="loginCancelBtn" class="auth-btn">Cancel</button>
           </form>
         </div>
       </div>`;
@@ -569,17 +610,16 @@
     contentPanel.innerHTML = `
       <div class="centered-view">
         <div class="auth-box">
+          <div class="auth-logo"><img src="/images/JukeANatorLogo.png" alt="JukeANator"></div>
           <h1>Create Account</h1>
-          <form id="registerForm">
+          <form id="registerForm" autocomplete="off">
             ${errorMessage ? `<div class="error-msg">${errorMessage}</div>` : ''}
-            <label>First name <input type="text" id="registerFirstName" required></label>
-            <label>Last name <input type="text" id="registerLastName" required></label>
-            <label>Email <input type="email" id="registerEmail" required></label>
-            <label>Password <input type="password" id="registerPassword" required></label>
-            <button type="submit">Register</button>
-            <div class="secondary-actions">
-              <button type="button" id="registerCancelBtn" class="link-btn">Cancel</button>
-            </div>
+            <label>First name <input type="text" id="registerFirstName" autocomplete="off" required></label>
+            <label>Last name <input type="text" id="registerLastName" autocomplete="off" required></label>
+            <label>Email <input type="email" id="registerEmail" autocomplete="off" required></label>
+            <label>Password <input type="password" id="registerPassword" autocomplete="new-password" required></label>
+            <button type="submit" class="auth-btn">Submit</button>
+            <button type="button" id="registerCancelBtn" class="auth-btn">Cancel</button>
           </form>
         </div>
       </div>`;
@@ -606,12 +646,8 @@
   }
 
   function afterLogin() {
-    const pending = state.pendingScreen;
     state.pendingScreen = null;
-    if (!pending) { renderMain('music'); return; }
-    if (pending.screen === 'addfunds') { renderMain('addfunds'); }
-    else if (pending.screen === 'my-account') { navigateSub('my-account'); }
-    else { renderMain('music'); }
+    renderMain('music');
   }
 
   // ── Search ──────────────────────────────────────────────────────────────
@@ -652,6 +688,8 @@
   }
 
   async function loadSearchHistory() {
+    // Prefer the copy already fetched by loadHomePage to avoid a second round-trip.
+    if (state.searchHistory) return state.searchHistory;
     if (state.token) {
       try { return await api('/api/users/search-history'); } catch { /* fall through */ }
     }
@@ -659,6 +697,7 @@
   }
 
   async function saveSearchQuery(query) {
+    state.searchHistory = null; // invalidate cache so next loadSearchHistory re-fetches
     if (state.token) {
       try { await api('/api/users/search-history', { method: 'POST', body: JSON.stringify({ query }) }); } catch { /* ignore */ }
     } else {
@@ -673,6 +712,7 @@
   }
 
   async function deleteSearchHistoryItem(index) {
+    state.searchHistory = null; // invalidate cache
     if (state.token) {
       try { await api(`/api/users/search-history/${index}`, { method: 'DELETE' }); } catch { /* ignore */ }
     } else {

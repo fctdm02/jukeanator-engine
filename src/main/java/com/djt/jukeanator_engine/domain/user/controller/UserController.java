@@ -18,6 +18,7 @@ import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
+import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 
@@ -42,6 +43,13 @@ public class UserController {
   public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
 
     return ResponseEntity.ok(userService.login(request));
+  }
+
+  /** Returns home-page content and search history for the currently authenticated user. */
+  @GetMapping("/home")
+  public ResponseEntity<UserHomePageDto> getHomePage(@AuthenticationPrincipal String emailAddress) {
+
+    return ResponseEntity.ok(userService.getHomePage(emailAddress));
   }
 
   /** Returns the profile for the currently authenticated user */
