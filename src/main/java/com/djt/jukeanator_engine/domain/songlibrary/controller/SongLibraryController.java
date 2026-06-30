@@ -31,17 +31,14 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
-import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
-import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
-import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
 /**
  * @author tmyers
  */
 @RestController
 @RequestMapping("/api/song-library")
-public class SongLibraryController implements SongLibraryService {
+public class SongLibraryController {
 
   private final SongLibraryService songLibraryService;
 
@@ -53,61 +50,61 @@ public class SongLibraryController implements SongLibraryService {
   }
 
   // USER ROLE METHODS
-  @Override
+
   @GetMapping("/popular")
   public SearchResultDto getMusicByPopularity() {
     return songLibraryService.getMusicByPopularity();
   }
 
-  @Override
+
   @GetMapping("/search")
   public SearchResultDto getMusicBySearch(@RequestParam String searchFor) {
     return songLibraryService.getMusicBySearch(searchFor);
   }
 
-  @Override
+
   @GetMapping("/genres")
   public List<GenreDto> getGenres() {
     return songLibraryService.getGenres();
   }
 
-  @Override
+
   @GetMapping("/genres/popular")
   public SearchResultDto getGenreMusicByPopularity(@RequestParam String genreName) {
     return songLibraryService.getGenreMusicByPopularity(genreName);
   }
 
-  @Override
+
   @GetMapping("/genres/title")
   public SearchResultDto getGenreMusicByTitle(@RequestParam String genreName) {
     return songLibraryService.getGenreMusicByTitle(genreName);
   }
 
-  @Override
+
   @GetMapping("/artists")
   public List<ArtistDto> getArtists() {
     return songLibraryService.getArtists();
   }
 
-  @Override
+
   @GetMapping("/artist")
   public ArtistDto getArtistByName(@RequestParam String artistName) {
     return songLibraryService.getArtistByName(artistName);
   }
 
-  @Override
+
   @GetMapping("/albums")
   public List<AlbumDto> getAlbums() {
     return songLibraryService.getAlbums();
   }
 
-  @Override
+
   @GetMapping("/genres/{genreId}/albums")
   public List<AlbumDto> getAlbumsForGenre(@PathVariable Integer genreId) {
     return songLibraryService.getAlbumsForGenre(genreId);
   }
 
-  @Override
+
   @GetMapping("/albums/{id}")
   public AlbumDto getAlbumById(@PathVariable Integer id) {
     return songLibraryService.getAlbumById(id);
@@ -138,13 +135,13 @@ public class SongLibraryController implements SongLibraryService {
         .body(new FileSystemResource(coverArtPath));
   }
 
-  @Override
+
   @GetMapping("/songs/{albumId}/{songId}")
   public SongDto getSongById(@PathVariable Integer albumId, @PathVariable Integer songId) {
     return songLibraryService.getSongById(albumId, songId);
   }
 
-  @Override
+
   @GetMapping("/songs/random")
   public SongDto getRandomSongFromBackgroundMusicPlaylist() {
     return songLibraryService.getRandomSongFromBackgroundMusicPlaylist();
@@ -152,14 +149,14 @@ public class SongLibraryController implements SongLibraryService {
 
 
   // ADMIN ROLE METHODS
-  @Override
+
   @PostMapping("/scanNoPath")
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 
     return songLibraryService.scanFileSystemForSongs();
   }
 
-  @Override
+
   @PostMapping("/scan")
   public Integer scanFileSystemForSongs(@RequestBody ScanRequest scanRequest)
       throws SongScanFailedException {
@@ -167,21 +164,21 @@ public class SongLibraryController implements SongLibraryService {
     return songLibraryService.scanFileSystemForSongs(scanRequest);
   }
 
-  @Override
+
   @PostMapping("/resetSongStatistics")
   public Integer resetSongStatistics() {
 
     return songLibraryService.resetSongStatistics();
   }
 
-  @Override
+
   @PostMapping("/restoreSongStatistics")
   public Integer restoreSongStatistics(@RequestBody String filename) {
 
     return songLibraryService.restoreSongStatistics(filename);
   }
 
-  @Override
+
   @GetMapping("/searchInternetForAlbumMetadata")
   public List<AlbumMetadataDto> searchInternetForAlbumMetadata(@RequestParam String artistName,
       @RequestParam String albumName, int limit) {
@@ -189,7 +186,7 @@ public class SongLibraryController implements SongLibraryService {
     return songLibraryService.searchInternetForAlbumMetadata(artistName, albumName, limit);
   }
 
-  @Override
+
   @PostMapping("/albums/{albumId}/updateAlbumMetadata")
   public AlbumMetadataDto updateAlbumMetadata(@PathVariable Integer albumId,
       @RequestBody AlbumMetadataDto albumMetadata) {
@@ -197,7 +194,7 @@ public class SongLibraryController implements SongLibraryService {
     return songLibraryService.updateAlbumMetadata(albumId, albumMetadata);
   }
 
-  @Override
+
   @PostMapping("/downloadAlbumCoverArt")
   public String downloadAlbumCoverArt(
       @RequestBody DownloadAlbumCoverArtRequest downloadAlbumCoverArtRequest) {
@@ -205,25 +202,12 @@ public class SongLibraryController implements SongLibraryService {
     return songLibraryService.downloadAlbumCoverArt(downloadAlbumCoverArtRequest);
   }
 
-  @Override
+
   @PostMapping("/authenticateForAdminPanel")
   public Boolean authenticateForAdminPanel(
       @RequestBody AuthenticateForAdminPanelRequest authenticateForAdminPanelRequest) {
     return songLibraryService.authenticateForAdminPanel(authenticateForAdminPanelRequest);
   }
 
-  @Override
-  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
-    throw new UnsupportedOperationException("This method cannot be invoked by a user");
-  }
 
-  @Override
-  public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
-    throw new UnsupportedOperationException("This method cannot be invoked by a user");
-  }
-
-  @Override
-  public RootFolderEntity getSongLibraryRoot() {
-    throw new UnsupportedOperationException("This method cannot be invoked by a user");
-  }
 }
