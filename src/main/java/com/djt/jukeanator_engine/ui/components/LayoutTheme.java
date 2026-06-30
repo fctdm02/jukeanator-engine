@@ -192,6 +192,7 @@ public class LayoutTheme {
     // ── Font sizes (header) ───────────────────────────────────────────────────
     fontSizeDetailTitle = 26;
     fontSizeAlbumLabel = 14;
+    fontSizeArtistLabel = 16;
 
     // ── Tab bar ────────────────────────────────────────────────────────────────
     tabWidth = 200;
@@ -362,6 +363,7 @@ public class LayoutTheme {
       // Detail header font, album label font — same as landscape for portrait
       fontSizeDetailTitle = 26;
       fontSizeAlbumLabel = 14;
+      fontSizeArtistLabel = 12;
 
       // Tab bar — same as landscape for portrait
       tabWidth = 200;
@@ -568,6 +570,7 @@ public class LayoutTheme {
       // leaving just enough padding at the top for a comfortable look.
       //
       fontSizeAlbumLabel = 11; // landscape default: 14
+      fontSizeArtistLabel = 12; // landscape default: 16
 
       // ── ResultsColumnPanel nav panel — compact for 1024 × 768 ────────────────
       //
@@ -863,41 +866,45 @@ public class LayoutTheme {
 
   private GridProfile computeLandscapeProfile(int screenW, int screenH) {
 
-    // Scale relative to the canonical 1920 × 1080 resolution.
-    // Use the smaller of the two axes so the grid always fits without clipping.
-    double scaleX = (double) screenW / CANONICAL_W;
-    double scaleY = (double) screenH / CANONICAL_H;
-    double scale = Math.min(scaleX, scaleY);
-    scale = Math.max(GRID_SCALE_MIN, Math.min(scale, GRID_SCALE_MAX));
+    // Grid dimensions are fixed at the landscape caps (4 cols × 2 rows).
+    final int cols = GRID_MAX_COLS_LANDSCAPE;
+    final int rows = GRID_MAX_ROWS_LANDSCAPE;
 
-    // Scale the canonical art dimensions and round to an even number of pixels.
-    int artW = roundEven((int) Math.round(homeArtW * scale));
-    int artH = roundEven((int) Math.round(homeArtH * scale));
+    // ── Height axis ─────────────────────────────────────────────────────────
+    // Deduct all fixed chrome to find the height available to the grid panel.
+    //   topPanelHeight   — credits / now-playing strip
+    //   tabHeight        — bottom JTabbedPane tab bar
+    //   detailHeaderH    — DetailHeaderPanel (HomePanel NORTH): icon + 4+4 px border
+    //   LETTER_NAV_H     — letter-navigation strip (nav button + 4+4 px padding)
+    int detailHeaderH = detailHeaderImageH + DETAIL_HEADER_BORDER_V;
+    int gridPanelH = screenH - topPanelHeight - tabHeight - detailHeaderH - LETTER_NAV_H;
 
-    // Available content height after fixed chrome is removed.
-    // topPanelHeight — credits / now-playing strip
-    // tabHeight — bottom JTabbedPane tab bar
-    // LETTER_NAV_H — letter-navigation strip in AlbumGridPanel (36px + 8px padding)
-    // TILE_TEXT_H — album + artist labels below each tile (≈ 40px)
-    // GRID_PADDING_V — top + bottom padding of the grid panel (≈ 16px)
-    int availH = screenH - topPanelHeight - tabHeight - LETTER_NAV_H - TILE_TEXT_H - GRID_PADDING_V;
+    // GridLayout distributes gridPanelH across rows after the grid panel's own
+    // top+bottom EmptyBorder (GRID_BORDER_V) and the inter-tile vertical gaps.
+    int tileCellH = (gridPanelH - GRID_BORDER_V - albumGridGapV * (rows - 1)) / rows;
 
-    // Available content width after left + right grid panel padding.
-    int availW = screenW - GRID_PADDING_H;
+    // Art height = tile cell minus the text panel below the art and the tile border,
+    // then scaled back by ART_FILL_FACTOR to leave visible padding around the image.
+    int artH = (int) Math.round((tileCellH - TILE_TEXT_H - TILE_BORDER_V) * ART_FILL_FACTOR);
 
-    // Derive cols and rows from available space ÷ tile size (plus inter-tile gap).
-    int tileW = artW + albumGridGapH;
-    int tileH = artH + albumGridGapV;
+    // ── Width axis ──────────────────────────────────────────────────────────
+    // The grid panel border is edge-to-edge (left+right = 0), so no horizontal
+    // border deduction is needed — only the inter-tile horizontal gaps.
+    int tileCellW = (screenW - albumGridGapH * (cols - 1)) / cols;
+    int artW = (int) Math.round((tileCellW - TILE_BORDER_H) * ART_FILL_FACTOR);
 
-    int cols = Math.max(1, availW / tileW);
-    int rows = Math.max(1, availH / tileH);
+    // Keep square, round to even pixel, apply safety floor.
+    int artSize = roundEven(Math.min(artH, artW));
+    artSize = Math.max(artSize, 80);
 
-    // Cap at the canonical maximums so very large screens don't produce huge pages.
-    cols = Math.min(cols, GRID_MAX_COLS_LANDSCAPE);
-    rows = Math.min(rows, GRID_MAX_ROWS_LANDSCAPE);
-
-    return new GridProfile(cols, rows, artW, artH);
+    return new GridProfile(cols, rows, artSize, artSize);
   }
+
+  /**
+   * Fraction of each tile's available art area that the cover image fills. Values below 1.0 leave
+   * visible padding around the image so it doesn't press flush against the tile edges.
+   */
+  private static final double ART_FILL_FACTOR = 0.90;
 
   // ── Portrait ──────────────────────────────────────────────────────────────
 
@@ -1087,8 +1094,8 @@ public class LayoutTheme {
   private final double portraitArtReduction;
 
   // Maximum grid dimensions (prevents absurdly large pages on 4 K+ or portrait 4 K displays)
-  private static final int GRID_MAX_COLS_LANDSCAPE = 8;
-  private static final int GRID_MAX_ROWS_LANDSCAPE = 5;
+  private static final int GRID_MAX_COLS_LANDSCAPE = 4;
+  private static final int GRID_MAX_ROWS_LANDSCAPE = 2;
   private static final int GRID_MAX_COLS_PORTRAIT = 4;
   private static final int GRID_MAX_ROWS_PORTRAIT = 8;
   /**
@@ -1505,7 +1512,7 @@ public class LayoutTheme {
   public final int homeGridCols = 4;
 
   /** Canonical number of rows in the main album grid (1920 × 1080 landscape). */
-  public final int homeGridRows = 3;
+  public final int homeGridRows = 2;
 
   /** Canonical width of each album cover-art thumbnail in the main grid. */
   public final int homeArtW = 190;
@@ -2073,7 +2080,7 @@ public class LayoutTheme {
   public final int fontSizeAdminHeader = 22; // AdminPanel header title
   public final int fontSizeAdminSection = 14; // AdminPanel section header labels
   public final int fontSizeAlbumLabel; // AlbumGridPanel tile album name
-  public final int fontSizeArtistLabel = 12; // AlbumGridPanel tile artist name
+  public final int fontSizeArtistLabel; // AlbumGridPanel tile artist name
   public final int fontSizePageLabel = 15; // Pagination page labels
   public final int fontSizeSortBtn; // GenreDetailPanel sort buttons
 

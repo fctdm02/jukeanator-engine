@@ -221,9 +221,14 @@ public class HomePanel extends JPanel implements TabNavigator {
       rawAlbums = List.of();
     }
 
+    // Both lists are sorted explicitly — do not rely on the service's return order.
+    // The letter map for each view must be built from its own sorted list so that
+    // the indices stored in the map align exactly with the positions in the list
+    // that AlbumGridPanel will paginate through.
     albumsByTitle = sortAlbums(rawAlbums, AlbumDto::getAlbumName);
-    albumsByArtist = sortAlbums(rawAlbums, AlbumDto::getArtistName);
     letterMapByTitle = buildLetterMap(albumsByTitle, AlbumDto::getAlbumName);
+
+    albumsByArtist = sortAlbums(rawAlbums, AlbumDto::getArtistName);
     letterMapByArtist = buildLetterMap(albumsByArtist, AlbumDto::getArtistName);
 
     // Icon size is read from LayoutTheme so that the header shrinks on small-landscape

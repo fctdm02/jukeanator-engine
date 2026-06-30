@@ -139,6 +139,32 @@ public class AlbumViewCard extends JPanel {
       cover.setForeground(new Color(80, 80, 100));
     }
 
+    // Wrap in GridBagLayout so the explicit-lyrics badge can be overlaid in the
+    // same cell — mirrors the technique used in AlbumGridPanel.buildTile().
+    JPanel artWrapper = new JPanel(new GridBagLayout());
+    artWrapper.setOpaque(false);
+
+    java.awt.GridBagConstraints artGbc = new java.awt.GridBagConstraints();
+    artGbc.gridx = 0;
+    artGbc.gridy = 0;
+    artWrapper.add(cover, artGbc);
+
+    if (Boolean.TRUE.equals(album.getHasExplicit())) {
+      int overlayW = (COVER_SIZE * 2) / 5;
+      int overlayH = overlayW / 2;
+      ImageIcon warningIcon =
+          imageLoader.loadClasspathImage("Explicit_Lyrics.jpg", overlayW, overlayH);
+      JLabel explicitBadge = new JLabel(warningIcon);
+      explicitBadge.setOpaque(false);
+      java.awt.GridBagConstraints badgeGbc = new java.awt.GridBagConstraints();
+      badgeGbc.gridx = 0;
+      badgeGbc.gridy = 0;
+      badgeGbc.anchor = java.awt.GridBagConstraints.NORTH;
+      badgeGbc.insets = new java.awt.Insets(12, 0, 0, 0);
+      artWrapper.add(explicitBadge, badgeGbc);
+      artWrapper.setComponentZOrder(explicitBadge, 0);
+    }
+
     // ── Metadata ──────────────────────────────────────────────────────────
     JPanel meta = new JPanel();
     meta.setOpaque(false);
@@ -191,7 +217,7 @@ public class AlbumViewCard extends JPanel {
     JPanel content = new JPanel();
     content.setOpaque(false);
     content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
-    content.add(cover);
+    content.add(artWrapper);
     content.add(meta);
 
     // Place content in the centre of the sidebar so it is vertically centred
