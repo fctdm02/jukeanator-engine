@@ -82,7 +82,7 @@ public class HomePanel extends JPanel implements TabNavigator {
   private List<AlbumDto> albumsByArtist = List.of();
   private Map<String, List<AlbumDto>> letterMapByTitle = Map.of();
   private Map<String, List<AlbumDto>> letterMapByArtist = Map.of();
-  private SortMode currentSort = SortMode.TITLE;
+  private SortMode currentSort = SortMode.ARTIST;
 
   // ── Live grid container (the AlbumGridPanel inside is swapped on sort change) ──
   private final JPanel gridContainer = new JPanel(new BorderLayout());
@@ -232,8 +232,29 @@ public class HomePanel extends JPanel implements TabNavigator {
     int headerIconSize = LayoutTheme.get().detailHeaderImageW;
     ImageIcon allAlbumsIcon =
         imageLoader.loadImage("AllAlbumsLogo.png", headerIconSize, headerIconSize);
+
+    // Artist/song totals are static for the lifetime of this panel, so they are
+    // fetched ONCE here rather than recomputed on every sort toggle/header rebuild.
+    int artistCount;
+    int songCount;
+    try {
+      com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto allMusic =
+          songLibraryService.getMusicByPopularity();
+      artistCount = allMusic != null && allMusic.getArtists() != null
+          ? allMusic.getArtists().size()
+          : 0;
+      songCount =
+          allMusic != null && allMusic.getSongs() != null ? allMusic.getSongs().size() : 0;
+    } catch (Exception e) {
+      artistCount = 0;
+      songCount = 0;
+    }
+
+    String subtitle = artistCount + " artists  •  " + albumsByTitle.size() + " albums  •  "
+        + songCount + " songs";
+
     DetailHeaderPanel header = new DetailHeaderPanel(null, null, allAlbumsIcon, "♫", "All Albums",
-        albumsByTitle.size() + " albums", buildSortButtonPanel());
+        subtitle, buildSortButtonPanel());
     header.setOpaque(false);
     // Left/right padding matches the album grid's own horizontal border so the header
     // icon/text aligns on the y-axis with the tile columns below it.
@@ -282,11 +303,11 @@ public class HomePanel extends JPanel implements TabNavigator {
     sortLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSortLabel));
     row.add(sortLabel);
 
-    btnTitle = sortButton("Title", SortMode.TITLE);
     btnArtist = sortButton("Artist", SortMode.ARTIST);
+    btnTitle = sortButton("Title", SortMode.TITLE);
 
-    row.add(btnTitle);
     row.add(btnArtist);
+    row.add(btnTitle);
 
     JPanel wrapper = new JPanel();
     wrapper.setLayout(new javax.swing.BoxLayout(wrapper, javax.swing.BoxLayout.Y_AXIS));

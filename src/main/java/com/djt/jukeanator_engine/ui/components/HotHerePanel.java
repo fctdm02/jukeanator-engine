@@ -216,7 +216,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     // glyph that already represents this tab on the JukeboxTabComponent.
     int headerIconSize = LayoutTheme.get().detailHeaderImageW;
     ImageIcon hotHereIcon =
-        imageLoader.loadImage("HotHereLogo.png", headerIconSize, headerIconSize);
+        imageLoader.loadImage("HotHere_Header_Image.png", headerIconSize, headerIconSize);
 
     String subtitle =
         artistCount + " artists  •  " + albumCount + " albums  •  " + songCount + " songs";

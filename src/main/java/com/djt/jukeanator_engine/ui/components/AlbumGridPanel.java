@@ -12,7 +12,6 @@ import java.awt.LinearGradientPaint;
 import java.awt.RenderingHints;
 import java.util.List;
 import java.util.Map;
-import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -26,11 +25,6 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 public class AlbumGridPanel extends JPanel {
 
   private static final long serialVersionUID = 1L;
-
-  // ── Palette — sourced from ColorTheme.get() ──────────────────────────────
-
-  /** Matches {@code AlbumViewCard.ACCENT_EXPLICIT} so the badge looks identical everywhere. */
-  private static final Color ACCENT_EXPLICIT = new Color(220, 60, 60);
 
   // ─────────────────────────────────────────────────────────────────────────
   // SHARED DISPLAY HELPER
@@ -564,19 +558,20 @@ public class AlbumGridPanel extends JPanel {
     artGbc.gridy = 0;
     artWrapper.add(artLabel, artGbc);
 
-    // ── Explicit badge — overlaid on top of the cover art, same style as AlbumViewCard ──
+    // ── Explicit warning image — overlaid on top of the cover art ────────────
     if (Boolean.TRUE.equals(album.getHasExplicit())) {
-      JLabel explicit = new JLabel("EXPLICIT");
-      explicit.setOpaque(true);
-      explicit.setBackground(Color.WHITE);
-      explicit.setForeground(ACCENT_EXPLICIT);
-      explicit.setFont(
-          new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
-      explicit.setBorder(BorderFactory.createCompoundBorder(
-          BorderFactory.createLineBorder(ACCENT_EXPLICIT, 1), new EmptyBorder(2, 6, 2, 6)));
+      // Scale the warning image to 80% of the art width; height is set to half
+      // that to match the standard 2:1 Parental Advisory sticker aspect ratio.
+      int overlayW = (albumGridProfile.artW() * 2) / 5;
+      int overlayH = overlayW / 2;
+      ImageIcon warningIcon = imageLoader.loadClasspathImage(
+          "Explicit_Lyrics.jpg", overlayW, overlayH);
+
+      JLabel explicit = new JLabel(warningIcon);
+      explicit.setOpaque(false);
 
       // Same cell as artLabel (gridx=0, gridy=0) — GridBagLayout lets multiple
-      // components share a cell. Anchor NORTH centers the badge horizontally
+      // components share a cell. Anchor NORTH centers the image horizontally
       // within the column's full width (driven by artLabel's preferred size)
       // and pins it to the top edge.
       java.awt.GridBagConstraints badgeGbc = new java.awt.GridBagConstraints();
@@ -586,7 +581,7 @@ public class AlbumGridPanel extends JPanel {
       badgeGbc.insets = new java.awt.Insets(12, 0, 0, 0);
       artWrapper.add(explicit, badgeGbc);
       // Component z-order index 0 is painted LAST (i.e. on top) — push the
-      // badge to index 0 so it renders over artLabel instead of underneath it.
+      // overlay to index 0 so it renders over artLabel instead of underneath it.
       artWrapper.setComponentZOrder(explicit, 0);
     }
 
@@ -597,6 +592,15 @@ public class AlbumGridPanel extends JPanel {
     textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
     textPanel.setOpaque(false);
     textPanel.setBorder(new EmptyBorder(6, 8, 6, 8));
+
+    // Artist is shown first (smaller font), album title second (larger font, bold) —
+    // matches the Home screen's default Artist-first ordering.
+    JLabel artistLabel = new JLabel(album.getArtistName() != null ? album.getArtistName() : "",
+        SwingConstants.CENTER);
+    artistLabel.setForeground(ColorTheme.get().textSecondary);
+    artistLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeArtistLabel));
+    artistLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
 
     JLabel albumLabel = new JLabel(
         "<html><div style='text-align:center;'>"
@@ -610,16 +614,18 @@ public class AlbumGridPanel extends JPanel {
     // Tooltip shows the full untruncated name when the tile is too narrow.
     albumLabel.setToolTipText(albumDisplayName(album.getAlbumName(), album.getGenreName()));
 
-    JLabel artistLabel = new JLabel(album.getArtistName() != null ? album.getArtistName() : "",
-        SwingConstants.CENTER);
-    artistLabel.setForeground(ColorTheme.get().textSecondary);
-    artistLabel
-        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeArtistLabel));
-    artistLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
-
-    textPanel.add(albumLabel);
-    textPanel.add(Box.createVerticalStrut(2));
-    textPanel.add(artistLabel);
+    // Only the full "All Albums" grid (HomePanel, showLetterNav) defaults to browsing
+    // by artist, so it leads with the artist line. The per-artist grid (ArtistDetailPanel)
+    // already shows one artist's albums, so it keeps the album title on top.
+    if (showLetterNav) {
+      textPanel.add(artistLabel);
+      textPanel.add(Box.createVerticalStrut(2));
+      textPanel.add(albumLabel);
+    } else {
+      textPanel.add(albumLabel);
+      textPanel.add(Box.createVerticalStrut(2));
+      textPanel.add(artistLabel);
+    }
 
     tile.add(artWrapper, BorderLayout.CENTER);
     tile.add(textPanel, BorderLayout.SOUTH);

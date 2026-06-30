@@ -174,7 +174,7 @@ public class QueuePanel extends JPanel {
    */
   private DetailHeaderPanel buildHeaderPanel() {
     int iconSize = LayoutTheme.get().detailHeaderImageW;
-    ImageIcon queueIcon = imageLoader.loadImage("QueueLogo.png", iconSize, iconSize);
+    ImageIcon queueIcon = imageLoader.loadImage("Queue_Header_Image.png", iconSize, iconSize);
 
     // BorderLayout.EAST stretches the legend panel to the header's full height, and its
     // own FlowLayout then lays the row out starting from the top — pinning it level with
