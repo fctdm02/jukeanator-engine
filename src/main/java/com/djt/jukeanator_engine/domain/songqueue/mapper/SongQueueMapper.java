@@ -27,13 +27,11 @@ public final class SongQueueMapper {
   }
 
   public static SongQueueEntryDto toDto(SongQueueEntryEntity entity) {
-    
+
     SongFileEntity song = entity.getSong();
 
-    SongQueueEntryDto dto = new SongQueueEntryDto(
-        SongLibraryMapper.toSongDto(song),
-        entity.getPriority(),
-        song.getNaturalIdentity());
+    SongQueueEntryDto dto = new SongQueueEntryDto(entity.getUsername(),
+        SongLibraryMapper.toSongDto(song), entity.getPriority(), song.getNaturalIdentity());
 
     return dto;
   }

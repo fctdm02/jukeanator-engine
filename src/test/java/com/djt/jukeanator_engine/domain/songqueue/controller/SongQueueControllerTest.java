@@ -38,7 +38,7 @@ class SongQueueControllerTest extends AbstractControllerTest {
 
   private SongQueueEntryDto aQueueEntry() {
     SongDto song = new SongDto(1, "Genre", 2, "Artist", 3, "Album", "/cover.jpg", 4, "Song", 1, 0);
-    return new SongQueueEntryDto(song, 5, "/music/song.mp3");
+    return new SongQueueEntryDto("su@domain.com", song, 5, "/music/song.mp3");
   }
 
   @Test

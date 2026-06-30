@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.user.service;
 
 import static java.util.Objects.requireNonNull;
 import java.util.ArrayList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -14,8 +15,9 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
-import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
-import java.util.List;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
@@ -61,18 +63,6 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     initialize();
 
     log.info("Using user root: " + this.userRoot);
-  }
-
-  @EventListener
-  public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
-    log.info("""
-        Received ScanFileSystemForSongsEvent:
-        scanPath={}
-        albumCount={}
-        """, event.scanPath(), event.albumCount());
-
-    this.rootPath = event.scanPath();
-    initialize();
   }
 
   // Service methods
@@ -129,6 +119,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   @Override
   public List<CreditPackageDto> getCreditPackages() {
+    
     return List.of(
         new CreditPackageDto("pkg-20", 60, 20, new java.math.BigDecimal("20.00"), "Best Value"),
         new CreditPackageDto("pkg-10", 30, 10, new java.math.BigDecimal("10.00"), null),
@@ -138,6 +129,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   @Override
   public void changePassword(String emailAddress, ChangePasswordRequest request) {
+    
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) throw new UserServiceException("User not found: " + emailAddress);
     if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
@@ -149,54 +141,73 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   @Override
   public void deleteAccount(String emailAddress) {
+    
     throw new UserServiceException("Delete account not yet implemented");
   }
 
   @Override
   public void addFunds(String emailAddress, AddFundsRequest request) {
+    
     throw new UserServiceException("Add funds payment not yet implemented");
   }
 
   @Override
   public UserProfileDto updateProfile(String emailAddress, UpdateProfileRequest request) {
+    
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) throw new UserServiceException("User not found: " + emailAddress);
+    
     if (request.firstName() != null) user.setFirstName(request.firstName());
     if (request.lastName() != null) user.setLastName(request.lastName());
+    
     this.userRepository.storeAggregateRoot(this.userRoot);
     return getProfile(emailAddress);
   }
 
   @Override
   public List<String> getSearchHistory(String emailAddress) {
+    
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) throw new UserServiceException("User not found: " + emailAddress);
+    
     return user.getSearchHistory();
   }
 
   @Override
   public void addSearchHistory(String emailAddress, String query) {
+    
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) throw new UserServiceException("User not found: " + emailAddress);
+    
     user.addToSearchHistory(query, 10);
+    
     this.userRepository.storeAggregateRoot(this.userRoot);
   }
 
   @Override
   public void removeSearchHistory(String emailAddress, int index) {
+    
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) throw new UserServiceException("User not found: " + emailAddress);
+    
     user.removeFromSearchHistory(index);
+    
     this.userRepository.storeAggregateRoot(this.userRoot);
   }
-
-  /** Called by SongLibraryService (or an event listener) when a song is played */
-  /*
-   * TODO: Need to have either singleton LOCAL UserEntity or a logged in remote user associated with
-   * every SongPlay public void recordSongPlay(String emailAddress, Integer albumId, Integer songId)
-   * { userRepository.findByEmailAddress(emailAddress).ifPresent(user -> {
-   * user.getSongPlayHistory().add(albumId + ":" + songId); userRepository.save(user); }); }
-   */
+  
+  @EventListener
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
+    
+    String emailAddress = event.queueEntry().getUsername();
+    
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) throw new UserServiceException("User not found: " + emailAddress);
+    
+    SongDto song = event.queueEntry().getSong();
+    user.addSongToSongPlayHistory(new SongIdentifier(song.getAlbumId(), song.getSongId()));
+    
+    this.userRepository.storeAggregateRoot(this.userRoot);
+  }
 
   // Repository methods
   @Override

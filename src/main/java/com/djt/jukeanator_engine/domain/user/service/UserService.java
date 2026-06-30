@@ -1,8 +1,8 @@
 package com.djt.jukeanator_engine.domain.user.service;
 
-import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
-import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import java.util.List;
+import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
@@ -40,22 +40,64 @@ public interface UserService {
    */
   UserProfileDto getProfile(String emailAddress);
 
+  /**
+   * 
+   * @return
+   */
   List<CreditPackageDto> getCreditPackages();
+  
+  /**
+   * 
+   * @param emailAddress
+   * @param request
+   */
   void changePassword(String emailAddress, ChangePasswordRequest request);
+  
+  /**
+   * 
+   * @param emailAddress
+   */
   void deleteAccount(String emailAddress);
+  
+  /**
+   * 
+   * @param emailAddress
+   * @param request
+   */
   void addFunds(String emailAddress, AddFundsRequest request);
+  
+  /**
+   * 
+   * @param emailAddress
+   * @param request
+   * @return
+   */
   UserProfileDto updateProfile(String emailAddress, UpdateProfileRequest request);
 
+  /**
+   * 
+   * @param emailAddress
+   * @return
+   */
   List<String> getSearchHistory(String emailAddress);
 
+  /**
+   * 
+   * @param emailAddress
+   * @param query
+   */
   void addSearchHistory(String emailAddress, String query);
 
+  /**
+   * 
+   * @param emailAddress
+   * @param index
+   */
   void removeSearchHistory(String emailAddress, int index);
 
   /**
-   *
+   * 
    * @param event
    */
-  @PublicServiceMethod
-  void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event);
+  void handleSongAddedToQueueEvent(SongAddedToQueueEvent event);
 }

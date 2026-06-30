@@ -1018,7 +1018,6 @@ DONE Albums are not sorted by popularity for artist detail panel
 
 DONE Song queue is still not being auto-populated correctly
 
-  
 36: Move over the most relevant features from:
 
 PlayerVolume=75
@@ -1059,6 +1058,13 @@ RandomByPlayListThreshold=1
 RandomPlayListFilePath=Top50Songs.PL
 RandomByGenre=false
 RandomByCD=false
+ 
+37: Handle the following error:
+2026-06-30 14:36:09.630 [main] WARN  c.d.j.d.s.s.SongQueueServiceImpl - 
+getNextSmartAdditionSong: failed for core song 
+R:\\Rock_On_Third\Rock\The Smithereens\Blown To Smithereens - The Best Of The Smithereens\The Smithereens-11-Blues Before & After.mp3
+Cannot invoke "String.replace(java.lang.CharSequence, java.lang.CharSequence)" because the return value of 
+"com.djt.jukeanator_engine.domain.songlibrary.model.utils.BackgroundMusicHelper.getRandomSmartAdditionSongPath(String, String, String)" is null
  
  
 

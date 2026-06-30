@@ -5,18 +5,21 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 
 public class SongQueueEntryDto {
 
+  private String username;
   private SongDto song;
   private Integer priority;
   private String songPath;
 
-  public SongQueueEntryDto(
-      SongDto song,
-      Integer priority,
-      String songPath) {
+  public SongQueueEntryDto(String username, SongDto song, Integer priority, String songPath) {
     super();
+    this.username = username;
     this.song = song;
     this.priority = priority;
     this.songPath = songPath;
+  }
+
+  public String getUsername() {
+    return username;
   }
 
   public SongDto getSong() {
@@ -26,7 +29,7 @@ public class SongQueueEntryDto {
   public Integer getPriority() {
     return priority;
   }
-  
+
   public String getSongPath() {
     return songPath;
   }
@@ -50,7 +53,7 @@ public class SongQueueEntryDto {
 
   @Override
   public String toString() {
-    return "SongQueueEntryDto [song=" + song + ", priority=" + priority + ", songPath=" + songPath
-        + "]";
-  }  
+    return "SongQueueEntryDto [username=" + username + ", song=" + song + ", priority=" + priority
+        + ", songPath=" + songPath + "]";
+  }
 }
