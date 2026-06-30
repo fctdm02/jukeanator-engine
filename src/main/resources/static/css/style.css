@@ -313,6 +313,362 @@ html, body {
   padding: 2rem;
 }
 
+/* ── Sub-screens ────────────────────────────────────────────────────────── */
+
+.sub-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 852px;
+}
+
+.sub-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.75rem;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: #4ab8d8;
+  font-size: 1.5rem;
+  padding: 0;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.sub-title {
+  color: var(--text);
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.sub-content {
+  flex: 1;
+  padding: 0.75rem 1rem 5rem;
+  overflow-y: auto;
+}
+
+/* My Account */
+.account-funds-box {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.funds-icon {
+  font-size: 2rem;
+  background: rgba(74,184,216,0.2);
+  border-radius: 8px;
+  padding: 0.5rem;
+  line-height: 1;
+}
+
+.funds-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.funds-amount {
+  color: var(--text);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.menu-section-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  padding: 0 0.25rem 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.menu-list {
+  background: rgba(255,255,255,0.07);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+
+.menu-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: none;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 0.85rem 1rem;
+  border-radius: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  text-align: left;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.menu-row:last-child {
+  border-bottom: none;
+}
+
+.menu-row-icon {
+  font-size: 1.1rem;
+  background: rgba(74,184,216,0.2);
+  border-radius: 6px;
+  padding: 0.3rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.menu-row.danger .menu-row-label {
+  color: #ff6b6b;
+}
+
+.danger-icon {
+  background: rgba(255,80,80,0.2) !important;
+}
+
+.menu-row-label { flex: 1; }
+.menu-row-arrow { color: var(--muted); font-size: 1.2rem; }
+
+.logout-row {
+  background: rgba(255,255,255,0.07);
+  border-radius: 10px;
+  width: 100%;
+  color: var(--text);
+  font-size: 1rem;
+  padding: 0.85rem 1rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* Forms */
+.form-group { margin-bottom: 1.1rem; }
+
+.form-label {
+  display: block;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 0.35rem;
+}
+
+.form-input {
+  width: 100%;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+}
+
+.form-input:read-only { opacity: 0.55; }
+
+.form-error {
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  min-height: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.form-spacer { height: 4rem; }
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 393px;
+  padding: 0.75rem 1rem;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  z-index: 10;
+}
+
+.form-btn {
+  flex: 1;
+  padding: 0.85rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-btn.cancel {
+  background: rgba(255,255,255,0.12);
+  color: var(--text);
+}
+
+.form-btn.save {
+  background: #4ab8d8;
+  color: #000;
+}
+
+.form-btn.delete-btn {
+  background: rgba(255,80,80,0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(255,80,80,0.3);
+}
+
+/* Delete Account */
+.delete-confirm-box {
+  background: rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  margin: 1.5rem 0 1rem;
+}
+
+.delete-warning-icon { font-size: 3rem; margin-bottom: 0.75rem; }
+
+.delete-warning-text {
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Add Funds content */
+.add-funds-content {
+  padding: 0.5rem 0 1rem;
+}
+
+.package-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255,255,255,0.08);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.65rem;
+  cursor: pointer;
+}
+
+.package-card.selected {
+  background: rgba(74,184,216,0.18);
+  border-color: #4ab8d8;
+}
+
+.package-radio {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: #4ab8d8;
+}
+
+.package-coin-icon { font-size: 1.8rem; flex-shrink: 0; }
+
+.package-details { flex: 1; }
+
+.package-credits-amount {
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.package-bonus-tag {
+  display: inline-block;
+  background: #d97706;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  margin-top: 0.2rem;
+  letter-spacing: 0.03em;
+}
+
+.package-price-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.package-badge-label {
+  background: rgba(74,184,216,0.25);
+  color: #4ab8d8;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  margin-bottom: 0.2rem;
+  white-space: nowrap;
+}
+
+.package-price-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.bonus-note {
+  color: var(--muted);
+  font-size: 0.73rem;
+  margin: 0.1rem 0 1rem;
+  font-style: italic;
+}
+
+.payment-section-title {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+}
+
+.payment-method-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255,255,255,0.07);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+
+.payment-gpay-icon {
+  background: #fff;
+  color: #000;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.3rem 0.45rem;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+.payment-method-info { flex: 1; }
+.payment-method-name { font-weight: 700; font-size: 0.95rem; }
+.payment-method-number { color: var(--muted); font-size: 0.8rem; }
+
+.payment-remove-btn {
+  background: none;
+  color: #4ab8d8;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.add-funds-action-btn {
+  width: 100%;
+  background: linear-gradient(90deg, #c0392b, #8e44ad);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 1rem;
+  border-radius: 12px;
+  margin-top: 1.25rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
 /* ── Misc shared ────────────────────────────────────────────────────────── */
 
 button {

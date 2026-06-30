@@ -15,9 +15,14 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
+import java.util.List;
+import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
+import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
+import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
+import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
@@ -30,6 +35,8 @@ import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 public class UserServiceImpl implements UserService, AggregateRootService<UserRootEntity> {
 
   private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
+
+  private static final int CREDITS_PER_DOLLAR = 3;
 
   private String rootPath;
   private final UserRepository userRepository;
@@ -114,8 +121,50 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new UserServiceException("User not found: " + emailAddress);
     }
 
+    java.math.BigDecimal balanceUsd = java.math.BigDecimal.valueOf(user.getNumCredits())
+        .divide(java.math.BigDecimal.valueOf(CREDITS_PER_DOLLAR), 2, java.math.RoundingMode.HALF_UP);
     return new UserProfileDto(user.getPersistentIdentity(), user.getFirstName(), user.getLastName(),
-        user.getEmailAddress(), user.getNumCredits(), user.getSongPlayHistory());
+        user.getEmailAddress(), user.getNumCredits(), balanceUsd, user.getSongPlayHistory());
+  }
+
+  @Override
+  public List<CreditPackageDto> getCreditPackages() {
+    return List.of(
+        new CreditPackageDto("pkg-20", 60, 20, new java.math.BigDecimal("20.00"), "Best Value"),
+        new CreditPackageDto("pkg-10", 30, 10, new java.math.BigDecimal("10.00"), null),
+        new CreditPackageDto("pkg-5",  15,  3, new java.math.BigDecimal("5.00"),  null)
+    );
+  }
+
+  @Override
+  public void changePassword(String emailAddress, ChangePasswordRequest request) {
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) throw new UserServiceException("User not found: " + emailAddress);
+    if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+      throw new UserServiceException("Current password is incorrect");
+    }
+    user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+    this.userRepository.storeAggregateRoot(this.userRoot);
+  }
+
+  @Override
+  public void deleteAccount(String emailAddress) {
+    throw new UserServiceException("Delete account not yet implemented");
+  }
+
+  @Override
+  public void addFunds(String emailAddress, AddFundsRequest request) {
+    throw new UserServiceException("Add funds payment not yet implemented");
+  }
+
+  @Override
+  public UserProfileDto updateProfile(String emailAddress, UpdateProfileRequest request) {
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) throw new UserServiceException("User not found: " + emailAddress);
+    if (request.firstName() != null) user.setFirstName(request.firstName());
+    if (request.lastName() != null) user.setLastName(request.lastName());
+    this.userRepository.storeAggregateRoot(this.userRoot);
+    return getProfile(emailAddress);
   }
 
   /** Called by SongLibraryService (or an event listener) when a song is played */

@@ -79,7 +79,7 @@ class UserControllerTest extends AbstractControllerTest {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     UserProfileDto profile =
-        new UserProfileDto(1, "Jane", "Doe", "jane@example.com", 10, List.of());
+        new UserProfileDto(1, "Jane", "Doe", "jane@example.com", 10, null, List.of());
     when(userService.getProfile("jane@example.com")).thenReturn(profile);
 
     mockMvc.perform(get("/api/users/me"))
