@@ -44,6 +44,8 @@ import com.djt.jukeanator_engine.ui.model.CreditManager;
 public class JukeANatorFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
+  
+  private final boolean alwaysOnTop;
 
   private final JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties;
   private final SongLibraryService songLibraryService;
@@ -206,6 +208,8 @@ public class JukeANatorFrame extends JFrame {
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
+    
+    this.alwaysOnTop = jukeANatorUserInterfaceProperties.isAlwaysOnTop();
 
     this.incrementCreditsKey = jukeANatorUserInterfaceProperties.getIncrementCreditsKey();
     this.numCredits = jukeANatorUserInterfaceProperties.getNumCredits();
@@ -445,17 +449,20 @@ public class JukeANatorFrame extends JFrame {
     // Keep the jukebox visible on the primary display when the operator works on
     // a second display. The only legitimate minimize path is AdminPanel.doMinimize(),
     // which sets adminMinimizeRequested before calling setState(ICONIFIED).
-    setAlwaysOnTop(true);
-    addWindowStateListener(e -> {
-      boolean nowIconified = (e.getNewState() & java.awt.Frame.ICONIFIED) != 0;
-      if (nowIconified) {
-        if (adminMinimizeRequested) {
-          adminMinimizeRequested = false;
-        } else {
-          SwingUtilities.invokeLater(() -> setState(java.awt.Frame.NORMAL));
+    if (this.alwaysOnTop) {
+
+      setAlwaysOnTop(true);
+      addWindowStateListener(e -> {
+        boolean nowIconified = (e.getNewState() & java.awt.Frame.ICONIFIED) != 0;
+        if (nowIconified) {
+          if (adminMinimizeRequested) {
+            adminMinimizeRequested = false;
+          } else {
+            SwingUtilities.invokeLater(() -> setState(java.awt.Frame.NORMAL));
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   /**

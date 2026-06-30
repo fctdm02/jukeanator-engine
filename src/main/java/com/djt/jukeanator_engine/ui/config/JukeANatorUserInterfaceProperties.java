@@ -7,10 +7,17 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "user-interface")
 public class JukeANatorUserInterfaceProperties {
 
-  private boolean enabled = false; // if true, a JFC/Swing UI is launched, otherwise, a headless
-                                   // backend
+  private boolean enabled = false; // if true, a JFC UI is launched, otherwise, headless backend
+  private boolean alwaysOnTop = false;
   
+  //
+  // SCREEN SAVER
+  // 
   private boolean enableScreenSaver = true;
+  
+  //
+  // HIBERNATION
+  //  
   private boolean enableHibernation = false;
   private int hibernateBegin = 3; // In 24 hour/military time (e.g. 3:00 hours is 3:00AM) Only used when enableHibernation is true
   private int hibernateEnd = 10; // In 24 hour/military time (e.g. 10:00 hours is 10:00AM) Only used when enableHibernation is true  
@@ -30,6 +37,8 @@ public class JukeANatorUserInterfaceProperties {
   //
   private boolean enableTypeAheadSearch = true;
 
+  
+  
   public boolean getEnabled() {
     return enabled;
   }
@@ -38,9 +47,14 @@ public class JukeANatorUserInterfaceProperties {
     this.enabled = enabled;
   }
 
-  //
-  // SCREEN SAVER
-  //  
+  public boolean isAlwaysOnTop() {
+    return alwaysOnTop;
+  }
+
+  public void setAlwaysOnTop(boolean alwaysOnTop) {
+    this.alwaysOnTop = alwaysOnTop;
+  }
+
   public boolean isEnableScreenSaver() {
     return enableScreenSaver;
   }
@@ -49,9 +63,6 @@ public class JukeANatorUserInterfaceProperties {
     this.enableScreenSaver = enableScreenSaver;
   }
 
-  //
-  // HIBERNATION
-  //  
   public boolean isEnableHibernation() {
     return enableHibernation;
   }
@@ -76,9 +87,6 @@ public class JukeANatorUserInterfaceProperties {
     this.hibernateEnd = hibernateEnd;
   }
 
-  //
-  // CREDIT CONFIGURATION  
-  //
   public char getIncrementCreditsKey() {
     return incrementCreditsKey;
   }
@@ -127,9 +135,6 @@ public class JukeANatorUserInterfaceProperties {
     this.tenDollarBonusCredits = tenDollarBonusCredits;
   }
 
-  //
-  // SEARCH
-  //
   public boolean isEnableTypeAheadSearch() {
     return enableTypeAheadSearch;
   }

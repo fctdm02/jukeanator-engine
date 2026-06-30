@@ -106,7 +106,7 @@ public class AlbumViewCard extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   private JPanel buildSidebar(AlbumDto album, ImageLoader imageLoader) {
 
-    JPanel sidebar = new JPanel(new GridBagLayout());
+    JPanel sidebar = new JPanel(new BorderLayout(0, 0));
     sidebar.setOpaque(false);
     sidebar.setPreferredSize(new Dimension(LEFT_PANEL_WIDTH, 0));
     sidebar.setMinimumSize(new Dimension(LEFT_PANEL_WIDTH, 0));
@@ -214,19 +214,10 @@ public class AlbumViewCard extends JPanel {
     meta.add(singleLineMetaLabel(formattedPlayCount + " plays", Font.PLAIN,
         LayoutTheme.get().fontSizeTrackArtist, TEXT_SECONDARY));
 
-    JPanel content = new JPanel();
-    content.setOpaque(false);
-    content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
-    content.add(artWrapper);
-    content.add(meta);
-
-    // Place content in the centre of the sidebar so it is vertically centred
-    // regardless of how tall the panel grows.
-    java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
-    gbc.gridx = 0;
-    gbc.gridy = 0;
-    gbc.anchor = java.awt.GridBagConstraints.CENTER;
-    sidebar.add(content, gbc);
+    // Art in NORTH so it stays at full sidebar width; meta fills the remaining
+    // space in CENTER, stretching to the full sidebar width so labels never clip.
+    sidebar.add(artWrapper, BorderLayout.NORTH);
+    sidebar.add(meta, BorderLayout.CENTER);
 
     return sidebar;
   }

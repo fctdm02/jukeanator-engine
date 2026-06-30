@@ -61,6 +61,7 @@ user:
   
 user-interface:
   enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
+  always-on-top: false
   enable-screen-saver: false
   enable-hibernation: false
   hibernate-begin: 3 # In 24 hour/military time (e.g. 3:00 hours is 3:00AM) Only used when enableHibernation is true
