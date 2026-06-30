@@ -39,7 +39,16 @@ html, body {
   align-items: center;
   justify-content: center;
   min-height: 852px;
-  background: linear-gradient(180deg, #0c2d3a 0%, #152535 30%, #1e1530 62%, #28101e 100%);
+  background-color: #0a0a0a;
+  background-image: linear-gradient(
+    to bottom right,
+    rgba(140, 50,  50,  0.35) 0%,
+    rgba(140, 90,  30,  0.31) 20%,
+    rgba(80,  110, 40,  0.27) 42%,
+    rgba(30,  100, 110, 0.27) 62%,
+    rgba(40,  60,  140, 0.31) 82%,
+    rgba(100, 30,  140, 0.35) 100%
+  );
 }
 
 .auth-box {
@@ -50,10 +59,15 @@ html, body {
   width: 320px;
 }
 
-.auth-box h1 {
+.auth-logo {
+  display: flex;
+  justify-content: center;
   margin: 0 0 1.5rem;
-  color: var(--accent);
-  text-align: center;
+}
+
+.auth-logo img {
+  max-width: 220px;
+  height: auto;
 }
 
 .auth-box form {

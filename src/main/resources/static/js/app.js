@@ -528,7 +528,7 @@
     contentPanel.innerHTML = `
       <div class="centered-view">
         <div class="auth-box">
-          <h1>JukeANator</h1>
+          <div class="auth-logo"><img src="/images/JukeANatorLogo.png" alt="JukeANator"></div>
           <form id="loginForm">
             ${errorMessage ? `<div class="error-msg">${errorMessage}</div>` : ''}
             <label>Email <input type="email" id="loginEmail" required></label>
