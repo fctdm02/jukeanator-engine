@@ -41,157 +41,6 @@
     localStorage.removeItem('emailAddress');
   }
 
-  // ── Album grid rendering ────────────────────────────────────────────────
-
-  const homeGrid = {
-    albums: [],
-    sort: 'title',
-    letter: null,
-  };
-
-  function albumCard(album) {
-    const div = document.createElement('div');
-    div.className = 'album-card';
-    const img = document.createElement('img');
-    img.src = `/api/song-library/albums/${album.albumId}/coverArt`;
-    img.alt = album.albumName;
-    img.onerror = () => img.remove();
-    div.appendChild(img);
-    const titleLine = album.genreName ? `${album.albumName} (${album.genreName})` : album.albumName;
-    div.insertAdjacentHTML('beforeend', `
-      <strong>${titleLine}</strong>
-      <span>${album.artistName}</span>
-    `);
-    return div;
-  }
-
-  function sortKey(value) {
-    if (!value || !value.trim()) return '￿';
-    const first = value.trim()[0].toUpperCase();
-    return /[A-Z]/.test(first) ? `~${value.toUpperCase()}` : value.toUpperCase();
-  }
-
-  function letterFor(value) {
-    if (!value || !value.trim()) return '#';
-    const first = value.trim()[0].toUpperCase();
-    return /[A-Z]/.test(first) ? first : '#';
-  }
-
-  function sortedAlbums() {
-    const field = homeGrid.sort === 'title' ? 'albumName' : 'artistName';
-    return [...homeGrid.albums].sort((a, b) =>
-      sortKey(a[field]).localeCompare(sortKey(b[field])),
-    );
-  }
-
-  function availableLetters(albums) {
-    const field = homeGrid.sort === 'title' ? 'albumName' : 'artistName';
-    const letters = new Set(albums.map((a) => letterFor(a[field])));
-    const ordered = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
-    return ordered.filter((l) => letters.has(l));
-  }
-
-  function renderAlbumGridHeader(container, albums) {
-    const header = document.createElement('div');
-    header.className = 'album-grid-header';
-    header.innerHTML = `
-      <div class="album-grid-title">
-        <span class="icon">♫</span>
-        <div>
-          <div class="title">All Albums</div>
-          <div class="subtitle">${albums.length} albums</div>
-        </div>
-      </div>
-      <div class="sort-toggle">
-        <span class="sort-toggle-label">Order By:</span>
-        <button class="sort-btn" data-sort="title">Title</button>
-        <button class="sort-btn" data-sort="artist">Artist</button>
-      </div>
-    `;
-    header.querySelectorAll('.sort-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.sort === homeGrid.sort);
-      btn.addEventListener('click', () => {
-        if (homeGrid.sort === btn.dataset.sort) return;
-        homeGrid.sort = btn.dataset.sort;
-        homeGrid.letter = null;
-        renderHomeGrid(container);
-      });
-    });
-    container.appendChild(header);
-  }
-
-  function renderLetterNav(container, letters) {
-    const nav = document.createElement('div');
-    nav.className = 'letter-nav';
-
-    const prevBtn = document.createElement('button');
-    prevBtn.className = 'letter-nav-arrow';
-    prevBtn.textContent = '‹';
-    nav.appendChild(prevBtn);
-
-    const buttons = document.createElement('div');
-    buttons.className = 'letter-buttons';
-    letters.forEach((letter) => {
-      const btn = document.createElement('button');
-      btn.className = 'letter-btn';
-      btn.textContent = letter;
-      btn.classList.toggle('active', letter === homeGrid.letter);
-      btn.addEventListener('click', () => {
-        homeGrid.letter = letter;
-        renderHomeGrid(container);
-      });
-      buttons.appendChild(btn);
-    });
-    nav.appendChild(buttons);
-
-    const nextBtn = document.createElement('button');
-    nextBtn.className = 'letter-nav-arrow';
-    nextBtn.textContent = '›';
-    nav.appendChild(nextBtn);
-
-    function stepLetter(delta) {
-      const idx = letters.indexOf(homeGrid.letter);
-      const nextIdx = idx === -1 ? 0 : (idx + delta + letters.length) % letters.length;
-      homeGrid.letter = letters[nextIdx];
-      renderHomeGrid(container);
-    }
-    prevBtn.addEventListener('click', () => stepLetter(-1));
-    nextBtn.addEventListener('click', () => stepLetter(1));
-
-    container.appendChild(nav);
-  }
-
-  function renderHomeGrid(homeContent) {
-    homeContent.innerHTML = '';
-
-    const albums = sortedAlbums();
-    renderAlbumGridHeader(homeContent, albums);
-
-    const letters = availableLetters(albums);
-    if (!homeGrid.letter || !letters.includes(homeGrid.letter)) {
-      homeGrid.letter = letters[0] || null;
-    }
-
-    const field = homeGrid.sort === 'title' ? 'albumName' : 'artistName';
-    const visibleAlbums = homeGrid.letter
-      ? albums.filter((a) => letterFor(a[field]) === homeGrid.letter)
-      : albums;
-
-    const grid = document.createElement('div');
-    grid.className = 'album-grid';
-    visibleAlbums.forEach((album) => grid.appendChild(albumCard(album)));
-    homeContent.appendChild(grid);
-
-    if (letters.length) {
-      renderLetterNav(homeContent, letters);
-    }
-  }
-
-  async function loadAlbumGrid(homeContent) {
-    homeGrid.albums = await api('/api/song-library/albums');
-    renderHomeGrid(homeContent);
-  }
-
   // ── Views ───────────────────────────────────────────────────────────────
 
   function renderLogin(errorMessage) {
@@ -278,7 +127,11 @@
     try {
       const song = await api('/api/song-player/nowPlayingSong');
       if (!song) {
-        widget.innerHTML = '<div class="now-playing-text"><span class="artist-name">Nothing playing</span></div>';
+        widget.innerHTML = `
+          <div class="now-playing-idle">
+            <div class="idle-title">No music playing</div>
+            <div class="idle-sub">Let's play some music!</div>
+          </div>`;
         return;
       }
       widget.innerHTML = `
@@ -291,16 +144,24 @@
         </div>
       `;
     } catch (err) {
-      widget.innerHTML = '<div class="now-playing-text"><span class="artist-name">Nothing playing</span></div>';
+      widget.innerHTML = `
+        <div class="now-playing-idle">
+          <div class="idle-title">No music playing</div>
+          <div class="idle-sub">Let's play some music!</div>
+        </div>`;
     }
   }
 
   async function loadCredits(widget) {
+    if (!state.token) {
+      widget.textContent = 'Credits: 0';
+      return;
+    }
     try {
       const profile = await api('/api/users/me');
-      widget.textContent = profile.numCredits ?? 0;
+      widget.textContent = `Credits: ${profile.numCredits ?? 0}`;
     } catch (err) {
-      widget.textContent = '0';
+      widget.textContent = 'Credits: 0';
     }
   }
 
@@ -308,47 +169,91 @@
     contentPanel.innerHTML = `
       <div class="app-frame">
         <header class="top-bar">
-          <div class="credits-widget">
-            <span class="credits-label">CREDITS</span>
-            <span class="credits-value" id="creditsValue">0</span>
+          <div class="account-panel">
+            <div class="account-left">
+              <button class="location-btn">
+                The Rock on Third <span class="location-arrow">&#8964;</span>
+              </button>
+              <span class="credits-value" id="creditsValue">Credits: 0</span>
+            </div>
+            <button class="account-logo-btn" id="accountBtn">
+              <img src="/images/AccountLogo.png" alt="Account">
+            </button>
           </div>
-          <h1 class="app-banner">JukeANator</h1>
-          <div class="now-playing-widget" id="nowPlayingWidget"></div>
-          <button id="logoutBtn" class="link-btn">Log out</button>
+          <div class="now-playing-bar" id="nowPlayingWidget"></div>
         </header>
+        <div class="search-bar-wrap">
+          <div class="search-bar">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" placeholder="Search for music" id="searchInput">
+          </div>
+        </div>
 
-        <main class="home-content" id="homeContent"></main>
+        <main class="home-content" id="homeContent">
+          <div class="stub-placeholder">HOME — coming soon</div>
+        </main>
 
         <nav class="bottom-tabs">
-          <button class="bottom-tab active" data-tab="home">
-            <span class="tab-icon">⌂</span><span>HOME</span>
+          <button class="bottom-tab active" data-tab="music">
+            <span class="tab-icon">♫</span><span>Music</span>
           </button>
-          <button class="bottom-tab" data-tab="search" disabled>
-            <span class="tab-icon">⌕</span><span>SEARCH</span>
-          </button>
-          <button class="bottom-tab" data-tab="hot" disabled>
-            <span class="tab-icon">♨</span><span>HOT HERE</span>
-          </button>
-          <button class="bottom-tab" data-tab="genres" disabled>
-            <span class="tab-icon">▦</span><span>GENRES</span>
-          </button>
-          <button class="bottom-tab" data-tab="queue" disabled>
-            <span class="tab-icon">♫</span><span>QUEUE</span>
+          <button class="bottom-tab" data-tab="addfunds" disabled>
+            <span class="tab-icon">👛</span><span>Add Funds</span>
           </button>
         </nav>
       </div>
     `;
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      clearAuth();
-      renderLogin();
+    document.getElementById('accountBtn').addEventListener('click', () => {
+      if (state.token) {
+        clearAuth();
+        renderHome();
+      } else {
+        renderLogin();
+      }
     });
 
     await Promise.all([
       loadCredits(document.getElementById('creditsValue')),
       loadNowPlaying(document.getElementById('nowPlayingWidget')),
-      loadAlbumGrid(document.getElementById('homeContent')),
     ]);
+  }
+
+  // ── WebSocket ───────────────────────────────────────────────────────────
+
+  let stompClient = null;
+
+  function connectWebSocket() {
+    if (stompClient && stompClient.connected) return;
+    const socket = new SockJS('/ws');
+    stompClient = Stomp.over(socket);
+    stompClient.debug = () => {};
+    stompClient.connect({}, () => {
+      stompClient.subscribe('/topic/now-playing', (frame) => {
+        const widget = document.getElementById('nowPlayingWidget');
+        if (!widget) return;
+        const msg = JSON.parse(frame.body);
+        const song = msg.song;
+        if (!song) {
+          widget.innerHTML = `
+            <div class="now-playing-idle">
+              <div class="idle-title">No music playing</div>
+              <div class="idle-sub">Let's play some music!</div>
+            </div>`;
+        } else {
+          widget.innerHTML = `
+            <img src="/api/song-library/albums/${song.albumId}/coverArt" alt="${song.albumName || ''}"
+                 onerror="this.remove()">
+            <div class="now-playing-text">
+              <div class="song-name">${song.songName}</div>
+              <div class="artist-name">${song.artistName}</div>
+              <div class="album-name">${song.albumName || ''}</div>
+            </div>`;
+        }
+      });
+    }, () => {
+      setTimeout(connectWebSocket, 3000);
+    });
   }
 
   // ── Init ────────────────────────────────────────────────────────────────
@@ -358,4 +263,5 @@
   } else {
     renderLogin();
   }
+  connectWebSocket();
 })();
