@@ -16,14 +16,19 @@ import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryService
  */
 public final class CoverArtDownloader {
 
-  private final RestClient restClient;
+  private RestClient restClient;
+  private boolean isInitialized = false;
 
   public CoverArtDownloader() {
+    super();
 
-    this.restClient = RestClient.create();
   }
 
   public void downloadCoverArt(String coverArtPath, String coverArtUrl) {
+
+    if (!isInitialized) {
+      initialize();
+    }
 
     String errorMessage = null;
     try {
@@ -36,31 +41,40 @@ public final class CoverArtDownloader {
       Path path = Path.of(coverArtPath);
       Files.write(path, imageBytes);
 
-      
+
       BufferedImage image = ImageIO.read(path.toFile());
       int width = image.getWidth();
       int height = image.getHeight();
       if (width > 500 || height > 500) {
-        
+
         errorMessage = "Could not resize image to 500x500px: " + coverArtPath;
         BufferedImage original = ImageIO.read(new File(coverArtPath));
         BufferedImage resized = resizeHighQuality(original, 500, 500);
-        ImageIO.write(resized, "jpg", new File(coverArtPath));        
-      }      
+        ImageIO.write(resized, "jpg", new File(coverArtPath));
+      }
 
     } catch (IOException ioe) {
       throw new SongLibraryServiceException(errorMessage + ", error: " + ioe.getMessage(), ioe);
     }
   }
 
-  public static BufferedImage resizeHighQuality(BufferedImage original, int targetWidth, int targetHeight) {
+  private void initialize() {
+
+    this.restClient = RestClient.create();
+
+    this.isInitialized = true;
+  }
+
+  public static BufferedImage resizeHighQuality(BufferedImage original, int targetWidth,
+      int targetHeight) {
 
     BufferedImage output = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
 
     Graphics2D g2d = output.createGraphics();
 
     // High-quality rendering hints
-    g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+    g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+        RenderingHints.VALUE_INTERPOLATION_BICUBIC);
     g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
     g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
