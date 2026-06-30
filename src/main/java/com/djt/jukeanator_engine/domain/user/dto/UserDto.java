@@ -24,6 +24,7 @@ public final class UserDto {
   private String passwordHash;
   private Integer numCredits = 0;
   private List<SongIdentifier> songPlayHistory = new ArrayList<>();
+  private List<String> searchHistory = new ArrayList<>();
   private String role = "ROLE_USER";
 
   public String getFirstName() {
@@ -72,6 +73,15 @@ public final class UserDto {
 
   public boolean addSongToSongPlayHistory(SongIdentifier songIdentifier) {
     return this.songPlayHistory.add(songIdentifier);
+  }
+
+  public List<String> getSearchHistory() {
+    if (searchHistory == null) searchHistory = new ArrayList<>();
+    return searchHistory;
+  }
+
+  public void setSearchHistory(List<String> searchHistory) {
+    this.searchHistory = searchHistory;
   }
 
   public String getRole() {

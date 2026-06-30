@@ -167,6 +167,29 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     return getProfile(emailAddress);
   }
 
+  @Override
+  public List<String> getSearchHistory(String emailAddress) {
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) throw new UserServiceException("User not found: " + emailAddress);
+    return user.getSearchHistory();
+  }
+
+  @Override
+  public void addSearchHistory(String emailAddress, String query) {
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) throw new UserServiceException("User not found: " + emailAddress);
+    user.addToSearchHistory(query, 10);
+    this.userRepository.storeAggregateRoot(this.userRoot);
+  }
+
+  @Override
+  public void removeSearchHistory(String emailAddress, int index) {
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) throw new UserServiceException("User not found: " + emailAddress);
+    user.removeFromSearchHistory(index);
+    this.userRepository.storeAggregateRoot(this.userRoot);
+  }
+
   /** Called by SongLibraryService (or an event listener) when a song is played */
   /*
    * TODO: Need to have either singleton LOCAL UserEntity or a logged in remote user associated with

@@ -58,8 +58,9 @@ public class SongLibraryController {
 
 
   @GetMapping("/search")
-  public SearchResultDto getMusicBySearch(@RequestParam String searchFor) {
-    return songLibraryService.getMusicBySearch(searchFor);
+  public SearchResultDto getMusicBySearch(@RequestParam String searchFor,
+      @RequestParam(defaultValue = "20") int limit) {
+    return songLibraryService.getMusicBySearch(searchFor, limit);
   }
 
 

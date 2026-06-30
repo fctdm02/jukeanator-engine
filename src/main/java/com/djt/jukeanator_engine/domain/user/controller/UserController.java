@@ -1,8 +1,12 @@
 package com.djt.jukeanator_engine.domain.user.controller;
 
+import java.util.List;
+import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -76,5 +80,27 @@ public class UserController {
   public ResponseEntity<UserProfileDto> updateProfile(@AuthenticationPrincipal String emailAddress,
       @RequestBody UpdateProfileRequest request) {
     return ResponseEntity.ok(userService.updateProfile(emailAddress, request));
+  }
+
+  @GetMapping("/search-history")
+  public ResponseEntity<List<String>> getSearchHistory(@AuthenticationPrincipal String emailAddress) {
+    return ResponseEntity.ok(userService.getSearchHistory(emailAddress));
+  }
+
+  @PostMapping("/search-history")
+  public ResponseEntity<Void> addSearchHistory(@AuthenticationPrincipal String emailAddress,
+      @RequestBody Map<String, String> body) {
+    String query = body.get("query");
+    if (query != null && !query.isBlank()) {
+      userService.addSearchHistory(emailAddress, query.strip());
+    }
+    return ResponseEntity.noContent().build();
+  }
+
+  @DeleteMapping("/search-history/{index}")
+  public ResponseEntity<Void> removeSearchHistory(@AuthenticationPrincipal String emailAddress,
+      @PathVariable int index) {
+    userService.removeSearchHistory(emailAddress, index);
+    return ResponseEntity.noContent().build();
   }
 }

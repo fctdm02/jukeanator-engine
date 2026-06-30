@@ -29,6 +29,7 @@ public final class UserMapper {
     UserDto dto = new UserDto(entity.getFirstName(), entity.getLastName(), entity.getEmailAddress(),
         entity.getPasswordHash(), entity.getNumCredits(), entity.getSongPlayHistory(),
         entity.getRole());
+    dto.setSearchHistory(entity.getSearchHistory());
 
     return dto;
   }

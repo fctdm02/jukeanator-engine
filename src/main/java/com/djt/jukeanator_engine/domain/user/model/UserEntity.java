@@ -15,6 +15,7 @@ public class UserEntity extends AbstractPersistentEntity {
   private String passwordHash;
   private Integer numCredits = 0;
   private List<SongIdentifier> songPlayHistory = new ArrayList<>();
+  private List<String> searchHistory = new ArrayList<>();
   private String role = "ROLE_USER";
 
   public UserEntity(Integer persistentIdentity, String firstName, String lastName, String emailAddress, String passwordHash,
@@ -79,6 +80,31 @@ public class UserEntity extends AbstractPersistentEntity {
 
   public boolean addSongToSongPlayHistory(SongIdentifier songIdentifier) {
     return this.songPlayHistory.add(songIdentifier);
+  }
+
+  public List<String> getSearchHistory() {
+    if (searchHistory == null) searchHistory = new ArrayList<>();
+    return searchHistory;
+  }
+
+  public void setSearchHistory(List<String> searchHistory) {
+    this.searchHistory = searchHistory;
+  }
+
+  public void addToSearchHistory(String query, int maxSize) {
+    if (searchHistory == null) searchHistory = new ArrayList<>();
+    searchHistory.remove(query);
+    searchHistory.add(0, query);
+    if (searchHistory.size() > maxSize) {
+      searchHistory = new ArrayList<>(searchHistory.subList(0, maxSize));
+    }
+  }
+
+  public void removeFromSearchHistory(int index) {
+    if (searchHistory == null) return;
+    if (index >= 0 && index < searchHistory.size()) {
+      searchHistory.remove(index);
+    }
   }
 
   public String getRole() {

@@ -35,6 +35,13 @@ public interface SongLibraryService {
   SearchResultDto getMusicBySearch(String searchFor);
 
   /**
+   * @param searchFor
+   * @param limit maximum number of results per category; defaults to the service-level setting
+   * @return
+   */
+  SearchResultDto getMusicBySearch(String searchFor, int limit);
+
+  /**
    * 
    * @return
    */

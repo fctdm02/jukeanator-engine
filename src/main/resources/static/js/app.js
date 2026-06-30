@@ -156,6 +156,11 @@
       }
     });
 
+    document.getElementById('searchInput').addEventListener('focus', (e) => {
+      e.target.blur();
+      renderSearchEntry();
+    });
+
     await Promise.all([
       loadCredits(document.getElementById('creditsValue')),
       loadNowPlaying(document.getElementById('nowPlayingWidget')),
@@ -607,6 +612,292 @@
     if (pending.screen === 'addfunds') { renderMain('addfunds'); }
     else if (pending.screen === 'my-account') { navigateSub('my-account'); }
     else { renderMain('music'); }
+  }
+
+  // ── Search ──────────────────────────────────────────────────────────────
+
+  // On-screen keyboard layout (mirrors JFC/Swing KeyboardPanel)
+  const KBD_ABC = [
+    ['Q','W','E','R','T','Y','U','I','O','P','CLEAR','⌫'],
+    ['A','S','D','F','G','H','J','K','L',"'",'?123'],
+    ['Z','X','C','V','B','N','M',',','.',' '],
+  ];
+  const KBD_NUM = [
+    ['1','2','3','4','5','6','7','8','9','0','CLEAR','⌫'],
+    ['!','@','#','$','%','^','&','*','"',"'",'ABC'],
+    ['(',')',  '[',']','/','\\','?',':',';',' '],
+  ];
+
+  function buildKeyboard(mode) {
+    const layout = mode === 'abc' ? KBD_ABC : KBD_NUM;
+
+    function keyHtml(k) {
+      if (k === 'CLEAR')  return `<button class="kbd-key kbd-wide" data-key="CLEAR">CLEAR</button>`;
+      if (k === '⌫')     return `<button class="kbd-key kbd-wide" data-key="BACK">⌫</button>`;
+      if (k === '?123')   return `<button class="kbd-key kbd-wide kbd-mode-active" data-key="TOGGLE">?123</button>`;
+      if (k === 'ABC')    return `<button class="kbd-key kbd-wide kbd-mode-active" data-key="TOGGLE">ABC</button>`;
+      if (k === ' ')      return `<button class="kbd-key kbd-space" data-key=" "> </button>`;
+      return `<button class="kbd-key" data-key="${k}">${k}</button>`;
+    }
+
+    const rows = layout.map(row =>
+      `<div class="kbd-row">${row.map(keyHtml).join('')}</div>`
+    ).join('');
+
+    const searchRow = `<div class="kbd-row">
+      <button class="kbd-key kbd-search" id="kbdSearchBtn">&#128269; Search</button>
+    </div>`;
+
+    return rows + searchRow;
+  }
+
+  async function loadSearchHistory() {
+    if (state.token) {
+      try { return await api('/api/users/search-history'); } catch { /* fall through */ }
+    }
+    try { return JSON.parse(localStorage.getItem('searchHistory') || '[]'); } catch { return []; }
+  }
+
+  async function saveSearchQuery(query) {
+    if (state.token) {
+      try { await api('/api/users/search-history', { method: 'POST', body: JSON.stringify({ query }) }); } catch { /* ignore */ }
+    } else {
+      try {
+        let h = JSON.parse(localStorage.getItem('searchHistory') || '[]');
+        h = h.filter(q => q !== query);
+        h.unshift(query);
+        if (h.length > 10) h = h.slice(0, 10);
+        localStorage.setItem('searchHistory', JSON.stringify(h));
+      } catch { /* ignore */ }
+    }
+  }
+
+  async function deleteSearchHistoryItem(index) {
+    if (state.token) {
+      try { await api(`/api/users/search-history/${index}`, { method: 'DELETE' }); } catch { /* ignore */ }
+    } else {
+      try {
+        let h = JSON.parse(localStorage.getItem('searchHistory') || '[]');
+        h.splice(index, 1);
+        localStorage.setItem('searchHistory', JSON.stringify(h));
+      } catch { /* ignore */ }
+    }
+  }
+
+  async function renderSearchEntry() {
+    let kbdMode = 'abc';
+    let buffer = '';
+
+    const history = await loadSearchHistory();
+
+    function historyHtml(items) {
+      if (!items.length) return '<div class="search-empty">No recent searches</div>';
+      return items.map((q, i) => `
+        <div class="search-history-item" data-index="${i}">
+          <span class="search-history-clock">&#128336;</span>
+          <span class="search-history-text">${escHtml(q)}</span>
+          <button class="search-history-remove" data-index="${i}" title="Remove">&#10005;</button>
+        </div>`).join('');
+    }
+
+    function render() {
+      contentPanel.innerHTML = `
+        <div class="search-screen">
+          <div class="search-top-bar">
+            <button class="search-back-btn" id="searchBackBtn">&#8592;</button>
+            <div class="search-input-bar">
+              <span class="search-icon">&#128269;</span>
+              <div class="search-input-display ${buffer ? '' : 'placeholder'}" id="searchDisplay">
+                ${buffer ? escHtml(buffer) : 'Search for music'}
+              </div>
+            </div>
+          </div>
+          <div class="search-history-list" id="searchHistoryList">
+            ${historyHtml(history)}
+          </div>
+          <div class="onscreen-keyboard" id="onscreenKbd">
+            ${buildKeyboard(kbdMode)}
+          </div>
+        </div>`;
+
+      document.getElementById('searchBackBtn').addEventListener('click', () => renderMain(state.currentMainTab));
+
+      // History item click — run search from history
+      document.getElementById('searchHistoryList').addEventListener('click', async (e) => {
+        const removeBtn = e.target.closest('.search-history-remove');
+        if (removeBtn) {
+          const idx = parseInt(removeBtn.dataset.index, 10);
+          history.splice(idx, 1);
+          await deleteSearchHistoryItem(idx);
+          document.getElementById('searchHistoryList').innerHTML = historyHtml(history);
+          // re-index data-index attributes
+          document.querySelectorAll('.search-history-item').forEach((el, i) => {
+            el.dataset.index = i;
+            el.querySelector('.search-history-remove').dataset.index = i;
+          });
+          return;
+        }
+        const item = e.target.closest('.search-history-item');
+        if (item) {
+          buffer = history[parseInt(item.dataset.index, 10)];
+          await executeSearch(buffer);
+        }
+      });
+
+      // Keyboard
+      document.getElementById('onscreenKbd').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.kbd-key');
+        if (!btn) return;
+        const key = btn.dataset.key;
+        if (btn.id === 'kbdSearchBtn') {
+          if (buffer.trim()) await executeSearch(buffer.trim());
+          return;
+        }
+        if (key === 'BACK') {
+          buffer = buffer.slice(0, -1);
+        } else if (key === 'CLEAR') {
+          buffer = '';
+        } else if (key === 'TOGGLE') {
+          kbdMode = kbdMode === 'abc' ? 'num' : 'abc';
+          document.getElementById('onscreenKbd').innerHTML = buildKeyboard(kbdMode);
+          return;
+        } else {
+          buffer += key;
+        }
+        const display = document.getElementById('searchDisplay');
+        if (display) {
+          display.textContent = buffer || 'Search for music';
+          display.className = 'search-input-display' + (buffer ? '' : ' placeholder');
+        }
+      });
+    }
+
+    async function executeSearch(query) {
+      await saveSearchQuery(query);
+      try {
+        const result = await api(`/api/song-library/search?searchFor=${encodeURIComponent(query)}&limit=20`);
+        renderSearchResults(query, result);
+      } catch {
+        renderSearchResults(query, { artists: [], albums: [], songs: [] });
+      }
+    }
+
+    render();
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function coverArtHtml(albumId, fallbackEmoji) {
+    if (albumId != null) {
+      return `<img class="result-thumb" src="/api/song-library/albums/${albumId}/coverArt"
+               alt="" onerror="this.outerHTML=\`<div class='result-thumb-placeholder'>${fallbackEmoji}</div>\`">`;
+    }
+    return `<div class="result-thumb-placeholder">${fallbackEmoji}</div>`;
+  }
+
+  function artistResultRow(a) {
+    const thumb = `<div class="result-thumb-placeholder">&#127911;</div>`;
+    return `<div class="result-row">
+      ${thumb}
+      <div class="result-info">
+        <div class="result-title">${escHtml(a.name || '')}</div>
+        <div class="result-sub">Artist</div>
+      </div>
+    </div>`;
+  }
+
+  function albumResultRow(a) {
+    const thumb = coverArtHtml(a.albumId, '&#128191;');
+    return `<div class="result-row">
+      ${thumb}
+      <div class="result-info">
+        <div class="result-title">${escHtml(a.name || '')}</div>
+        <div class="result-sub">Album &middot; ${escHtml(a.artistName || '')}</div>
+      </div>
+    </div>`;
+  }
+
+  function songResultRow(s) {
+    const thumb = coverArtHtml(s.albumId, '&#127925;');
+    const name = s.songName || s.title || '';
+    return `<div class="result-row">
+      ${thumb}
+      <div class="result-info">
+        <div class="result-title">${escHtml(name)}</div>
+        <div class="result-sub">Song &middot; ${escHtml(s.artistName || '')}</div>
+      </div>
+    </div>`;
+  }
+
+  function renderSearchResults(query, result) {
+    const artists = result.artists || [];
+    const albums  = result.albums  || [];
+    const songs   = result.songs   || [];
+
+    const TOP_N = 5;
+    const topArtists = artists.slice(0, TOP_N);
+    const topAlbums  = albums.slice(0,  TOP_N);
+    const topSongs   = songs.slice(0,   TOP_N);
+
+    function topPanelHtml() {
+      if (!topArtists.length && !topAlbums.length && !topSongs.length) {
+        return `<div class="search-empty">No results found</div>`;
+      }
+      let html = '';
+      if (topArtists.length) {
+        html += `<div class="result-section-label">Artists</div>` + topArtists.map(artistResultRow).join('');
+      }
+      if (topAlbums.length) {
+        html += `<div class="result-section-label">Albums</div>` + topAlbums.map(albumResultRow).join('');
+      }
+      if (topSongs.length) {
+        html += `<div class="result-section-label">Songs</div>` + topSongs.map(songResultRow).join('');
+      }
+      return html;
+    }
+
+    contentPanel.innerHTML = `
+      <div class="search-results-screen">
+        <div class="search-top-bar">
+          <button class="search-back-btn" id="searchResultsBackBtn">&#8592;</button>
+          <div class="search-input-bar">
+            <span class="search-icon">&#128269;</span>
+            <div class="search-input-display">${escHtml(query)}</div>
+          </div>
+        </div>
+        <div class="search-tabs-bar">
+          <button class="search-tab active" data-tab="top">Top</button>
+          <button class="search-tab" data-tab="artists">Artists</button>
+          <button class="search-tab" data-tab="albums">Albums</button>
+          <button class="search-tab" data-tab="songs">Songs</button>
+        </div>
+        <div class="search-tab-panels">
+          <div class="search-tab-panel active" id="tab-top">${topPanelHtml()}</div>
+          <div class="search-tab-panel" id="tab-artists">
+            ${artists.length ? artists.map(artistResultRow).join('') : '<div class="search-empty">No artists found</div>'}
+          </div>
+          <div class="search-tab-panel" id="tab-albums">
+            ${albums.length ? albums.map(albumResultRow).join('') : '<div class="search-empty">No albums found</div>'}
+          </div>
+          <div class="search-tab-panel" id="tab-songs">
+            ${songs.length ? songs.map(songResultRow).join('') : '<div class="search-empty">No songs found</div>'}
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('searchResultsBackBtn').addEventListener('click', () => renderSearchEntry());
+
+    // Tab switching
+    contentPanel.querySelectorAll('.search-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        contentPanel.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
+        contentPanel.querySelectorAll('.search-tab-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      });
+    });
   }
 
   // ── WebSocket ───────────────────────────────────────────────────────────

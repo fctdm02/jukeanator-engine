@@ -165,6 +165,11 @@ public class SongLibraryServiceImpl
 
   @Override
   public SearchResultDto getMusicBySearch(String searchFor) {
+    return getMusicBySearch(searchFor, searchResultSize);
+  }
+
+  @Override
+  public SearchResultDto getMusicBySearch(String searchFor, int limit) {
 
     if (!isInitialized) {
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
@@ -176,7 +181,7 @@ public class SongLibraryServiceImpl
 
     String searchForNormalized = stripNonKeyboardCharacters(searchFor.strip().toLowerCase());
 
-    return getMusic(null, searchForNormalized, SortOrder.POPULARITY);
+    return getMusic(null, searchForNormalized, SortOrder.POPULARITY, limit);
   }
 
   @Override
@@ -204,6 +209,10 @@ public class SongLibraryServiceImpl
    * </ul>
    */
   private SearchResultDto getMusic(String genreName, String searchFor, SortOrder sortOrder) {
+    return getMusic(genreName, searchFor, sortOrder, searchResultSize);
+  }
+
+  private SearchResultDto getMusic(String genreName, String searchFor, SortOrder sortOrder, int limit) {
 
     if (!isInitialized) {
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
@@ -251,13 +260,13 @@ public class SongLibraryServiceImpl
     // ── Queries ───────────────────────────────────────────────────────────
 
     List<SongFileEntity> songs = songLibraryRoot.getSongs().stream().filter(hasPlays)
-        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(searchResultSize).toList();
+        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
 
     List<ArtistFolderEntity> artists = songLibraryRoot.getArtists().stream().filter(hasPlays)
-        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(searchResultSize).toList();
+        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
 
     List<AlbumFolderEntity> albums = songLibraryRoot.getAlbums().stream().filter(hasPlays)
-        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(searchResultSize).toList();
+        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
 
     return new SearchResultDto(SongLibraryMapper.toSongDtoList(songs),
         SongLibraryMapper.toArtistDtoList(artists), SongLibraryMapper.toAlbumDtoList(albums));

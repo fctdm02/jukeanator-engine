@@ -46,6 +46,12 @@ public interface UserService {
   void addFunds(String emailAddress, AddFundsRequest request);
   UserProfileDto updateProfile(String emailAddress, UpdateProfileRequest request);
 
+  List<String> getSearchHistory(String emailAddress);
+
+  void addSearchHistory(String emailAddress, String query);
+
+  void removeSearchHistory(String emailAddress, int index);
+
   /**
    *
    * @param event

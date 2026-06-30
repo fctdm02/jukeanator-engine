@@ -42,9 +42,15 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
 
   @Override
   public SearchResultDto getMusicBySearch(String searchFor) {
+    return getMusicBySearch(searchFor, 20);
+  }
+
+  @Override
+  public SearchResultDto getMusicBySearch(String searchFor, int limit) {
 
     return restClient.get().uri(uriBuilder -> uriBuilder.path("/api/song-library/search")
-        .queryParam("searchFor", searchFor).build()).retrieve().body(SearchResultDto.class);
+        .queryParam("searchFor", searchFor).queryParam("limit", limit).build()).retrieve()
+        .body(SearchResultDto.class);
   }
 
   @Override
