@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -13,6 +14,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EntityDoesNotExistException.class)
     public ResponseEntity<ApiError> handleNotFound(EntityDoesNotExistException ex) {
         return build(HttpStatus.NOT_FOUND, ex);
+    }
+
+    @ExceptionHandler(InvalidPrincipalException.class)
+    public ResponseEntity<ApiError> handleInvalidPrincipal(InvalidPrincipalException ex) {
+        return build(HttpStatus.UNAUTHORIZED, ex);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

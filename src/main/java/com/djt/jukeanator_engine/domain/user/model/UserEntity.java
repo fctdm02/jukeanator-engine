@@ -79,6 +79,7 @@ public class UserEntity extends AbstractPersistentEntity {
   }
 
   public boolean addSongToSongPlayHistory(SongIdentifier songIdentifier) {
+    this.songPlayHistory.remove(songIdentifier);
     return this.songPlayHistory.add(songIdentifier);
   }
 

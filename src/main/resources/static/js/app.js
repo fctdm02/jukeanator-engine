@@ -45,6 +45,12 @@
       ...options,
       headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(options.headers || {}) },
     });
+    if (res.status === 401 && state.token) {
+      // Stale/invalid token (e.g. left over from before the user store was reset) -
+      // treat this the same as "not logged in" instead of surfacing a raw failure.
+      clearAuth();
+      renderLogin();
+    }
     if (!res.ok) throw new Error(`${options.method || 'GET'} ${path} failed: ${res.status}`);
     const text = await res.text();
     return text ? JSON.parse(text) : null;
@@ -722,9 +728,9 @@
 
   // On-screen keyboard layout — AMI-style 4-row layout
   const KBD_ABC = [
-    ['Q','W','E','R','T','Y','U','I','O','P'],
-    ['A','S','D','F','G','H','J','K','L'],
-    ['Z','X','C','V','B','N','M','⌫'],
+    ['q','w','e','r','t','y','u','i','o','p'],
+    ['a','s','d','f','g','h','j','k','l'],
+    ['⇧','z','x','c','v','b','n','m','⌫'],
   ];
   const KBD_NUM = [
     ['1','2','3','4','5','6','7','8','9','0'],
@@ -732,12 +738,18 @@
     ['(',')',  '[',']','/','\\','?',':',';','⌫'],
   ];
 
-  function buildKeyboard(mode) {
+  function buildKeyboard(mode, shiftState) {
     const layout = mode === 'abc' ? KBD_ABC : KBD_NUM;
+    const caps = mode === 'abc' && shiftState !== 'none';
 
     function keyHtml(k) {
       if (k === '⌫') return `<button class="kbd-key kbd-back" data-key="BACK">⌫</button>`;
-      return `<button class="kbd-key" data-key="${k}">${k}</button>`;
+      if (k === '⇧') {
+        const activeClass = shiftState === 'locked' ? ' kbd-shift-locked' : shiftState === 'once' ? ' kbd-shift-active' : '';
+        return `<button class="kbd-key kbd-shift${activeClass}" data-key="SHIFT">⇧</button>`;
+      }
+      const label = caps ? k.toUpperCase() : k;
+      return `<button class="kbd-key" data-key="${k}">${label}</button>`;
     }
 
     const rows = layout.map(row =>
@@ -796,6 +808,8 @@
   async function renderSearchEntry() {
     let kbdMode = 'abc';
     let buffer = '';
+    let shiftState = 'none'; // 'none' | 'once' | 'locked'
+    let lastShiftClick = 0;
 
     const history = await loadSearchHistory();
 
@@ -836,7 +850,7 @@
             ${historyHtml(history)}
           </div>
           <div class="onscreen-keyboard" id="onscreenKbd">
-            ${buildKeyboard(kbdMode)}
+            ${buildKeyboard(kbdMode, shiftState)}
           </div>
         </div>`;
 
@@ -874,14 +888,36 @@
           if (buffer.trim()) await executeSearch(buffer.trim());
           return;
         }
+        if (key === 'SHIFT') {
+          const now = Date.now();
+          const isDoubleClick = now - lastShiftClick < 350;
+          lastShiftClick = now;
+          if (shiftState === 'locked') {
+            shiftState = 'none';
+          } else if (isDoubleClick) {
+            shiftState = 'locked';
+          } else if (shiftState === 'once') {
+            shiftState = 'none';
+          } else {
+            shiftState = 'once';
+          }
+          document.getElementById('onscreenKbd').innerHTML = buildKeyboard(kbdMode, shiftState);
+          return;
+        }
         if (key === 'BACK') {
           buffer = buffer.slice(0, -1);
         } else if (key === 'TOGGLE') {
           kbdMode = kbdMode === 'abc' ? 'num' : 'abc';
-          document.getElementById('onscreenKbd').innerHTML = buildKeyboard(kbdMode);
+          shiftState = 'none';
+          document.getElementById('onscreenKbd').innerHTML = buildKeyboard(kbdMode, shiftState);
           return;
         } else {
-          buffer += key;
+          const isLetter = kbdMode === 'abc' && key.length === 1 && /[a-z]/i.test(key);
+          buffer += (isLetter && shiftState !== 'none') ? key.toUpperCase() : key;
+          if (shiftState === 'once') {
+            shiftState = 'none';
+            document.getElementById('onscreenKbd').innerHTML = buildKeyboard(kbdMode, shiftState);
+          }
         }
         updateDisplay();
       });

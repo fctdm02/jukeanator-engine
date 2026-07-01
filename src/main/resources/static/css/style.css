@@ -1019,6 +1019,24 @@ input {
   font-weight: 600;
 }
 
+.kbd-key.kbd-shift {
+  background: #2e3138;
+  max-width: 40px;
+  flex: 1.2;
+  font-size: 1rem;
+}
+
+.kbd-key.kbd-shift.kbd-shift-active {
+  background: #4ab8d8;
+  color: #000;
+}
+
+.kbd-key.kbd-shift.kbd-shift-locked {
+  background: #4ab8d8;
+  color: #000;
+  box-shadow: 0 0 0 2px #ffffff inset;
+}
+
 .kbd-key.kbd-punct {
   background: #3d4147;
   max-width: 36px;

@@ -9,6 +9,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.security.LocalPrincipal;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
@@ -128,7 +129,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);;
     if (user == null)
     {
-      throw new UserServiceException("User not found: " + emailAddress);
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
     // Temporary: ensure every user has at least the default credit balance until
@@ -149,7 +150,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
-      throw new UserServiceException("User not found: " + emailAddress);
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
     List<SongIdentifier> history = user.getSongPlayHistory();
@@ -187,7 +188,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null)
     {
-      throw new UserServiceException("User not found: " + emailAddress);
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
     
     if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
@@ -216,7 +217,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null)
     {
-      throw new UserServiceException("User not found: " + emailAddress);
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
     if (request.firstName() != null)
@@ -234,7 +235,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null)
     {
-      throw new UserServiceException("User not found: " + emailAddress);
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
     return user.getSearchHistory();
@@ -246,7 +247,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null)
     {
-      throw new UserServiceException("User not found: " + emailAddress);
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
     user.addToSearchHistory(query, 10);
@@ -260,7 +261,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null)
     {
-      throw new UserServiceException("User not found: " + emailAddress);
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
     user.removeFromSearchHistory(index);

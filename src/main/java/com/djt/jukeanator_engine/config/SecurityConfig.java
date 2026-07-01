@@ -39,7 +39,8 @@ public class SecurityConfig {
 
             // ── Public: static web UI assets and the websocket handshake ─────
             .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/images/**",
-                "/favicon.ico", "/ws/**")
+                "/favicon.ico", "/favicon-16x16.png", "/favicon-32x32.png",
+                "/apple-touch-icon.png", "/site.webmanifest", "/ws/**")
             .permitAll()
 
             // ── Public: read-only music browsing ─────────────────────────────

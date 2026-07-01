@@ -12,6 +12,7 @@ import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 
 /**
@@ -67,6 +68,6 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     assertEquals("jane.doe@example.com", profile.emailAddress());
 
     // Getting a profile for an unknown email address should fail
-    assertThrows(UserServiceException.class, () -> userService.getProfile("unknown@example.com"));
+    assertThrows(InvalidPrincipalException.class, () -> userService.getProfile("unknown@example.com"));
   }
 }
