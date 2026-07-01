@@ -5,23 +5,28 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 
 /**
- * Payload returned by GET /api/users/home.
+ * Payload returned by GET /api/users/home (authenticated users only).
  *
- * <p>Drives the home-page content area (sections a–d) and pre-populates the search page history
- * list so a single round-trip covers both panels.
+ * <p>Extends {@link HomePageDto} with user-specific sections and pre-populates the search page
+ * history list so a single round-trip covers both panels.
  *
- * <p>All list fields default to empty lists until the underlying feature is implemented.
- *
- * @param myRecentPlays  (a) Songs the authenticated user has recently played.
- * @param myPlaylists    (b) Placeholder — no playlist domain yet; will hold playlist names.
- * @param artistsHotHere (c) Artists currently trending at this venue.
- * @param songsHotHere   (d) Songs currently trending at this venue.
- * @param searchHistory  Recent search queries for the authenticated user.
+ * @see HomePageDto
  */
-public record UserHomePageDto(
-    List<SongDto>    myRecentPlays,
-    List<String>     myPlaylists,
-    List<ArtistDto>  artistsHotHere,
-    List<SongDto>    songsHotHere,
-    List<String>     searchHistory) {
+public class UserHomePageDto extends HomePageDto {
+
+  private final List<SongDto>  myRecentPlays;
+  private final List<String>   myPlaylists;
+  private final List<String>   searchHistory;
+
+  public UserHomePageDto(List<SongDto> myRecentPlays, List<String> myPlaylists,
+      List<ArtistDto> artistsHotHere, List<SongDto> songsHotHere, List<String> searchHistory) {
+    super(artistsHotHere, songsHotHere);
+    this.myRecentPlays = myRecentPlays;
+    this.myPlaylists   = myPlaylists;
+    this.searchHistory = searchHistory;
+  }
+
+  public List<SongDto> getMyRecentPlays() { return myRecentPlays; }
+  public List<String>  getMyPlaylists()   { return myPlaylists; }
+  public List<String>  getSearchHistory() { return searchHistory; }
 }

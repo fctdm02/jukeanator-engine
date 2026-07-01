@@ -400,11 +400,19 @@ html, body {
   gap: 0.6rem;
   padding: 0.75rem 0.75rem 0.85rem;
   overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.rp-thumb-row::-webkit-scrollbar {
+  display: none;
 }
 
 .rp-thumb-card {
-  flex: 0 0 calc(33.33% - 0.4rem);
+  flex: 0 0 calc(30% - 0.2rem);
   min-width: 0;
+  scroll-snap-align: start;
 }
 
 .rp-thumb-img {

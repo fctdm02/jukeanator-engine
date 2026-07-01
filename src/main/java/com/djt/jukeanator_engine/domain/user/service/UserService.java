@@ -10,6 +10,7 @@ import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
+import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 
@@ -46,6 +47,8 @@ public interface UserService {
    * @param emailAddress
    * @return
    */
+  HomePageDto getPublicHomePage();
+
   UserHomePageDto getHomePage(String emailAddress);
 
   /**

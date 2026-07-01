@@ -18,6 +18,7 @@ import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
+import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
@@ -43,6 +44,13 @@ public class UserController {
   public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
 
     return ResponseEntity.ok(userService.login(request));
+  }
+
+  /** Returns trending artists and songs for unauthenticated users. */
+  @GetMapping("/home-public")
+  public ResponseEntity<HomePageDto> getPublicHomePage() {
+
+    return ResponseEntity.ok(userService.getPublicHomePage());
   }
 
   /** Returns home-page content and search history for the currently authenticated user. */

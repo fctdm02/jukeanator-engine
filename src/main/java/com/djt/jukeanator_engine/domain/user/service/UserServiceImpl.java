@@ -29,6 +29,7 @@ import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
+import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
@@ -145,6 +146,16 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
         user.getEmailAddress(), user.getNumCredits(), balanceUsd, user.getSongPlayHistory());
   }
 
+  private static final int MAX_HOT_HERE = 10;
+
+  @Override
+  public HomePageDto getPublicHomePage() {
+    var popular = songLibraryService.getMusicByPopularity();
+    var artists = popular.getArtists().stream().limit(MAX_HOT_HERE).toList();
+    var songs   = popular.getSongs().stream().limit(MAX_HOT_HERE).toList();
+    return new HomePageDto(artists, songs);
+  }
+
   @Override
   public UserHomePageDto getHomePage(String emailAddress) {
 
@@ -165,11 +176,12 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       }
     }
 
+    HomePageDto hotHere = getPublicHomePage();
     return new UserHomePageDto(
-        recentPlays,     // (a) myRecentPlays
-        List.of(),       // (b) myPlaylists
-        List.of(),       // (c) artistsHotHere
-        List.of(),       // (d) songsHotHere
+        recentPlays,
+        List.of(),
+        hotHere.getArtistsHotHere(),
+        hotHere.getSongsHotHere(),
         user.getSearchHistory());
   }
 

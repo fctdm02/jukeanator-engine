@@ -9,6 +9,8 @@
     currentMainTab: 'music',
     searchHistory: null,   // cached from GET /api/users/home; null = not yet loaded
     recentPlays: [],       // cached from GET /api/users/home; updated live via STOMP
+    hotHereArtists: [],    // cached from home page API; refreshed on loadHomePage
+    hotHereSongs: [],      // cached from home page API; refreshed on loadHomePage
     numCredits: 0,         // cached credit count; refreshed on loadCredits()
   };
 
@@ -96,8 +98,10 @@
       case 'settings':          renderStub('Settings');          break;
       case 'terms':             renderStub('Terms and Conditions'); break;
       case 'privacy':           renderStub('Privacy Policy');    break;
-      case 'recent-plays-all':  renderRecentPlaysAll();          break;
-      case 'search-entry':      renderSearchEntry();             break;
+      case 'recent-plays-all':       renderRecentPlaysAll();          break;
+      case 'artists-hot-here-all':   renderArtistsHotHereAll();       break;
+      case 'songs-hot-here-all':     renderSongsHotHereAll();         break;
+      case 'search-entry':           renderSearchEntry();             break;
       case 'search-results':    renderSearchResults(params.query, params.result); break;
       case 'artist-detail':     renderArtistDetail(params);      break;
       case 'album-detail':      renderAlbumDetail(params);       break;
@@ -190,52 +194,79 @@
   async function loadHomePage(container) {
     if (!container) return;
 
-    if (!state.token) {
-      container.innerHTML = '<div class="stub-placeholder">HOME — coming soon</div>';
-      return;
-    }
-
-    let homePage;
     try {
-      homePage = await api('/api/users/home');
+      if (state.token) {
+        const homePage = await api('/api/users/home');
+        state.searchHistory    = homePage.searchHistory    || [];
+        state.recentPlays      = homePage.myRecentPlays    || [];
+        state.hotHereArtists   = homePage.artistsHotHere   || [];
+        state.hotHereSongs     = homePage.songsHotHere     || [];
+      } else {
+        const publicPage = await api('/api/users/home-public');
+        state.hotHereArtists   = publicPage.artistsHotHere || [];
+        state.hotHereSongs     = publicPage.songsHotHere   || [];
+      }
     } catch {
-      container.innerHTML = '<div class="stub-placeholder">HOME — coming soon</div>';
+      container.innerHTML = '<div class="stub-placeholder">Could not load home page.</div>';
       return;
     }
 
-    // Cache search history so the search page can use it without a second round-trip.
-    state.searchHistory = homePage.searchHistory || [];
-    state.recentPlays = homePage.myRecentPlays || [];
+    if (state.token) {
+      container.innerHTML = `
+        <div class="home-sections">
+          <section class="home-section">
+            <div class="home-section-header">
+              <h2 class="home-section-title">My Recent Plays</h2>
+              <button class="home-section-view-all" id="recentPlaysViewAll">View All</button>
+            </div>
+            <div class="home-section-body" id="recentPlaysBody">${renderSwipeableSongThumbs(state.recentPlays, 'rp')}</div>
+          </section>
+          <section class="home-section">
+            <h2 class="home-section-title">My Playlists</h2>
+            <div class="home-section-body stub-placeholder">Coming soon</div>
+          </section>
+          ${hotHereSectionsHtml()}
+        </div>`;
 
-    container.innerHTML = `
-      <div class="home-sections">
-        <section class="home-section">
-          <div class="home-section-header">
-            <h2 class="home-section-title">My Recent Plays</h2>
-            <button class="home-section-view-all" id="recentPlaysViewAll">View All</button>
-          </div>
-          <div class="home-section-body" id="recentPlaysBody">${renderRecentPlaysThumbnails(state.recentPlays)}</div>
-        </section>
-        <section class="home-section">
-          <h2 class="home-section-title">My Playlists</h2>
-          <div class="home-section-body stub-placeholder">Coming soon</div>
-        </section>
-        <section class="home-section">
-          <h2 class="home-section-title">Artists Hot Here</h2>
-          <div class="home-section-body stub-placeholder">Coming soon</div>
-        </section>
-        <section class="home-section">
-          <h2 class="home-section-title">Songs Hot Here</h2>
-          <div class="home-section-body stub-placeholder">Coming soon</div>
-        </section>
-      </div>`;
+      document.getElementById('recentPlaysViewAll')
+        ?.addEventListener('click', () => navigateSub('recent-plays-all'));
+      wireSwipeableClicks('recentPlaysBody', state.recentPlays, s => showSongPopup(s));
+    } else {
+      container.innerHTML = `<div class="home-sections">${hotHereSectionsHtml()}</div>`;
+    }
 
-    document.getElementById('recentPlaysViewAll')
-      ?.addEventListener('click', () => navigateSub('recent-plays-all'));
-    wireRecentPlaysClicks(state.recentPlays);
+    wireHotHereButtons();
   }
 
-  function recentPlayThumbHtml(s) {
+  function hotHereSectionsHtml() {
+    return `
+      <section class="home-section">
+        <div class="home-section-header">
+          <h2 class="home-section-title">Artists Hot Here</h2>
+          <button class="home-section-view-all" id="artistsHotHereViewAll">View All</button>
+        </div>
+        <div class="home-section-body" id="artistsHotHereBody">${renderSwipeableArtistThumbs(state.hotHereArtists)}</div>
+      </section>
+      <section class="home-section">
+        <div class="home-section-header">
+          <h2 class="home-section-title">Songs Hot Here</h2>
+          <button class="home-section-view-all" id="songsHotHereViewAll">View All</button>
+        </div>
+        <div class="home-section-body" id="songsHotHereBody">${renderSwipeableSongThumbs(state.hotHereSongs, 'hot')}</div>
+      </section>`;
+  }
+
+  function wireHotHereButtons() {
+    document.getElementById('artistsHotHereViewAll')
+      ?.addEventListener('click', () => navigateSub('artists-hot-here-all'));
+    document.getElementById('songsHotHereViewAll')
+      ?.addEventListener('click', () => navigateSub('songs-hot-here-all'));
+    wireSwipeableClicks('artistsHotHereBody', state.hotHereArtists,
+      a => navigateSub('artist-detail', { artistId: a.artistId }));
+    wireSwipeableClicks('songsHotHereBody', state.hotHereSongs, s => showSongPopup(s));
+  }
+
+  function songThumbHtml(s) {
     const art = s.albumId != null
       ? `<img src="/api/song-library/albums/${s.albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'rp-thumb-placeholder\\'>&#127925;</div>'">`
@@ -247,17 +278,34 @@
     </div>`;
   }
 
-  function renderRecentPlaysThumbnails(songs) {
-    if (!songs || songs.length === 0) return '<div class="stub-placeholder">No plays yet</div>';
-    return `<div class="rp-thumb-row">${songs.slice(0, 3).map(recentPlayThumbHtml).join('')}</div>`;
+  function artistThumbHtml(a) {
+    const art = (a.albums && a.albums.length && a.albums[0].albumId != null)
+      ? `<img src="/api/song-library/albums/${a.albums[0].albumId}/coverArt" alt=""
+              onerror="this.outerHTML='<div class=\\'rp-thumb-placeholder\\'>&#127911;</div>'">`
+      : `<div class="rp-thumb-placeholder">&#127911;</div>`;
+    return `<div class="rp-thumb-card">
+      <div class="rp-thumb-img">${art}</div>
+      <div class="rp-thumb-song">${escHtml(a.artistName || '')}</div>
+      <div class="rp-thumb-artist">${a.songCount != null ? escHtml(String(a.songCount)) + ' songs' : ''}</div>
+    </div>`;
   }
 
-  function wireRecentPlaysClicks(songs) {
-    const body = document.getElementById('recentPlaysBody');
+  function renderSwipeableSongThumbs(songs, _prefix) {
+    if (!songs || songs.length === 0) return '<div class="stub-placeholder">Nothing to show yet</div>';
+    return `<div class="rp-thumb-row">${songs.map(songThumbHtml).join('')}</div>`;
+  }
+
+  function renderSwipeableArtistThumbs(artists) {
+    if (!artists || artists.length === 0) return '<div class="stub-placeholder">Nothing to show yet</div>';
+    return `<div class="rp-thumb-row">${artists.map(artistThumbHtml).join('')}</div>`;
+  }
+
+  function wireSwipeableClicks(containerId, items, onClick) {
+    const body = document.getElementById(containerId);
     if (!body) return;
     body.querySelectorAll('.rp-thumb-card').forEach((card, i) => {
       card.style.cursor = 'pointer';
-      card.addEventListener('click', () => showSongPopup(songs[i]));
+      card.addEventListener('click', () => onClick(items[i]));
     });
   }
 
@@ -265,22 +313,70 @@
     const songs = state.recentPlays || [];
     const rows = songs.length === 0
       ? '<div class="stub-placeholder">No plays yet</div>'
-      : songs.map(s => {
-          const art = s.albumId != null
-            ? `<img class="result-thumb" src="/api/song-library/albums/${s.albumId}/coverArt" alt=""
-                    onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#127925;</div>'">`
-            : `<div class="result-thumb-placeholder">&#127925;</div>`;
-          return `<div class="result-row">
-            ${art}
-            <div class="result-info">
-              <div class="result-title">${escHtml(s.songName || '')}</div>
-              <div class="result-sub">${escHtml(s.artistName || '')}</div>
-            </div>
-          </div>`;
-        }).join('');
+      : songs.map(s => songListRowHtml(s)).join('');
 
     contentPanel.innerHTML = subScreenShell('My Recent Plays', `<div class="recent-plays-all">${rows}</div>`);
     wireBackBtn();
+    contentPanel.querySelectorAll('.result-row').forEach((row, i) => {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => showSongPopup(songs[i]));
+    });
+  }
+
+  function renderArtistsHotHereAll() {
+    const artists = state.hotHereArtists || [];
+    const rows = artists.length === 0
+      ? '<div class="stub-placeholder">Nothing to show yet</div>'
+      : artists.map(a => artistListRowHtml(a)).join('');
+
+    contentPanel.innerHTML = subScreenShell('Artists Hot Here', `<div class="recent-plays-all">${rows}</div>`);
+    wireBackBtn();
+    contentPanel.querySelectorAll('.result-row').forEach((row, i) => {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => navigateSub('artist-detail', { artistId: artists[i].artistId }));
+    });
+  }
+
+  function renderSongsHotHereAll() {
+    const songs = state.hotHereSongs || [];
+    const rows = songs.length === 0
+      ? '<div class="stub-placeholder">Nothing to show yet</div>'
+      : songs.map(s => songListRowHtml(s)).join('');
+
+    contentPanel.innerHTML = subScreenShell('Songs Hot Here', `<div class="recent-plays-all">${rows}</div>`);
+    wireBackBtn();
+    contentPanel.querySelectorAll('.result-row').forEach((row, i) => {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => showSongPopup(songs[i]));
+    });
+  }
+
+  function songListRowHtml(s) {
+    const art = s.albumId != null
+      ? `<img class="result-thumb" src="/api/song-library/albums/${s.albumId}/coverArt" alt=""
+              onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#127925;</div>'">`
+      : `<div class="result-thumb-placeholder">&#127925;</div>`;
+    return `<div class="result-row">
+      ${art}
+      <div class="result-info">
+        <div class="result-title">${escHtml(s.songName || '')}</div>
+        <div class="result-sub">${escHtml(s.artistName || '')}</div>
+      </div>
+    </div>`;
+  }
+
+  function artistListRowHtml(a) {
+    const art = (a.albums && a.albums.length && a.albums[0].albumId != null)
+      ? `<img class="result-thumb" src="/api/song-library/albums/${a.albums[0].albumId}/coverArt" alt=""
+              onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#127911;</div>'">`
+      : `<div class="result-thumb-placeholder">&#127911;</div>`;
+    return `<div class="result-row">
+      ${art}
+      <div class="result-info">
+        <div class="result-title">${escHtml(a.artistName || '')}</div>
+        <div class="result-sub">${a.songCount != null ? escHtml(String(a.songCount)) + ' songs' : ''}</div>
+      </div>
+    </div>`;
   }
 
   // ── Header data loaders ─────────────────────────────────────────────────
@@ -1411,8 +1507,8 @@
           if (state.recentPlays.length > 10) state.recentPlays.length = 10;
           const body = document.getElementById('recentPlaysBody');
           if (body) {
-            body.innerHTML = renderRecentPlaysThumbnails(state.recentPlays);
-            wireRecentPlaysClicks(state.recentPlays);
+            body.innerHTML = renderSwipeableSongThumbs(state.recentPlays, 'rp');
+            wireSwipeableClicks('recentPlaysBody', state.recentPlays, s => showSongPopup(s));
           }
         });
       }

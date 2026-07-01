@@ -35,7 +35,7 @@ public class SecurityConfig {
 
             // ── Public: auth endpoints ────────────────────────────────────────
             .requestMatchers("/api/users/register", "/api/users/login").permitAll()
-            .requestMatchers(HttpMethod.GET, "/api/users/credit-packages").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/users/credit-packages", "/api/users/home-public").permitAll()
 
             // ── Public: static web UI assets and the websocket handshake ─────
             .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/images/**",
