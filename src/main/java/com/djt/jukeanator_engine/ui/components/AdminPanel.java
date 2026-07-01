@@ -371,10 +371,15 @@ public class AdminPanel extends JPanel {
     if (selected == null)
       return;
     int idx = queueList.getSelectedIndex();
+    if (idx <= 0)
+      return;
     try {
-      songQueueService.moveSongUpInQueue(new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
-          selected.getSong().getSongId()));
-      queueList.setSelectedIndex(Math.max(0, idx - 1));
+      songQueueService.moveSongUpInQueue(new ChangeSongQueueRequest(
+          selected.getSong().getAlbumId(), selected.getSong().getSongId(), idx));
+      SongQueueEntryDto above = queueListModel.get(idx - 1);
+      queueListModel.set(idx - 1, selected);
+      queueListModel.set(idx, above);
+      queueList.setSelectedIndex(idx - 1);
     } catch (Exception ex) {
       ex.printStackTrace();
     }
@@ -386,10 +391,15 @@ public class AdminPanel extends JPanel {
     if (selected == null)
       return;
     int idx = queueList.getSelectedIndex();
+    if (idx >= queueListModel.getSize() - 1)
+      return;
     try {
       songQueueService.moveSongDownInQueue(new ChangeSongQueueRequest(
-          selected.getSong().getAlbumId(), selected.getSong().getSongId()));
-      queueList.setSelectedIndex(Math.min(queueListModel.getSize() - 1, idx + 1));
+          selected.getSong().getAlbumId(), selected.getSong().getSongId(), idx));
+      SongQueueEntryDto below = queueListModel.get(idx + 1);
+      queueListModel.set(idx + 1, selected);
+      queueListModel.set(idx, below);
+      queueList.setSelectedIndex(idx + 1);
     } catch (Exception ex) {
       ex.printStackTrace();
     }

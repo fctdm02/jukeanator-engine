@@ -134,11 +134,15 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
    *         song is already at the top of the queue, then -1 is removed
    */
   public Integer moveSongUpInQueue(SongFileEntity song) {
+    return moveSongUpInQueue(song, -1);
+  }
+
+  public Integer moveSongUpInQueue(SongFileEntity song, int preferredIndex) {
 
     if (queueEntries == null) {
       queueEntries = new ArrayList<>();
     }
-    int index = getIndexForSongQueueEntry(song);
+    int index = resolveIndex(song, preferredIndex);
     if (index > 0) {
 
       SongQueueEntryEntity current = this.queueEntries.get(index);
@@ -158,12 +162,16 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
    *         song is already at the bottom of the queue, then -1 is removed
    */
   public Integer moveSongDownInQueue(SongFileEntity song) {
+    return moveSongDownInQueue(song, -1);
+  }
+
+  public Integer moveSongDownInQueue(SongFileEntity song, int preferredIndex) {
 
     if (queueEntries == null) {
       queueEntries = new ArrayList<>();
     }
-    int index = getIndexForSongQueueEntry(song);
-    if (index > 0) {
+    int index = resolveIndex(song, preferredIndex);
+    if (index >= 0 && index < this.queueEntries.size() - 1) {
 
       SongQueueEntryEntity current = this.queueEntries.get(index);
       this.queueEntries.set(index, this.queueEntries.get(index + 1));
@@ -206,6 +214,23 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
       queueEntries = new ArrayList<>();
     }
     return this.queueEntries.remove(songQueueEntry);
+  }
+
+  /**
+   * Resolves the queue index for a song. If {@code preferredIndex} is a valid index and the entry
+   * there matches {@code song}, it is used directly (handles duplicate songs correctly). Otherwise
+   * falls back to scanning for the first matching entry.
+   */
+  private int resolveIndex(SongFileEntity song, int preferredIndex) {
+
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
+    if (preferredIndex >= 0 && preferredIndex < queueEntries.size()
+        && queueEntries.get(preferredIndex).getSong().equals(song)) {
+      return preferredIndex;
+    }
+    return getIndexForSongQueueEntry(song);
   }
 
   private int getIndexForSongQueueEntry(SongFileEntity song) {

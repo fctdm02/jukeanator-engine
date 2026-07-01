@@ -883,7 +883,9 @@ public class SongQueueServiceImpl
       if (album != null) {
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
-          numSongsInQueue = songQueueRoot.moveSongUpInQueue(song);
+          int preferredIndex = changeSongQueueRequest.getQueuePosition() != null
+              ? changeSongQueueRequest.getQueuePosition() : -1;
+          numSongsInQueue = songQueueRoot.moveSongUpInQueue(song, preferredIndex);
           if (numSongsInQueue.intValue() > 0) {
             songQueueRepository.storeAggregateRoot(songQueueRoot);
             eventPublisher.publishEvent(
@@ -915,7 +917,9 @@ public class SongQueueServiceImpl
       if (album != null) {
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
-          numSongsInQueue = songQueueRoot.moveSongDownInQueue(song);
+          int preferredIndex = changeSongQueueRequest.getQueuePosition() != null
+              ? changeSongQueueRequest.getQueuePosition() : -1;
+          numSongsInQueue = songQueueRoot.moveSongDownInQueue(song, preferredIndex);
           if (numSongsInQueue.intValue() > 0) {
             songQueueRepository.storeAggregateRoot(songQueueRoot);
             eventPublisher.publishEvent(
