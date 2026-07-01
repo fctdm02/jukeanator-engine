@@ -100,6 +100,7 @@
       case 'search-entry':      renderSearchEntry();             break;
       case 'search-results':    renderSearchResults(params.query, params.result); break;
       case 'artist-detail':     renderArtistDetail(params);      break;
+      case 'album-detail':      renderAlbumDetail(params);       break;
       default:                  renderMain(state.currentMainTab);
     }
   }
@@ -966,7 +967,7 @@
 
   function albumResultRow(a) {
     const thumb = coverArtHtml(a.albumId, '&#128191;');
-    return `<div class="result-row">
+    return `<div class="result-row album-result-row" data-album-id="${a.albumId ?? ''}">
       ${thumb}
       <div class="result-info">
         <div class="result-title">${escHtml(a.name || '')}</div>
@@ -1057,6 +1058,12 @@
         if (artistId) navigateSub('artist-detail', { artistId: Number(artistId) });
         return;
       }
+      const albumRow = e.target.closest('.album-result-row');
+      if (albumRow) {
+        const albumId = albumRow.dataset.albumId;
+        if (albumId) navigateSub('album-detail', { albumId: Number(albumId) });
+        return;
+      }
       const row = e.target.closest('.song-result-row');
       if (!row) return;
       try {
@@ -1092,7 +1099,7 @@
   function artistAlbumRow(al) {
     const thumb = coverArtHtml(al.albumId, '&#128191;');
     const year = (al.releaseDate || '').slice(0, 4);
-    return `<div class="result-row">
+    return `<div class="result-row" data-album-id="${al.albumId ?? ''}">
       ${thumb}
       <div class="result-info">
         <div class="result-title">${escHtml(al.albumName || '')}</div>
@@ -1154,6 +1161,90 @@
       const song = songs[parseInt(row.dataset.index, 10)];
       if (song) showSongPopup(song);
     });
+
+    contentPanel.querySelector('#artist-tab-albums').addEventListener('click', (e) => {
+      const row = e.target.closest('.result-row');
+      if (!row) return;
+      const albumId = row.dataset.albumId;
+      if (albumId) navigateSub('album-detail', { albumId: Number(albumId) });
+    });
+  }
+
+  // ── Album detail screen ─────────────────────────────────────────────────
+
+  // Mirrors SongTrackCellRenderer.barsForPlays thresholds in the JFC/Swing UI —
+  // keep the two in sync if the popularity model changes.
+  const POPULARITY_T1 = 10, POPULARITY_T2 = 25, POPULARITY_T3 = 50;
+
+  function barsForPlays(plays) {
+    if (plays >= POPULARITY_T3) return 3;
+    if (plays >= POPULARITY_T2) return 2;
+    if (plays >= POPULARITY_T1) return 1;
+    return 0;
+  }
+
+  function popularityBarsHtml(numPlays) {
+    const active = barsForPlays(numPlays || 0);
+    const bars = [1, 2, 3]
+      .map(n => `<span class="popularity-bar${n <= active ? ' active' : ''}"></span>`)
+      .join('');
+    return `<div class="popularity-bars">${bars}</div>`;
+  }
+
+  function albumTrackRow(song, i) {
+    const num = song.trackNumber != null ? song.trackNumber : i + 1;
+    return `<div class="album-track-row" data-index="${i}">
+      ${popularityBarsHtml(song.numPlays)}
+      <div class="album-track-num">${String(num).padStart(2, '0')}</div>
+      <div class="album-track-title">${escHtml(song.songName || '')}</div>
+    </div>`;
+  }
+
+  async function renderAlbumDetail(params = {}) {
+    contentPanel.innerHTML = subScreenShell('Album', '<div class="stub-placeholder">Loading…</div>');
+    wireBackBtn();
+
+    let album;
+    try {
+      album = await api(`/api/song-library/albums/${params.albumId}`);
+    } catch {
+      contentPanel.querySelector('.sub-content').innerHTML = '<div class="stub-placeholder">Could not load album.</div>';
+      return;
+    }
+
+    const songs = [...(album.songs || [])].sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
+    const year = (album.releaseDate || '').slice(0, 4);
+    const coverHtml = album.albumId != null
+      ? `<img class="album-detail-cover" src="/api/song-library/albums/${album.albumId}/coverArt"
+              alt="" onerror="this.outerHTML=\`<div class='album-detail-cover album-detail-cover-placeholder'>&#128191;</div>\`">`
+      : `<div class="album-detail-cover album-detail-cover-placeholder">&#128191;</div>`;
+
+    contentPanel.querySelector('.sub-title').textContent = album.albumName || '';
+    contentPanel.querySelector('.sub-content').innerHTML = `
+      <div class="album-detail-header">
+        ${coverHtml}
+        <div class="album-detail-header-info">
+          <div class="album-detail-name">${escHtml(album.albumName || '')}</div>
+          <div class="album-detail-artist" id="albumDetailArtist">${escHtml(album.artistName || '')}</div>
+          <div class="album-detail-meta">${year ? year + ' &middot; ' : ''}${songs.length} Songs</div>
+        </div>
+      </div>
+      <div class="album-track-list">
+        ${songs.length ? songs.map(albumTrackRow).join('') : '<div class="search-empty">No songs found</div>'}
+      </div>`;
+
+    contentPanel.querySelector('.album-track-list').addEventListener('click', (e) => {
+      const row = e.target.closest('.album-track-row');
+      if (!row) return;
+      const song = songs[parseInt(row.dataset.index, 10)];
+      if (song) showSongPopup(song);
+    });
+
+    const artistEl = document.getElementById('albumDetailArtist');
+    if (artistEl && album.artistId != null) {
+      artistEl.classList.add('album-detail-artist-link');
+      artistEl.addEventListener('click', () => navigateSub('artist-detail', { artistId: album.artistId }));
+    }
   }
 
   // ── Song bottom-sheet popup ─────────────────────────────────────────────

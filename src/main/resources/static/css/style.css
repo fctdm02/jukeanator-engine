@@ -1267,6 +1267,122 @@ input {
   display: block;
 }
 
+/* ── Popularity bars (mirrors JFC/Swing PopularityBarsPanel) ──────────────── */
+
+.popularity-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  width: 24px;
+  flex-shrink: 0;
+}
+
+.popularity-bar {
+  width: 5px;
+  border-radius: 2px;
+  background: rgba(60, 60, 70, 0.47);
+}
+
+.popularity-bar:nth-child(1) { height: 9px; }
+.popularity-bar:nth-child(2) { height: 13px; }
+.popularity-bar:nth-child(3) { height: 18px; }
+
+.popularity-bar.active:nth-child(1) { background: rgba(60, 210, 80, 0.71); }
+.popularity-bar.active:nth-child(2) { background: rgba(60, 210, 80, 0.80); }
+.popularity-bar.active:nth-child(3) { background: rgba(60, 210, 80, 0.90); }
+
+/* ── Album detail screen ───────────────────────────────────────────────── */
+
+.album-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 0 1rem;
+}
+
+.album-detail-cover {
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.08);
+}
+
+.album-detail-cover-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  color: var(--muted);
+}
+
+.album-detail-header-info {
+  min-width: 0;
+}
+
+.album-detail-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.album-detail-artist {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.album-detail-artist-link {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.album-detail-meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+
+.album-track-list {
+  margin: 0 -1rem;
+}
+
+.album-track-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.album-track-row:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.album-track-num {
+  width: 22px;
+  flex-shrink: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.album-track-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Song bottom-sheet popup ─────────────────────────────────────────────── */
 
 .song-popup-overlay {
