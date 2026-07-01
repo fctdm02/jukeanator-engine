@@ -240,13 +240,17 @@ public class AppConfig {
       AppProperties appProperties,
       UserRepository userRepository,
       PasswordEncoder passwordEncoder,
-      JwtUtil jwtUtil) {
-    
+      JwtUtil jwtUtil,
+      org.springframework.context.ApplicationEventPublisher eventPublisher,
+      SongLibraryService songLibraryService) {
+
     return new UserServiceImpl(
         appProperties.getEffectiveRootPath(),
         userRepository,
         passwordEncoder,
-        jwtUtil);
+        jwtUtil,
+        eventPublisher,
+        songLibraryService);
   }
   
   @Bean

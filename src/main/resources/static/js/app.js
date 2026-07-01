@@ -8,7 +8,11 @@
     navStack: [],          // { screen, params } entries for back navigation
     currentMainTab: 'music',
     searchHistory: null,   // cached from GET /api/users/home; null = not yet loaded
+    recentPlays: [],       // cached from GET /api/users/home; updated live via STOMP
+    numCredits: 0,         // cached credit count; refreshed on loadCredits()
   };
+
+  const COST_PLAY = 2; // Web UI normal play cost (double the JFC 1-credit cost)
 
   const contentPanel = document.getElementById('contentPanel');
 
@@ -87,6 +91,7 @@
       case 'settings':          renderStub('Settings');          break;
       case 'terms':             renderStub('Terms and Conditions'); break;
       case 'privacy':           renderStub('Privacy Policy');    break;
+      case 'recent-plays-all':  renderRecentPlaysAll();          break;
       default:                  renderMain(state.currentMainTab);
     }
   }
@@ -191,12 +196,16 @@
 
     // Cache search history so the search page can use it without a second round-trip.
     state.searchHistory = homePage.searchHistory || [];
+    state.recentPlays = homePage.myRecentPlays || [];
 
     container.innerHTML = `
       <div class="home-sections">
         <section class="home-section">
-          <h2 class="home-section-title">My Recent Plays</h2>
-          <div class="home-section-body stub-placeholder">Coming soon</div>
+          <div class="home-section-header">
+            <h2 class="home-section-title">My Recent Plays</h2>
+            <button class="home-section-view-all" id="recentPlaysViewAll">View All</button>
+          </div>
+          <div class="home-section-body" id="recentPlaysBody">${renderRecentPlaysThumbnails(state.recentPlays)}</div>
         </section>
         <section class="home-section">
           <h2 class="home-section-title">My Playlists</h2>
@@ -211,16 +220,65 @@
           <div class="home-section-body stub-placeholder">Coming soon</div>
         </section>
       </div>`;
+
+    document.getElementById('recentPlaysViewAll')
+      ?.addEventListener('click', () => navigateSub('recent-plays-all'));
+  }
+
+  function recentPlayThumbHtml(s) {
+    const art = s.albumId != null
+      ? `<img src="/api/song-library/albums/${s.albumId}/coverArt" alt=""
+              onerror="this.outerHTML='<div class=\\'rp-thumb-placeholder\\'>&#127925;</div>'">`
+      : `<div class="rp-thumb-placeholder">&#127925;</div>`;
+    return `<div class="rp-thumb-card">
+      <div class="rp-thumb-img">${art}</div>
+      <div class="rp-thumb-song">${escHtml(s.songName || '')}</div>
+      <div class="rp-thumb-artist">${escHtml(s.artistName || '')}</div>
+    </div>`;
+  }
+
+  function renderRecentPlaysThumbnails(songs) {
+    if (!songs || songs.length === 0) return '<div class="stub-placeholder">No plays yet</div>';
+    return `<div class="rp-thumb-row">${songs.slice(0, 3).map(recentPlayThumbHtml).join('')}</div>`;
+  }
+
+  function renderRecentPlaysAll() {
+    const songs = state.recentPlays || [];
+    const rows = songs.length === 0
+      ? '<div class="stub-placeholder">No plays yet</div>'
+      : songs.map(s => {
+          const art = s.albumId != null
+            ? `<img class="result-thumb" src="/api/song-library/albums/${s.albumId}/coverArt" alt=""
+                    onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#127925;</div>'">`
+            : `<div class="result-thumb-placeholder">&#127925;</div>`;
+          return `<div class="result-row">
+            ${art}
+            <div class="result-info">
+              <div class="result-title">${escHtml(s.songName || '')}</div>
+              <div class="result-sub">${escHtml(s.artistName || '')}</div>
+            </div>
+          </div>`;
+        }).join('');
+
+    contentPanel.innerHTML = subScreenShell('My Recent Plays', `<div class="recent-plays-all">${rows}</div>`);
+    wireBackBtn();
   }
 
   // ── Header data loaders ─────────────────────────────────────────────────
   async function loadCredits(widget) {
-    if (!widget) return;
-    if (!state.token) { widget.textContent = 'Credits: 0'; return; }
+    if (!state.token) {
+      state.numCredits = 0;
+      if (widget) widget.textContent = 'Credits: 0';
+      return;
+    }
     try {
       const profile = await api('/api/users/me');
-      widget.textContent = `Credits: ${profile.numCredits ?? 0}`;
-    } catch { widget.textContent = 'Credits: 0'; }
+      state.numCredits = profile.numCredits ?? 0;
+      if (widget) widget.textContent = `Credits: ${state.numCredits}`;
+    } catch {
+      state.numCredits = 0;
+      if (widget) widget.textContent = 'Credits: 0';
+    }
   }
 
   async function loadNowPlaying(widget) {
@@ -652,27 +710,23 @@
 
   // ── Search ──────────────────────────────────────────────────────────────
 
-  // On-screen keyboard layout (mirrors JFC/Swing KeyboardPanel)
+  // On-screen keyboard layout — AMI-style 4-row layout
   const KBD_ABC = [
-    ['Q','W','E','R','T','Y','U','I','O','P','CLEAR','⌫'],
-    ['A','S','D','F','G','H','J','K','L',"'",'?123'],
-    ['Z','X','C','V','B','N','M',',','.',' '],
+    ['Q','W','E','R','T','Y','U','I','O','P'],
+    ['A','S','D','F','G','H','J','K','L'],
+    ['Z','X','C','V','B','N','M','⌫'],
   ];
   const KBD_NUM = [
-    ['1','2','3','4','5','6','7','8','9','0','CLEAR','⌫'],
-    ['!','@','#','$','%','^','&','*','"',"'",'ABC'],
-    ['(',')',  '[',']','/','\\','?',':',';',' '],
+    ['1','2','3','4','5','6','7','8','9','0'],
+    ['!','@','#','$','%','^','&','*','"',"'"],
+    ['(',')',  '[',']','/','\\','?',':',';','⌫'],
   ];
 
   function buildKeyboard(mode) {
     const layout = mode === 'abc' ? KBD_ABC : KBD_NUM;
 
     function keyHtml(k) {
-      if (k === 'CLEAR')  return `<button class="kbd-key kbd-wide" data-key="CLEAR">CLEAR</button>`;
-      if (k === '⌫')     return `<button class="kbd-key kbd-wide" data-key="BACK">⌫</button>`;
-      if (k === '?123')   return `<button class="kbd-key kbd-wide kbd-mode-active" data-key="TOGGLE">?123</button>`;
-      if (k === 'ABC')    return `<button class="kbd-key kbd-wide kbd-mode-active" data-key="TOGGLE">ABC</button>`;
-      if (k === ' ')      return `<button class="kbd-key kbd-space" data-key=" "> </button>`;
+      if (k === '⌫') return `<button class="kbd-key kbd-back" data-key="BACK">⌫</button>`;
       return `<button class="kbd-key" data-key="${k}">${k}</button>`;
     }
 
@@ -680,11 +734,16 @@
       `<div class="kbd-row">${row.map(keyHtml).join('')}</div>`
     ).join('');
 
-    const searchRow = `<div class="kbd-row">
+    const toggleLabel = mode === 'abc' ? '?123' : 'ABC';
+    const actionRow = `<div class="kbd-row kbd-action-row">
+      <button class="kbd-key kbd-toggle" data-key="TOGGLE">${toggleLabel}</button>
+      <button class="kbd-key kbd-punct" data-key=",">,</button>
+      <button class="kbd-key kbd-space" data-key=" "></button>
+      <button class="kbd-key kbd-punct" data-key=".">.</button>
       <button class="kbd-key kbd-search" id="kbdSearchBtn">&#128269; Search</button>
     </div>`;
 
-    return rows + searchRow;
+    return rows + actionRow;
   }
 
   async function loadSearchHistory() {
@@ -740,6 +799,16 @@
         </div>`).join('');
     }
 
+    function updateDisplay() {
+      const display = document.getElementById('searchDisplay');
+      const clearBtn = document.getElementById('searchClearBtn');
+      if (display) {
+        display.textContent = buffer || 'Search for music';
+        display.className = 'search-input-display' + (buffer ? '' : ' placeholder');
+      }
+      if (clearBtn) clearBtn.style.display = buffer ? 'flex' : 'none';
+    }
+
     function render() {
       contentPanel.innerHTML = `
         <div class="search-screen">
@@ -750,6 +819,7 @@
               <div class="search-input-display ${buffer ? '' : 'placeholder'}" id="searchDisplay">
                 ${buffer ? escHtml(buffer) : 'Search for music'}
               </div>
+              <button class="search-clear-btn" id="searchClearBtn" style="display:${buffer ? 'flex' : 'none'}">&#10005;</button>
             </div>
           </div>
           <div class="search-history-list" id="searchHistoryList">
@@ -761,6 +831,7 @@
         </div>`;
 
       document.getElementById('searchBackBtn').addEventListener('click', () => renderMain(state.currentMainTab));
+      document.getElementById('searchClearBtn').addEventListener('click', () => { buffer = ''; updateDisplay(); });
 
       // History item click — run search from history
       document.getElementById('searchHistoryList').addEventListener('click', async (e) => {
@@ -795,8 +866,6 @@
         }
         if (key === 'BACK') {
           buffer = buffer.slice(0, -1);
-        } else if (key === 'CLEAR') {
-          buffer = '';
         } else if (key === 'TOGGLE') {
           kbdMode = kbdMode === 'abc' ? 'num' : 'abc';
           document.getElementById('onscreenKbd').innerHTML = buildKeyboard(kbdMode);
@@ -804,11 +873,7 @@
         } else {
           buffer += key;
         }
-        const display = document.getElementById('searchDisplay');
-        if (display) {
-          display.textContent = buffer || 'Search for music';
-          display.className = 'search-input-display' + (buffer ? '' : ' placeholder');
-        }
+        updateDisplay();
       });
     }
 
@@ -862,12 +927,14 @@
   function songResultRow(s) {
     const thumb = coverArtHtml(s.albumId, '&#127925;');
     const name = s.songName || s.title || '';
-    return `<div class="result-row">
+    const encoded = encodeURIComponent(JSON.stringify(s));
+    return `<div class="result-row song-result-row" data-song="${encoded}">
       ${thumb}
       <div class="result-info">
         <div class="result-title">${escHtml(name)}</div>
         <div class="result-sub">Song &middot; ${escHtml(s.artistName || '')}</div>
       </div>
+      <button class="result-menu-btn" title="More options">&#8942;</button>
     </div>`;
   }
 
@@ -929,6 +996,16 @@
 
     document.getElementById('searchResultsBackBtn').addEventListener('click', () => renderSearchEntry());
 
+    // Song row click → bottom sheet popup
+    contentPanel.addEventListener('click', (e) => {
+      const row = e.target.closest('.song-result-row');
+      if (!row) return;
+      try {
+        const song = JSON.parse(decodeURIComponent(row.dataset.song));
+        showSongPopup(song);
+      } catch { /* ignore */ }
+    });
+
     // Tab switching
     contentPanel.querySelectorAll('.search-tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -940,6 +1017,134 @@
     });
   }
 
+  // ── Song bottom-sheet popup ─────────────────────────────────────────────
+
+  let _songPopupTimer = null;
+
+  function dismissSongPopup() {
+    clearTimeout(_songPopupTimer);
+    const overlay = document.getElementById('songPopupOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('song-popup-visible');
+    setTimeout(() => overlay.remove(), 300);
+  }
+
+  function resetSongPopupTimer() {
+    clearTimeout(_songPopupTimer);
+    _songPopupTimer = setTimeout(dismissSongPopup, 20000);
+  }
+
+  async function showSongPopup(song) {
+    // Remove any existing popup
+    const existing = document.getElementById('songPopupOverlay');
+    if (existing) existing.remove();
+    clearTimeout(_songPopupTimer);
+
+    const credits = state.numCredits;
+    const highest = await api('/api/song-queue/highestPriority').catch(() => 1) || 1;
+    const priorityLevel   = highest + 1;
+    const costPriority    = priorityLevel * 2;   // Web UI = double the JFC cost
+    const canPlay         = credits >= COST_PLAY;
+    const canPriority     = credits >= costPriority;
+
+    const name      = escHtml(song.songName || song.title || '');
+    const albumName = escHtml(song.albumName || '');
+    const artist    = escHtml(song.artistName || '');
+    const crawlText = `${albumName} · ${artist}`;
+
+    const thumbHtml = song.albumId != null
+      ? `<img class="song-popup-thumb" src="/api/song-library/albums/${song.albumId}/coverArt"
+              alt="" onerror="this.outerHTML='<div class=\\'song-popup-thumb song-popup-thumb-placeholder\\'>&#127925;</div>'">`
+      : `<div class="song-popup-thumb song-popup-thumb-placeholder">&#127925;</div>`;
+
+    const priorityClass       = canPriority ? 'song-popup-action' : 'song-popup-action song-popup-action--warn';
+    const playClass           = canPlay     ? 'song-popup-action' : 'song-popup-action song-popup-action--warn';
+    const priorityCreditClass = canPriority ? 'spa-credits'       : 'spa-credits spa-credits--warn';
+    const playCreditClass     = canPlay     ? 'spa-credits'       : 'spa-credits spa-credits--warn';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'songPopupOverlay';
+    overlay.className = 'song-popup-overlay';
+    overlay.innerHTML = `
+      <div class="song-popup" id="songPopup">
+        <div class="song-popup-handle"></div>
+        <div class="song-popup-header">
+          ${thumbHtml}
+          <div class="song-popup-meta">
+            <div class="song-popup-title">${name}</div>
+            <div class="song-popup-crawl-wrap">
+              <div class="song-popup-crawl">${crawlText}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${crawlText}</div>
+            </div>
+          </div>
+        </div>
+        <div class="${priorityClass}" id="spaPlayPriority">
+          <span class="spa-label">Play Priority Song</span>
+          <span class="${priorityCreditClass}">${costPriority} Credits${canPriority ? '' : ' ⚠'}</span>
+        </div>
+        <div class="${playClass}" id="spaPlay">
+          <span class="spa-label">Play Song</span>
+          <span class="${playCreditClass}">${COST_PLAY} Credits${canPlay ? '' : ' ⚠'}</span>
+        </div>
+        <div class="song-popup-action song-popup-action--icon" id="spaArtist">
+          <span class="spa-icon">&#128100;</span>
+          <span class="spa-label">View This Artist</span>
+        </div>
+        <div class="song-popup-action song-popup-action--icon" id="spaFavorite">
+          <span class="spa-icon">&#127925;</span>
+          <span class="spa-label">Add to My Favorites</span>
+        </div>
+        <div class="song-popup-action song-popup-action--icon" id="spaPlaylist">
+          <span class="spa-icon">&#127925;</span>
+          <span class="spa-label">Add to a Playlist &hellip;</span>
+        </div>
+      </div>`;
+
+    document.getElementById('app-shell').appendChild(overlay);
+
+    // Slide in after next frame
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => overlay.classList.add('song-popup-visible'));
+    });
+
+    // Dismiss on overlay background click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) dismissSongPopup();
+    });
+
+    // Reset timer on any interaction inside popup
+    document.getElementById('songPopup').addEventListener('click', resetSongPopupTimer);
+
+    async function submitPlay(priority) {
+      try {
+        await api('/api/song-queue/addSong', {
+          method: 'POST',
+          body: JSON.stringify({ albumId: song.albumId, songId: song.songId, priority })
+        });
+        dismissSongPopup();
+      } catch (err) {
+        alert('Could not add song to queue: ' + (err.message || err));
+      }
+    }
+
+    document.getElementById('spaPlayPriority').addEventListener('click', async () => {
+      if (!canPriority) { resetSongPopupTimer(); return; }
+      resetSongPopupTimer();
+      await submitPlay(priorityLevel);
+    });
+
+    document.getElementById('spaPlay').addEventListener('click', async () => {
+      if (!canPlay) { resetSongPopupTimer(); return; }
+      resetSongPopupTimer();
+      await submitPlay(1);
+    });
+
+    document.getElementById('spaArtist').addEventListener('click',   () => { dismissSongPopup(); });
+    document.getElementById('spaFavorite').addEventListener('click', () => { resetSongPopupTimer(); });
+    document.getElementById('spaPlaylist').addEventListener('click', () => { resetSongPopupTimer(); });
+
+    resetSongPopupTimer();
+  }
+
   // ── WebSocket ───────────────────────────────────────────────────────────
   let stompClient = null;
 
@@ -948,13 +1153,34 @@
     const socket = new SockJS('/ws');
     stompClient = Stomp.over(socket);
     stompClient.debug = () => {};
-    stompClient.connect({}, () => {
+    const connectHeaders = state.token ? { token: state.token } : {};
+    stompClient.connect(connectHeaders, () => {
+
       stompClient.subscribe('/topic/now-playing', (frame) => {
         const widget = document.getElementById('nowPlayingWidget');
         if (!widget) return;
         const msg = JSON.parse(frame.body);
         setNowPlayingWidget(widget, msg.song);
       });
+
+      // User-specific updates — only fire for the logged-in user
+      if (state.token) {
+        stompClient.subscribe('/user/queue/credits', (frame) => {
+          const msg = JSON.parse(frame.body);
+          state.numCredits = msg.numCredits ?? 0;
+          const widget = document.getElementById('creditsValue');
+          if (widget) widget.textContent = `Credits: ${state.numCredits}`;
+        });
+
+        stompClient.subscribe('/user/queue/recent-plays', (frame) => {
+          const song = JSON.parse(frame.body);
+          state.recentPlays.unshift(song);
+          if (state.recentPlays.length > 10) state.recentPlays.length = 10;
+          const body = document.getElementById('recentPlaysBody');
+          if (body) body.innerHTML = renderRecentPlaysThumbnails(state.recentPlays);
+        });
+      }
+
     }, () => setTimeout(connectWebSocket, 3000));
   }
 

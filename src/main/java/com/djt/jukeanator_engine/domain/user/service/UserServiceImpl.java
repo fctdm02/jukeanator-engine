@@ -5,10 +5,12 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
+import com.djt.jukeanator_engine.domain.common.security.LocalPrincipal;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResponse;
@@ -16,6 +18,7 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
+import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
@@ -27,6 +30,7 @@ import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
@@ -41,25 +45,37 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   private static final int CREDITS_PER_DOLLAR = 3;
 
+  /** Web UI credit cost for a normal play (priority == 1). */
+  private static final int WEB_COST_PER_PRIORITY_LEVEL = 2;
+
+  private static final int MAX_RECENT_PLAYS = 10;
+
   private String rootPath;
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
+  private final ApplicationEventPublisher eventPublisher;
+  private final SongLibraryService songLibraryService;
 
   private UserRootEntity userRoot;
 
   public UserServiceImpl(String rootPath, UserRepository userRepository,
-      PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+      PasswordEncoder passwordEncoder, JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
+      SongLibraryService songLibraryService) {
 
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(userRepository, "userRepository cannot be null");
     requireNonNull(passwordEncoder, "passwordEncoder cannot be null");
     requireNonNull(jwtUtil, "jwtUtil cannot be null");
+    requireNonNull(eventPublisher, "eventPublisher cannot be null");
+    requireNonNull(songLibraryService, "songLibraryService cannot be null");
 
     this.rootPath = rootPath;
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtUtil = jwtUtil;
+    this.eventPublisher = eventPublisher;
+    this.songLibraryService = songLibraryService;
 
     initialize();
 
@@ -78,7 +94,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     Integer persistentIdentity = Integer.valueOf(this.userRoot.getUsers().size() + 1);
 
     UserEntity user = new UserEntity(persistentIdentity, request.firstName(), request.lastName(),
-        request.emailAddress(), passwordEncoder.encode(request.password()), Integer.valueOf(0),
+        request.emailAddress(), passwordEncoder.encode(request.password()), Integer.valueOf(6),
         new ArrayList<>(), "ROLE_USER");
 
     this.userRoot.addUser(user);
@@ -104,6 +120,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     return new AuthResponse(token, user.getEmailAddress(), user.getRole());
   }
 
+  private static final int DEFAULT_CREDITS = 6;
+
   @Override
   public UserProfileDto getProfile(String emailAddress) {
 
@@ -111,6 +129,13 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     if (user == null)
     {
       throw new UserServiceException("User not found: " + emailAddress);
+    }
+
+    // Temporary: ensure every user has at least the default credit balance until
+    // the Add Funds workflow is implemented.
+    if (user.getNumCredits() == null || user.getNumCredits() == 0) {
+      user.setNumCredits(DEFAULT_CREDITS);
+      this.userRepository.storeAggregateRoot(this.userRoot);
     }
 
     java.math.BigDecimal balanceUsd = java.math.BigDecimal.valueOf(user.getNumCredits()).divide(
@@ -127,9 +152,20 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new UserServiceException("User not found: " + emailAddress);
     }
 
-    // Placeholder — all content lists are empty until the underlying features are built.
+    List<SongIdentifier> history = user.getSongPlayHistory();
+    List<SongDto> recentPlays = new ArrayList<>();
+    for (int i = history.size() - 1; i >= 0 && recentPlays.size() < MAX_RECENT_PLAYS; i--) {
+      SongIdentifier id = history.get(i);
+      try {
+        SongDto song = songLibraryService.getSongById(id.getAlbumId(), id.getSongId());
+        if (song != null) recentPlays.add(song);
+      } catch (Exception e) {
+        // song may have been removed from the library; skip it
+      }
+    }
+
     return new UserHomePageDto(
-        List.of(),       // (a) myRecentPlays
+        recentPlays,     // (a) myRecentPlays
         List.of(),       // (b) myPlaylists
         List.of(),       // (c) artistsHotHere
         List.of(),       // (d) songsHotHere
@@ -237,7 +273,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     String username = event.queueEntry().getUsername();
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(username);
-    if (user == null && username == "LOCAL") {
+    if (user == null && LocalPrincipal.LOCAL_USERNAME.equals(username)) {
 
       String firstName = "Local";
       String lastName = "User";
@@ -248,14 +284,25 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
       user = userRoot.getUserByEmailAddressNullIfNotExists(username);
     }
-    
-    if (user == null)
-    {
+
+    if (user == null) {
       throw new UserServiceException("User not found: " + username);
     }
 
     SongDto song = event.queueEntry().getSong();
     user.addSongToSongPlayHistory(new SongIdentifier(song.getAlbumId(), song.getSongId()));
+
+    // Deduct Web UI credits for non-local (web) users.
+    // Cost = priority * WEB_COST_PER_PRIORITY_LEVEL:
+    //   normal play  (priority == 1) → 2 credits
+    //   priority play (priority == N) → N * 2 credits
+    if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
+      int priority = event.queueEntry().getPriority() != null ? event.queueEntry().getPriority() : 1;
+      int cost = priority * WEB_COST_PER_PRIORITY_LEVEL;
+      int remaining = Math.max(0, (user.getNumCredits() != null ? user.getNumCredits() : 0) - cost);
+      user.setNumCredits(remaining);
+      eventPublisher.publishEvent(new UserCreditsChangedEvent(username, remaining));
+    }
 
     this.userRepository.storeAggregateRoot(this.userRoot);
   }

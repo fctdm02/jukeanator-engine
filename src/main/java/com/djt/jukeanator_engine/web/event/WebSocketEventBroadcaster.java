@@ -3,6 +3,8 @@ package com.djt.jukeanator_engine.web.event;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
+import com.djt.jukeanator_engine.domain.common.security.LocalPrincipal;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.SongStatisticsChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -12,9 +14,10 @@ import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEven
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStoppedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
+import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 
 /**
  * Web UI counterpart to {@code JukeANatorEventListener}: rebroadcasts the same
@@ -77,9 +80,25 @@ public class WebSocketEventBroadcaster {
     messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus());
   }
 
-  /** Wraps the now-playing song so a "nothing playing" state can be sent as JSON {@code {"song":null}}. */
-  public record NowPlayingMessage(SongDto song) {
+  @EventListener
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
+    String username = event.queueEntry().getUsername();
+    if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
+      messagingTemplate.convertAndSendToUser(
+          username, "/queue/recent-plays", event.queueEntry().getSong());
+    }
   }
+
+  @EventListener
+  public void handleUserCreditsChangedEvent(UserCreditsChangedEvent event) {
+    messagingTemplate.convertAndSendToUser(
+        event.emailAddress(), "/queue/credits", new CreditsMessage(event.numCredits()));
+  }
+
+  /** Wraps the now-playing song so a "nothing playing" state can be sent as JSON {@code {"song":null}}. */
+  public record NowPlayingMessage(SongDto song) {}
+
+  public record CreditsMessage(int numCredits) {}
 
   @EventListener
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
