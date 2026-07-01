@@ -223,6 +223,7 @@
 
     document.getElementById('recentPlaysViewAll')
       ?.addEventListener('click', () => navigateSub('recent-plays-all'));
+    wireRecentPlaysClicks(state.recentPlays);
   }
 
   function recentPlayThumbHtml(s) {
@@ -240,6 +241,15 @@
   function renderRecentPlaysThumbnails(songs) {
     if (!songs || songs.length === 0) return '<div class="stub-placeholder">No plays yet</div>';
     return `<div class="rp-thumb-row">${songs.slice(0, 3).map(recentPlayThumbHtml).join('')}</div>`;
+  }
+
+  function wireRecentPlaysClicks(songs) {
+    const body = document.getElementById('recentPlaysBody');
+    if (!body) return;
+    body.querySelectorAll('.rp-thumb-card').forEach((card, i) => {
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', () => showSongPopup(songs[i]));
+    });
   }
 
   function renderRecentPlaysAll() {
@@ -1180,7 +1190,10 @@
           state.recentPlays.unshift(song);
           if (state.recentPlays.length > 10) state.recentPlays.length = 10;
           const body = document.getElementById('recentPlaysBody');
-          if (body) body.innerHTML = renderRecentPlaysThumbnails(state.recentPlays);
+          if (body) {
+            body.innerHTML = renderRecentPlaysThumbnails(state.recentPlays);
+            wireRecentPlaysClicks(state.recentPlays);
+          }
         });
       }
 
