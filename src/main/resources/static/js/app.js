@@ -68,7 +68,6 @@
     if (!prev) {
       renderMain(state.currentMainTab);
     } else {
-      state.navStack.pop(); // will be re-pushed by renderSubScreen
       renderSubScreen(prev.screen, prev.params);
     }
   }
@@ -98,6 +97,9 @@
       case 'terms':             renderStub('Terms and Conditions'); break;
       case 'privacy':           renderStub('Privacy Policy');    break;
       case 'recent-plays-all':  renderRecentPlaysAll();          break;
+      case 'search-entry':      renderSearchEntry();             break;
+      case 'search-results':    renderSearchResults(params.query, params.result); break;
+      case 'artist-detail':     renderArtistDetail(params);      break;
       default:                  renderMain(state.currentMainTab);
     }
   }
@@ -168,7 +170,7 @@
 
     document.getElementById('searchInput').addEventListener('focus', (e) => {
       e.target.blur();
-      renderSearchEntry();
+      navigateSub('search-entry');
     });
 
     await Promise.all([
@@ -854,7 +856,7 @@
           </div>
         </div>`;
 
-      document.getElementById('searchBackBtn').addEventListener('click', () => renderMain(state.currentMainTab));
+      document.getElementById('searchBackBtn').addEventListener('click', () => goBack());
       document.getElementById('searchClearBtn').addEventListener('click', () => { buffer = ''; updateDisplay(); });
 
       // History item click — run search from history
@@ -927,9 +929,9 @@
       await saveSearchQuery(query);
       try {
         const result = await api(`/api/song-library/search?searchFor=${encodeURIComponent(query)}&limit=20`);
-        renderSearchResults(query, result);
+        navigateSub('search-results', { query, result });
       } catch {
-        renderSearchResults(query, { artists: [], albums: [], songs: [] });
+        navigateSub('search-results', { query, result: { artists: [], albums: [], songs: [] } });
       }
     }
 
@@ -953,7 +955,7 @@
       ? `<img class="result-thumb" src="/api/song-library/artists/${a.artistId}/coverArt"
                alt="" onerror="this.outerHTML=\`<div class='result-thumb-placeholder'>&#127911;</div>\`">`
       : `<div class="result-thumb-placeholder">&#127911;</div>`;
-    return `<div class="result-row">
+    return `<div class="result-row artist-result-row" data-artist-id="${a.artistId ?? ''}">
       ${thumb}
       <div class="result-info">
         <div class="result-title">${escHtml(a.artistName || '')}</div>
@@ -1043,10 +1045,18 @@
         </div>
       </div>`;
 
-    document.getElementById('searchResultsBackBtn').addEventListener('click', () => renderSearchEntry());
+    document.getElementById('searchResultsBackBtn').addEventListener('click', () => goBack());
 
-    // Song row click → bottom sheet popup
-    contentPanel.addEventListener('click', (e) => {
+    // Artist / song row clicks — scoped to this screen's own wrapper (not the
+    // persistent contentPanel) so listeners don't accumulate across re-renders
+    // (e.g. when navigating back to search results).
+    contentPanel.querySelector('.search-results-screen').addEventListener('click', (e) => {
+      const artistRow = e.target.closest('.artist-result-row');
+      if (artistRow) {
+        const artistId = artistRow.dataset.artistId;
+        if (artistId) navigateSub('artist-detail', { artistId: Number(artistId) });
+        return;
+      }
       const row = e.target.closest('.song-result-row');
       if (!row) return;
       try {
@@ -1063,6 +1073,86 @@
         tab.classList.add('active');
         document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
       });
+    });
+  }
+
+  // ── Artist detail screen ────────────────────────────────────────────────
+
+  function artistSongRow(s, i) {
+    const thumb = coverArtHtml(s.albumId, '&#127925;');
+    return `<div class="result-row" data-index="${i}">
+      ${thumb}
+      <div class="result-info">
+        <div class="result-title">${escHtml(s.songName || '')}</div>
+        <div class="result-sub">${escHtml(s.albumName || '')}</div>
+      </div>
+    </div>`;
+  }
+
+  function artistAlbumRow(al) {
+    const thumb = coverArtHtml(al.albumId, '&#128191;');
+    const year = (al.releaseDate || '').slice(0, 4);
+    return `<div class="result-row">
+      ${thumb}
+      <div class="result-info">
+        <div class="result-title">${escHtml(al.albumName || '')}</div>
+        <div class="result-sub">${escHtml(year)}</div>
+      </div>
+    </div>`;
+  }
+
+  async function renderArtistDetail(params = {}) {
+    contentPanel.innerHTML = subScreenShell('Artist', '<div class="stub-placeholder">Loading…</div>');
+    wireBackBtn();
+
+    let artist;
+    try {
+      artist = await api(`/api/song-library/artists/${params.artistId}`);
+    } catch {
+      contentPanel.querySelector('.sub-content').innerHTML = '<div class="stub-placeholder">Could not load artist.</div>';
+      return;
+    }
+
+    const albums = [...(artist.albums || [])].sort((a, b) => (b.releaseDate || '').localeCompare(a.releaseDate || ''));
+    const songs = (artist.albums || [])
+      .flatMap(al => al.songs || [])
+      .sort((a, b) => (b.numPlays || 0) - (a.numPlays || 0));
+
+    contentPanel.querySelector('.sub-title').textContent = artist.artistName || '';
+    contentPanel.querySelector('.sub-content').innerHTML = `
+      <div class="artist-detail-counts">${artist.songCount ?? songs.length} Songs, ${artist.albumCount ?? albums.length} Albums</div>
+      <div class="artist-tabs-bar">
+        <button class="artist-tab active" data-tab="songs">Songs</button>
+        <button class="artist-tab" data-tab="albums">Albums</button>
+      </div>
+      <div class="artist-sort-label">
+        <span id="artistSortText">Sorted by Popularity</span>
+        <span class="artist-sort-icon">&#8693;</span>
+      </div>
+      <div class="artist-tab-panels">
+        <div class="artist-tab-panel active" id="artist-tab-songs">
+          ${songs.length ? songs.map(artistSongRow).join('') : '<div class="search-empty">No songs found</div>'}
+        </div>
+        <div class="artist-tab-panel" id="artist-tab-albums">
+          ${albums.length ? albums.map(artistAlbumRow).join('') : '<div class="search-empty">No albums found</div>'}
+        </div>
+      </div>`;
+
+    contentPanel.querySelectorAll('.artist-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        contentPanel.querySelectorAll('.artist-tab').forEach(t => t.classList.remove('active'));
+        contentPanel.querySelectorAll('.artist-tab-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('artist-tab-' + tab.dataset.tab).classList.add('active');
+        document.getElementById('artistSortText').textContent = 'Sorted by Popularity';
+      });
+    });
+
+    contentPanel.querySelector('#artist-tab-songs').addEventListener('click', (e) => {
+      const row = e.target.closest('.result-row');
+      if (!row) return;
+      const song = songs[parseInt(row.dataset.index, 10)];
+      if (song) showSongPopup(song);
     });
   }
 
@@ -1187,7 +1277,10 @@
       await submitPlay(1);
     });
 
-    document.getElementById('spaArtist').addEventListener('click',   () => { dismissSongPopup(); });
+    document.getElementById('spaArtist').addEventListener('click', () => {
+      dismissSongPopup();
+      if (song.artistId != null) navigateSub('artist-detail', { artistId: song.artistId });
+    });
     document.getElementById('spaFavorite').addEventListener('click', () => { resetSongPopupTimer(); });
     document.getElementById('spaPlaylist').addEventListener('click', () => { resetSongPopupTimer(); });
 

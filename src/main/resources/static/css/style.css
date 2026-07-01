@@ -382,7 +382,7 @@ html, body {
 .home-section-view-all {
   background: none;
   border: none;
-  color: var(--accent, #4fc3f7);
+  color: #3a9fc0;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
@@ -1199,6 +1199,72 @@ input {
   cursor: pointer;
   flex-shrink: 0;
   line-height: 1;
+}
+
+/* ── Artist detail screen ───────────────────────────────────────────────── */
+
+.artist-detail-counts {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.artist-tabs-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.artist-tab {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: none;
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0.85rem;
+  cursor: pointer;
+}
+
+.artist-tab.active {
+  background: #3a9fc0;
+  color: #fff;
+}
+
+.artist-sort-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.4rem 0.1rem 0.6rem;
+}
+
+.artist-sort-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  color: var(--muted);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.artist-tab-panels {
+  margin: 0 -1rem;
+}
+
+.artist-tab-panel {
+  display: none;
+}
+
+.artist-tab-panel.active {
+  display: block;
 }
 
 /* ── Song bottom-sheet popup ─────────────────────────────────────────────── */
