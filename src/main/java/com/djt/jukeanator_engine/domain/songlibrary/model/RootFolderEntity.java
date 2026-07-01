@@ -273,6 +273,15 @@ public class RootFolderEntity extends FolderEntity {
     throw new EntityDoesNotExistException("Artist with name: [" + artistName + "] not found.");
   }
 
+  public ArtistFolderEntity getArtistById(Integer artistId) throws EntityDoesNotExistException {
+    for (ArtistFolderEntity artist : artistsMap.values()) {
+      if (artistId.equals(artist.getPersistentIdentity())) {
+        return artist;
+      }
+    }
+    throw new EntityDoesNotExistException("Artist with id: [" + artistId + "] not found.");
+  }
+
   public AlbumFolderEntity getAlbumById(Integer id) throws EntityDoesNotExistException {
     AlbumFolderEntity entity = albumsMap.get(id);
     if (entity != null) {

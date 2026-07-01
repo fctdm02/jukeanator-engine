@@ -268,8 +268,9 @@ public class SongLibraryServiceImpl
     List<AlbumFolderEntity> albums = songLibraryRoot.getAlbums().stream().filter(hasPlays)
         .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
 
-    return new SearchResultDto(SongLibraryMapper.toSongDtoList(songs),
+    SearchResultDto dto = new SearchResultDto(SongLibraryMapper.toSongDtoList(songs),
         SongLibraryMapper.toArtistDtoList(artists), SongLibraryMapper.toAlbumDtoList(albums));
+    return dto;
   }
 
   private int calculateSearchResultWeight(String value, String normalizedSearch) {
@@ -478,6 +479,16 @@ public class SongLibraryServiceImpl
       return SongLibraryMapper.toArtistDto(songLibraryRoot.getArtistByName(artistName));
     } catch (EntityDoesNotExistException ednee) {
       throw new SongLibraryServiceException("Could not find artist by name: " + artistName, ednee);
+    }
+  }
+
+  @Override
+  public ArtistDto getArtistById(Integer artistId) {
+
+    try {
+      return SongLibraryMapper.toArtistDto(songLibraryRoot.getArtistById(artistId));
+    } catch (EntityDoesNotExistException ednee) {
+      throw new SongLibraryServiceException("Could not find artist by id: " + artistId, ednee);
     }
   }
 

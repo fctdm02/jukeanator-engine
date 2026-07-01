@@ -53,6 +53,10 @@ public class ArtistDto {
     return albums;
   }
 
+  public int getNumAlbums() {
+    return this.albums.size();
+  }
+  
   @Override
   public int hashCode() {
     return Objects.hash(artistId);

@@ -42,4 +42,15 @@ public class SearchResultDto {
     this.albums = albums;
   }
   
+  public int getNumArtists() {
+    return this.artists.size();
+  }
+
+  public int getNumAlbums() {
+    return this.albums.size();
+  }
+
+  public int getNumSongs() {
+    return this.songs.size();
+  }  
 }

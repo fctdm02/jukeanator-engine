@@ -903,11 +903,14 @@
   }
 
   function artistResultRow(a) {
-    const thumb = `<div class="result-thumb-placeholder">&#127911;</div>`;
+    const thumb = a.artistId != null
+      ? `<img class="result-thumb" src="/api/song-library/artists/${a.artistId}/coverArt"
+               alt="" onerror="this.outerHTML=\`<div class='result-thumb-placeholder'>&#127911;</div>\`">`
+      : `<div class="result-thumb-placeholder">&#127911;</div>`;
     return `<div class="result-row">
       ${thumb}
       <div class="result-info">
-        <div class="result-title">${escHtml(a.name || '')}</div>
+        <div class="result-title">${escHtml(a.artistName || '')}</div>
         <div class="result-sub">Artist</div>
       </div>
     </div>`;

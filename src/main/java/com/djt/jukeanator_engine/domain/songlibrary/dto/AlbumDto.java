@@ -93,6 +93,10 @@ public class AlbumDto {
   public List<SongDto> getSongs() {
     return songs;
   }
+
+  public int getNumSongs() {
+    return this.songs.size();
+  }  
   
   @Override
   public int hashCode() {

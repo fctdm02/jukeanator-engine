@@ -111,6 +111,38 @@ public class SongLibraryController {
     return songLibraryService.getAlbumById(id);
   }
 
+  @GetMapping("/artists/{id}")
+  public ArtistDto getArtistById(@PathVariable Integer id) {
+    return songLibraryService.getArtistById(id);
+  }
+
+
+  @GetMapping("/artists/{id}/coverArt")
+  public ResponseEntity<Resource> getArtistCoverArt(@PathVariable Integer id)
+      throws EntityDoesNotExistException, IOException {
+
+    ArtistDto artist = songLibraryService.getArtistById(id);
+    if (artist.getCoverArtPath() == null) {
+      throw new EntityDoesNotExistException("No cover art path set for artist: " + id);
+    }
+
+    Path coverArtPath = Paths.get(artist.getCoverArtPath());
+    if (!Files.isRegularFile(coverArtPath)) {
+      throw new EntityDoesNotExistException(
+          "Cover art file does not exist for artist: " + id + " at path: " + coverArtPath);
+    }
+
+    String probed = Files.probeContentType(coverArtPath);
+    MediaType contentType =
+        probed != null ? MediaType.parseMediaType(probed) : MediaType.APPLICATION_OCTET_STREAM;
+
+    return ResponseEntity.ok()
+        .contentType(contentType)
+        .cacheControl(CacheControl.maxAge(Duration.ofDays(1)))
+        .body(new FileSystemResource(coverArtPath));
+  }
+
+
   @GetMapping("/albums/{id}/coverArt")
   public ResponseEntity<Resource> getAlbumCoverArt(@PathVariable Integer id)
       throws EntityDoesNotExistException, IOException {
