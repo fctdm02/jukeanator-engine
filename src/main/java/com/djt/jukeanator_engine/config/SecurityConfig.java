@@ -1,8 +1,11 @@
 package com.djt.jukeanator_engine.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -15,6 +18,8 @@ import com.djt.jukeanator_engine.domain.common.security.JwtAuthenticationFilter;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+  private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
   private final JwtAuthenticationFilter jwtFilter;
 
@@ -31,6 +36,20 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http.csrf(csrf -> csrf.disable())
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .exceptionHandling(ex -> ex
+            // No/invalid/expired JWT on a protected endpoint → 401, not the default 403, so the
+            // web UI can tell "you need to log in" apart from "you're logged in but not allowed".
+            .authenticationEntryPoint((request, response, authException) -> {
+              log.warn("[SECURITY] 401 Unauthorized: {} {} — {}", request.getMethod(),
+                  request.getRequestURI(), authException.getMessage());
+              response.sendError(HttpStatus.UNAUTHORIZED.value(), authException.getMessage());
+            })
+            // Authenticated but lacking the required role (e.g. non-admin hitting an admin route).
+            .accessDeniedHandler((request, response, accessDeniedException) -> {
+              log.warn("[SECURITY] 403 Forbidden: {} {} — {}", request.getMethod(),
+                  request.getRequestURI(), accessDeniedException.getMessage());
+              response.sendError(HttpStatus.FORBIDDEN.value(), accessDeniedException.getMessage());
+            }))
         .authorizeHttpRequests(auth -> auth
 
             // ── Public: auth endpoints ────────────────────────────────────────
@@ -42,6 +61,12 @@ public class SecurityConfig {
                 "/favicon.ico", "/favicon-16x16.png", "/favicon-32x32.png",
                 "/apple-touch-icon.png", "/site.webmanifest", "/ws/**")
             .permitAll()
+
+            // ── Public: container error-page forward ──────────────────────────
+            // response.sendError() triggers an internal forward to /error, which re-enters this
+            // filter chain as a new request. Without this, that forward gets blocked too and
+            // silently overwrites the real 401/403 status set by the handlers below.
+            .requestMatchers("/error").permitAll()
 
             // ── Public: read-only music browsing ─────────────────────────────
             .requestMatchers(HttpMethod.GET, "/api/song-library/popular",
