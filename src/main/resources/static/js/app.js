@@ -1207,6 +1207,7 @@
         <div class="result-title">${escHtml(s.songName || '')}</div>
         <div class="result-sub">${escHtml(s.albumName || '')}</div>
       </div>
+      ${popularityBarsHtml(s.numPlays)}
     </div>`;
   }
 
@@ -1581,7 +1582,7 @@
     tiles.forEach((tile, i) => {
       tile.style.cursor = 'pointer';
       if (tile.classList.contains('create-playlist-tile')) {
-        tile.addEventListener('click', () => showCreatePlaylistDialog());
+        tile.addEventListener('click', () => showCreatePlaylistDialog({ onCreated: () => renderMyPlaylistsAll() }));
       } else {
         tile.addEventListener('click', () => navigateSub('playlist-detail', { playlist: playlists[i] }));
       }
@@ -1598,7 +1599,7 @@
     contentPanel.querySelectorAll('.playlist-tile').forEach((tile, i) => {
       tile.style.cursor = 'pointer';
       if (tile.classList.contains('create-playlist-tile')) {
-        tile.addEventListener('click', () => showCreatePlaylistDialog());
+        tile.addEventListener('click', () => showCreatePlaylistDialog({ onCreated: () => renderMyPlaylistsAll() }));
       } else {
         tile.addEventListener('click', () => navigateSub('playlist-detail', { playlist: playlists[i] }));
       }

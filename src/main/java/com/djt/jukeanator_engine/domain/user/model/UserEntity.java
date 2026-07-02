@@ -128,6 +128,11 @@ public class UserEntity extends AbstractPersistentEntity {
   }
 
   public List<PlaylistEntity> getPlaylists() {
+
+    if (playlists == null) {
+      playlists = new ArrayList<>();
+    }
+
     return playlists;
   }
 
@@ -137,17 +142,9 @@ public class UserEntity extends AbstractPersistentEntity {
     if (playlist != null) {
       return playlist;
     }
-    
-    // Every user should have a "My favorites" playlist 
-    if (playlistName.equals(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)) {
-      try {
-        return createPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
-      } catch (EntityAlreadyExistsException eaee) {
-        log.error("My favorites playlist somehow already exists for new user: {" + this.emailAddress
-            + "].");
-      }
-    }
-    
+
+    createMyFavoritesPlaylist();
+
     throw new EntityDoesNotExistException(
         "Cannot find playlist: [" + playlistName + "] for user: [" + this.emailAddress + "].");
   }
@@ -163,12 +160,30 @@ public class UserEntity extends AbstractPersistentEntity {
     return null;
   }
 
+  public PlaylistEntity createMyFavoritesPlaylist() {
+
+    // Every user should have a "My favorites" playlist
+    try {
+      return createPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
+    } catch (EntityAlreadyExistsException eaee) {
+      log.error("My favorites playlist somehow already exists for new user: {" + this.emailAddress
+          + "].");
+    }
+
+    // This should never occur.
+    return this.getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
+  }
+
   public PlaylistEntity createPlaylist(String playlistName) throws EntityAlreadyExistsException {
 
     PlaylistEntity check = getPlaylistByNameNullIfNotExists(playlistName);
     if (check != null) {
       throw new EntityAlreadyExistsException("Cannot create playlist: [" + playlistName
           + "] for user: [" + this.emailAddress + "] because it already exists.");
+    }
+
+    if (this.playlists == null) {
+      this.playlists = new ArrayList<>();
     }
 
     int index = this.playlists.size();

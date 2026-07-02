@@ -30,8 +30,8 @@ import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
-import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
+import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
@@ -167,6 +167,18 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
+    // Handle the case where a de-serialized user does not have any playlists.
+    List<PlaylistEntity> playlists = user.getPlaylists();
+    if (playlists == null || playlists.isEmpty()) {
+
+      user.createMyFavoritesPlaylist();
+    }
+
+    List<String> playlistNames = new ArrayList<>();
+    for (PlaylistEntity playlist : user.getPlaylists()) {
+      playlistNames.add(playlist.getName());
+    }
+
     List<SongIdentifier> history = user.getSongPlayHistory();
     List<SongDto> recentPlays = new ArrayList<>();
     for (int i = history.size() - 1; i >= 0 && recentPlays.size() < MAX_RECENT_PLAYS; i--) {
@@ -180,9 +192,13 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       }
     }
 
-    HomePageDto hotHere = getPublicHomePage();
-    return new UserHomePageDto(recentPlays, List.of(), hotHere.getArtistsHotHere(),
-        hotHere.getSongsHotHere(), user.getSearchHistory());
+    HomePageDto publicHomePageDto = getPublicHomePage();
+    
+    UserHomePageDto userHomePageDto =
+        new UserHomePageDto(recentPlays, playlistNames, publicHomePageDto.getArtistsHotHere(),
+            publicHomePageDto.getSongsHotHere(), user.getSearchHistory());
+
+    return userHomePageDto;
   }
 
   @Override
@@ -309,8 +325,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public boolean removeSongFromPlaylist(String emailAddress, String playlistName, SongFileEntity song)
-      throws EntityDoesNotExistException {
+  public boolean removeSongFromPlaylist(String emailAddress, String playlistName,
+      SongFileEntity song) throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -391,8 +407,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
           result.add(song);
         }
       } catch (Exception e) {
-        log.warn("Skipping missing song albumId={} songId={} in playlist '{}'",
-            si.getAlbumId(), si.getSongId(), playlistName);
+        log.warn("Skipping missing song albumId={} songId={} in playlist '{}'", si.getAlbumId(),
+            si.getSongId(), playlistName);
       }
     }
     return result;

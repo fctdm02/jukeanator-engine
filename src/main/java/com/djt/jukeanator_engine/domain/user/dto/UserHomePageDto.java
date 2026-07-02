@@ -14,12 +14,17 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
  */
 public class UserHomePageDto extends HomePageDto {
 
-  private final List<SongDto>  myRecentPlays;
-  private final List<String>   myPlaylists;
-  private final List<String>   searchHistory;
+  private final List<SongDto> myRecentPlays;
+  private final List<String> myPlaylists;
+  private final List<String> searchHistory;
 
-  public UserHomePageDto(List<SongDto> myRecentPlays, List<String> myPlaylists,
-      List<ArtistDto> artistsHotHere, List<SongDto> songsHotHere, List<String> searchHistory) {
+  public UserHomePageDto(
+      List<SongDto> myRecentPlays, 
+      List<String> myPlaylists,
+      List<ArtistDto> artistsHotHere, 
+      List<SongDto> songsHotHere, 
+      List<String> searchHistory) {
+    
     super(artistsHotHere, songsHotHere);
     this.myRecentPlays = myRecentPlays;
     this.myPlaylists   = myPlaylists;
