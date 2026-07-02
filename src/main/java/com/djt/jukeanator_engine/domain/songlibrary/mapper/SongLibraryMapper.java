@@ -10,6 +10,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFromSongEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 
@@ -122,8 +123,20 @@ public final class SongLibraryMapper {
   public static SongDto toSongDto(ArtistFolderEntity artist, AlbumFolderEntity album,
       SongFileEntity songEntity) {
 
+    // For compilation albums the parent artist is the "Compilations" folder, which is excluded from
+    // the artist browse map. Use the individual song-level ArtistFromSongEntity ID instead so that
+    // "View Artist" in the song popup navigates to the correct, browseable artist.
+    Integer artistId = artist.getPersistentIdentity();
+    if (album.isCompilation() && songEntity.getArtistName() != null) {
+      ArtistFromSongEntity artistFromSong =
+          album.getRootFolder().getArtistFromSong(songEntity.getArtistName());
+      if (artistFromSong != null) {
+        artistId = artistFromSong.getPersistentIdentity();
+      }
+    }
+
     return new SongDto(album.getParentGenre().getPersistentIdentity(),
-        album.getParentGenre().getName(), artist.getPersistentIdentity(),
+        album.getParentGenre().getName(), artistId,
         songEntity.getArtistName(), album.getPersistentIdentity(), album.getName(),
         album.getCoverArtPath(), songEntity.getPersistentIdentity(), songEntity.getSongName(),
         songEntity.getTrackNumber(), songEntity.getNumPlays());
