@@ -123,11 +123,14 @@ public final class SongLibraryMapper {
   public static SongDto toSongDto(ArtistFolderEntity artist, AlbumFolderEntity album,
       SongFileEntity songEntity) {
 
-    // For compilation albums the parent artist is the "Compilations" folder, which is excluded from
-    // the artist browse map. Use the individual song-level ArtistFromSongEntity ID instead so that
-    // "View Artist" in the song popup navigates to the correct, browseable artist.
+    // RootFolderEntity.initialize() builds artistsMap keyed by name, adding ArtistFromSongEntity
+    // instances first. When a regular ArtistFolderEntity shares a name with an ArtistFromSongEntity
+    // (which happens whenever artist names appear in song filenames), the two have different
+    // persistentIdentity values and the ArtistFolderEntity ends up absent from artistsMap. Using
+    // the ArtistFromSongEntity's ID here keeps the artistId in the DTO consistent with what
+    // getArtistById can actually resolve.
     Integer artistId = artist.getPersistentIdentity();
-    if (album.isCompilation() && songEntity.getArtistName() != null) {
+    if (songEntity.getArtistName() != null) {
       ArtistFromSongEntity artistFromSong =
           album.getRootFolder().getArtistFromSong(songEntity.getArtistName());
       if (artistFromSong != null) {
