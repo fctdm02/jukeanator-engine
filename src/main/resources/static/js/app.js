@@ -1454,10 +1454,11 @@
       requestAnimationFrame(() => overlay.classList.add('song-popup-visible'));
     });
 
-    // Dismiss on overlay background click
+    // Dismiss on overlay background click or handle tap
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) dismissSongPopup();
     });
+    overlay.querySelector('.song-popup-handle').addEventListener('click', dismissSongPopup);
 
     // Reset timer on any interaction inside popup
     document.getElementById('songPopup').addEventListener('click', resetSongPopupTimer);

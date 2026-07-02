@@ -1432,6 +1432,7 @@ input {
   background: rgba(255,255,255,0.25);
   border-radius: 2px;
   margin: 10px auto 12px;
+  cursor: pointer;
 }
 
 .song-popup-header {
