@@ -177,8 +177,7 @@
       }
     });
 
-    document.getElementById('searchInput').addEventListener('focus', (e) => {
-      e.target.blur();
+    document.getElementById('searchInput').addEventListener('focus', () => {
       navigateSub('search-entry');
     });
 
@@ -843,48 +842,6 @@
 
   // ── Search ──────────────────────────────────────────────────────────────
 
-  // On-screen keyboard layout — AMI-style 4-row layout
-  const KBD_ABC = [
-    ['q','w','e','r','t','y','u','i','o','p'],
-    ['a','s','d','f','g','h','j','k','l'],
-    ['⇧','z','x','c','v','b','n','m','⌫'],
-  ];
-  const KBD_NUM = [
-    ['1','2','3','4','5','6','7','8','9','0'],
-    ['!','@','#','$','%','^','&','*','"',"'"],
-    ['(',')',  '[',']','/','\\','?',':',';','⌫'],
-  ];
-
-  function buildKeyboard(mode, shiftState) {
-    const layout = mode === 'abc' ? KBD_ABC : KBD_NUM;
-    const caps = mode === 'abc' && shiftState !== 'none';
-
-    function keyHtml(k) {
-      if (k === '⌫') return `<button class="kbd-key kbd-back" data-key="BACK">⌫</button>`;
-      if (k === '⇧') {
-        const activeClass = shiftState === 'locked' ? ' kbd-shift-locked' : shiftState === 'once' ? ' kbd-shift-active' : '';
-        return `<button class="kbd-key kbd-shift${activeClass}" data-key="SHIFT">⇧</button>`;
-      }
-      const label = caps ? k.toUpperCase() : k;
-      return `<button class="kbd-key" data-key="${k}">${label}</button>`;
-    }
-
-    const rows = layout.map(row =>
-      `<div class="kbd-row">${row.map(keyHtml).join('')}</div>`
-    ).join('');
-
-    const toggleLabel = mode === 'abc' ? '?123' : 'ABC';
-    const actionRow = `<div class="kbd-row kbd-action-row">
-      <button class="kbd-key kbd-toggle" data-key="TOGGLE">${toggleLabel}</button>
-      <button class="kbd-key kbd-punct" data-key=",">,</button>
-      <button class="kbd-key kbd-space" data-key=" "></button>
-      <button class="kbd-key kbd-punct" data-key=".">.</button>
-      <button class="kbd-key kbd-search" id="kbdSearchBtn">&#128269; Search</button>
-    </div>`;
-
-    return rows + actionRow;
-  }
-
   async function loadSearchHistory() {
     // Prefer the copy already fetched by loadHomePage to avoid a second round-trip.
     if (state.searchHistory) return state.searchHistory;
@@ -923,11 +880,6 @@
   }
 
   async function renderSearchEntry() {
-    let kbdMode = 'abc';
-    let buffer = '';
-    let shiftState = 'none'; // 'none' | 'once' | 'locked'
-    let lastShiftClick = 0;
-
     const history = await loadSearchHistory();
 
     function historyHtml(items) {
@@ -940,16 +892,6 @@
         </div>`).join('');
     }
 
-    function updateDisplay() {
-      const display = document.getElementById('searchDisplay');
-      const clearBtn = document.getElementById('searchClearBtn');
-      if (display) {
-        display.textContent = buffer || 'Search for music';
-        display.className = 'search-input-display' + (buffer ? '' : ' placeholder');
-      }
-      if (clearBtn) clearBtn.style.display = buffer ? 'flex' : 'none';
-    }
-
     function render() {
       contentPanel.innerHTML = `
         <div class="search-screen">
@@ -957,22 +899,36 @@
             <button class="search-back-btn" id="searchBackBtn">&#8592;</button>
             <div class="search-input-bar">
               <span class="search-icon">&#128269;</span>
-              <div class="search-input-display ${buffer ? '' : 'placeholder'}" id="searchDisplay">
-                ${buffer ? escHtml(buffer) : 'Search for music'}
-              </div>
-              <button class="search-clear-btn" id="searchClearBtn" style="display:${buffer ? 'flex' : 'none'}">&#10005;</button>
+              <input type="search" class="search-input-field" id="searchEntryInput"
+                     placeholder="Search for music" autocomplete="off" enterkeyhint="search">
+              <button class="search-clear-btn" id="searchClearBtn" style="display:none">&#10005;</button>
             </div>
           </div>
           <div class="search-history-list" id="searchHistoryList">
             ${historyHtml(history)}
           </div>
-          <div class="onscreen-keyboard" id="onscreenKbd">
-            ${buildKeyboard(kbdMode, shiftState)}
-          </div>
         </div>`;
 
+      const input = document.getElementById('searchEntryInput');
+      const clearBtn = document.getElementById('searchClearBtn');
+
       document.getElementById('searchBackBtn').addEventListener('click', () => goBack());
-      document.getElementById('searchClearBtn').addEventListener('click', () => { buffer = ''; updateDisplay(); });
+
+      input.addEventListener('input', () => {
+        clearBtn.style.display = input.value ? 'flex' : 'none';
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && input.value.trim()) executeSearch(input.value.trim());
+      });
+      input.addEventListener('search', () => {
+        if (input.value.trim()) executeSearch(input.value.trim());
+      });
+
+      clearBtn.addEventListener('click', () => {
+        input.value = '';
+        clearBtn.style.display = 'none';
+        input.focus();
+      });
 
       // History item click — run search from history
       document.getElementById('searchHistoryList').addEventListener('click', async (e) => {
@@ -991,53 +947,13 @@
         }
         const item = e.target.closest('.search-history-item');
         if (item) {
-          buffer = history[parseInt(item.dataset.index, 10)];
-          await executeSearch(buffer);
+          await executeSearch(history[parseInt(item.dataset.index, 10)]);
         }
       });
 
-      // Keyboard
-      document.getElementById('onscreenKbd').addEventListener('click', async (e) => {
-        const btn = e.target.closest('.kbd-key');
-        if (!btn) return;
-        const key = btn.dataset.key;
-        if (btn.id === 'kbdSearchBtn') {
-          if (buffer.trim()) await executeSearch(buffer.trim());
-          return;
-        }
-        if (key === 'SHIFT') {
-          const now = Date.now();
-          const isDoubleClick = now - lastShiftClick < 350;
-          lastShiftClick = now;
-          if (shiftState === 'locked') {
-            shiftState = 'none';
-          } else if (isDoubleClick) {
-            shiftState = 'locked';
-          } else if (shiftState === 'once') {
-            shiftState = 'none';
-          } else {
-            shiftState = 'once';
-          }
-          document.getElementById('onscreenKbd').innerHTML = buildKeyboard(kbdMode, shiftState);
-          return;
-        }
-        if (key === 'BACK') {
-          buffer = buffer.slice(0, -1);
-        } else if (key === 'TOGGLE') {
-          kbdMode = kbdMode === 'abc' ? 'num' : 'abc';
-          shiftState = 'none';
-          document.getElementById('onscreenKbd').innerHTML = buildKeyboard(kbdMode, shiftState);
-          return;
-        } else {
-          const isLetter = kbdMode === 'abc' && key.length === 1 && /[a-z]/i.test(key);
-          buffer += (isLetter && shiftState !== 'none') ? key.toUpperCase() : key;
-          if (shiftState === 'once') {
-            shiftState = 'none';
-            document.getElementById('onscreenKbd').innerHTML = buildKeyboard(kbdMode, shiftState);
-          }
-        }
-        updateDisplay();
-      });
+      // Give the search bar keyboard focus immediately — on touch devices this
+      // is what triggers the browser's native on-screen keyboard.
+      input.focus();
     }
 
     async function executeSearch(query) {

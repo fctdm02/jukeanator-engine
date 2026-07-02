@@ -908,6 +908,21 @@ input {
   color: var(--muted);
 }
 
+.search-input-field {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.search-input-field::placeholder {
+  color: var(--muted);
+}
+
 .search-clear-btn {
   background: var(--text);
   border: none;
@@ -971,108 +986,6 @@ input {
 .search-history-remove:hover {
   color: var(--text);
   background: rgba(255,255,255,0.1);
-}
-
-/* On-screen keyboard */
-.onscreen-keyboard {
-  flex-shrink: 0;
-  background: #1b1d22;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  padding: 0.5rem 0.4rem 0.6rem;
-  user-select: none;
-}
-
-.kbd-row {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-
-.kbd-key {
-  background: #3d4147;
-  border: none;
-  border-radius: 6px;
-  color: #ffffff;
-  font-size: 0.9rem;
-  font-weight: 500;
-  height: 44px;
-  min-width: 28px;
-  flex: 1;
-  max-width: 38px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  line-height: 1;
-  box-shadow: 0 2px 0 rgba(0,0,0,0.5);
-}
-
-.kbd-key:active {
-  background: #4e545c;
-  transform: translateY(1px);
-  box-shadow: none;
-}
-
-.kbd-key.kbd-back {
-  background: #2e3138;
-  max-width: 52px;
-  flex: 1.5;
-  font-size: 1rem;
-}
-
-.kbd-key.kbd-toggle {
-  background: #2e3138;
-  max-width: 54px;
-  flex: 1.6;
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-
-.kbd-key.kbd-shift {
-  background: #2e3138;
-  max-width: 40px;
-  flex: 1.2;
-  font-size: 1rem;
-}
-
-.kbd-key.kbd-shift.kbd-shift-active {
-  background: #4ab8d8;
-  color: #000;
-}
-
-.kbd-key.kbd-shift.kbd-shift-locked {
-  background: #4ab8d8;
-  color: #000;
-  box-shadow: 0 0 0 2px #ffffff inset;
-}
-
-.kbd-key.kbd-punct {
-  background: #3d4147;
-  max-width: 36px;
-  flex: 1;
-}
-
-.kbd-key.kbd-space {
-  background: #2e3138;
-  max-width: 160px;
-  flex: 4.5;
-}
-
-.kbd-key.kbd-search {
-  background: #4ab8d8;
-  color: #000;
-  border-radius: 22px;
-  max-width: 80px;
-  flex: 2.2;
-  font-size: 0.75rem;
-  font-weight: 700;
-  box-shadow: 0 2px 0 rgba(0,0,0,0.4);
-}
-
-.kbd-action-row {
-  margin-bottom: 0;
 }
 
 /* ── Search results (tabbed) ────────────────────────────────────────────── */
