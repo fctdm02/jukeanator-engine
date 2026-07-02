@@ -97,7 +97,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     UserEntity user = new UserEntity(persistentIdentity, request.firstName(), request.lastName(),
         request.emailAddress(), passwordEncoder.encode(request.password()), Integer.valueOf(6),
-        new ArrayList<>(), "ROLE_USER");
+        "ROLE_USER");
 
     this.userRoot.addUser(user);
     this.userRepository.storeAggregateRoot(this.userRoot);
@@ -128,8 +128,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public UserProfileDto getProfile(String emailAddress) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);;
-    if (user == null)
-    {
+    if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
@@ -152,7 +151,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public HomePageDto getPublicHomePage() {
     var popular = songLibraryService.getMusicByPopularity();
     var artists = popular.getArtists().stream().limit(MAX_HOT_HERE).toList();
-    var songs   = popular.getSongs().stream().limit(MAX_HOT_HERE).toList();
+    var songs = popular.getSongs().stream().limit(MAX_HOT_HERE).toList();
     return new HomePageDto(artists, songs);
   }
 
@@ -170,19 +169,16 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       SongIdentifier id = history.get(i);
       try {
         SongDto song = songLibraryService.getSongById(id.getAlbumId(), id.getSongId());
-        if (song != null) recentPlays.add(song);
+        if (song != null)
+          recentPlays.add(song);
       } catch (Exception e) {
         // song may have been removed from the library; skip it
       }
     }
 
     HomePageDto hotHere = getPublicHomePage();
-    return new UserHomePageDto(
-        recentPlays,
-        List.of(),
-        hotHere.getArtistsHotHere(),
-        hotHere.getSongsHotHere(),
-        user.getSearchHistory());
+    return new UserHomePageDto(recentPlays, List.of(), hotHere.getArtistsHotHere(),
+        hotHere.getSongsHotHere(), user.getSearchHistory());
   }
 
   @Override
@@ -198,15 +194,14 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public void changePassword(String emailAddress, ChangePasswordRequest request) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null)
-    {
+    if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
-    
+
     if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
       throw new UserServiceException("Current password is incorrect");
     }
-    
+
     user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
     this.userRepository.storeAggregateRoot(this.userRoot);
   }
@@ -227,8 +222,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public UserProfileDto updateProfile(String emailAddress, UpdateProfileRequest request) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null)
-    {
+    if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
@@ -245,8 +239,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public List<String> getSearchHistory(String emailAddress) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null)
-    {
+    if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
@@ -257,8 +250,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public void addSearchHistory(String emailAddress, String query) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null)
-    {
+    if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
@@ -271,8 +263,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public void removeSearchHistory(String emailAddress, int index) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null)
-    {
+    if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
@@ -307,10 +298,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     // Deduct Web UI credits for non-local (web) users.
     // Cost = priority * WEB_COST_PER_PRIORITY_LEVEL:
-    //   normal play  (priority == 1) → 2 credits
-    //   priority play (priority == N) → N * 2 credits
+    // normal play (priority == 1) → 2 credits
+    // priority play (priority == N) → N * 2 credits
     if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
-      int priority = event.queueEntry().getPriority() != null ? event.queueEntry().getPriority() : 1;
+      int priority =
+          event.queueEntry().getPriority() != null ? event.queueEntry().getPriority() : 1;
       int cost = priority * WEB_COST_PER_PRIORITY_LEVEL;
       int remaining = Math.max(0, (user.getNumCredits() != null ? user.getNumCredits() : 0) - cost);
       user.setNumCredits(remaining);

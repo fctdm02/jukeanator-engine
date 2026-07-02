@@ -14,22 +14,24 @@ public class UserEntity extends AbstractPersistentEntity {
   private String emailAddress;
   private String passwordHash;
   private Integer numCredits = 0;
+  
   private List<SongIdentifier> songPlayHistory = new ArrayList<>();
   private List<String> searchHistory = new ArrayList<>();
+  private List<PlaylistEntity> playlists = new ArrayList<>();
+
   private String role = "ROLE_USER";
 
-  public UserEntity(Integer persistentIdentity, String firstName, String lastName, String emailAddress, String passwordHash,
-      Integer numCredits, List<SongIdentifier> songPlayHistory, String role) {
+  public UserEntity(Integer persistentIdentity, String firstName, String lastName,
+      String emailAddress, String passwordHash, Integer numCredits, String role) {
     super(persistentIdentity);
     this.firstName = firstName;
     this.lastName = lastName;
     this.emailAddress = emailAddress;
     this.passwordHash = passwordHash;
     this.numCredits = numCredits;
-    this.songPlayHistory = songPlayHistory;
     this.role = role;
   }
-  
+
   public String getFirstName() {
     return firstName;
   }
@@ -84,7 +86,8 @@ public class UserEntity extends AbstractPersistentEntity {
   }
 
   public List<String> getSearchHistory() {
-    if (searchHistory == null) searchHistory = new ArrayList<>();
+    if (searchHistory == null)
+      searchHistory = new ArrayList<>();
     return searchHistory;
   }
 
@@ -93,7 +96,8 @@ public class UserEntity extends AbstractPersistentEntity {
   }
 
   public void addToSearchHistory(String query, int maxSize) {
-    if (searchHistory == null) searchHistory = new ArrayList<>();
+    if (searchHistory == null)
+      searchHistory = new ArrayList<>();
     searchHistory.remove(query);
     searchHistory.add(0, query);
     if (searchHistory.size() > maxSize) {
@@ -102,10 +106,23 @@ public class UserEntity extends AbstractPersistentEntity {
   }
 
   public void removeFromSearchHistory(int index) {
-    if (searchHistory == null) return;
+    if (searchHistory == null)
+      return;
     if (index >= 0 && index < searchHistory.size()) {
       searchHistory.remove(index);
     }
+  }
+
+  public List<PlaylistEntity> getPlaylists() {
+    return playlists;
+  }
+
+  public void setPlaylists(List<PlaylistEntity> playlists) {
+    this.playlists = playlists;
+  }
+
+  public boolean addPlaylist(PlaylistEntity playlist) {
+    return this.playlists.add(playlist);
   }
 
   public String getRole() {
