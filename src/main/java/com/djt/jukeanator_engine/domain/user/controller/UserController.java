@@ -11,6 +11,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
+import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
@@ -28,10 +33,12 @@ import com.djt.jukeanator_engine.domain.user.service.UserService;
 public class UserController {
 
   private final UserService userService;
+  private final SongLibraryService songLibraryService;
 
-  public UserController(UserService userService) {
+  public UserController(UserService userService, SongLibraryService songLibraryService) {
 
     this.userService = userService;
+    this.songLibraryService = songLibraryService;
   }
 
   @PostMapping("/register")
@@ -117,6 +124,56 @@ public class UserController {
   public ResponseEntity<Void> removeSearchHistory(@AuthenticationPrincipal String emailAddress,
       @PathVariable int index) {
     userService.removeSearchHistory(emailAddress, index);
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/playlists")
+  public ResponseEntity<Void> createPlaylist(@AuthenticationPrincipal String emailAddress,
+      @RequestBody Map<String, String> body) throws EntityAlreadyExistsException {
+    String playlistName = body.get("playlistName");
+    if (playlistName != null && !playlistName.isBlank()) {
+      userService.createPlaylist(emailAddress, playlistName.strip());
+    }
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/playlists/{playlistName}/songs")
+  public ResponseEntity<Void> addSongToPlaylist(@AuthenticationPrincipal String emailAddress,
+      @PathVariable String playlistName, @RequestBody SongIdentifier songIdentifier)
+      throws EntityDoesNotExistException {
+    SongFileEntity song = songLibraryService.getSongLibraryRoot()
+        .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
+    userService.addSongToPlaylist(emailAddress, playlistName, song);
+    return ResponseEntity.noContent().build();
+  }
+
+  @DeleteMapping("/playlists/{playlistName}/songs")
+  public ResponseEntity<Void> removeSongFromPlaylist(@AuthenticationPrincipal String emailAddress,
+      @PathVariable String playlistName, @RequestBody SongIdentifier songIdentifier)
+      throws EntityDoesNotExistException {
+    SongFileEntity song = songLibraryService.getSongLibraryRoot()
+        .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
+    userService.removeSongFromPlaylist(emailAddress, playlistName, song);
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/playlists/favorites/songs")
+  public ResponseEntity<Void> addSongToMyFavoritesPlaylist(
+      @AuthenticationPrincipal String emailAddress, @RequestBody SongIdentifier songIdentifier)
+      throws EntityDoesNotExistException {
+    SongFileEntity song = songLibraryService.getSongLibraryRoot()
+        .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
+    userService.addSongToMyFavoritesPlaylist(emailAddress, song);
+    return ResponseEntity.noContent().build();
+  }
+
+  @DeleteMapping("/playlists/favorites/songs")
+  public ResponseEntity<Void> removeSongFromMyFavoritesPlaylist(
+      @AuthenticationPrincipal String emailAddress, @RequestBody SongIdentifier songIdentifier)
+      throws EntityDoesNotExistException {
+    SongFileEntity song = songLibraryService.getSongLibraryRoot()
+        .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
+    userService.removeSongFromMyFavoritesPlaylist(emailAddress, song);
     return ResponseEntity.noContent().build();
   }
 }

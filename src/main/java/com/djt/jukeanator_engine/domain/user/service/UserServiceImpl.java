@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
@@ -19,6 +20,7 @@ import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
+import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
@@ -26,14 +28,15 @@ import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
+import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
-import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
+import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
@@ -270,6 +273,86 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     user.removeFromSearchHistory(index);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
+  }
+
+  @Override
+  public boolean createPlaylist(String emailAddress, String playlistName)
+      throws EntityAlreadyExistsException {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    user.createPlaylist(playlistName);
+
+    this.userRepository.storeAggregateRoot(this.userRoot);
+
+    return true;
+  }
+
+  @Override
+  public boolean addSongToPlaylist(String emailAddress, String playlistName, SongFileEntity song)
+      throws EntityDoesNotExistException {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    boolean result = user.addSongToPlaylist(playlistName, song);
+
+    this.userRepository.storeAggregateRoot(this.userRoot);
+
+    return result;
+  }
+
+  @Override
+  public boolean removeSongFromPlaylist(String emailAddress, String playlistName, SongFileEntity song)
+      throws EntityDoesNotExistException {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    boolean result = user.removeSongFromPlaylist(playlistName, song);
+
+    this.userRepository.storeAggregateRoot(this.userRoot);
+
+    return result;
+  }
+
+  @Override
+  public boolean addSongToMyFavoritesPlaylist(String emailAddress, SongFileEntity song)
+      throws EntityDoesNotExistException {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    boolean result = user.addSongToPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, song);
+
+    this.userRepository.storeAggregateRoot(this.userRoot);
+
+    return result;
+  }
+
+  @Override
+  public boolean removeSongFromMyFavoritesPlaylist(String emailAddress, SongFileEntity song)
+      throws EntityDoesNotExistException {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    boolean result = user.removeSongFromPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, song);
+
+    this.userRepository.storeAggregateRoot(this.userRoot);
+
+    return result;
   }
 
   @EventListener

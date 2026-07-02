@@ -2,19 +2,26 @@ package com.djt.jukeanator_engine.domain.user.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
+import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
 public class UserEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
+  private static final Logger log = LoggerFactory.getLogger(UserEntity.class);
+
   private String firstName;
   private String lastName;
   private String emailAddress;
   private String passwordHash;
   private Integer numCredits = 0;
-  
+
   private List<SongIdentifier> songPlayHistory = new ArrayList<>();
   private List<String> searchHistory = new ArrayList<>();
   private List<PlaylistEntity> playlists = new ArrayList<>();
@@ -30,6 +37,13 @@ public class UserEntity extends AbstractPersistentEntity {
     this.passwordHash = passwordHash;
     this.numCredits = numCredits;
     this.role = role;
+
+    try {
+      createPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
+    } catch (EntityAlreadyExistsException eaee) {
+      log.error("My favorites playlist somehow already exists for new user: {" + this.emailAddress
+          + "].");
+    }
   }
 
   public String getFirstName() {
@@ -117,12 +131,69 @@ public class UserEntity extends AbstractPersistentEntity {
     return playlists;
   }
 
-  public void setPlaylists(List<PlaylistEntity> playlists) {
-    this.playlists = playlists;
+  public PlaylistEntity getPlaylistByName(String playlistName) throws EntityDoesNotExistException {
+
+    PlaylistEntity playlist = getPlaylistByNameNullIfNotExists(playlistName);
+    if (playlist != null) {
+      return playlist;
+    }
+    
+    // Every user should have a "My favorites" playlist 
+    if (playlistName.equals(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)) {
+      try {
+        return createPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
+      } catch (EntityAlreadyExistsException eaee) {
+        log.error("My favorites playlist somehow already exists for new user: {" + this.emailAddress
+            + "].");
+      }
+    }
+    
+    throw new EntityDoesNotExistException(
+        "Cannot find playlist: [" + playlistName + "] for user: [" + this.emailAddress + "].");
   }
 
-  public boolean addPlaylist(PlaylistEntity playlist) {
-    return this.playlists.add(playlist);
+  public PlaylistEntity getPlaylistByNameNullIfNotExists(String playlistName) {
+
+    for (PlaylistEntity playlist : this.playlists) {
+
+      if (playlist.getName().equals(playlistName)) {
+        return playlist;
+      }
+    }
+    return null;
+  }
+
+  public PlaylistEntity createPlaylist(String playlistName) throws EntityAlreadyExistsException {
+
+    PlaylistEntity check = getPlaylistByNameNullIfNotExists(playlistName);
+    if (check != null) {
+      throw new EntityAlreadyExistsException("Cannot create playlist: [" + playlistName
+          + "] for user: [" + this.emailAddress + "] because it already exists.");
+    }
+
+    int index = this.playlists.size();
+    PlaylistEntity playlist = new PlaylistEntity(index, this.emailAddress, playlistName);
+    return playlist;
+  }
+
+  public boolean addSongToPlaylist(String playlistName, SongFileEntity song)
+      throws EntityDoesNotExistException {
+
+    PlaylistEntity playlist = getPlaylistByName(playlistName);
+    SongIdentifier songIdentifier =
+        new SongIdentifier(song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity());
+
+    return playlist.addSong(songIdentifier);
+  }
+
+  public boolean removeSongFromPlaylist(String playlistName, SongFileEntity song)
+      throws EntityDoesNotExistException {
+
+    PlaylistEntity playlist = getPlaylistByName(playlistName);
+    SongIdentifier songIdentifier =
+        new SongIdentifier(song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity());
+
+    return playlist.removeSong(songIdentifier);
   }
 
   public String getRole() {
