@@ -130,12 +130,15 @@ public final class SongLibraryMapper {
     // the ArtistFromSongEntity's ID here keeps the artistId in the DTO consistent with what
     // getArtistById can actually resolve.
     Integer artistId = artist.getPersistentIdentity();
-    if (songEntity.getArtistName() != null) {
-      ArtistFromSongEntity artistFromSong =
-          album.getRootFolder().getArtistFromSong(songEntity.getArtistName());
-      if (artistFromSong != null) {
-        artistId = artistFromSong.getPersistentIdentity();
-      }
+    // Use the song's embedded artist name for lookup if present; otherwise fall back to the folder
+    // artist's name. This ensures we get the ID that artistsMap actually holds — which may be the
+    // ArtistFromSongEntity's ID rather than the ArtistFolderEntity's ID when both share a name.
+    String lookupName =
+        songEntity.getArtistName() != null ? songEntity.getArtistName() : artist.getName();
+    ArtistFromSongEntity artistFromSong =
+        album.getRootFolder().getArtistFromSong(lookupName);
+    if (artistFromSong != null) {
+      artistId = artistFromSong.getPersistentIdentity();
     }
 
     return new SongDto(album.getParentGenre().getPersistentIdentity(),

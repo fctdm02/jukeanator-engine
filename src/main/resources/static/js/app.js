@@ -1229,7 +1229,10 @@
 
     let artist;
     try {
-      artist = await api(`/api/song-library/artists/${params.artistId}`);
+      const url = params.albumId != null
+        ? `/api/song-library/artistByAlbum/${params.albumId}`
+        : `/api/song-library/artists/${params.artistId}`;
+      artist = await api(url);
     } catch {
       contentPanel.querySelector('.sub-content').innerHTML = '<div class="stub-placeholder">Could not load artist.</div>';
       return;
@@ -1356,9 +1359,9 @@
     });
 
     const artistEl = document.getElementById('albumDetailArtist');
-    if (artistEl && album.artistId != null) {
+    if (artistEl && album.albumId != null) {
       artistEl.classList.add('album-detail-artist-link');
-      artistEl.addEventListener('click', () => navigateSub('artist-detail', { artistId: album.artistId }));
+      artistEl.addEventListener('click', () => navigateSub('artist-detail', { albumId: album.albumId }));
     }
   }
 
@@ -1485,7 +1488,8 @@
 
     document.getElementById('spaArtist').addEventListener('click', () => {
       dismissSongPopup();
-      if (song.artistId != null) navigateSub('artist-detail', { artistId: song.artistId });
+      if (song.albumId != null) navigateSub('artist-detail', { albumId: song.albumId });
+      else if (song.artistId != null) navigateSub('artist-detail', { artistId: song.artistId });
     });
 
     document.getElementById('spaFavorite').addEventListener('click', async () => {

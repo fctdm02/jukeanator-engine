@@ -72,7 +72,8 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.GET, "/api/song-library/popular",
                 "/api/song-library/search", "/api/song-library/genres",
                 "/api/song-library/genres/**", "/api/song-library/artists",
-                "/api/song-library/artists/**", "/api/song-library/albums",
+                "/api/song-library/artists/**", "/api/song-library/artistByAlbum/**",
+                "/api/song-library/albums",
                 "/api/song-library/albums/**", "/api/song-library/songs/**",
                 "/api/song-library/artist", "/api/song-library/searchInternetForAlbumMetadata")
             .permitAll()

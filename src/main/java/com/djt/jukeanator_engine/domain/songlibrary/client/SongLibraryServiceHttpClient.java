@@ -110,6 +110,13 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
   }
 
   @Override
+  public ArtistDto getArtistByAlbumId(Integer albumId) {
+
+    return restClient.get().uri("/api/song-library/artistByAlbum/" + albumId).retrieve()
+        .body(new ParameterizedTypeReference<>() {});
+  }
+
+  @Override
   public AlbumDto getAlbumById(Integer albumId) {
 
     return restClient.get().uri("/api/song-library/albums/" + albumId).retrieve()

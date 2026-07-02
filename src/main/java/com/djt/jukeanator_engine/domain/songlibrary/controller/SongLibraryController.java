@@ -116,6 +116,11 @@ public class SongLibraryController {
     return songLibraryService.getArtistById(id);
   }
 
+  @GetMapping("/artistByAlbum/{albumId}")
+  public ArtistDto getArtistByAlbumId(@PathVariable Integer albumId) {
+    return songLibraryService.getArtistByAlbumId(albumId);
+  }
+
 
   @GetMapping("/artists/{id}/coverArt")
   public ResponseEntity<Resource> getArtistCoverArt(@PathVariable Integer id)

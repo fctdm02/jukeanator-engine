@@ -282,6 +282,21 @@ public class RootFolderEntity extends FolderEntity {
     throw new EntityDoesNotExistException("Artist with id: [" + artistId + "] not found.");
   }
 
+  public ArtistFolderEntity getArtistByAlbumId(Integer albumId) throws EntityDoesNotExistException {
+    AlbumFolderEntity album = getAlbumById(albumId);
+    String artistName = album.getParentArtist().getName();
+    if ("Compilations".equals(artistName)) {
+      throw new EntityDoesNotExistException(
+          "Album " + albumId + " belongs to Compilations; use song artist lookup instead.");
+    }
+    ArtistFolderEntity canonical = artistsMap.get(artistName);
+    if (canonical != null) {
+      return canonical;
+    }
+    throw new EntityDoesNotExistException(
+        "Artist with name: [" + artistName + "] not found in artistsMap.");
+  }
+
   public AlbumFolderEntity getAlbumById(Integer id) throws EntityDoesNotExistException {
     AlbumFolderEntity entity = albumsMap.get(id);
     if (entity != null) {

@@ -493,6 +493,17 @@ public class SongLibraryServiceImpl
   }
 
   @Override
+  public ArtistDto getArtistByAlbumId(Integer albumId) {
+
+    try {
+      return SongLibraryMapper.toArtistDto(songLibraryRoot.getArtistByAlbumId(albumId));
+    } catch (EntityDoesNotExistException ednee) {
+      throw new SongLibraryServiceException(
+          "Could not find artist by album id: " + albumId, ednee);
+    }
+  }
+
+  @Override
   public AlbumDto getAlbumById(Integer albumId) {
 
     try {
