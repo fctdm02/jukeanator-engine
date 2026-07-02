@@ -120,11 +120,12 @@ public class HomePanel extends JPanel implements TabNavigator {
     rootPanel.setOpaque(false);
     add(rootPanel, BorderLayout.CENTER);
 
-    // Seed the three cards. ARTIST and DETAIL start as empty placeholders;
-    // real content is swapped in on demand via replaceCard().
-    JPanel gridCard = buildGridCard();
-    gridCard.setName(CARD_GRID);
-    rootPanel.add(gridCard, CARD_GRID);
+    // Seed the three cards. The grid card starts as a loading placeholder; the
+    // real content is swapped in by setAlbums() once the background data fetch
+    // completes. ARTIST and DETAIL start as empty placeholders swapped on demand.
+    JPanel gridPlaceholder = buildLoadingCard();
+    gridPlaceholder.setName(CARD_GRID);
+    rootPanel.add(gridPlaceholder, CARD_GRID);
 
     JPanel artistPlaceholder = placeholder();
     artistPlaceholder.setName(CARD_ARTIST);
@@ -205,31 +206,63 @@ public class HomePanel extends JPanel implements TabNavigator {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // ASYNC DATA POPULATION
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Populates the Home tab with the album library. Must be called on the EDT after the background
+   * data fetch in {@link com.djt.jukeanator_engine.ui.JukeANatorUserInterfaceApplication} completes.
+   *
+   * <p>Replaces the loading placeholder installed by the constructor with the real album grid.
+   * Sort-order toggling after this point operates purely on the in-memory lists built here — no
+   * further service calls are made.
+   */
+  public void setAlbums(List<AlbumDto> rawAlbums,
+      com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto popular) {
+
+    List<AlbumDto> albums = rawAlbums != null ? rawAlbums : List.of();
+
+    albumsByTitle = sortAlbums(albums, AlbumDto::getAlbumName);
+    letterMapByTitle = buildLetterMap(albumsByTitle, AlbumDto::getAlbumName);
+
+    albumsByArtist = sortAlbums(albums, AlbumDto::getArtistName);
+    letterMapByArtist = buildLetterMap(albumsByArtist, AlbumDto::getArtistName);
+
+    int artistCount = popular != null && popular.getArtists() != null
+        ? popular.getArtists().size() : 0;
+    int songCount = popular != null && popular.getSongs() != null
+        ? popular.getSongs().size() : 0;
+
+    JPanel gridCard = buildGridCard(artistCount, songCount);
+    replaceCard(CARD_GRID, gridCard);
+    cardLayout.show(rootPanel, CARD_GRID);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // GRID CARD
   // ─────────────────────────────────────────────────────────────────────────
-  private JPanel buildGridCard() {
+
+  /** Minimal card shown while album data is loading in the background. */
+  private JPanel buildLoadingCard() {
 
     JPanel card = new JPanel(new BorderLayout());
     card.setOpaque(false);
 
-    // Fetch the album list ONCE. All sort-order switching below operates
-    // purely on the two in-memory lists built from this single call.
-    List<AlbumDto> rawAlbums;
-    try {
-      rawAlbums = songLibraryService.getAlbums();
-    } catch (Exception e) {
-      rawAlbums = List.of();
-    }
+    JLabel loading = new JLabel("Loading library…", SwingConstants.CENTER);
+    loading.setForeground(ColorTheme.get().textSecondary);
+    loading.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 22));
+    card.add(loading, BorderLayout.CENTER);
+    return card;
+  }
 
-    // Both lists are sorted explicitly — do not rely on the service's return order.
-    // The letter map for each view must be built from its own sorted list so that
-    // the indices stored in the map align exactly with the positions in the list
-    // that AlbumGridPanel will paginate through.
-    albumsByTitle = sortAlbums(rawAlbums, AlbumDto::getAlbumName);
-    letterMapByTitle = buildLetterMap(albumsByTitle, AlbumDto::getAlbumName);
+  /**
+   * Builds the album grid card from already-loaded, already-sorted data. Called by
+   * {@link #setAlbums} once the background fetch has populated {@link #albumsByTitle} etc.
+   */
+  private JPanel buildGridCard(int artistCount, int songCount) {
 
-    albumsByArtist = sortAlbums(rawAlbums, AlbumDto::getArtistName);
-    letterMapByArtist = buildLetterMap(albumsByArtist, AlbumDto::getArtistName);
+    JPanel card = new JPanel(new BorderLayout());
+    card.setOpaque(false);
 
     // Icon size is read from LayoutTheme so that the header shrinks on small-landscape
     // displays (1024x768) where detailHeaderImageW/H are reduced to 40px, keeping the
@@ -237,23 +270,6 @@ public class HomePanel extends JPanel implements TabNavigator {
     int headerIconSize = LayoutTheme.get().detailHeaderImageW;
     ImageIcon allAlbumsIcon =
         imageLoader.loadImage("AllAlbumsLogo.png", headerIconSize, headerIconSize);
-
-    // Artist/song totals are static for the lifetime of this panel, so they are
-    // fetched ONCE here rather than recomputed on every sort toggle/header rebuild.
-    int artistCount;
-    int songCount;
-    try {
-      com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto allMusic =
-          songLibraryService.getMusicByPopularity();
-      artistCount = allMusic != null && allMusic.getArtists() != null
-          ? allMusic.getArtists().size()
-          : 0;
-      songCount =
-          allMusic != null && allMusic.getSongs() != null ? allMusic.getSongs().size() : 0;
-    } catch (Exception e) {
-      artistCount = 0;
-      songCount = 0;
-    }
 
     String subtitle = artistCount + " artists  •  " + albumsByTitle.size() + " albums  •  "
         + songCount + " songs";

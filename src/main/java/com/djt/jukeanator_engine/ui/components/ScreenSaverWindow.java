@@ -39,12 +39,12 @@ public class ScreenSaverWindow extends JWindow {
 
   private final SongPlayerService songPlayerService;
   private final SongLibraryService songLibraryService;
-  private final int numAlbums;
+  private int numAlbums = 0; // lazy-initialised on first updateContent() call
   private final ImageIcon logo;
   private final ImageIcon textImage;
 
   public ScreenSaverWindow(javax.swing.JFrame owner, ImageLoader imageLoader, int screenWidth,
-      int screenHeight, int numAlbums, SongPlayerService songPlayerService,
+      int screenHeight, SongPlayerService songPlayerService,
       SongLibraryService songLibraryService) {
 
     // Passing the owner JFrame ensures the JWindow is anchored to the same
@@ -54,7 +54,6 @@ public class ScreenSaverWindow extends JWindow {
     this.imageLoader = imageLoader;
     this.screenWidth = screenWidth;
     this.screenHeight = screenHeight;
-    this.numAlbums = numAlbums;
     this.songPlayerService = songPlayerService;
     this.songLibraryService = songLibraryService;
 
@@ -174,6 +173,9 @@ public class ScreenSaverWindow extends JWindow {
 
     } else {
 
+      if (numAlbums == 0) {
+        numAlbums = this.songLibraryService.getAlbums().size();
+      }
       AlbumDto album = this.songLibraryService.getAlbumById(new Random().nextInt(this.numAlbums));
       coverArt = imageLoader.loadFilesystemImage(album.getCoverArtPath(), 350, 350);
 

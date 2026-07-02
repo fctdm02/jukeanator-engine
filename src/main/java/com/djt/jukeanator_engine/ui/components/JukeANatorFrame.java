@@ -33,6 +33,7 @@ import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
@@ -384,8 +385,7 @@ public class JukeANatorFrame extends JFrame {
     if (this.enableScreenSaver) {
 
       this.screenSaverWindow = new ScreenSaverWindow(this, this.imageLoader, this.screenWidth,
-          this.screenHeight, this.songLibraryService.getAlbums().size(), this.songPlayerService,
-          this.songLibraryService);
+          this.screenHeight, this.songPlayerService, this.songLibraryService);
 
       new IdleMonitor(
 
@@ -1156,6 +1156,12 @@ public class JukeANatorFrame extends JFrame {
   public void refreshMusicByPopularityResults() {
 
     hotHerePanel.refreshMusicByPopularityResults();
+  }
+
+  // ALBUM LIST (populates HomePanel once data arrives from the background loader)
+  public void setAlbums(List<AlbumDto> albums, SearchResultDto popular) {
+
+    homePanel.setAlbums(albums, popular);
   }
 
   // GENRE LIST

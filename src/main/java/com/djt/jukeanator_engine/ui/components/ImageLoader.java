@@ -77,24 +77,34 @@ public class ImageLoader {
 
     CacheKey key = new CacheKey(imageUrl, width, height);
 
+    // Fast path — return from cache without holding the lock during I/O or scaling.
     synchronized (cache) {
       ImageIcon cached = cache.get(key);
       if (cached != null) {
         return cached;
       }
+    }
 
-      try {
-        ImageIcon icon = new ImageIcon(imageUrl);
-        Image image = icon.getImage();
-        Image scaled = image.getScaledInstance(width, height, scaling);
-        ImageIcon result = new ImageIcon(scaled);
+    // Slow path — load and scale outside the lock so the EDT is never blocked by a
+    // background preloader thread that is busy scaling a large image. Two threads may
+    // race to load the same key; the loser's result is discarded by the re-check below.
+    ImageIcon result;
+    try {
+      ImageIcon icon = new ImageIcon(imageUrl);
+      Image image = icon.getImage();
+      Image scaled = image.getScaledInstance(width, height, scaling);
+      result = new ImageIcon(scaled);
+    } catch (Exception e) {
+      return null;
+    }
 
-        cache.put(key, result);
-        return result;
-
-      } catch (Exception e) {
-        return null;
+    synchronized (cache) {
+      ImageIcon existing = cache.get(key);
+      if (existing != null) {
+        return existing;
       }
+      cache.put(key, result);
+      return result;
     }
   }
 
