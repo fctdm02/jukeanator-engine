@@ -1,0 +1,8 @@
+0 src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder\80s\Billy Idol\Rebel Yell\Billy Idol-01-Rebel Yell_30sec.mp3
+0 src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder\80s\Billy Idol\Rebel Yell\Billy Idol-04-Blue Highway_30sec.mp3
+0 src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder\80s\Billy Idol\Vital Idol\Billy Idol-01-White Wedding-Parts I & II_30sec.mp3
+0 src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder\80s\Billy Idol\Vital Idol\Billy Idol-02-Mony Mony_30sec.mp3
+0 src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder\80s\Billy Idol\Vital Idol\Billy Idol-04-Dancing With Myself_30sec.mp3
+0 src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder\80s\Compilations\The Big 80s\A Ha-02-Take On Me_30sec.mp3
+0 src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder\80s\Compilations\The Big 80s\Men Without Hats-03-The Safety Dance_30sec.mp3
+0 src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder\Soundtracks\The Wedding Singer\Stray Cats-01-Rock This Town_30sec.mp3

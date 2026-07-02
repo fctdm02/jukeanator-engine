@@ -2,17 +2,20 @@ package com.djt.jukeanator_engine.domain.user.controller;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
@@ -20,12 +23,14 @@ import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
+import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
+import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
-import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 
 @RestController
@@ -175,5 +180,62 @@ public class UserController {
         .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
     userService.removeSongFromMyFavoritesPlaylist(emailAddress, song);
     return ResponseEntity.noContent().build();
+  }
+
+  @GetMapping("/playlists")
+  public ResponseEntity<List<PlaylistSummaryDto>> getPlaylists(
+      @AuthenticationPrincipal String emailAddress) {
+    return ResponseEntity.ok(userService.getPlaylists(emailAddress));
+  }
+
+  @GetMapping("/playlists/favorites/songs")
+  public ResponseEntity<List<SongIdentifier>> getFavoriteSongIdentifiers(
+      @AuthenticationPrincipal String emailAddress) {
+    return ResponseEntity.ok(userService.getFavoriteSongIdentifiers(emailAddress));
+  }
+
+  @GetMapping("/playlists/{playlistName}/songs")
+  public ResponseEntity<List<SongDto>> getPlaylistSongs(
+      @AuthenticationPrincipal String emailAddress,
+      @PathVariable String playlistName) throws EntityDoesNotExistException {
+    return ResponseEntity.ok(userService.getPlaylistSongs(emailAddress, playlistName));
+  }
+
+  @PutMapping("/playlists/{playlistName}/songs")
+  public ResponseEntity<Void> reorderPlaylistSongs(
+      @AuthenticationPrincipal String emailAddress,
+      @PathVariable String playlistName,
+      @RequestBody List<SongIdentifier> songs) throws EntityDoesNotExistException {
+    userService.reorderPlaylistSongs(emailAddress, playlistName, songs);
+    return ResponseEntity.noContent().build();
+  }
+
+  @GetMapping("/playlists/{playlistName}/coverArt")
+  public ResponseEntity<Void> getPlaylistCoverArt(
+      @AuthenticationPrincipal String emailAddress,
+      @PathVariable String playlistName) {
+    if (PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(playlistName)) {
+      return ResponseEntity.status(HttpStatus.FOUND)
+          .header("Location", "/images/MyFavorites_Playlist.png")
+          .build();
+    }
+    try {
+      for (PlaylistSummaryDto p : userService.getPlaylists(emailAddress)) {
+        if (p.getName().equals(playlistName)) {
+          if (p.getFirstSongAlbumId() != null) {
+            return ResponseEntity.status(HttpStatus.FOUND)
+                .header("Location",
+                    "/api/song-library/albums/" + p.getFirstSongAlbumId() + "/coverArt")
+                .build();
+          }
+          break;
+        }
+      }
+    } catch (Exception e) {
+      // fall through to generic image
+    }
+    return ResponseEntity.status(HttpStatus.FOUND)
+        .header("Location", "/images/Generic_Playlist.png")
+        .build();
   }
 }

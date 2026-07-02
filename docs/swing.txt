@@ -1063,10 +1063,32 @@ RandomByCD=false
  DONE 37. On AdminPanel, Move Song Up does not work
  
  
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-<link rel="manifest" href="/site.webmanifest">
+Questions:
+1: Playlist cover art (Item 2): The spec says "the song at the front of the list, or the most popular in the playlist." Which should it be — simpler (front of list) or smarter (most popular)? And if "most popular," does that mean globally most-played, or most-played by this specific user?
+ANSWER: Use the song at the front of the list, as this will make it easier for implementation.
+
  
- 
- 
+2: Song context menu (Item 4/5): The existing popup already has "Play Priority Song," "Play Song," "View This Artist." Should I add "Add to My Favorites" and "Add to a Playlist..." to that same existing popup, or is this a new/separate UI element?
+ANSWER: Yes, add these two options to the existing popup.  In fact, make the Web UI add song to popup exactly as is shown in "AMI_AddSongToQueue_Popup" (NOTE: If a "View This Artist" workflow does not exist yet, then implement it with the popup being dismissed and the artist view being shown.  The back button behavior for the artist page for this workflow should take the user to the song list view of the playlist)
+
+
+3: "Remove from My Favorites" (Item 5): When a song is already in a playlist, the popup should show "Remove from My Favorites" instead of "Add to My Favorites." Should it also show "Remove from [PlaylistName]" for non-favorites playlists, or only for My Favorites?
+ANSWER: Only for my favorites. The view songs for a playlist view should allow the user to select songs to remove, or allow the user to re-arrange the song order
+
+
+4: Web UI framework: Looking at the app.js SPA — is it vanilla JS, or does it use a specific framework (React, Vue, etc.)? This affects how I implement the new views.
+ANSWER: It is vanilla JS, please see index.html, app.js and style.css, all are in src/main/resources/static
+
+
+5: "View All" for playlists: Should the "View All" page for playlists show playlist tiles (like the home page panel) or a flat list like the competing app screenshot shows?
+ANSWER: Yes.  Also, make this page so that the user can remove songs or re-arrange the ordering of songs.  The first song in the list will be the source for the cover art image. 
+
+Have I answered all of your questions?
+
+
+
+
+
+There is an issue loading the home page for the Web UI.  Attached is the javscript console output showing 403s.  I would like the backend to be logging any exceptions like to both the console and log file, as I cannot troubleshoot anything with a generic "403" for a given endpoint.
+
+But the main task here is to resolve the issue of not being able to load the home page

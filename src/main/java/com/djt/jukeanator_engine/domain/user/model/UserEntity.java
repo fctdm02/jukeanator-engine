@@ -173,6 +173,7 @@ public class UserEntity extends AbstractPersistentEntity {
 
     int index = this.playlists.size();
     PlaylistEntity playlist = new PlaylistEntity(index, this.emailAddress, playlistName);
+    this.playlists.add(playlist);
     return playlist;
   }
 

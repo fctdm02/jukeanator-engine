@@ -1541,3 +1541,276 @@ input {
 .song-popup-action--warn .spa-label {
   color: #e05555;
 }
+
+/* ── Playlist tiles ─────────────────────────────────────────────────────── */
+
+.playlist-tile-create-img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  border: 2px dashed rgba(255,255,255,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 0.35rem;
+}
+
+/* ── My Playlists "View All" grid ───────────────────────────────────────── */
+
+.playlist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+  padding: 0.25rem 0 1rem;
+}
+
+.playlist-grid .rp-thumb-card {
+  flex: unset;
+  min-width: unset;
+  scroll-snap-align: unset;
+}
+
+/* ── Playlist detail screen ─────────────────────────────────────────────── */
+
+.playlist-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 0 1rem;
+}
+
+.playlist-detail-cover-wrap {
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+
+.playlist-detail-cover-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.playlist-detail-info {
+  min-width: 0;
+}
+
+.playlist-detail-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-detail-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+
+.playlist-song-list {
+  margin: 0 -1rem;
+}
+
+.playlist-song-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.playlist-song-row:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.playlist-song-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.playlist-order-btn {
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.playlist-order-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.playlist-order-btn:not(:disabled):hover {
+  background: rgba(255,255,255,0.15);
+  color: var(--text);
+}
+
+.playlist-remove-btn {
+  background: rgba(255,80,80,0.12);
+  border: none;
+  color: #e05555;
+  font-size: 0.85rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.playlist-remove-btn:hover {
+  background: rgba(255,80,80,0.25);
+}
+
+/* ── Select Playlist sheet ──────────────────────────────────────────────── */
+
+.select-playlist-sheet {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.select-playlist-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  padding: 0.25rem 1.25rem 0.9rem;
+}
+
+.select-playlist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.select-playlist-row:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.select-playlist-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+
+.select-playlist-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.select-playlist-create-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.08);
+  border: 2px dashed rgba(255,255,255,0.2);
+  border-radius: 6px;
+}
+
+.select-playlist-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ── Create New Playlist dialog ─────────────────────────────────────────── */
+
+.create-playlist-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-playlist-box {
+  background: #1a2a3a;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  padding: 1.5rem 1.5rem 1.25rem;
+  width: 320px;
+  max-width: calc(100% - 2rem);
+}
+
+.create-playlist-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.create-playlist-input {
+  width: 100%;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.create-playlist-input::placeholder {
+  color: var(--muted);
+}
+
+.create-playlist-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.create-playlist-btn {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.create-playlist-btn.cancel {
+  background: rgba(255,255,255,0.1);
+  color: #4ab8d8;
+}
+
+.create-playlist-btn.save {
+  background: linear-gradient(135deg, #c0392b, #8e44ad);
+  color: #fff;
+}

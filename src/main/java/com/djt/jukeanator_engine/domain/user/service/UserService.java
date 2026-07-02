@@ -4,7 +4,9 @@ import java.util.List;
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
@@ -14,6 +16,7 @@ import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
+import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 
@@ -165,8 +168,18 @@ public interface UserService {
   boolean removeSongFromMyFavoritesPlaylist(String emailAddress, SongFileEntity song)
       throws EntityDoesNotExistException;
 
+  List<PlaylistSummaryDto> getPlaylists(String emailAddress);
+
+  List<SongDto> getPlaylistSongs(
+      String emailAddress, String playlistName) throws EntityDoesNotExistException;
+
+  void reorderPlaylistSongs(String emailAddress, String playlistName,
+      List<SongIdentifier> songs) throws EntityDoesNotExistException;
+
+  List<SongIdentifier> getFavoriteSongIdentifiers(String emailAddress);
+
   /**
-   * 
+   *
    * @param event
    */
   void handleSongAddedToQueueEvent(SongAddedToQueueEvent event);

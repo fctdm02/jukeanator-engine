@@ -31,6 +31,7 @@ import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
+import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
@@ -353,6 +354,85 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     this.userRepository.storeAggregateRoot(this.userRoot);
 
     return result;
+  }
+
+  @Override
+  public List<PlaylistSummaryDto> getPlaylists(String emailAddress) {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    List<PlaylistSummaryDto> result = new ArrayList<>();
+    for (PlaylistEntity p : user.getPlaylists()) {
+      List<SongIdentifier> songs = p.getSongs();
+      Integer firstSongAlbumId = songs.isEmpty() ? null : songs.get(0).getAlbumId();
+      result.add(new PlaylistSummaryDto(p.getName(), songs.size(), firstSongAlbumId));
+    }
+    return result;
+  }
+
+  @Override
+  public List<SongDto> getPlaylistSongs(String emailAddress, String playlistName)
+      throws EntityDoesNotExistException {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    PlaylistEntity playlist = user.getPlaylistByName(playlistName);
+    List<SongDto> result = new ArrayList<>();
+    for (SongIdentifier si : playlist.getSongs()) {
+      try {
+        SongDto song = songLibraryService.getSongById(si.getAlbumId(), si.getSongId());
+        if (song != null) {
+          result.add(song);
+        }
+      } catch (Exception e) {
+        log.warn("Skipping missing song albumId={} songId={} in playlist '{}'",
+            si.getAlbumId(), si.getSongId(), playlistName);
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public void reorderPlaylistSongs(String emailAddress, String playlistName,
+      List<SongIdentifier> songs) throws EntityDoesNotExistException {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    PlaylistEntity playlist = user.getPlaylistByName(playlistName);
+    List<SongIdentifier> current = new ArrayList<>(playlist.getSongs());
+    List<SongIdentifier> reordered = new ArrayList<>();
+    for (SongIdentifier si : songs) {
+      if (current.contains(si)) {
+        reordered.add(si);
+      }
+    }
+    playlist.setSongs(reordered);
+    this.userRepository.storeAggregateRoot(this.userRoot);
+  }
+
+  @Override
+  public List<SongIdentifier> getFavoriteSongIdentifiers(String emailAddress) {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    PlaylistEntity favs =
+        user.getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
+    if (favs == null) {
+      return new ArrayList<>();
+    }
+    return new ArrayList<>(favs.getSongs());
   }
 
   @EventListener
