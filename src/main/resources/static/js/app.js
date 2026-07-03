@@ -94,6 +94,14 @@
           <h1 class="sub-title">${title}</h1>
         </header>
         <div class="sub-content">${bodyHtml}</div>
+        <nav class="bottom-tabs">
+          <button class="bottom-tab ${state.currentMainTab === 'music' ? 'active' : ''}" id="tabMusic">
+            <span class="tab-icon">&#9835;</span><span>Music</span>
+          </button>
+          <button class="bottom-tab ${state.currentMainTab === 'addfunds' ? 'active' : ''}" id="tabAddFunds">
+            <span class="tab-icon">&#128176;</span><span>Add Funds</span>
+          </button>
+        </nav>
       </div>`;
   }
 
@@ -127,6 +135,16 @@
   function wireBackBtn() {
     const btn = document.getElementById('backBtn');
     if (btn) btn.addEventListener('click', goBack);
+
+    document.getElementById('tabMusic')?.addEventListener('click', () => renderMain('music'));
+    document.getElementById('tabAddFunds')?.addEventListener('click', () => {
+      if (!state.token) {
+        state.pendingScreen = { screen: 'addfunds' };
+        renderLogin();
+      } else {
+        renderMain('addfunds');
+      }
+    });
   }
 
   // ── Main frame ──────────────────────────────────────────────────────────
