@@ -142,7 +142,7 @@ public class AdminPanel extends JPanel {
     queueList.setSelectionBackground(ColorTheme.get().bgListSelected);
     queueList.setSelectionForeground(ColorTheme.get().textPrimary);
     queueList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-    SongTrackCellRenderer.installWithPriority(queueList, popularityT1, popularityT2, popularityT3,
+    SongTrackCellRenderer.installForAdmin(queueList, popularityT1, popularityT2, popularityT3,
         imageLoader);
 
     JPanel queuePane = new JPanel(new BorderLayout(0, 4));

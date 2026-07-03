@@ -65,6 +65,12 @@ public class SongTrackCellRenderer extends JPanel
   /** When {@code true}, row background is driven by queue-entry priority instead of alternating. */
   private final boolean usePriorityColor;
 
+  /** When {@code false}, the queue-position number badge to the left of the thumbnail is hidden. */
+  private final boolean showIndex;
+
+  /** When {@code true}, the requesting username is appended in parentheses after the song name. */
+  private final boolean showRequester;
+
   // ── Sub-widgets ───────────────────────────────────────────────────────────
   private final PopularityBarsPanel barsPanel;
   private final JLabel numLabel = new JLabel();
@@ -86,11 +92,27 @@ public class SongTrackCellRenderer extends JPanel
    */
   public SongTrackCellRenderer(int t1, int t2, int t3, boolean usePriorityColor,
       ImageLoader imageLoader) {
+    this(t1, t2, t3, usePriorityColor, imageLoader, true, false);
+  }
+
+  /**
+   * Full constructor — see {@link #SongTrackCellRenderer(int, int, int, boolean, ImageLoader)} for
+   * the other parameters.
+   *
+   * @param showIndex When {@code false}, the queue-position number badge is hidden (used by the
+   *        Admin Panel queue list).
+   * @param showRequester When {@code true}, the requesting username is appended in parentheses
+   *        after the song name (used by the Admin Panel queue list).
+   */
+  public SongTrackCellRenderer(int t1, int t2, int t3, boolean usePriorityColor,
+      ImageLoader imageLoader, boolean showIndex, boolean showRequester) {
     this.t1 = t1;
     this.t2 = t2;
     this.t3 = t3;
     this.usePriorityColor = usePriorityColor;
     this.imageLoader = imageLoader;
+    this.showIndex = showIndex;
+    this.showRequester = showRequester;
 
     barsPanel = new PopularityBarsPanel(0);
 
@@ -110,6 +132,7 @@ public class SongTrackCellRenderer extends JPanel
     // sized to fit within the fixed queue cell height.
     int thumbSize = Math.max(24, CELL_HEIGHT - 8);
     numLabel.setPreferredSize(new Dimension(LayoutTheme.get().resultNumLabelW, thumbSize));
+    numLabel.setVisible(showIndex);
     thumb.setPreferredSize(new Dimension(thumbSize, thumbSize));
     thumb.setHorizontalAlignment(SwingConstants.CENTER);
     thumb.setOpaque(true);
@@ -160,7 +183,11 @@ public class SongTrackCellRenderer extends JPanel
     numLabel.setText(String.format("%02d", index + 1));
 
     // ── Song / sub text ────────────────────────────────────────────────────
-    song.setText(entry.getSong().getSongName());
+    String songName = entry.getSong().getSongName();
+    if (showRequester) {
+      songName += " (" + entry.getUsername() + ")";
+    }
+    song.setText(songName);
     sub.setText(entry.getSong().getArtistName() + "  •  " + entry.getSong().getAlbumName());
 
     // Bottom separator line — matches the JSeparator drawn between rows in the
@@ -294,6 +321,17 @@ public class SongTrackCellRenderer extends JPanel
   public static void installWithPriority(JList<SongQueueEntryDto> list, int t1, int t2, int t3,
       ImageLoader imageLoader) {
     list.setCellRenderer(new SongTrackCellRenderer(t1, t2, t3, true, imageLoader));
+    list.setFixedCellHeight(CELL_HEIGHT);
+  }
+
+  /**
+   * Like {@link #installWithPriority(JList, int, int, int, ImageLoader)} but tailored to the Admin
+   * Panel queue list: hides the queue-position number badge and appends the requesting username in
+   * parentheses after the song name.
+   */
+  public static void installForAdmin(JList<SongQueueEntryDto> list, int t1, int t2, int t3,
+      ImageLoader imageLoader) {
+    list.setCellRenderer(new SongTrackCellRenderer(t1, t2, t3, true, imageLoader, false, true));
     list.setFixedCellHeight(CELL_HEIGHT);
   }
 
