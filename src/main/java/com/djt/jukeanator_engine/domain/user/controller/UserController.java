@@ -142,6 +142,13 @@ public class UserController {
     return ResponseEntity.noContent().build();
   }
 
+  @DeleteMapping("/playlists/{playlistName}")
+  public ResponseEntity<Void> deletePlaylist(@AuthenticationPrincipal String emailAddress,
+      @PathVariable String playlistName) throws EntityDoesNotExistException {
+    userService.deletePlaylist(emailAddress, playlistName);
+    return ResponseEntity.noContent().build();
+  }
+
   @PostMapping("/playlists/{playlistName}/songs")
   public ResponseEntity<Void> addSongToPlaylist(@AuthenticationPrincipal String emailAddress,
       @PathVariable String playlistName, @RequestBody SongIdentifier songIdentifier)

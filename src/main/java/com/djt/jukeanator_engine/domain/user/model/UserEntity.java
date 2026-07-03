@@ -192,6 +192,16 @@ public class UserEntity extends AbstractPersistentEntity {
     return playlist;
   }
 
+  public boolean deletePlaylist(String playlistName) throws EntityDoesNotExistException {
+
+    if (PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(playlistName)) {
+      throw new IllegalArgumentException("Cannot delete the My Favorites playlist.");
+    }
+
+    PlaylistEntity playlist = getPlaylistByName(playlistName);
+    return this.playlists.remove(playlist);
+  }
+
   public boolean addSongToPlaylist(String playlistName, SongFileEntity song)
       throws EntityDoesNotExistException {
 

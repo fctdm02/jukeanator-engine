@@ -149,6 +149,16 @@ public interface UserService {
       throws EntityDoesNotExistException;
 
   /**
+   *
+   * @param emailAddress
+   * @param playlistName
+   * @return
+   * @throws EntityDoesNotExistException
+   */
+  boolean deletePlaylist(String emailAddress, String playlistName)
+      throws EntityDoesNotExistException;
+
+  /**
    * 
    * @param emailAddress
    * @param song
@@ -183,4 +193,13 @@ public interface UserService {
    * @param event
    */
   void handleSongAddedToQueueEvent(SongAddedToQueueEvent event);
+
+  /**
+   * Charges Web UI credits for a patron reordering or removing a song in the shared queue,
+   * mirroring the priority-based cost charged when a song is first added to the queue.
+   *
+   * @param emailAddress
+   * @param priority the queue entry's priority level at the time of the action (1 = normal)
+   */
+  void chargeCreditsForQueueAction(String emailAddress, Integer priority);
 }

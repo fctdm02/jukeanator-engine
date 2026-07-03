@@ -54,6 +54,14 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   /** Web UI credit cost for a normal play (priority == 1). */
   private static final int WEB_COST_PER_PRIORITY_LEVEL = 2;
 
+  /**
+   * Web UI credit cost per priority level for reordering/removing a queued song — double the
+   * JFC/Swing Queue tab's {@code priority * 3} (minimum {@value #WEB_QUEUE_ACTION_MIN_COST}),
+   * matching the same 2x multiplier used for {@link #WEB_COST_PER_PRIORITY_LEVEL}.
+   */
+  private static final int WEB_QUEUE_ACTION_COST_PER_PRIORITY_LEVEL = 6;
+  private static final int WEB_QUEUE_ACTION_MIN_COST = 2;
+
   private static final int MAX_RECENT_PLAYS = 10;
 
   private String rootPath;
@@ -341,6 +349,22 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
+  public boolean deletePlaylist(String emailAddress, String playlistName)
+      throws EntityDoesNotExistException {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    boolean result = user.deletePlaylist(playlistName);
+
+    this.userRepository.storeAggregateRoot(this.userRoot);
+
+    return result;
+  }
+
+  @Override
   public boolean addSongToMyFavoritesPlaylist(String emailAddress, SongFileEntity song)
       throws EntityDoesNotExistException {
 
@@ -482,13 +506,32 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
       int priority =
           event.queueEntry().getPriority() != null ? event.queueEntry().getPriority() : 1;
-      int cost = priority * WEB_COST_PER_PRIORITY_LEVEL;
-      int remaining = Math.max(0, (user.getNumCredits() != null ? user.getNumCredits() : 0) - cost);
-      user.setNumCredits(remaining);
-      eventPublisher.publishEvent(new UserCreditsChangedEvent(username, remaining));
+      deductCredits(user, username, priority * WEB_COST_PER_PRIORITY_LEVEL);
     }
 
     this.userRepository.storeAggregateRoot(this.userRoot);
+  }
+
+  @Override
+  public void chargeCreditsForQueueAction(String emailAddress, Integer priority) {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    int cost = Math.max(WEB_QUEUE_ACTION_MIN_COST,
+        (priority != null ? priority : 1) * WEB_QUEUE_ACTION_COST_PER_PRIORITY_LEVEL);
+    deductCredits(user, emailAddress, cost);
+
+    this.userRepository.storeAggregateRoot(this.userRoot);
+  }
+
+  /** Deducts {@code cost} credits (floored at zero) and broadcasts the new balance. */
+  private void deductCredits(UserEntity user, String emailAddress, int cost) {
+    int remaining = Math.max(0, (user.getNumCredits() != null ? user.getNumCredits() : 0) - cost);
+    user.setNumCredits(remaining);
+    eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, remaining));
   }
 
   // Repository methods

@@ -17,6 +17,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.user.service.UserService;
 
 /**
  * @author tmyers
@@ -26,11 +27,40 @@ import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 public class SongQueueController {
 
   private final SongQueueService songQueueService;
+  private final UserService userService;
 
-  public SongQueueController(@Qualifier("songQueueService") SongQueueService songQueueService) {
+  public SongQueueController(@Qualifier("songQueueService") SongQueueService songQueueService,
+      UserService userService) {
 
     requireNonNull(songQueueService, "songQueueService cannot be null");
+    requireNonNull(userService, "userService cannot be null");
     this.songQueueService = songQueueService;
+    this.userService = userService;
+  }
+
+  /**
+   * Looks up a queue entry's current priority, used to price a reorder/remove action before it
+   * runs — {@code removeSongDownFromQueue} makes the entry disappear, so this must be read
+   * beforehand.
+   */
+  private Integer findQueuedPriority(int albumId, int songId) {
+    return songQueueService.getQueuedSongs().stream()
+        .filter(entry -> entry.getSong().getAlbumId() == albumId
+            && entry.getSong().getSongId() == songId)
+        .map(SongQueueEntryDto::getPriority)
+        .findFirst()
+        .orElse(1);
+  }
+
+  /**
+   * Web UI patrons pay for reordering/removing a queued song, same as adding one. A
+   * {@code LOCAL_USERNAME}/JFC caller's {@code Authentication#getPrincipal()} is a
+   * {@code LocalPrincipal}, not a {@code String}, so it is naturally excluded here.
+   */
+  private void chargeWebUserForQueueAction(Authentication authentication, Integer priority) {
+    if (authentication != null && authentication.getPrincipal() instanceof String email) {
+      userService.chargeCreditsForQueueAction(email, priority);
+    }
   }
 
 
@@ -105,24 +135,44 @@ public class SongQueueController {
 
 
   @PostMapping("/moveSongUpInQueue")
-  public Integer moveSongUpInQueue(@RequestBody ChangeSongQueueRequest changeSongQueueRequest) {
+  public Integer moveSongUpInQueue(@RequestBody ChangeSongQueueRequest changeSongQueueRequest,
+      Authentication authentication) {
 
-    return songQueueService.moveSongUpInQueue(changeSongQueueRequest);
+    Integer priority =
+        findQueuedPriority(changeSongQueueRequest.getAlbumId(), changeSongQueueRequest.getSongId());
+    Integer result = songQueueService.moveSongUpInQueue(changeSongQueueRequest);
+    if (result != null && result > 0) {
+      chargeWebUserForQueueAction(authentication, priority);
+    }
+    return result;
   }
 
 
   @PostMapping("/moveSongDownInQueue")
-  public Integer moveSongDownInQueue(@RequestBody ChangeSongQueueRequest changeSongQueueRequest) {
+  public Integer moveSongDownInQueue(@RequestBody ChangeSongQueueRequest changeSongQueueRequest,
+      Authentication authentication) {
 
-    return songQueueService.moveSongDownInQueue(changeSongQueueRequest);
+    Integer priority =
+        findQueuedPriority(changeSongQueueRequest.getAlbumId(), changeSongQueueRequest.getSongId());
+    Integer result = songQueueService.moveSongDownInQueue(changeSongQueueRequest);
+    if (result != null && result > 0) {
+      chargeWebUserForQueueAction(authentication, priority);
+    }
+    return result;
   }
 
 
   @PostMapping("/removeSongDownFromQueue")
   public Integer removeSongDownFromQueue(
-      @RequestBody ChangeSongQueueRequest changeSongQueueRequest) {
+      @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication) {
 
-    return songQueueService.removeSongDownFromQueue(changeSongQueueRequest);
+    Integer priority =
+        findQueuedPriority(changeSongQueueRequest.getAlbumId(), changeSongQueueRequest.getSongId());
+    Integer result = songQueueService.removeSongDownFromQueue(changeSongQueueRequest);
+    if (result != null && result > 0) {
+      chargeWebUserForQueueAction(authentication, priority);
+    }
+    return result;
   }
 
 

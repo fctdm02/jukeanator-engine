@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jukeanator-web",
+      "runtimeExecutable": "sleep",
+      "runtimeArgs": ["999999"],
+      "port": 8080
+    }
+  ]
+}

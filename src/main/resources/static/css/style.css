@@ -226,13 +226,30 @@ html, body {
   text-overflow: ellipsis;
 }
 
-.now-playing-text .artist-name,
-.now-playing-text .album-name {
+.now-playing-crawl-wrap {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.now-playing-crawl {
+  display: inline-block;
   font-size: 0.82rem;
   color: var(--muted);
+  animation: song-popup-crawl 14s linear infinite;
+}
+
+.now-playing-view-queue {
+  background: none;
+  border: none;
+  color: #3a9fc0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  flex-shrink: 0;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  letter-spacing: 0.03em;
 }
 
 /* ── Search bar ─────────────────────────────────────────────────────────── */
@@ -1531,6 +1548,16 @@ input {
   margin-top: 0.2rem;
 }
 
+.playlist-delete-link {
+  background: none;
+  border: none;
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.4rem 0 1rem;
+}
+
 .playlist-song-list {
   margin: 0 -1rem;
 }
@@ -1727,4 +1754,146 @@ input {
 .create-playlist-btn.save {
   background: linear-gradient(135deg, #c0392b, #8e44ad);
   color: #fff;
+}
+
+/* ── Song Queue screen ──────────────────────────────────────────────────── */
+
+.queue-now-playing-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+.queue-now-playing-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.queue-now-playing-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.queue-now-playing-song {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.queue-now-playing-artist {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.queue-section-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-transform: uppercase;
+  padding: 1rem 0 0.25rem;
+}
+
+.queue-song-list {
+  margin: 0 -1rem;
+}
+
+.queue-song-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer;
+}
+
+.queue-song-row:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.queue-song-row.selected {
+  background: rgba(58,159,192,0.15);
+}
+
+.queue-action-buttons {
+  display: flex;
+  gap: 0.6rem;
+  padding: 1rem 0 0.75rem;
+}
+
+.queue-action-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  min-height: 52px;
+  background: rgba(255,255,255,0.06);
+  border: 2px solid rgba(255,255,255,0.14);
+  border-radius: 10px;
+  padding: 0.5rem 0.35rem;
+  color: var(--text);
+  text-align: center;
+  cursor: pointer;
+}
+
+.queue-action-btn:disabled {
+  cursor: default;
+}
+
+.queue-action-btn.state-grey {
+  opacity: 0.4;
+}
+
+.queue-action-btn.state-normal {
+  border-color: #3a9fc0;
+  background: rgba(58,159,192,0.12);
+}
+
+.queue-action-btn.state-warn {
+  border-color: #e05555;
+  background: rgba(224,85,85,0.1);
+  opacity: 0.85;
+}
+
+.qab-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.qab-sub {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #ffc800;
+}
+
+.queue-action-btn.state-warn .qab-sub {
+  color: #e05555;
+}
+
+.queue-order-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: rgba(58,159,192,0.08);
+  border: 1px solid rgba(58,159,192,0.3);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.8rem;
+  color: #7fc4de;
+  margin-top: 0.5rem;
+}
+
+.queue-order-note-icon {
+  flex-shrink: 0;
 }

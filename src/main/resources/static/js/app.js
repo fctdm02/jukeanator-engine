@@ -18,6 +18,15 @@
 
   const COST_PLAY = 2; // Web UI normal play cost (double the JFC 1-credit cost)
 
+  // Web UI cost for reordering/removing a queued song — mirrors
+  // UserServiceImpl.WEB_QUEUE_ACTION_COST_PER_PRIORITY_LEVEL / WEB_QUEUE_ACTION_MIN_COST
+  // (double the JFC/Swing Queue tab's priority * 3, minimum 1).
+  const QUEUE_ACTION_COST_PER_PRIORITY_LEVEL = 6;
+  const QUEUE_ACTION_MIN_COST = 2;
+  function queueActionCost(priority) {
+    return Math.max(QUEUE_ACTION_MIN_COST, (priority != null ? priority : 1) * QUEUE_ACTION_COST_PER_PRIORITY_LEVEL);
+  }
+
   const contentPanel = document.getElementById('contentPanel');
 
   // ── Auth helpers ────────────────────────────────────────────────────────
@@ -105,10 +114,12 @@
       case 'songs-hot-here-all':     renderSongsHotHereAll();         break;
       case 'my-playlists-all':       renderMyPlaylistsAll();          break;
       case 'playlist-detail':        renderPlaylistDetail(params);    break;
+      case 'delete-playlist':        renderDeletePlaylist(params);    break;
       case 'search-entry':           renderSearchEntry();             break;
       case 'search-results':    renderSearchResults(params.query, params.result); break;
       case 'artist-detail':     renderArtistDetail(params);      break;
       case 'album-detail':      renderAlbumDetail(params);       break;
+      case 'song-queue':        renderSongQueue();                break;
       default:                  renderMain(state.currentMainTab);
     }
   }
@@ -429,17 +440,22 @@
         <div class="now-playing-idle">
           <div class="idle-title">No music playing</div>
           <div class="idle-sub">Let's play some music!</div>
-        </div>`;
+        </div>
+        <button class="now-playing-view-queue" id="viewQueueBtn">View Queue</button>`;
     } else {
+      const crawlText = `${escHtml(song.artistName || '')}${song.albumName ? ' &middot; ' + escHtml(song.albumName) : ''}`;
       widget.innerHTML = `
-        <img src="/api/song-library/albums/${song.albumId}/coverArt" alt="${song.albumName || ''}"
+        <img src="/api/song-library/albums/${song.albumId}/coverArt" alt="${escHtml(song.albumName || '')}"
              onerror="this.remove()">
         <div class="now-playing-text">
-          <div class="song-name">${song.songName}</div>
-          <div class="artist-name">${song.artistName}</div>
-          <div class="album-name">${song.albumName || ''}</div>
-        </div>`;
+          <div class="song-name">${escHtml(song.songName || '')}</div>
+          <div class="now-playing-crawl-wrap">
+            <div class="now-playing-crawl">${crawlText}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${crawlText}</div>
+          </div>
+        </div>
+        <button class="now-playing-view-queue" id="viewQueueBtn">View Queue</button>`;
     }
+    document.getElementById('viewQueueBtn')?.addEventListener('click', () => navigateSub('song-queue'));
   }
 
   // ── Add Funds tab content ───────────────────────────────────────────────
@@ -744,6 +760,44 @@
       } catch {
         document.getElementById('deleteError').textContent = 'Delete account not yet available.';
         btn.disabled = false; btn.textContent = 'Delete Account';
+      }
+    });
+  }
+
+  // ── Sub-screen: Delete Playlist ──────────────────────────────────────────
+  function renderDeletePlaylist(params = {}) {
+    const playlist = params.playlist || {};
+    const name = playlist.name || '';
+
+    contentPanel.innerHTML = subScreenShell('Delete Playlist', `
+      <div class="delete-confirm-box">
+        <div class="delete-warning-icon">&#9888;&#65039;</div>
+        <p class="delete-warning-text">
+          Are you sure you want to delete the playlist<br>
+          <strong>${escHtml(name)}</strong>?<br>
+          This action <strong>cannot be undone</strong>.
+        </p>
+      </div>
+      <div id="deletePlaylistError" class="form-error"></div>
+      <div class="form-actions">
+        <button class="form-btn cancel" id="cancelDeletePlaylistBtn">Cancel</button>
+        <button class="form-btn delete-btn" id="confirmDeletePlaylistBtn">Delete Playlist</button>
+      </div>`);
+
+    wireBackBtn();
+    document.getElementById('cancelDeletePlaylistBtn').addEventListener('click', goBack);
+    document.getElementById('confirmDeletePlaylistBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('confirmDeletePlaylistBtn');
+      btn.disabled = true; btn.textContent = 'Deleting…';
+      try {
+        await api(`/api/users/playlists/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        await refreshPlaylistsState();
+        goBack(); // off the delete-confirm screen
+        goBack(); // off the playlist-detail screen
+      } catch (err) {
+        document.getElementById('deletePlaylistError').textContent =
+          'Could not delete playlist: ' + (err.message || err);
+        btn.disabled = false; btn.textContent = 'Delete Playlist';
       }
     });
   }
@@ -1281,6 +1335,161 @@
     }
   }
 
+  // ── Song Queue screen ────────────────────────────────────────────────────
+
+  const QUEUE_TOP_N = 5;
+
+  async function renderSongQueue() {
+    contentPanel.innerHTML = subScreenShell('Song Queue', '<div class="stub-placeholder">Loading&hellip;</div>');
+    wireBackBtn();
+
+    let nowPlaying = null;
+    let topQueue = [];
+    let selectedIndex = -1;
+
+    async function reload() {
+      const [np, queue] = await Promise.all([
+        api('/api/song-player/nowPlayingSong').catch(() => null),
+        api('/api/song-queue/queuedSongs').catch(() => []),
+      ]);
+      nowPlaying = np;
+      topQueue = (queue || []).slice(0, QUEUE_TOP_N);
+      if (selectedIndex >= topQueue.length) selectedIndex = topQueue.length - 1;
+      render();
+    }
+
+    function nowPlayingHtml() {
+      if (!nowPlaying) {
+        return `<div class="queue-now-playing-row">
+          <div class="queue-now-playing-info">
+            <div class="queue-now-playing-song">No music playing</div>
+          </div>
+        </div>`;
+      }
+      const art = nowPlaying.albumId != null
+        ? `<img class="queue-now-playing-thumb" src="/api/song-library/albums/${nowPlaying.albumId}/coverArt"
+                alt="" onerror="this.remove()">`
+        : '';
+      return `<div class="queue-now-playing-row">
+        ${art}
+        <div class="queue-now-playing-info">
+          <div class="queue-now-playing-song">${escHtml(nowPlaying.songName || '')}</div>
+          <div class="queue-now-playing-artist">${escHtml(nowPlaying.artistName || '')}</div>
+        </div>
+      </div>`;
+    }
+
+    function queueRowHtml(entry, i) {
+      const s = entry.song || {};
+      return `<div class="queue-song-row${i === selectedIndex ? ' selected' : ''}" data-index="${i}">
+        ${coverArtHtml(s.albumId, '&#127925;')}
+        <div class="result-info">
+          <div class="result-title">${escHtml(s.songName || '')}</div>
+          <div class="result-sub">${escHtml(s.artistName || '')}</div>
+        </div>
+      </div>`;
+    }
+
+    function actionButtonHtml(action, label) {
+      return `<button class="queue-action-btn state-grey" data-action="${action}" disabled>
+        <span class="qab-label">${label}</span>
+        <span class="qab-sub"></span>
+      </button>`;
+    }
+
+    function render() {
+      const subContent = contentPanel.querySelector('.sub-content');
+      subContent.innerHTML = `
+        <div class="queue-now-playing-label">Now Playing:</div>
+        ${nowPlayingHtml()}
+        <div class="queue-section-label">Play Queue (Next ${QUEUE_TOP_N} Songs)</div>
+        <div class="queue-song-list" id="queueSongList">
+          ${topQueue.length ? topQueue.map(queueRowHtml).join('')
+            : '<div class="stub-placeholder">The queue is currently empty.</div>'}
+        </div>
+        <div class="queue-action-buttons">
+          ${actionButtonHtml('up', 'Move Song Up')}
+          ${actionButtonHtml('down', 'Move Song Down')}
+          ${actionButtonHtml('remove', 'Remove Song')}
+        </div>
+        <div class="queue-order-note">
+          <span class="queue-order-note-icon">&#8505;</span>
+          Order may change pending additional song selections purchased with priority play.
+        </div>`;
+
+      subContent.querySelectorAll('.queue-song-row').forEach((row, i) => {
+        row.addEventListener('click', () => {
+          selectedIndex = i;
+          subContent.querySelectorAll('.queue-song-row').forEach(r => r.classList.remove('selected'));
+          row.classList.add('selected');
+          updateActionButtons();
+        });
+      });
+
+      subContent.querySelectorAll('.queue-action-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleAction(btn.dataset.action));
+      });
+
+      updateActionButtons();
+    }
+
+    function updateActionButtons() {
+      const subContent = contentPanel.querySelector('.sub-content');
+      const upBtn = subContent.querySelector('.queue-action-btn[data-action="up"]');
+      const downBtn = subContent.querySelector('.queue-action-btn[data-action="down"]');
+      const removeBtn = subContent.querySelector('.queue-action-btn[data-action="remove"]');
+      if (!upBtn || !downBtn || !removeBtn) return;
+
+      const entry = selectedIndex >= 0 ? topQueue[selectedIndex] : null;
+      const cost = entry ? queueActionCost(entry.priority) : 0;
+      const afford = state.numCredits >= cost;
+
+      function apply(btn, locked) {
+        const sub = btn.querySelector('.qab-sub');
+        btn.classList.remove('state-grey', 'state-normal', 'state-warn');
+        btn.disabled = true;
+        if (!entry || locked) {
+          btn.classList.add('state-grey');
+          sub.textContent = '';
+          return;
+        }
+        if (afford) {
+          btn.classList.add('state-normal');
+          sub.textContent = `${cost}cr`;
+          btn.disabled = false;
+        } else {
+          btn.classList.add('state-warn');
+          const needed = cost - state.numCredits;
+          sub.textContent = `ADD ${needed} CREDIT${needed === 1 ? '' : 'S'}`;
+        }
+      }
+
+      apply(upBtn, selectedIndex <= 0);
+      apply(downBtn, selectedIndex < 0 || selectedIndex >= topQueue.length - 1);
+      apply(removeBtn, false);
+    }
+
+    async function handleAction(action) {
+      if (selectedIndex < 0) return;
+      const entry = topQueue[selectedIndex];
+      const song = entry.song;
+      const endpoint = action === 'up' ? 'moveSongUpInQueue'
+        : action === 'down' ? 'moveSongDownInQueue'
+        : 'removeSongDownFromQueue';
+      try {
+        await api(`/api/song-queue/${endpoint}`, {
+          method: 'POST',
+          body: JSON.stringify({ albumId: song.albumId, songId: song.songId }),
+        });
+        await reload();
+      } catch (err) {
+        alert('Could not update the queue: ' + (err.message || err));
+      }
+    }
+
+    await reload();
+  }
+
   // ── Song bottom-sheet popup ─────────────────────────────────────────────
 
   let _songPopupTimer = null;
@@ -1298,14 +1507,18 @@
     _songPopupTimer = setTimeout(dismissSongPopup, 20000);
   }
 
-  async function showSongPopup(song) {
+  async function showSongPopup(song, opts = {}) {
     // Remove any existing popup
     const existing = document.getElementById('songPopupOverlay');
     if (existing) existing.remove();
     clearTimeout(_songPopupTimer);
 
+    // Read-only mode (e.g. tapping a song already in the Song Queue) shows the same sheet
+    // minus the two "add to queue" actions — there's nothing to add, it's already queued.
+    const readOnly = !!opts.readOnly;
+
     const credits = state.numCredits;
-    const highest = await api('/api/song-queue/highestPriority').catch(() => 1) || 1;
+    const highest = readOnly ? 1 : (await api('/api/song-queue/highestPriority').catch(() => 1) || 1);
     const priorityLevel   = highest + 1;
     const costPriority    = priorityLevel * 2;   // Web UI = double the JFC cost
     const canPlay         = credits >= COST_PLAY;
@@ -1341,6 +1554,7 @@
             </div>
           </div>
         </div>
+        ${readOnly ? '' : `
         <div class="${priorityClass}" id="spaPlayPriority">
           <span class="spa-label">Play Priority Song</span>
           <span class="${priorityCreditClass}">${costPriority} Credits${canPriority ? '' : ' ⚠'}</span>
@@ -1348,7 +1562,7 @@
         <div class="${playClass}" id="spaPlay">
           <span class="spa-label">Play Song</span>
           <span class="${playCreditClass}">${COST_PLAY} Credits${canPlay ? '' : ' ⚠'}</span>
-        </div>
+        </div>`}
         <div class="song-popup-action song-popup-action--icon" id="spaArtist">
           <span class="spa-icon">&#128100;</span>
           <span class="spa-label">View This Artist</span>
@@ -1391,13 +1605,13 @@
       }
     }
 
-    document.getElementById('spaPlayPriority').addEventListener('click', async () => {
+    document.getElementById('spaPlayPriority')?.addEventListener('click', async () => {
       if (!canPriority) { resetSongPopupTimer(); return; }
       resetSongPopupTimer();
       await submitPlay(priorityLevel);
     });
 
-    document.getElementById('spaPlay').addEventListener('click', async () => {
+    document.getElementById('spaPlay')?.addEventListener('click', async () => {
       if (!canPlay) { resetSongPopupTimer(); return; }
       resetSongPopupTimer();
       await submitPlay(1);
@@ -1562,6 +1776,8 @@
         </div>`).join('');
     }
 
+    const isMyFavorites = name === 'My Favorites';
+
     const subContent = contentPanel.querySelector('.sub-content');
     subContent.innerHTML = `
       <div class="playlist-detail-header">
@@ -1571,7 +1787,14 @@
           <div class="playlist-detail-count">${songs.length} song${songs.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
+      ${isMyFavorites ? '' : '<button class="playlist-delete-link" id="deletePlaylistBtn">Delete Playlist</button>'}
       <div class="playlist-song-list" id="playlistSongList">${renderSongs(songs)}</div>`;
+
+    if (!isMyFavorites) {
+      document.getElementById('deletePlaylistBtn').addEventListener('click', () => {
+        navigateSub('delete-playlist', { playlist });
+      });
+    }
 
     async function moveAndSave(fromIdx, toIdx) {
       const moved = songs.splice(fromIdx, 1)[0];

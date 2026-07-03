@@ -89,9 +89,16 @@ public class SecurityConfig {
             .permitAll()
 
             // ── Authenticated users: add songs to the queue ───────────────────
-            // Any logged-in patron can queue songs; they cannot manage the queue.
+            // Any logged-in patron can queue songs.
             .requestMatchers(HttpMethod.POST, "/api/song-queue/addSong", "/api/song-queue/addAlbum",
                 "/api/song-queue/addMultipleSongs")
+            .authenticated()
+
+            // ── Authenticated users: reorder/remove songs from the queue ──────
+            // Mirrors the JFC/Swing Queue tab's move-up/move-down/remove actions,
+            // priced the same way addSong is (see UserServiceImpl WEB_QUEUE_ACTION_COST).
+            .requestMatchers(HttpMethod.POST, "/api/song-queue/moveSongUpInQueue",
+                "/api/song-queue/moveSongDownInQueue", "/api/song-queue/removeSongDownFromQueue")
             .authenticated()
 
             // ── Admin only: song library mutations ────────────────────────────
@@ -105,8 +112,7 @@ public class SecurityConfig {
             .hasRole("ADMIN")
 
             .requestMatchers(HttpMethod.POST, "/api/song-queue/flushQueue",
-                "/api/song-queue/randomizeQueue", "/api/song-queue/moveSongUpInQueue",
-                "/api/song-queue/moveSongDownInQueue", "/api/song-queue/removeSongDownFromQueue",
+                "/api/song-queue/randomizeQueue",
                 "/api/song-queue/saveQueueAsPlaylist", "/api/song-queue/loadPlaylistIntoQueue")
             .hasRole("ADMIN")
 
