@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
@@ -47,6 +49,11 @@ import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
 
 @Configuration
 public class AppConfig {
+
+  @Bean
+  public ObjectMapper objectMapper() {
+    return ObjectMappers.createNew();
+  }
 
   @Bean
   public MasterVolumeService masterVolumeService() {
