@@ -38,7 +38,7 @@ song-library:
 song-queue:
   repository-type: filesystem   # filesystem | postgres
   reset-queue-at-startup: true
-  enable-background-music: true # assumes playlist file called BackgroundMusic.TXT exists in rootPath
+  enable-background-music: false # assumes playlist file called BackgroundMusic.TXT exists in rootPath
   enable-smart-background-music-additions: true # will play songs from same artist/album from background music
   smart-background-music-additions-factor: 2 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
   smart-background-music-additions-begin: 7 # start time for enableSmartBackgroundMusicAdditions

@@ -777,13 +777,6 @@ html, body {
   color: var(--text);
 }
 
-.bonus-note {
-  color: var(--muted);
-  font-size: 0.73rem;
-  margin: 0.1rem 0 1rem;
-  font-style: italic;
-}
-
 .payment-section-title {
   color: var(--text);
   font-size: 0.95rem;

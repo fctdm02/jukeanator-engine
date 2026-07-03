@@ -499,7 +499,7 @@
           <span class="package-coin-icon">&#129689;</span>
           <div class="package-details">
             <div class="package-credits-amount"><strong>${pkg.credits}</strong> Credits</div>
-            <span class="package-bonus-tag">+${pkg.bonusCredits} BONUS CREDITS *</span>
+            <span class="package-bonus-tag">+${pkg.bonusCredits} BONUS CREDITS</span>
           </div>
           <div class="package-price-box">
             ${pkg.badge ? `<div class="package-badge-label">&#11088; ${pkg.badge}</div>` : ''}
@@ -513,7 +513,6 @@
         <div id="packagesContainer">
           ${packages.map(packageCardHtml).join('')}
         </div>
-        <p class="bonus-note">* Bonus credits are earned when paid credits are spent in the same night</p>
 
         <div class="payment-section-title">Default Payment Method</div>
         <div class="payment-method-card">
@@ -1452,7 +1451,7 @@
         </div>
         <div class="queue-order-note">
           <span class="queue-order-note-icon">&#8505;</span>
-          Order may change pending additional song selections purchased with priority play.
+          Order may change pending additional song selections purchased with priority play or queue operations by other users.  In addition, your song may be removed, at cost by others.  This likely will not happen if you do not troll the jukebox.
         </div>`;
 
       subContent.querySelectorAll('.queue-song-row').forEach((row, i) => {

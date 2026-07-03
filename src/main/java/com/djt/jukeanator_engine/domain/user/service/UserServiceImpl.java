@@ -213,9 +213,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public List<CreditPackageDto> getCreditPackages() {
 
     return List.of(
-        new CreditPackageDto("pkg-20", 60, 20, new java.math.BigDecimal("20.00"), "Best Value"),
-        new CreditPackageDto("pkg-10", 30, 10, new java.math.BigDecimal("10.00"), null),
-        new CreditPackageDto("pkg-5", 15, 3, new java.math.BigDecimal("5.00"), null));
+        new CreditPackageDto("pkg-28", 48, 24, new java.math.BigDecimal("28.00"), "Best Value"),
+        new CreditPackageDto("pkg-14", 24, 7, new java.math.BigDecimal("14.00"), null),
+        new CreditPackageDto("pkg-7", 12, 1, new java.math.BigDecimal("7.00"), null));
   }
 
   @Override
