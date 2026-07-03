@@ -979,7 +979,17 @@
           <div class="search-history-list" id="searchHistoryList">
             ${historyHtml(history)}
           </div>
+          <nav class="bottom-tabs">
+            <button class="bottom-tab ${state.currentMainTab === 'music' ? 'active' : ''}" id="tabMusic">
+              <span class="tab-icon">&#9835;</span><span>Music</span>
+            </button>
+            <button class="bottom-tab ${state.currentMainTab === 'addfunds' ? 'active' : ''}" id="tabAddFunds">
+              <span class="tab-icon">&#128176;</span><span>Add Funds</span>
+            </button>
+          </nav>
         </div>`;
+
+      wireBackBtn();
 
       const input = document.getElementById('searchEntryInput');
       const clearBtn = document.getElementById('searchClearBtn');
@@ -1146,7 +1156,17 @@
             ${songs.length ? songs.map(songResultRow).join('') : '<div class="search-empty">No songs found</div>'}
           </div>
         </div>
+        <nav class="bottom-tabs">
+          <button class="bottom-tab ${state.currentMainTab === 'music' ? 'active' : ''}" id="tabMusic">
+            <span class="tab-icon">&#9835;</span><span>Music</span>
+          </button>
+          <button class="bottom-tab ${state.currentMainTab === 'addfunds' ? 'active' : ''}" id="tabAddFunds">
+            <span class="tab-icon">&#128176;</span><span>Add Funds</span>
+          </button>
+        </nav>
       </div>`;
+
+    wireBackBtn();
 
     document.getElementById('searchResultsBackBtn').addEventListener('click', () => goBack());
 
