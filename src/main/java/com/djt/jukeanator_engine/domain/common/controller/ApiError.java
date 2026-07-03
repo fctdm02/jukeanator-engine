@@ -1,6 +1,11 @@
 package com.djt.jukeanator_engine.domain.common.controller;
-public class ApiError {
 
+import java.io.Serializable;
+
+public class ApiError implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+    
     private String message;
     private String error;
     private int status;

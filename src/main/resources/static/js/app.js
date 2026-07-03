@@ -505,7 +505,7 @@
           <span class="package-coin-icon">&#129689;</span>
           <div class="package-details">
             <div class="package-credits-amount"><strong>${pkg.credits}</strong> Credits</div>
-            <span class="package-bonus-tag">+${pkg.bonusCredits} BONUS CREDITS</span>
+            <span class="package-bonus-tag">+${pkg.bonusCredits} BONUS CREDIT${pkg.bonusCredits === 1 ? '' : 'S'}</span>
           </div>
           <div class="package-price-box">
             ${pkg.badge ? `<div class="package-badge-label">&#11088; ${pkg.badge}</div>` : ''}

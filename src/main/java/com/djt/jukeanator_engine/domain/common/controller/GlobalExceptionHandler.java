@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.common.controller;
 import java.io.IOException;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -47,12 +48,16 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.INTERNAL_SERVER_ERROR, ex);
     }
 
+    // Always answer as JSON. Without a fixed Content-Type, Spring content-negotiates the error
+    // body against whatever Accept header the caller sent — e.g. internet scanners hitting the
+    // now-public-facing port with "Accept: application/javascript" — Jackson can't write ApiError
+    // as that type, and the resulting HttpMessageNotWritableException masks the real error.
     private ResponseEntity<ApiError> build(HttpStatus status, Exception ex) {
         ApiError error = new ApiError(
                 ex.getMessage(),
                 ex.getClass().getSimpleName(),
                 status.value()
         );
-        return ResponseEntity.status(status).body(error);
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(error);
     }
 }
