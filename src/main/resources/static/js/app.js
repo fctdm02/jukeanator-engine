@@ -1374,7 +1374,7 @@
 
   // ── Song Queue screen ────────────────────────────────────────────────────
 
-  const QUEUE_TOP_N = 5;
+  const QUEUE_TOP_N = 3;
 
   async function renderSongQueue() {
     contentPanel.innerHTML = subScreenShell('Song Queue', '<div class="stub-placeholder">Loading&hellip;</div>');
