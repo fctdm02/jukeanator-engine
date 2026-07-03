@@ -29,6 +29,12 @@
 
   const contentPanel = document.getElementById('contentPanel');
 
+  // Whenever a screen's top-level markup is replaced (navigation, back, tab
+  // switch), snap the scroll position back to the top so the new header is
+  // never left hidden above the fold from the previous screen's scroll spot.
+  new MutationObserver(() => { contentPanel.scrollTop = 0; })
+    .observe(contentPanel, { childList: true });
+
   // ── Auth helpers ────────────────────────────────────────────────────────
   function authHeaders() {
     return state.token ? { Authorization: `Bearer ${state.token}` } : {};
