@@ -1072,7 +1072,7 @@
     return `<div class="result-row album-result-row" data-album-id="${a.albumId ?? ''}">
       ${thumb}
       <div class="result-info">
-        <div class="result-title">${escHtml(a.name || '')}</div>
+        <div class="result-title">${escHtml(a.albumName || '')}</div>
         <div class="result-sub">Album &middot; ${escHtml(a.artistName || '')}</div>
       </div>
     </div>`;
@@ -1086,7 +1086,7 @@
       ${thumb}
       <div class="result-info">
         <div class="result-title">${escHtml(name)}</div>
-        <div class="result-sub">Song &middot; ${escHtml(s.artistName || '')}</div>
+        <div class="result-sub">Song &middot; ${escHtml(s.artistName || '')} &middot; ${escHtml(s.albumName || '')}</div>
       </div>
       <button class="result-menu-btn" title="More options">&#8942;</button>
     </div>`;
