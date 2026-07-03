@@ -933,6 +933,12 @@ input {
   color: var(--muted);
 }
 
+.search-input-field::-webkit-search-cancel-button,
+.search-input-field::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .search-clear-btn {
   background: var(--text);
   border: none;

@@ -1106,7 +1106,7 @@
     const albums  = result.albums  || [];
     const songs   = result.songs   || [];
 
-    const TOP_N = 5;
+    const TOP_N = 3;
     const topArtists = artists.slice(0, TOP_N);
     const topAlbums  = albums.slice(0,  TOP_N);
     const topSongs   = songs.slice(0,   TOP_N);
@@ -1135,6 +1135,7 @@
           <div class="search-input-bar">
             <span class="search-icon">&#128269;</span>
             <div class="search-input-display">${escHtml(query)}</div>
+            <button class="search-clear-btn" id="searchResultsClearBtn">&#10005;</button>
           </div>
         </div>
         <div class="search-tabs-bar">
@@ -1168,6 +1169,7 @@
     wireBackBtn();
 
     document.getElementById('searchResultsBackBtn').addEventListener('click', () => goBack());
+    document.getElementById('searchResultsClearBtn').addEventListener('click', () => goBack());
 
     // Artist / song row clicks — scoped to this screen's own wrapper (not the
     // persistent contentPanel) so listeners don't accumulate across re-renders
