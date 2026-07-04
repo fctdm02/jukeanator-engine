@@ -14,7 +14,7 @@ public class AbstractRepositoryFileSystemImpl {
     return nextValue;
   }
   
-  protected static boolean USE_PRETTY_PRINT = false;
+  protected static boolean USE_PRETTY_PRINT = true;
   public static boolean getPrettyPrint() {
     return USE_PRETTY_PRINT;
   }
@@ -22,35 +22,18 @@ public class AbstractRepositoryFileSystemImpl {
     USE_PRETTY_PRINT = prettyPrint;
   }
 
-  protected static final ThreadLocal<ObjectMapper> MAPPER = new ThreadLocal<ObjectMapper>() {
-    
-    @Override
-    protected ObjectMapper initialValue() {
-      return ObjectMappers.create();
-    }
-  };
-  
-  protected static final ThreadLocal<ObjectWriter> OBJECT_WRITER = new ThreadLocal<ObjectWriter>() {
-    
-    @Override
-    protected ObjectWriter initialValue() {
-      return ObjectMappers.create().writer();
-    }
-  };
+  protected static final ObjectMapper MAPPER = ObjectMappers.create();
 
-  protected static final ThreadLocal<ObjectWriter> OBJECT_WRITER_WITH_PRETTY_PRINTER = new ThreadLocal<ObjectWriter>() {
-    
-    @Override
-    protected ObjectWriter initialValue() {
-      return ObjectMappers.create().writerWithDefaultPrettyPrinter();
-    }
-  };
-  
+  protected static final ObjectWriter OBJECT_WRITER = MAPPER.writer();
+
+  protected static final ObjectWriter OBJECT_WRITER_WITH_PRETTY_PRINTER =
+      MAPPER.writerWithDefaultPrettyPrinter();
+
   protected static final ObjectWriter getObjectWriter() {
     if  (USE_PRETTY_PRINT) {
-      return OBJECT_WRITER_WITH_PRETTY_PRINTER.get(); 
+      return OBJECT_WRITER_WITH_PRETTY_PRINTER;
     }
-    return OBJECT_WRITER.get();
+    return OBJECT_WRITER;
   }
   
   protected String basePath;

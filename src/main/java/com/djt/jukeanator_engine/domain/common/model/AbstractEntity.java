@@ -128,21 +128,9 @@ public abstract class AbstractEntity implements Comparable<AbstractEntity>, Seri
     }
   };
   
-  public static final ThreadLocal<ObjectMapper> OBJECT_MAPPER = new ThreadLocal<ObjectMapper>() {
+  public static final ObjectMapper OBJECT_MAPPER = ObjectMappers.create();
 
-    @Override
-    protected ObjectMapper initialValue() {
-      return ObjectMappers.create();
-    }
-  };
-  
-  public static final ThreadLocal<ObjectWriter> OBJECT_WRITER = new ThreadLocal<ObjectWriter>() {
-    
-    @Override
-    protected ObjectWriter initialValue() {
-      return ObjectMappers.create().writerWithDefaultPrettyPrinter();
-    }
-  };
+  public static final ObjectWriter OBJECT_WRITER = OBJECT_MAPPER.writerWithDefaultPrettyPrinter();
   
   /*
    * Used to manage the current time.  In a test context, the "current time" may be set to be a

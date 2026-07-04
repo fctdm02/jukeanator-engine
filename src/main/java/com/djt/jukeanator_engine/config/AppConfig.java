@@ -52,7 +52,7 @@ public class AppConfig {
 
   @Bean
   public ObjectMapper objectMapper() {
-    return ObjectMappers.createNew();
+    return ObjectMappers.create();
   }
 
   @Bean
