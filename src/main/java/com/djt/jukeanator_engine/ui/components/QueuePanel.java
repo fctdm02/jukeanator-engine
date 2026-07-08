@@ -12,16 +12,17 @@ import java.awt.GridLayout;
 import java.awt.LinearGradientPaint;
 import java.awt.RenderingHints;
 import java.awt.geom.Point2D;
+import java.util.ArrayList;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JList;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.ListSelectionModel;
+import javax.swing.JSeparator;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
@@ -62,6 +63,12 @@ public class QueuePanel extends JPanel {
   private static final Color TEXT_PRIMARY = Color.WHITE;
   private static final Color AM_WARN_BORDER = new Color(220, 40, 40);
 
+  // ── Track-row palette — identical to AlbumViewCard, so the queue list renders exactly
+  // like the album track listing ────────────────────────────────────────────
+  private static final Color BG_ROW_HOVER = new Color(255, 255, 255, 25);
+  private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
+  private static final Color SEPARATOR = new Color(50, 50, 65);
+
   // ── 3-D button palette (mirrors AddSongToQueueCard) ─────────────────────
   private static final Color BTN3D_FACE_TOP = new Color(28, 45, 72);
   private static final Color BTN3D_FACE_MID = new Color(18, 32, 54);
@@ -85,8 +92,11 @@ public class QueuePanel extends JPanel {
   private final int popularityT3;
 
   // ── Queue list ────────────────────────────────────────────────────────────
-  private final DefaultListModel<SongQueueEntryDto> queueListModel = new DefaultListModel<>();
-  private final JList<SongQueueEntryDto> queueList = new JList<>(queueListModel);
+  // Mutable snapshot of the visible (capped) queue rows, rendered as AlbumViewCard-style
+  // track rows rather than a JList — decoupled from `queue` so move/remove actions can be
+  // applied optimistically before the authoritative server round-trip arrives.
+  private final List<SongQueueEntryDto> displayedQueue = new ArrayList<>();
+  private JPanel queueRowsPanel;
 
   // ── Action buttons ────────────────────────────────────────────────────────
   private JButton moveUpButton;
@@ -129,12 +139,12 @@ public class QueuePanel extends JPanel {
    */
   public void setQueue(List<SongQueueEntryDto> queue) {
     this.queue = queue;
-    SwingUtilities.invokeLater(this::refreshQueueListModel);
+    SwingUtilities.invokeLater(this::rebuildQueueRows);
   }
 
   /** Called by the tab {@code ChangeListener} whenever this tab is selected. Refreshes the queue list. */
   public void onShown() {
-    refreshQueueListModel();
+    rebuildQueueRows();
     requestFocusInWindow();
   }
 
@@ -145,8 +155,7 @@ public class QueuePanel extends JPanel {
    */
   public void resetToDefaultView() {
     selectedIndex = -1;
-    queueList.clearSelection();
-    refreshQueueListModel();
+    rebuildQueueRows();
     requestFocusInWindow();
   }
 
@@ -196,40 +205,25 @@ public class QueuePanel extends JPanel {
 
   /**
    * Builds the queue list and action area.
+   *
+   * <p>
+   * The list itself is rendered exactly like {@link AlbumViewCard}'s track listing — same column
+   * header row, same row layout/height/padding, same gradient card backdrop — rather than a JList
+   * with a custom cell renderer. Unlike {@code AlbumViewCard} there is no footer nav panel: the
+   * queue is capped at {@link LayoutTheme#songQueueMaxVisible} entries for normal users, so
+   * pagination is never needed.
    */
   private JPanel buildQueueBody() {
     JPanel section = new JPanel(new BorderLayout(0, 8));
     section.setOpaque(false);
 
-    // Populate model (up to MAX_QUEUE_VISIBLE entries)
-    refreshQueueListModel();
+    JPanel wrapper = new JPanel(new BorderLayout());
+    wrapper.setOpaque(false);
+    wrapper.add(buildColumnHeaderPanel(), BorderLayout.NORTH);
 
-    SongTrackCellRenderer.installWithPriority(queueList, popularityT1, popularityT2, popularityT3,
-        imageLoader);
-    // Transparent so the underlying screen gradient shows through, matching the Search / Hot
-    // Here / Genre result lists — no opaque black list/row backgrounds.
-    queueList.setOpaque(false);
-    queueList.setForeground(TEXT_PRIMARY);
-    queueList.setSelectionBackground(ColorTheme.get().bgListSelected);
-    queueList.setSelectionForeground(Color.WHITE);
-    queueList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-    queueList.addListSelectionListener(e -> {
-      if (!e.getValueIsAdjusting()) {
-        selectedIndex = queueList.getSelectedIndex();
-        updateButtonStates();
-      }
-    });
-
-    // Fix the list height to exactly songQueueMaxVisible rows — no scroll bar needed.
-    int listH = SongTrackCellRenderer.CELL_HEIGHT * LayoutTheme.get().songQueueMaxVisible;
-    queueList.setPreferredSize(new Dimension(Integer.MAX_VALUE, listH));
-    queueList.setMinimumSize(new Dimension(0, listH));
-    queueList.setMaximumSize(new Dimension(Integer.MAX_VALUE, listH));
-
-    // Rounded gradient card backdrop — identical paint to ResultsColumnPanel's
-    // innerColumnBody, so the queue list reads exactly like a Hot Here / Search /
-    // Genre result column. No JScrollPane, so no scroll bar can appear.
-    JPanel listWrapper = new JPanel(new BorderLayout()) {
+    // Rounded gradient card backdrop — identical paint to AlbumViewCard's track-list body,
+    // so the queue list reads exactly like the album track listing.
+    JPanel body = new JPanel(new BorderLayout()) {
       private static final long serialVersionUID = 1L;
 
       @Override
@@ -238,20 +232,206 @@ public class QueuePanel extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setPaint(new LinearGradientPaint(new Point2D.Float(0, 0),
             new Point2D.Float(0, getHeight()), new float[] {0.0f, 1.0f},
-            new Color[] {ColorTheme.get().columnGradTop, ColorTheme.get().columnGradBottom}));
+            new Color[] {new Color(24, 38, 60, 225), new Color(12, 18, 30, 245)}));
         g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
         g2.dispose();
         super.paintComponent(g);
       }
     };
-    listWrapper.setOpaque(false);
-    listWrapper.setBorder(new EmptyBorder(4, 0, 4, 0));
-    listWrapper.add(queueList, BorderLayout.CENTER);
+    body.setOpaque(false);
 
-    section.add(listWrapper, BorderLayout.CENTER);
+    queueRowsPanel = new JPanel();
+    queueRowsPanel.setOpaque(false);
+    queueRowsPanel.setLayout(new BoxLayout(queueRowsPanel, BoxLayout.Y_AXIS));
+    queueRowsPanel.setBorder(new EmptyBorder(4, 0, 4, 0));
+    body.add(queueRowsPanel, BorderLayout.CENTER);
+
+    wrapper.add(body, BorderLayout.CENTER);
+
+    // Populate rows (up to songQueueMaxVisible entries)
+    rebuildQueueRows();
+
+    section.add(wrapper, BorderLayout.CENTER);
     section.add(buildActionArea(), BorderLayout.SOUTH);
 
     return section;
+  }
+
+  /**
+   * Builds the column-name header row above the queue rows — same layout and style as
+   * {@code AlbumViewCard}'s track-list header, using the "Artist" / "Song" compilation columns
+   * since queue entries typically span multiple artists/albums.
+   */
+  private JPanel buildColumnHeaderPanel() {
+    JPanel headerPanel = new JPanel(new BorderLayout(10, 0));
+    headerPanel.setBackground(Color.BLACK);
+    headerPanel.setBorder(new EmptyBorder(8, 16, 8, 16));
+    headerPanel.setPreferredSize(new Dimension(headerPanel.getPreferredSize().width, 45));
+
+    JPanel headerLeftCluster = new JPanel(new BorderLayout(6, 0));
+    headerLeftCluster.setOpaque(false);
+
+    JLabel popHeaderLabel = new JLabel("Plays");
+    popHeaderLabel.setForeground(TEXT_SECONDARY);
+    popHeaderLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
+    popHeaderLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewPlaysColW, 30));
+    popHeaderLabel.setHorizontalAlignment(SwingConstants.LEFT);
+
+    JLabel trackHeaderLabel = new JLabel("Track");
+    trackHeaderLabel.setForeground(TEXT_SECONDARY);
+    trackHeaderLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
+    trackHeaderLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewTrkNumColW, 30));
+    trackHeaderLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+    headerLeftCluster.add(popHeaderLabel, BorderLayout.WEST);
+    headerLeftCluster.add(trackHeaderLabel, BorderLayout.CENTER);
+
+    JPanel headerCenterCluster = new JPanel(new BorderLayout(10, 0));
+    headerCenterCluster.setOpaque(false);
+
+    JPanel textCluster = new JPanel(new BorderLayout(10, 0));
+    textCluster.setOpaque(false);
+
+    JLabel artistHeaderLabel = new JLabel("Artist");
+    artistHeaderLabel.setForeground(TEXT_SECONDARY);
+    artistHeaderLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
+    artistHeaderLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationArtistW, 30));
+
+    JLabel songHeaderLabel = new JLabel("Song");
+    songHeaderLabel.setForeground(TEXT_SECONDARY);
+    songHeaderLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
+    songHeaderLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationSongW, 30));
+
+    textCluster.add(artistHeaderLabel, BorderLayout.WEST);
+    textCluster.add(songHeaderLabel, BorderLayout.CENTER);
+
+    headerCenterCluster.add(textCluster, BorderLayout.WEST);
+    headerCenterCluster.add(Box.createHorizontalGlue(), BorderLayout.CENTER);
+
+    headerPanel.add(headerLeftCluster, BorderLayout.WEST);
+    headerPanel.add(headerCenterCluster, BorderLayout.CENTER);
+
+    return headerPanel;
+  }
+
+  /**
+   * Builds a single queue row — same layout, sizing, and popularity-bar widget as
+   * {@code AlbumViewCard.buildTrackRow}'s compilation-album branch (Plays | queue-position |
+   * Artist | Song). The song-name colour is tinted by queue priority (as before), and switches to
+   * the accent colour when the row is the current selection for the move/remove buttons.
+   */
+  private JPanel buildQueueRow(SongQueueEntryDto entry, int index) {
+    JPanel row = new JPanel(new BorderLayout(10, 0));
+    row.setOpaque(false);
+    int padV = LayoutTheme.get().albumViewRowPadV;
+    row.setBorder(new EmptyBorder(padV, 16, padV, 16));
+
+    Dimension rowSize = new Dimension(Integer.MAX_VALUE, LayoutTheme.get().albumViewRowH);
+    row.setPreferredSize(rowSize);
+    row.setMinimumSize(new Dimension(0, LayoutTheme.get().albumViewRowH));
+    row.setMaximumSize(rowSize);
+    row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+    // ── Popularity bars (WEST) ────────────────────────────────────────────
+    int plays = entry.getSong().getNumPlays() == null ? 0 : entry.getSong().getNumPlays();
+    int bars = SongTrackCellRenderer.barsForPlays(plays, popularityT1, popularityT2, popularityT3);
+    JPanel barsPanel = new SongTrackCellRenderer.PopularityBarsPanel(bars);
+    barsPanel.setOpaque(false);
+    int barW = SongTrackCellRenderer.BAR_WIDTH;
+    int barGap = SongTrackCellRenderer.BAR_GAP;
+    int barMaxH = SongTrackCellRenderer.BAR_MAX_H;
+    barsPanel.setPreferredSize(new Dimension(3 * (barW + barGap) + 6, barMaxH + 4));
+
+    // ── Queue position ─────────────────────────────────────────────────────
+    JLabel numLabel = new JLabel(String.format("%02d", index + 1));
+    numLabel.setForeground(TEXT_SECONDARY);
+    numLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
+    numLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewTrkNumColW, 30));
+    numLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+    JPanel left = new JPanel(new BorderLayout(6, 0));
+    left.setOpaque(false);
+
+    JPanel barsAlignmentPanel = new JPanel(new BorderLayout());
+    barsAlignmentPanel.setOpaque(false);
+    barsAlignmentPanel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewPlaysColW, 30));
+    barsAlignmentPanel.add(barsPanel, BorderLayout.WEST);
+
+    left.add(barsAlignmentPanel, BorderLayout.WEST);
+    left.add(numLabel, BorderLayout.CENTER);
+    row.add(left, BorderLayout.WEST);
+
+    // ── Artist / Song columns (CENTER) ────────────────────────────────────
+    JPanel columnsPanel = new JPanel(new BorderLayout(10, 0));
+    columnsPanel.setOpaque(false);
+
+    JPanel textCluster = new JPanel(new BorderLayout(10, 0));
+    textCluster.setOpaque(false);
+
+    JLabel artistLabel = new JLabel(entry.getSong().getArtistName());
+    artistLabel.setForeground(TEXT_PRIMARY);
+    artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
+    artistLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationArtistW, 30));
+
+    JLabel songLabel = new JLabel(entry.getSong().getSongName());
+    songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
+    songLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationSongW, 30));
+
+    boolean selected = index == selectedIndex;
+    if (selected) {
+      songLabel.setForeground(ACCENT_BLUE);
+    } else {
+      int priority = entry.getPriority() == null ? 0 : entry.getPriority();
+      int slot = Math.min(priority, SongTrackCellRenderer.PRIORITY_COLORS.length - 1);
+      songLabel.setForeground(SongTrackCellRenderer.PRIORITY_COLORS[slot]);
+    }
+
+    textCluster.add(artistLabel, BorderLayout.WEST);
+    textCluster.add(songLabel, BorderLayout.CENTER);
+
+    columnsPanel.add(textCluster, BorderLayout.WEST);
+    columnsPanel.add(Box.createHorizontalGlue(), BorderLayout.CENTER);
+
+    row.add(columnsPanel, BorderLayout.CENTER);
+
+    if (selected) {
+      row.setOpaque(true);
+      row.setBackground(ColorTheme.get().bgListSelected);
+    }
+
+    // ── Hover + click-to-select ────────────────────────────────────────────
+    row.addMouseListener(new java.awt.event.MouseAdapter() {
+
+      @Override
+      public void mouseEntered(java.awt.event.MouseEvent e) {
+        if (index != selectedIndex) {
+          row.setOpaque(true);
+          row.setBackground(BG_ROW_HOVER);
+          queueRowsPanel.repaint();
+        }
+      }
+
+      @Override
+      public void mouseExited(java.awt.event.MouseEvent e) {
+        if (index != selectedIndex) {
+          row.setOpaque(false);
+          row.setBackground(null);
+          queueRowsPanel.repaint();
+        }
+      }
+
+      @Override
+      public void mouseClicked(java.awt.event.MouseEvent e) {
+        selectedIndex = index;
+        rebuildQueueRows();
+      }
+    });
+
+    return row;
   }
 
   // ── Action area (buttons + timeout row) ──────────────────────────────────
@@ -288,10 +468,12 @@ public class QueuePanel extends JPanel {
   // ── Queue operations ──────────────────────────────────────────────────────
 
   private void doMoveUp() {
-    SongQueueEntryDto selected = queueList.getSelectedValue();
-    if (selected == null || !deductCostFor(selected))
+    if (selectedIndex < 0 || selectedIndex >= displayedQueue.size())
       return;
-    int idx = queueList.getSelectedIndex();
+    SongQueueEntryDto selected = displayedQueue.get(selectedIndex);
+    if (!deductCostFor(selected))
+      return;
+    int idx = selectedIndex;
     SwingSecurityUtil.runAsync(() -> {
       try {
         songQueueService.moveSongUpInQueue(new ChangeSongQueueRequest(
@@ -303,19 +485,22 @@ public class QueuePanel extends JPanel {
     // Update local model optimistically
     SwingUtilities.invokeLater(() -> {
       if (idx > 0) {
-        SongQueueEntryDto above = queueListModel.get(idx - 1);
-        queueListModel.set(idx - 1, selected);
-        queueListModel.set(idx, above);
-        queueList.setSelectedIndex(idx - 1);
+        SongQueueEntryDto above = displayedQueue.get(idx - 1);
+        displayedQueue.set(idx - 1, selected);
+        displayedQueue.set(idx, above);
+        selectedIndex = idx - 1;
+        rebuildQueueRows();
       }
     });
   }
 
   private void doMoveDown() {
-    SongQueueEntryDto selected = queueList.getSelectedValue();
-    if (selected == null || !deductCostFor(selected))
+    if (selectedIndex < 0 || selectedIndex >= displayedQueue.size())
       return;
-    int idx = queueList.getSelectedIndex();
+    SongQueueEntryDto selected = displayedQueue.get(selectedIndex);
+    if (!deductCostFor(selected))
+      return;
+    int idx = selectedIndex;
     SwingSecurityUtil.runAsync(() -> {
       try {
         songQueueService.moveSongDownInQueue(new ChangeSongQueueRequest(
@@ -325,20 +510,23 @@ public class QueuePanel extends JPanel {
       }
     });
     SwingUtilities.invokeLater(() -> {
-      if (idx < queueListModel.getSize() - 1) {
-        SongQueueEntryDto below = queueListModel.get(idx + 1);
-        queueListModel.set(idx + 1, selected);
-        queueListModel.set(idx, below);
-        queueList.setSelectedIndex(idx + 1);
+      if (idx < displayedQueue.size() - 1) {
+        SongQueueEntryDto below = displayedQueue.get(idx + 1);
+        displayedQueue.set(idx + 1, selected);
+        displayedQueue.set(idx, below);
+        selectedIndex = idx + 1;
+        rebuildQueueRows();
       }
     });
   }
 
   private void doRemove() {
-    SongQueueEntryDto selected = queueList.getSelectedValue();
-    if (selected == null || !deductCostFor(selected))
+    if (selectedIndex < 0 || selectedIndex >= displayedQueue.size())
       return;
-    int idx = queueList.getSelectedIndex();
+    SongQueueEntryDto selected = displayedQueue.get(selectedIndex);
+    if (!deductCostFor(selected))
+      return;
+    int idx = selectedIndex;
     SwingSecurityUtil.runAsync(() -> {
       try {
         songQueueService.removeSongDownFromQueue(new ChangeSongQueueRequest(
@@ -348,12 +536,9 @@ public class QueuePanel extends JPanel {
       }
     });
     SwingUtilities.invokeLater(() -> {
-      queueListModel.remove(idx);
-      if (queueListModel.getSize() > 0) {
-        queueList.setSelectedIndex(Math.min(idx, queueListModel.getSize() - 1));
-      } else {
-        selectedIndex = -1;
-      }
+      displayedQueue.remove(idx);
+      selectedIndex = displayedQueue.isEmpty() ? -1 : Math.min(idx, displayedQueue.size() - 1);
+      rebuildQueueRows();
     });
   }
 
@@ -374,10 +559,12 @@ public class QueuePanel extends JPanel {
   private void updateButtonStates() {
     if (moveUpButton == null || moveDownButton == null || removeButton == null)
       return; // buttons not yet constructed (initial population during buildQueueBody)
-    SongQueueEntryDto selected = queueList.getSelectedValue();
+    SongQueueEntryDto selected =
+        (selectedIndex >= 0 && selectedIndex < displayedQueue.size()) ? displayedQueue.get(selectedIndex)
+            : null;
     int currentCredits = creditManager.getCredits();
-    int idx = queueList.getSelectedIndex();
-    int size = queueListModel.getSize();
+    int idx = selectedIndex;
+    int size = displayedQueue.size();
 
     if (selected == null) {
       // No selection — all buttons go fully grey
@@ -423,31 +610,38 @@ public class QueuePanel extends JPanel {
   }
 
   /**
-   * Rebuilds the queue list model from the (live) queue reference — used at construction,
-   * onShown(), and every {@link #setQueue(List)} call (including the round trip after a
-   * move/remove action, or an externally-triggered {@code SongQueueChangedEvent}). Restores the
-   * previously-selected row at {@link #selectedIndex} (clamped to the rebuilt model's bounds) so
-   * the same song stays selected across the rebuild.
-   *
-   * <p>
-   * The desired index is snapshotted into a local before {@code clear()} runs, because clearing the
-   * model fires a selection-changed event that — via the list's own selection listener — resets
-   * {@link #selectedIndex} to {@code -1} before this method would otherwise get a chance to use it.
+   * Rebuilds {@link #displayedQueue} and the row panels from the (live) queue reference — used at
+   * construction, onShown(), and every {@link #setQueue(List)} call (including the round trip after
+   * a move/remove action, or an externally-triggered {@code SongQueueChangedEvent}). Restores the
+   * previously-selected row at {@link #selectedIndex} (clamped to the rebuilt list's bounds) so the
+   * same song stays selected across the rebuild.
    */
-  private void refreshQueueListModel() {
-    int desiredIndex = selectedIndex;
-    queueListModel.clear();
+  private void rebuildQueueRows() {
+    displayedQueue.clear();
     if (queue != null) {
       int limit = Math.min(queue.size(), LayoutTheme.get().songQueueMaxVisible);
       for (int i = 0; i < limit; i++) {
-        queueListModel.addElement(queue.get(i));
+        displayedQueue.add(queue.get(i));
       }
     }
-    if (desiredIndex >= 0 && queueListModel.getSize() > 0) {
-      queueList.setSelectedIndex(Math.min(desiredIndex, queueListModel.getSize() - 1));
-    } else {
-      selectedIndex = -1;
+    if (selectedIndex >= displayedQueue.size()) {
+      selectedIndex = displayedQueue.isEmpty() ? -1 : displayedQueue.size() - 1;
     }
+
+    queueRowsPanel.removeAll();
+    for (int i = 0; i < displayedQueue.size(); i++) {
+      queueRowsPanel.add(buildQueueRow(displayedQueue.get(i), i));
+      if (i < displayedQueue.size() - 1) {
+        JSeparator sep = new JSeparator();
+        sep.setForeground(SEPARATOR);
+        sep.setBackground(SEPARATOR);
+        sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        queueRowsPanel.add(sep);
+      }
+    }
+    queueRowsPanel.revalidate();
+    queueRowsPanel.repaint();
+
     updateButtonStates();
   }
 

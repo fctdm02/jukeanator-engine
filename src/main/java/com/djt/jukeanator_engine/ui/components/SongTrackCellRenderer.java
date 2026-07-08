@@ -132,7 +132,7 @@ public class SongTrackCellRenderer extends JPanel
     // sized to fit within the fixed queue cell height.
     int thumbSize = Math.max(24, CELL_HEIGHT - 8);
     numLabel.setPreferredSize(new Dimension(LayoutTheme.get().resultNumLabelW, thumbSize));
-    numLabel.setVisible(showIndex);
+    numLabel.setVisible(this.showIndex);
     thumb.setPreferredSize(new Dimension(thumbSize, thumbSize));
     thumb.setHorizontalAlignment(SwingConstants.CENTER);
     thumb.setOpaque(true);
@@ -179,8 +179,9 @@ public class SongTrackCellRenderer extends JPanel
     int active = barsForPlays(plays, t1, t2, t3);
     barsPanel.setActiveBars(active);
 
-    // ── Row number ─────────────────────────────────────────────────────────
-    numLabel.setText(String.format("%02d", index + 1));
+    // ── Track number ─────────────────────────────────────────────────────────
+    int trackNumber = entry.getSong().getTrackNumber();
+    numLabel.setText(String.format("%02d", trackNumber));
 
     // ── Song / sub text ────────────────────────────────────────────────────
     String songName = entry.getSong().getSongName();
