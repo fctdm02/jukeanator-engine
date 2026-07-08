@@ -347,7 +347,8 @@ public class QueuePanel extends JPanel {
     barsPanel.setPreferredSize(new Dimension(3 * (barW + barGap) + 6, barMaxH + 4));
 
     // ── Queue position ─────────────────────────────────────────────────────
-    JLabel numLabel = new JLabel(String.format("%02d", index + 1));
+    int trackNumber = entry.getSong().getTrackNumber();
+    JLabel numLabel = new JLabel(String.format("%02d", trackNumber));
     numLabel.setForeground(TEXT_SECONDARY);
     numLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
     numLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewTrkNumColW, 30));
