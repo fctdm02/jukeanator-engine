@@ -15,12 +15,14 @@ public interface SongPlayerService {
    * 
    * @return
    */
+  @PublicServiceMethod
   SongDto getNowPlayingSong();
 
   /**
    * 
    * @return
    */
+  @PublicServiceMethod
   SongPlaybackStatusDto getPlaybackStatus();
 
   /**

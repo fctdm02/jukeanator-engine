@@ -84,8 +84,18 @@ public interface SongLibraryService {
    */
   ArtistDto getArtistByName(String artistName);
 
+  /**
+   * 
+   * @param artistId
+   * @return
+   */
   ArtistDto getArtistById(Integer artistId);
 
+  /**
+   * 
+   * @param albumId
+   * @return
+   */
   ArtistDto getArtistByAlbumId(Integer albumId);
 
   /**

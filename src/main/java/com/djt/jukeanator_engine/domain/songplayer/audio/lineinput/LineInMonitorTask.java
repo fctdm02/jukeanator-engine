@@ -56,9 +56,11 @@ public class LineInMonitorTask implements Runnable {
 
   @Override
   public void run() {
+    
     TargetDataLine lineIn = null;
     SourceDataLine speakers = null;
     try {
+      
       Mixer mixer = AudioSystem.getMixer(mixerInfo);
       AudioFormat format = pickSupportedFormat(mixer);
       if (format == null) {
@@ -110,6 +112,7 @@ public class LineInMonitorTask implements Runnable {
    * signal-present flag from the block's RMS.
    */
   private void applyGainAndDetectSignal(byte[] buffer, int length) {
+    
     float gain = clampVolume(volumePercent.get()) / 100f;
     long sumSquares = 0;
     int sampleCount = 0;
@@ -140,6 +143,7 @@ public class LineInMonitorTask implements Runnable {
   }
 
   private AudioFormat pickSupportedFormat(Mixer mixer) {
+    
     for (AudioFormat format : FORMAT_ATTEMPTS) {
       DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
       if (mixer.isLineSupported(info)) {
@@ -150,6 +154,7 @@ public class LineInMonitorTask implements Runnable {
   }
 
   private void closeQuietly(Line line) {
+    
     if (line != null) {
       try {
         if (line instanceof TargetDataLine targetDataLine) {

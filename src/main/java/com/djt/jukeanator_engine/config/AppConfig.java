@@ -54,29 +54,6 @@ public class AppConfig {
   public ObjectMapper objectMapper() {
     return ObjectMappers.create();
   }
-
-  @Bean
-  public MasterVolumeService masterVolumeService() {
-    
-    OSType osType = OperatingSystemDetector.getOperatingSystem();
-    if (osType == OSType.WINDOWS) {
-      return new WindowsMasterVolumeService();
-    }
-    
-    if (osType == OSType.MACOS) {
-      return new MacMasterVolumeService();
-    } 
-    
-    return new LinuxMasterVolumeService();
-  }
-
-  @Bean
-  public LineInService lineInService(SongQueueProperties songQueueProperties) {
-    
-    return new LineInServiceImpl(
-        songQueueProperties.getPreferredMixerName(), 
-        songQueueProperties.getLineInVolume());
-  }
   
   @Bean
   public DiscogsClientWrapper discogsClientWrapper(SongLibraryProperties songLibraryProperties) {
@@ -189,7 +166,6 @@ public class AppConfig {
   }
 
   // ── Services ──────────────────────────────────────────────────────────────
-
   @Bean
   @Primary
   public SongLibraryService songLibraryService(
@@ -263,12 +239,40 @@ public class AppConfig {
         eventPublisher,
         songLibraryService);
   }
+ 
+  @Bean
+  @Primary
+  public MasterVolumeService masterVolumeService() {
+    
+    OSType osType = OperatingSystemDetector.getOperatingSystem();
+    if (osType == OSType.WINDOWS) {
+      return new WindowsMasterVolumeService();
+    }
+    
+    if (osType == OSType.MACOS) {
+      return new MacMasterVolumeService();
+    } 
+    
+    return new LinuxMasterVolumeService();
+  }
+
+  @Bean
+  @Primary
+  public LineInService lineInService(SongPlayerProperties songPlayerProperties) {
+    
+    return new LineInServiceImpl(
+        songPlayerProperties.isEnableLineInOnSilence(),
+        songPlayerProperties.getPreferredMixerName(), 
+        songPlayerProperties.getLineInVolume());
+  }
   
   @Bean
+  @Primary
   public JukeboxAudioCoordinator jukeboxAudioCoordinator(
       LineInService lineInService,
-      SongQueueService songQueueService) {
+      SongQueueService songQueueService,
+      SongPlayerService songPlayerService) {
 
-    return new JukeboxAudioCoordinator(lineInService, songQueueService);
+    return new JukeboxAudioCoordinator(lineInService, songQueueService, songPlayerService);
   }
 }

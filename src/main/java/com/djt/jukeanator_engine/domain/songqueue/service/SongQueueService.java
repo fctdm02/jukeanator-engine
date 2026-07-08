@@ -25,6 +25,7 @@ public interface SongQueueService {
    * 
    * @return
    */
+  @PublicServiceMethod
   SongQueueEntryDto dequeueNextSong();
 
   /**
@@ -32,6 +33,7 @@ public interface SongQueueService {
    * 
    * @return
    */
+  @PublicServiceMethod
   boolean isQueueEmpty();
 
   /**
@@ -39,6 +41,7 @@ public interface SongQueueService {
    * 
    * @return
    */
+  @PublicServiceMethod
   boolean isBackgroundMusicEnabled();  
 
   /**

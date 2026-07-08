@@ -104,13 +104,13 @@ public class SongPlayerServiceImpl implements SongPlayerService {
       this.player =
           new WinampMediaPlayer(songPlayerProperties.getWinampExePath(), this.playerVolume);
 
-    } else if (this.playerType.equals("vlc")) {
+    } else if (this.playerType.equals("video-vlc")) {
 
-      this.player = new VlcMediaPlayer(this.playerVolume);
+      this.player = new VideoVlcMediaPlayer(this.playerVolume);
 
     } else {
 
-      this.player = new VideoVlcMediaPlayer(this.playerVolume);
+      this.player = new VlcMediaPlayer(this.playerVolume);
 
     }
 

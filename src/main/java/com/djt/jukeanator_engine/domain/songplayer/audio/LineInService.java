@@ -7,6 +7,12 @@ package com.djt.jukeanator_engine.domain.songplayer.audio;
  * level" control (many don't, especially on macOS).
  */
 public interface LineInService {
+  
+  /**
+   * 
+   * @return true if we want to enable the line-in on silence
+   */
+  boolean isLineInOnSilenceEnabled();
 
   /**
    * @return true if a capture device that looks like a line-in/aux input was found on this machine.
@@ -45,5 +51,9 @@ public interface LineInService {
    */
   void stopMonitoring();
 
+  /**
+   * 
+   * @return
+   */
   boolean isMonitoring();
 }

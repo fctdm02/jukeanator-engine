@@ -83,10 +83,6 @@ public class SongQueueServiceImpl
   private final int smartBackgroundMusicAdditionsEnd; // end time for
                                                       // enableSmartBackgroundMusicAdditions
 
-  // LINE IN MUSIC (MUTUALLY EXCLUSIVE TO BACKGROUND MUSIC), WILL BE ON WHEN NOTHING IN THE QUEUE
-  private final String preferredMixerName;
-  private final int lineInVolume;
-
   // SONG QUEUE PLAY CONSTRAINTS
   private final int minimumMinutesBetweenSongPlays;
   private final int maximumConsecutiveSongPlaysByArtist;
@@ -138,9 +134,6 @@ public class SongQueueServiceImpl
         songQueueProperties.getSmartBackgroundMusicAdditionsBegin();
     this.smartBackgroundMusicAdditionsEnd =
         songQueueProperties.getSmartBackgroundMusicAdditionsEnd();
-
-    this.preferredMixerName = songQueueProperties.getPreferredMixerName();
-    this.lineInVolume = songQueueProperties.getLineInVolume();
 
     this.minimumMinutesBetweenSongPlays = songQueueProperties.getMinimumMinutesBetweenSongPlays();
     this.maximumConsecutiveSongPlaysByArtist =
@@ -219,8 +212,6 @@ public class SongQueueServiceImpl
     log.info("smartBackgroundMusicAdditionsFactor: " + this.smartBackgroundMusicAdditionsFactor);
     log.info("smartBackgroundMusicAdditionsBegin: " + this.smartBackgroundMusicAdditionsBegin);
     log.info("smartBackgroundMusicAdditionsEnd: " + this.smartBackgroundMusicAdditionsEnd);
-    log.info("preferredMixerName: " + this.preferredMixerName);
-    log.info("lineInVolume: " + this.lineInVolume);
     log.info("minimumMinutesBetweenSongPlays: " + this.minimumMinutesBetweenSongPlays);
     log.info("maximumConsecutiveSongPlaysByArtist: " + this.maximumConsecutiveSongPlaysByArtist);
     log.info("allowExplicitSongsAtAllTimes: " + this.allowExplicitSongsAtAllTimes);
@@ -242,12 +233,13 @@ public class SongQueueServiceImpl
 
       } catch (Exception e1) {
 
-        // NOTE: If unable to load BackgroundMusic.TXT, then fall back to using the most popular songs.
+        // NOTE: If unable to load BackgroundMusic.TXT, then fall back to using the most popular
+        // songs.
 
         // If that files, use the top 500 songs as BackgroundMusic.TXT
         log.error(
             "Unable to auto-populate song queue for background music, error: " + e1.getMessage());
-        
+
         try {
 
           this.songLibraryRoot.createBackgroundMusicFromTopSongs(this.rootPath);
@@ -255,13 +247,13 @@ public class SongQueueServiceImpl
           autoPopulateQueue();
 
         } catch (Exception e) {
-          
+
           // NOTE: If unable to load the most popular songs, then disable the feature
-          
+
           log.error(
               "Unable to auto-populate song queue for background music with top songs, error: "
                   + e.getMessage());
-          
+
           this.enableBackgroundMusic = false;
           this.minimumNumberSongsToKeepInQueue = 0;
         }
@@ -397,7 +389,8 @@ public class SongQueueServiceImpl
         SongFileEntity smartSong = getNextSmartAdditionSong(coreSong);
         if (smartSong == null) {
           // No candidates available at all — skip remaining slots.
-          log.debug("autoPopulateQueue: no smart-addition candidates available for {}, skipping slot {}",
+          log.debug(
+              "autoPopulateQueue: no smart-addition candidates available for {}, skipping slot {}",
               coreSong, i);
           break;
         }
@@ -785,7 +778,8 @@ public class SongQueueServiceImpl
         }
       }
     } catch (Exception e) {
-      throw new SongQueueServiceException("Unable to determine song queue eligibility for albumId: " + albumId + ", songId: " + songId + " and priority: " + priority);
+      throw new SongQueueServiceException("Unable to determine song queue eligibility for albumId: "
+          + albumId + ", songId: " + songId + " and priority: " + priority);
     }
 
     return null;
@@ -884,7 +878,8 @@ public class SongQueueServiceImpl
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
           int preferredIndex = changeSongQueueRequest.getQueuePosition() != null
-              ? changeSongQueueRequest.getQueuePosition() : -1;
+              ? changeSongQueueRequest.getQueuePosition()
+              : -1;
           numSongsInQueue = songQueueRoot.moveSongUpInQueue(song, preferredIndex);
           if (numSongsInQueue.intValue() > 0) {
             songQueueRepository.storeAggregateRoot(songQueueRoot);
@@ -892,12 +887,12 @@ public class SongQueueServiceImpl
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }
         } else {
-          throw new SongQueueServiceException("Could not add move song up in queue, albumId: " + albumId
-              + ", songId: " + songId + ", error: song does not exist!");
+          throw new SongQueueServiceException("Could not add move song up in queue, albumId: "
+              + albumId + ", songId: " + songId + ", error: song does not exist!");
         }
       } else {
-        throw new SongQueueServiceException("Could not add move song up in queue, albumId: " + albumId
-            + ", songId: " + songId + ", error: album does not exist!");
+        throw new SongQueueServiceException("Could not add move song up in queue, albumId: "
+            + albumId + ", songId: " + songId + ", error: album does not exist!");
       }
       return numSongsInQueue;
     } catch (EntityDoesNotExistException e) {
@@ -918,7 +913,8 @@ public class SongQueueServiceImpl
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
           int preferredIndex = changeSongQueueRequest.getQueuePosition() != null
-              ? changeSongQueueRequest.getQueuePosition() : -1;
+              ? changeSongQueueRequest.getQueuePosition()
+              : -1;
           numSongsInQueue = songQueueRoot.moveSongDownInQueue(song, preferredIndex);
           if (numSongsInQueue.intValue() > 0) {
             songQueueRepository.storeAggregateRoot(songQueueRoot);
@@ -926,17 +922,17 @@ public class SongQueueServiceImpl
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }
         } else {
-          throw new SongQueueServiceException("Could not add move song down in queue, albumId: " + albumId
-              + ", songId: " + songId + ", error: song does not exist!");
+          throw new SongQueueServiceException("Could not add move song down in queue, albumId: "
+              + albumId + ", songId: " + songId + ", error: song does not exist!");
         }
       } else {
-        throw new SongQueueServiceException("Could not add move song down in queue, albumId: " + albumId
-            + ", songId: " + songId + ", error: album does not exist!");
+        throw new SongQueueServiceException("Could not add move song down in queue, albumId: "
+            + albumId + ", songId: " + songId + ", error: album does not exist!");
       }
       return numSongsInQueue;
     } catch (EntityDoesNotExistException e) {
-      throw new SongQueueServiceException("Could not add move song down in queue, albumId: " + albumId
-          + ", songId: " + songId + ", error: " + e.getMessage(), e);
+      throw new SongQueueServiceException("Could not add move song down in queue, albumId: "
+          + albumId + ", songId: " + songId + ", error: " + e.getMessage(), e);
     }
   }
 
@@ -967,12 +963,12 @@ public class SongQueueServiceImpl
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }
         } else {
-          throw new SongQueueServiceException("Could not remove song down in queue, albumId: " + albumId
-              + ", songId: " + songId + ", error: song does not exist!");
+          throw new SongQueueServiceException("Could not remove song down in queue, albumId: "
+              + albumId + ", songId: " + songId + ", error: song does not exist!");
         }
       } else {
-        throw new SongQueueServiceException("Could not remove song down in queue, albumId: " + albumId
-            + ", songId: " + songId + ", error: album does not exist!");
+        throw new SongQueueServiceException("Could not remove song down in queue, albumId: "
+            + albumId + ", songId: " + songId + ", error: album does not exist!");
       }
       return numSongsRemoved;
     } catch (EntityDoesNotExistException e) {
@@ -1038,11 +1034,11 @@ public class SongQueueServiceImpl
         }
       }
     } catch (EntityDoesNotExistException ednee) {
-      throw new SongQueueServiceException("Could not add song to queue, albumId: " + albumId + ", songId: "
-          + songId + ", priority: " + priority, ednee);
+      throw new SongQueueServiceException("Could not add song to queue, albumId: " + albumId
+          + ", songId: " + songId + ", priority: " + priority, ednee);
     }
-    throw new SongQueueServiceException("Could not add song to queue, albumId: " + albumId + ", songId: "
-        + songId + ", priority: " + priority);
+    throw new SongQueueServiceException("Could not add song to queue, albumId: " + albumId
+        + ", songId: " + songId + ", priority: " + priority);
   }
 
   @Override

@@ -26,11 +26,7 @@ public class SongQueueProperties {
   private int smartBackgroundMusicAdditionsFactor = 2; // for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs  
   private int smartBackgroundMusicAdditionsBegin = 19; // start time for enableSmartBackgroundMusicAdditions
   private int smartBackgroundMusicAdditionsEnd = 5; // end time for enableSmartBackgroundMusicAdditions  
-  
-  // LINE IN MUSIC (MUTUALLY EXCLUSIVE TO BACKGROUND MUSIC), WILL BE ON WHEN NOTHING IN THE QUEUE
-  private String preferredMixerName = "Line In";
-  private int lineInVolume = 75;
-  
+    
   // SONG QUEUE CONSTRAINTS  
   private int minimumMinutesBetweenSongPlays = 60;
   private int maximumConsecutiveSongPlaysByArtist = 3;
@@ -100,22 +96,6 @@ public class SongQueueProperties {
 
   public void setSmartBackgroundMusicAdditionsEnd(int smartBackgroundMusicAdditionsEnd) {
     this.smartBackgroundMusicAdditionsEnd = smartBackgroundMusicAdditionsEnd;
-  }
-
-  public String getPreferredMixerName() {
-    return preferredMixerName;
-  }
-
-  public void setPreferredMixerName(String preferredMixerName) {
-    this.preferredMixerName = preferredMixerName;
-  }
-
-  public int getLineInVolume() {
-    return lineInVolume;
-  }
-
-  public void setLineInVolume(int lineInVolume) {
-    this.lineInVolume = lineInVolume;
   }
 
   public int getMinimumMinutesBetweenSongPlays() {

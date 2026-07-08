@@ -15,6 +15,7 @@ public class LineInServiceImpl implements LineInService {
 
   private static final Logger log = LoggerFactory.getLogger(LineInServiceImpl.class);
 
+  private final boolean enableLineInOnSilence;
   private final String preferredMixerName;
   private final AtomicInteger volumePercent;
   private final AtomicBoolean signalPresent = new AtomicBoolean(false);
@@ -23,10 +24,21 @@ public class LineInServiceImpl implements LineInService {
   private Thread monitorThread;
   private LineInMonitorTask monitorTask;
 
-  public LineInServiceImpl(String preferredMixerName, int defaultVolume) {
+  public LineInServiceImpl(boolean enableLineInOnSilence, String preferredMixerName,
+      int lineInVolume) {
 
+    this.enableLineInOnSilence = enableLineInOnSilence;
     this.preferredMixerName = preferredMixerName;
-    this.volumePercent = new AtomicInteger(defaultVolume);
+    this.volumePercent = new AtomicInteger(lineInVolume);
+
+    log.info("preferredMixerName: " + this.preferredMixerName);
+    log.info("preferredMixerName: " + this.preferredMixerName);
+    log.info("lineInVolume: " + lineInVolume);
+  }
+  
+  @Override
+  public boolean isLineInOnSilenceEnabled() {
+    return enableLineInOnSilence;
   }
 
   @Override
@@ -51,36 +63,47 @@ public class LineInServiceImpl implements LineInService {
 
   @Override
   public void startMonitoring() {
-    synchronized (lock) {
-      if (monitorThread != null && monitorThread.isAlive()) {
-        return;
+
+    if (this.enableLineInOnSilence) {
+
+      synchronized (lock) {
+        if (monitorThread != null && monitorThread.isAlive()) {
+          return;
+        }
+
+        Mixer.Info mixerInfo = findLineInMixer();
+        if (mixerInfo == null) {
+          log.warn("Cannot start line-in monitoring: no capture-capable mixer found");
+          return;
+        }
+
+        monitorTask = new LineInMonitorTask(mixerInfo, volumePercent, signalPresent);
+        monitorThread = new Thread(monitorTask, "line-in-monitor");
+        monitorThread.setDaemon(true);
+        monitorThread.setPriority(Thread.MAX_PRIORITY);
+        monitorThread.start();
       }
-      Mixer.Info mixerInfo = findLineInMixer();
-      if (mixerInfo == null) {
-        log.warn("Cannot start line-in monitoring: no capture-capable mixer found");
-        return;
-      }
-      monitorTask = new LineInMonitorTask(mixerInfo, volumePercent, signalPresent);
-      monitorThread = new Thread(monitorTask, "line-in-monitor");
-      monitorThread.setDaemon(true);
-      monitorThread.setPriority(Thread.MAX_PRIORITY);
-      monitorThread.start();
     }
   }
 
   @Override
   public void stopMonitoring() {
+
     synchronized (lock) {
+
       if (monitorTask != null) {
         monitorTask.stop();
       }
+
       if (monitorThread != null) {
+
         try {
           monitorThread.join(2000);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
       }
+
       monitorThread = null;
       monitorTask = null;
     }
@@ -88,6 +111,7 @@ public class LineInServiceImpl implements LineInService {
 
   @Override
   public boolean isMonitoring() {
+
     synchronized (lock) {
       return monitorThread != null && monitorThread.isAlive();
     }
@@ -132,6 +156,7 @@ public class LineInServiceImpl implements LineInService {
   }
 
   private boolean supportsCapture(Mixer mixer) {
+
     for (Line.Info info : mixer.getTargetLineInfo()) {
       if (info instanceof DataLine.Info dataLineInfo
           && TargetDataLine.class.isAssignableFrom(dataLineInfo.getLineClass())) {
@@ -145,5 +170,5 @@ public class LineInServiceImpl implements LineInService {
   public String toString() {
     return "LineInServiceImpl [preferredMixerName=" + preferredMixerName + ", volumePercent="
         + volumePercent + "]";
-  } 
+  }
 }
