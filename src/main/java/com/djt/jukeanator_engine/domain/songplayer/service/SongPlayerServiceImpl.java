@@ -16,6 +16,8 @@ import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
+import com.djt.jukeanator_engine.domain.songplayer.audio.LineInService;
+import com.djt.jukeanator_engine.domain.songplayer.audio.MasterVolumeService;
 import com.djt.jukeanator_engine.domain.songplayer.config.SongPlayerProperties;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlaybackStatusDto;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlayerStatus;
@@ -46,19 +48,21 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   /**
    * ONE AND ONLY ONE queue-processing thread.
    */
-  private final ExecutorService queueExecutor =
-      Executors.newSingleThreadExecutor(r -> {
-        Thread t = Thread.ofPlatform().name("song-queue-thread").unstarted(r);
-        t.setPriority(Thread.MAX_PRIORITY);
-        return t;
-      });
+  private final ExecutorService queueExecutor = Executors.newSingleThreadExecutor(r -> {
+    Thread t = Thread.ofPlatform().name("song-queue-thread").unstarted(r);
+    t.setPriority(Thread.MAX_PRIORITY);
+    return t;
+  });
 
   private final String playerType;
   private final int playerVolume;
   private final int masterVolume;
 
   private final SongQueueService songQueueService;
+  private final MasterVolumeService masterVolumeService;
+  private final LineInService lineInService;
   private final ApplicationEventPublisher eventPublisher;
+
   private final Deque<SongQueueEntryDto> playbackHistory = new ArrayDeque<>();
   private final Player player;
 
@@ -77,16 +81,21 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   private volatile boolean queueLocked = false;
 
   public SongPlayerServiceImpl(SongPlayerProperties songPlayerProperties,
-      SongQueueService songQueueService, ApplicationEventPublisher eventPublisher) {
+      SongQueueService songQueueService, MasterVolumeService masterVolumeService,
+      LineInService lineInService, ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(songPlayerProperties, "songPlayerProperties cannot be null");
     requireNonNull(songQueueService, "songQueueService cannot be null");
+    requireNonNull(masterVolumeService, "masterVolumeService cannot be null");
+    requireNonNull(lineInService, "lineInService cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
     this.playerType = songPlayerProperties.getPlayerType();
     this.playerVolume = songPlayerProperties.getPlayerVolume();
     this.masterVolume = songPlayerProperties.getMasterVolume();
     this.songQueueService = songQueueService;
+    this.masterVolumeService = masterVolumeService;
+    this.lineInService = lineInService;
     this.eventPublisher = eventPublisher;
 
     OSType osType = OperatingSystemDetector.getOperatingSystem();
@@ -107,6 +116,8 @@ public class SongPlayerServiceImpl implements SongPlayerService {
 
     initialize();
 
+    log.info("masterVolumeService : " + this.masterVolumeService);
+    log.info("lineInService : " + this.lineInService);
     log.info("playerType : " + this.playerType);
     log.info("playerVolume : " + this.playerVolume);
     log.info("masterVolume : " + this.masterVolume);

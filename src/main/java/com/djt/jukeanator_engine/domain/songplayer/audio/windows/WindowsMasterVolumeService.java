@@ -32,4 +32,9 @@ public class WindowsMasterVolumeService implements MasterVolumeService {
   private int clamp(int percent) {
     return Math.max(0, Math.min(100, percent));
   }
+  
+  @Override
+  public String toString() {
+    return "WindowsMasterVolumeService";
+  }
 }

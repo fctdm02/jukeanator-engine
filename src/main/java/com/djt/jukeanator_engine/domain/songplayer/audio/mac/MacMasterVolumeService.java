@@ -51,4 +51,9 @@ public class MacMasterVolumeService implements MasterVolumeService {
     }
     return output;
   }
+  
+  @Override
+  public String toString() {
+    return "MacMasterVolumeService";
+  }  
 }

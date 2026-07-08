@@ -140,4 +140,10 @@ public class LineInServiceImpl implements LineInService {
     }
     return false;
   }
+
+  @Override
+  public String toString() {
+    return "LineInServiceImpl [preferredMixerName=" + preferredMixerName + ", volumePercent="
+        + volumePercent + "]";
+  } 
 }

@@ -68,4 +68,9 @@ public class LinuxMasterVolumeService implements MasterVolumeService {
     }
     return output;
   }
+  
+  @Override
+  public String toString() {
+    return "LinuxMasterVolumeService";
+  }
 }

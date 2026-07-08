@@ -233,11 +233,15 @@ public class AppConfig {
   public SongPlayerService songPlayerService(
       SongPlayerProperties songPlayerProperties,
       SongQueueService songQueueService,
+      MasterVolumeService masterVolumeService,
+      LineInService lineInService,      
       ApplicationEventPublisher eventPublisher) {
     
     return new SongPlayerServiceImpl(
         songPlayerProperties,
         songQueueService,
+        masterVolumeService,
+        lineInService,        
         eventPublisher);
   }
 
