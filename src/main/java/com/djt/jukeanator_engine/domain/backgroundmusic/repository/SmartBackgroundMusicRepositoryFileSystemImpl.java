@@ -2,6 +2,8 @@ package com.djt.jukeanator_engine.domain.backgroundmusic.repository;
 
 import static java.util.Objects.requireNonNull;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.backgroundmusic.dto.SmartBackgroundMusicSongDto;
 import com.djt.jukeanator_engine.domain.backgroundmusic.mapper.BackgroundMusicMapper;
@@ -49,5 +51,10 @@ public final class SmartBackgroundMusicRepositoryFileSystemImpl
     }
 
     writeJsonList(filePath, BackgroundMusicMapper.toSmartDtoList(songs));
+  }
+
+  @Override
+  public boolean exists() {
+    return Files.exists(Path.of(filePath));
   }
 }

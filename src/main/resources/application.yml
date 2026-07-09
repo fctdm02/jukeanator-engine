@@ -8,8 +8,8 @@ app:
     file-path: logs/jukeanator-service.log
     max-file-size: 10MB
   # Shared root path used by song-library, song-queue, and user services.
-  root-path-windows: R:\\Rock_On_Third          # windows
-  root-path-unix: /mnt/readyNAS/Rock_On_Third       # linux / macOS
+  root-path-windows: R:\\Rock_On_Third             # windows
+  root-path-unix: /home/tmyers/Music/Rock_On_Third # linux / macOS
 
 logging:
   level:

@@ -44,9 +44,9 @@ public interface BackgroundMusicService {
   int getSmartAdditionsFactor();
 
   /**
-   * Draws the next smart-addition song related to {@code coreSong} (same artist/album, or a
-   * popular song from the same genre). Lazily (re)builds the smart-additions pool when it is
-   * empty.
+   * Draws the next smart-addition song from the full smart-additions pool (built up-front from
+   * every source song in {@code BackgroundMusic.TXT} — same artist/album, or a popular song from
+   * the same genre, relative to whichever source song seeded it).
    *
    * @param coreSong the core background-music song that triggered this smart-addition draw
    * @return the next smart-addition song, or {@code null} if no candidates are available

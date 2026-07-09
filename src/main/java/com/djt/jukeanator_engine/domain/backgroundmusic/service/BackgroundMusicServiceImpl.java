@@ -16,6 +16,8 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.djt.jukeanator_engine.domain.backgroundmusic.config.BackgroundMusicProperties;
 import com.djt.jukeanator_engine.domain.backgroundmusic.exception.BackgroundMusicServiceException;
 import com.djt.jukeanator_engine.domain.backgroundmusic.model.BackgroundMusicSongEntity;
@@ -25,6 +27,7 @@ import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMus
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgroundMusicRepository;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.utils.BackgroundMusicHelper;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
@@ -113,7 +116,28 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     initialize();
   }
 
+  /**
+   * Runs during bean construction (from the constructor), which happens while Spring is still
+   * refreshing the application context — before {@code LocalSecurityContextConfigurer} installs
+   * the EDT auth and before any HTTP request has run the JWT filter. {@link #loadAndReconcile()}
+   * may call into secured services (e.g. {@code SongLibraryService.getGenreMusicByPopularity()}
+   * for smart additions), which {@code ServiceSecurityAspect} would otherwise reject, so install
+   * the SYSTEM principal for the duration of startup initialization — mirrors
+   * {@code SongQueueServiceImpl#initialize()}.
+   */
   private void initialize() {
+
+    SecurityContext startupCtx = SecurityContextHolder.createEmptyContext();
+    startupCtx.setAuthentication(SystemPrincipal.SystemAuthenticationToken.INSTANCE);
+    SecurityContextHolder.setContext(startupCtx);
+    try {
+      initializeInternal();
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  private void initializeInternal() {
 
     log.info("enableBackgroundMusic: " + this.enableBackgroundMusic);
     log.info("enableSmartBackgroundMusicAdditions: " + this.enableSmartBackgroundMusicAdditions);
@@ -161,6 +185,12 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * yet known becomes a new entity (persisted with {@code timeLastPlayed=null}). Entities for
    * paths no longer present in the playlist are left untouched in the repository, but excluded
    * from the not-played selection cache. Also (re)loads the smart-addition genre exclusions list.
+   *
+   * <p>
+   * If {@code SmartBackgroundMusicSongs.json} does not exist yet (no prior smart-additions run),
+   * the smart pool is fully (re)generated from every source song currently in
+   * {@code BackgroundMusic.TXT} — see {@link #refreshSmartAdditionPool()} — so the whole smart
+   * list can be inspected up front rather than trickling in lazily.
    */
   private void loadAndReconcile() throws IOException {
 
@@ -196,6 +226,14 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     }
 
     rebuildNotPlayedCache();
+
+    boolean smartPoolFileExists = smartBackgroundMusicRepository.exists();
+    this.smartPool = new ArrayList<>(smartBackgroundMusicRepository.loadAll());
+    rebuildSmartCaches();
+
+    if (!smartPoolFileExists && enableSmartBackgroundMusicAdditions) {
+      refreshSmartAdditionPool();
+    }
   }
 
   private void rebuildSongsById() {
@@ -289,7 +327,9 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * <p>
    * When the pool is empty — i.e. every song has actually been played this cycle — resets every
    * song's {@code timeLastPlayed} back to {@code null} and persists that reset immediately, so it
-   * survives a restart even if none of the reset songs happen to be replayed before then.
+   * survives a restart even if none of the reset songs happen to be replayed before then. Since
+   * song popularity may have shifted over a full cycle, the smart-additions pool is refreshed at
+   * the same time — see {@link #refreshSmartAdditionPool()}.
    */
   private Integer pickNextEligibleBackgroundId() {
 
@@ -299,6 +339,10 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       }
       backgroundMusicRepository.storeAll(allSongs);
       rebuildNotPlayedCache();
+
+      if (enableSmartBackgroundMusicAdditions) {
+        refreshSmartAdditionPool();
+      }
     }
 
     if (notPlayedIds.isEmpty()) {
@@ -353,13 +397,26 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   /**
    * NOTE: Selection is read-only — see {@link #getNextSong()} for why a song is only marked
    * played once it is actually confirmed via {@link #handleSongPlaybackStartedEvent}.
+   *
+   * <p>
+   * Selection draws from the whole smart-additions pool (built up-front from every source song in
+   * {@code BackgroundMusic.TXT} — see {@link #refreshSmartAdditionPool()}), not just candidates
+   * seeded from {@code coreSong}. When every smart song has been played this cycle, their
+   * {@code timeLastPlayed} is simply reset (mirroring {@link #pickNextEligibleBackgroundId()}) —
+   * a full recompute only happens when the core background-music list itself cycles.
    */
   @Override
   public SongFileEntity getNextSmartAdditionSong(SongFileEntity coreSong) {
 
     try {
 
-      buildSmartAdditionPool(coreSong, getSmartAdditionsFactor());
+      if (smartNotPlayedIds.isEmpty() && !smartPool.isEmpty()) {
+        for (SmartBackgroundMusicSongEntity song : smartPool) {
+          song.setTimeLastPlayed(null);
+        }
+        smartBackgroundMusicRepository.storeAll(smartPool);
+        rebuildSmartCaches();
+      }
 
       List<Integer> eligible = smartNotPlayedIds.stream()
           .filter(id -> !isCurrentlyQueued(smartSongsById.get(id)))
@@ -405,10 +462,110 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   }
 
   /**
-   * Ensures the in-memory smart-additions pool contains candidates relevant to
-   * {@code coreSong}. The pool is rebuilt only when it is empty (i.e. all previously loaded
-   * candidates have been played), and — being a disposable per-cycle pool — is wholesale-replaced
-   * in the repository each time it is rebuilt rather than accumulated as permanent history.
+   * (Re)builds the entire smart-additions pool from scratch, seeding candidates from every
+   * source song currently in {@code BackgroundMusic.TXT} ({@link #currentPlaylistPaths}) — not
+   * just one core song — so the complete smart-additions list can be inspected at once. Called:
+   * <ul>
+   * <li>at startup, when {@code SmartBackgroundMusicSongs.json} does not yet exist</li>
+   * <li>whenever the core background-music list itself finishes a full played cycle (see
+   * {@link #pickNextEligibleBackgroundId()}), since song popularity may have shifted</li>
+   * </ul>
+   *
+   * <p>
+   * Candidates are computed per source song via {@link #computeSmartCandidatesForSource}, using a
+   * single shared "reserved paths" set across all sources so the same candidate song is never
+   * claimed by more than one source in the same build pass. The freshly computed candidate set is
+   * then merged against the previous pool by song path: songs that are still valid candidates
+   * keep their persisted identity/play history (only {@code sourceSong}/{@code reason} are
+   * refreshed), brand new candidates start unplayed, and candidates that no longer qualify are
+   * dropped.
+   */
+  private void refreshSmartAdditionPool() {
+
+    try {
+
+      int factor = getSmartAdditionsFactor();
+
+      List<String> sourcePaths = new ArrayList<>(currentPlaylistPaths);
+      Collections.shuffle(sourcePaths, ThreadLocalRandom.current());
+
+      Set<String> reservedPaths = new HashSet<>();
+      Map<String, SmartBackgroundMusicSongEntity> freshByPath = new HashMap<>();
+
+      for (String sourcePath : sourcePaths) {
+
+        SongFileEntity coreSong = resolveSourceSong(sourcePath);
+        if (coreSong == null) {
+          continue;
+        }
+
+        List<SmartBackgroundMusicSongEntity> candidates =
+            computeSmartCandidatesForSource(coreSong, factor, reservedPaths);
+
+        for (SmartBackgroundMusicSongEntity candidate : candidates) {
+          freshByPath.put(candidate.getSongFilePath(), candidate);
+        }
+      }
+
+      Map<String, SmartBackgroundMusicSongEntity> existingByPath = new HashMap<>();
+      for (SmartBackgroundMusicSongEntity existing : smartPool) {
+        existingByPath.put(existing.getSongFilePath(), existing);
+      }
+
+      List<SmartBackgroundMusicSongEntity> merged = new ArrayList<>();
+      for (SmartBackgroundMusicSongEntity fresh : freshByPath.values()) {
+
+        SmartBackgroundMusicSongEntity existing = existingByPath.get(fresh.getSongFilePath());
+        if (existing != null) {
+          // Still a valid candidate — preserve persisted identity/play history, refresh only why
+          // it was picked, since a different source may now claim it.
+          existing.setSourceSong(fresh.getSourceSong());
+          existing.setReason(fresh.getReason());
+          merged.add(existing);
+        } else {
+          merged.add(fresh);
+        }
+      }
+
+      Collections.shuffle(merged, ThreadLocalRandom.current());
+
+      smartBackgroundMusicRepository.storeAll(merged);
+      this.smartPool = merged;
+      rebuildSmartCaches();
+
+    } catch (Exception e) {
+      // Fail-safe: if the refresh fails for any reason, log and leave the existing pool in place.
+      log.warn("refreshSmartAdditionPool: could not refresh smart-addition pool: {}",
+          e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Resolves a raw {@code BackgroundMusic.TXT} path into a {@link SongFileEntity}, normalizing it
+   * for the current OS first.
+   *
+   * @return the resolved entity, or {@code null} if it could not be found (e.g. the file was
+   *         moved/deleted since being added to the playlist)
+   */
+  private SongFileEntity resolveSourceSong(String rawPath) {
+
+    try {
+      String normalized =
+          backgroundMusicHelper.normalizePathForCurrentOS(rawPath, rootPathWindows, rootPathUnix);
+      return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalized);
+    } catch (Exception e) {
+      log.debug("resolveSourceSong: could not resolve source song for path {}: {}", rawPath,
+          e.getMessage());
+      return null;
+    }
+  }
+
+  /**
+   * Computes the smart-addition candidates seeded from a single source song (same artist/album,
+   * and popular songs from the same genre), skipping the source entirely if its genre is
+   * excluded. Every returned candidate meets the min-plays filter ({@link #isEligibleByPlayCount})
+   * and is tagged with the {@link SmartAdditionReason} that explains why it was picked relative to
+   * {@code coreSong}.
    *
    * <h3>Mix formula</h3>
    * <ul>
@@ -420,24 +577,24 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    *
    * <p>
    * All candidates are drawn from {@link SongLibraryService#getGenreMusicByPopularity}
-   * (popularity-ordered) and sorted randomly before loading into the pool. Each candidate is
-   * tagged with the {@link SmartAdditionReason} that explains why it was picked.
+   * (popularity-ordered); the top slice is shuffled before picking so repeated builds vary.
+   * {@code reservedPaths} is shared across all source songs in one {@link #refreshSmartAdditionPool()}
+   * pass — any path already claimed by another source is skipped, and every path this call picks
+   * is added to it before returning, so no candidate is claimed by more than one source.
    */
-  private void buildSmartAdditionPool(SongFileEntity coreSong, int factor) {
+  private List<SmartBackgroundMusicSongEntity> computeSmartCandidatesForSource(
+      SongFileEntity coreSong, int factor, Set<String> reservedPaths) {
+
+    List<SmartBackgroundMusicSongEntity> newPool = new ArrayList<>();
 
     try {
-
-      // Only rebuild the pool when it is empty — preserves the played/not-played cycle.
-      if (!smartNotPlayedIds.isEmpty()) {
-        return;
-      }
 
       String genreName = coreSong.getAlbum().getParentGenre().getName();
 
       if (excludedGenres.contains(genreName.toLowerCase())) {
-        log.debug("buildSmartAdditionPool: genre '{}' is excluded from smart additions",
+        log.debug("computeSmartCandidatesForSource: genre '{}' is excluded from smart additions",
             genreName);
-        return;
+        return newPool;
       }
 
       String artistName = coreSong.getArtistName();
@@ -462,8 +619,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       // Fetch popularity-ranked results for this genre from the song library.
       SearchResultDto genreResults = this.songLibraryService.getGenreMusicByPopularity(genreName);
 
-      List<SmartBackgroundMusicSongEntity> newPool = new ArrayList<>();
-      Set<String> excludedPaths = new HashSet<>();
+      Set<String> excludedPaths = new HashSet<>(reservedPaths);
       excludedPaths.add(coreSongPath);
 
       // ── Same-artist / same-album candidates ──────────────────────────────
@@ -533,22 +689,20 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         }
       }
 
-      // Shuffle the final combined list one more time to fully randomise the draw order.
-      Collections.shuffle(newPool, ThreadLocalRandom.current());
-
-      if (!newPool.isEmpty()) {
-        // Disposable per-cycle pool — wholesale-replace whatever was persisted before.
-        smartBackgroundMusicRepository.storeAll(newPool);
-        this.smartPool = newPool;
-        rebuildSmartCaches();
+      // Reserve every path claimed by this source so later sources in the same build pass don't
+      // pick it too.
+      for (SmartBackgroundMusicSongEntity candidate : newPool) {
+        reservedPaths.add(candidate.getSongFilePath());
       }
 
     } catch (Exception e) {
-      // Fail-safe: if pool-building fails for any reason, log and leave the pool empty so
-      // getNextSmartAdditionSong() will fall back gracefully.
-      log.warn("buildSmartAdditionPool: could not build smart-addition pool for {}: {}", coreSong,
-          e.getMessage(), e);
+      // Fail-safe: if candidate computation fails for any reason, log and return whatever was
+      // gathered so far (typically empty).
+      log.warn("computeSmartCandidatesForSource: could not compute smart candidates for {}: {}",
+          coreSong, e.getMessage(), e);
     }
+
+    return newPool;
   }
 
   /**
@@ -558,7 +712,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private boolean isEligibleByPlayCount(SongDto s) {
 
     int plays = (s.getNumPlays() == null) ? 0 : s.getNumPlays();
-    return plays >= smartBackgroundMusicMinPlays;
+    boolean isEligibleByPlayCount =  plays >= smartBackgroundMusicMinPlays;
+    return isEligibleByPlayCount;
   }
 
   /**

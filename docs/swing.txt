@@ -1109,3 +1109,28 @@ Item 1: Create a BackgroundMusicRootEntity that has collections for both Backgro
 
 
 Item 2: Refactor BackgroundMusicService so that it takes in a SINGLE repository (that per item 1, operates on both types of background music songs)
+
+
+
+
+
+For BackgroundMusicService, do the following:
+
+Item 1: When none of the JSON files exist upon loadAndReconcile(), change the logic so that the smart background music file is generated fully, 
+with each entry being seeded from a source BackgroundMusicSong (i.e. songs in BackgroundMusic.TXT)
+
+Item 2: To be clear, all of the smart background music songs still need to have:
+a: a source song
+b: a SmartAdditionReason (that is related to the source song)
+b: meet genre exclusion filter
+c: meet min play filter
+
+The reason for this, is that I want to be able to see the whole list of smart background songs at once.  
+Also, whenever all background music songs have been replayed, then the same process is to happen with smart background songs, 
+as the popularity of songs may have changed.
+
+Please ask any questions before proceeding with implementation.
+
+
+
+
