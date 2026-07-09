@@ -6,15 +6,23 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import com.djt.jukeanator_engine.domain.backgroundmusic.config.BackgroundMusicProperties;
 import com.djt.jukeanator_engine.domain.backgroundmusic.exception.BackgroundMusicServiceException;
+import com.djt.jukeanator_engine.domain.backgroundmusic.model.BackgroundMusicSongEntity;
+import com.djt.jukeanator_engine.domain.backgroundmusic.model.SmartAdditionReason;
+import com.djt.jukeanator_engine.domain.backgroundmusic.model.SmartBackgroundMusicSongEntity;
+import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepository;
+import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgroundMusicRepository;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.utils.BackgroundMusicHelper;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
@@ -32,6 +40,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private static final Logger log = LoggerFactory.getLogger(BackgroundMusicServiceImpl.class);
 
   private final SongLibraryService songLibraryService;
+  private final BackgroundMusicRepository backgroundMusicRepository;
+  private final SmartBackgroundMusicRepository smartBackgroundMusicRepository;
   private final BackgroundMusicHelper backgroundMusicHelper = new BackgroundMusicHelper();
 
   private String rootPath;
@@ -44,19 +54,36 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private final int smartBackgroundMusicAdditionsBegin;
   private final int smartBackgroundMusicAdditionsEnd;
 
+  // ── Core background-music in-memory cache (Item 5) ────────────────────────
+  private List<BackgroundMusicSongEntity> allSongs = new ArrayList<>();
+  private Map<Integer, BackgroundMusicSongEntity> songsById = new HashMap<>();
+  private List<Integer> notPlayedIds = new ArrayList<>();
+  private Set<String> currentPlaylistPaths = new HashSet<>();
+
+  // ── Smart-additions in-memory cache (disposable per-cycle pool) ───────────
+  private List<SmartBackgroundMusicSongEntity> smartPool = new ArrayList<>();
+  private Map<Integer, SmartBackgroundMusicSongEntity> smartSongsById = new HashMap<>();
+  private List<Integer> smartNotPlayedIds = new ArrayList<>();
+
   public BackgroundMusicServiceImpl(String rootPath, String rootPathWindows, String rootPathUnix,
-      BackgroundMusicProperties backgroundMusicProperties, SongLibraryService songLibraryService) {
+      BackgroundMusicProperties backgroundMusicProperties, SongLibraryService songLibraryService,
+      BackgroundMusicRepository backgroundMusicRepository,
+      SmartBackgroundMusicRepository smartBackgroundMusicRepository) {
 
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
     requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
     requireNonNull(backgroundMusicProperties, "backgroundMusicProperties cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
+    requireNonNull(backgroundMusicRepository, "backgroundMusicRepository cannot be null");
+    requireNonNull(smartBackgroundMusicRepository, "smartBackgroundMusicRepository cannot be null");
 
     this.rootPath = rootPath;
     this.rootPathWindows = rootPathWindows;
     this.rootPathUnix = rootPathUnix;
     this.songLibraryService = songLibraryService;
+    this.backgroundMusicRepository = backgroundMusicRepository;
+    this.smartBackgroundMusicRepository = smartBackgroundMusicRepository;
 
     this.enableBackgroundMusic = backgroundMusicProperties.isEnableBackgroundMusic();
     this.enableSmartBackgroundMusicAdditions =
@@ -83,20 +110,22 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       return;
     }
 
-    // Try first to load from a file called BackgroundMusic.TXT
+    // Try first to load the playlist from BackgroundMusic.TXT and reconcile it against the
+    // persisted repository.
     try {
 
-      backgroundMusicHelper.initializeBackgroundMusic(this.rootPath);
+      loadAndReconcile();
 
     } catch (Exception e1) {
 
       // NOTE: If unable to load BackgroundMusic.TXT, then fall back to using the most popular
-      // songs. The first draw from getNextSong() will self-heal the played/not-played files.
+      // songs. The retry below will self-heal the repository from the freshly-created file.
       log.error("Unable to initialize background music playlist, error: " + e1.getMessage());
 
       try {
 
         createBackgroundMusicFromTopSongs();
+        loadAndReconcile();
 
       } catch (Exception e) {
 
@@ -108,6 +137,60 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         this.enableBackgroundMusic = false;
       }
     }
+  }
+
+  /**
+   * Reads the canonical playlist from {@code BackgroundMusic.TXT}, loads the persisted
+   * {@link BackgroundMusicSongEntity} collection, and reconciles the two: any playlist path not
+   * yet known becomes a new entity (persisted with {@code timeLastPlayed=null}). Entities for
+   * paths no longer present in the playlist are left untouched in the repository, but excluded
+   * from the not-played selection cache.
+   */
+  private void loadAndReconcile() throws IOException {
+
+    List<String> playlistPaths = backgroundMusicHelper.readBackgroundMusicPlaylist(this.rootPath);
+    this.currentPlaylistPaths = new HashSet<>(playlistPaths);
+
+    this.allSongs = new ArrayList<>(backgroundMusicRepository.loadAll());
+    rebuildSongsById();
+
+    Set<String> knownPaths = new HashSet<>();
+    for (BackgroundMusicSongEntity song : allSongs) {
+      knownPaths.add(song.getSongFilePath());
+    }
+
+    boolean changed = false;
+    for (String path : playlistPaths) {
+      if (!knownPaths.contains(path)) {
+        allSongs.add(new BackgroundMusicSongEntity(null, path));
+        knownPaths.add(path);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      backgroundMusicRepository.storeAll(allSongs);
+      rebuildSongsById();
+    }
+
+    rebuildNotPlayedCache();
+  }
+
+  private void rebuildSongsById() {
+
+    this.songsById = new HashMap<>();
+    for (BackgroundMusicSongEntity song : allSongs) {
+      songsById.put(song.getPersistentIdentity(), song);
+    }
+  }
+
+  private void rebuildNotPlayedCache() {
+
+    this.notPlayedIds = allSongs.stream()
+        .filter(BackgroundMusicSongEntity::isNotYetPlayed)
+        .filter(song -> currentPlaylistPaths.contains(song.getSongFilePath()))
+        .map(BackgroundMusicSongEntity::getPersistentIdentity)
+        .collect(Collectors.toCollection(ArrayList::new));
   }
 
   private void createBackgroundMusicFromTopSongs() throws IOException {
@@ -136,19 +219,44 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     return this.enableBackgroundMusic;
   }
 
+  private Integer pickRandom(List<Integer> ids) {
+
+    if (ids.size() == 1) {
+      return ids.get(0);
+    }
+    int index = ThreadLocalRandom.current().nextInt(ids.size());
+    return ids.get(index);
+  }
+
   @Override
   public SongFileEntity getNextSong() {
 
     try {
 
-      String songPathName = backgroundMusicHelper.getRandomSongFromBackgroundMusicPlaylist(
-          this.rootPath, this.rootPathWindows, this.rootPathUnix);
+      if (notPlayedIds.isEmpty()) {
+        // Every song has been played this cycle — reset all of them and start over.
+        for (BackgroundMusicSongEntity song : allSongs) {
+          song.setTimeLastPlayed(null);
+        }
+        rebuildNotPlayedCache();
+      }
 
-      SongFileEntity song = this.songLibraryService.getSongLibraryRoot().getSongByPath(songPathName);
+      if (notPlayedIds.isEmpty()) {
+        throw new BackgroundMusicServiceException("No background music songs available");
+      }
 
-      backgroundMusicHelper.update(this.rootPath);
+      Integer chosenId = pickRandom(notPlayedIds);
+      BackgroundMusicSongEntity chosen = songsById.get(chosenId);
 
-      return song;
+      chosen.markPlayed(Instant.now());
+      notPlayedIds.remove(chosenId);
+
+      backgroundMusicRepository.storeAll(allSongs);
+
+      String normalizedPath = backgroundMusicHelper.normalizePathForCurrentOS(
+          chosen.getSongFilePath(), this.rootPathWindows, this.rootPathUnix);
+
+      return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalizedPath);
 
     } catch (Exception e) {
       throw new BackgroundMusicServiceException(
@@ -197,25 +305,28 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
       buildSmartAdditionPool(coreSong, getSmartAdditionsFactor());
 
-      String songPathName = backgroundMusicHelper.getRandomSmartAdditionSongPath(this.rootPath,
-          this.rootPathWindows, this.rootPathUnix);
-
-      if (songPathName == null) {
-        // Pool was exhausted; helper has reset — caller should treat this as a miss.
+      if (smartNotPlayedIds.isEmpty()) {
+        // Pool was exhausted/empty; caller should treat this as a miss.
         return null;
       }
 
-      SongFileEntity song;
+      Integer chosenId = pickRandom(smartNotPlayedIds);
+      SmartBackgroundMusicSongEntity chosen = smartSongsById.get(chosenId);
+
+      chosen.markPlayed(Instant.now());
+      smartNotPlayedIds.remove(chosenId);
+      smartBackgroundMusicRepository.storeAll(smartPool);
+
+      String normalizedPath = backgroundMusicHelper.normalizePathForCurrentOS(
+          chosen.getSongFilePath(), this.rootPathWindows, this.rootPathUnix);
+
       try {
-        song = this.songLibraryService.getSongLibraryRoot().getSongByPath(songPathName);
+        return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalizedPath);
       } catch (EntityDoesNotExistException ednee) {
         // Path not found in library — fail gracefully so the caller can fall back.
-        log.warn("getNextSmartAdditionSong: could not find song for path: {}", songPathName);
+        log.warn("getNextSmartAdditionSong: could not find song for path: {}", normalizedPath);
         return null;
       }
-
-      backgroundMusicHelper.updateSmartAdditions(this.rootPath);
-      return song;
 
     } catch (Exception e) {
       log.warn("getNextSmartAdditionSong: failed for core song {}: {}", coreSong, e.getMessage());
@@ -223,11 +334,23 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     }
   }
 
+  private void rebuildSmartCaches() {
+
+    this.smartSongsById = new HashMap<>();
+    for (SmartBackgroundMusicSongEntity song : smartPool) {
+      smartSongsById.put(song.getPersistentIdentity(), song);
+    }
+    this.smartNotPlayedIds = smartPool.stream()
+        .filter(SmartBackgroundMusicSongEntity::isNotYetPlayed)
+        .map(SmartBackgroundMusicSongEntity::getPersistentIdentity)
+        .collect(Collectors.toCollection(ArrayList::new));
+  }
+
   /**
-   * Ensures the smart-additions pool held by {@code BackgroundMusicHelper} contains candidates
-   * relevant to {@code coreSong}. The pool is rebuilt only when it is empty (i.e. all previously
-   * loaded candidates have been played), so across a single background-music cycle the pool
-   * accumulates candidates from every core song encountered.
+   * Ensures the in-memory smart-additions pool contains candidates relevant to
+   * {@code coreSong}. The pool is rebuilt only when it is empty (i.e. all previously loaded
+   * candidates have been played), and — being a disposable per-cycle pool — is wholesale-replaced
+   * in the repository each time it is rebuilt rather than accumulated as permanent history.
    *
    * <h3>Mix formula</h3>
    * <ul>
@@ -239,20 +362,22 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    *
    * <p>
    * All candidates are drawn from {@link SongLibraryService#getGenreMusicByPopularity}
-   * (popularity-ordered) and sorted randomly before loading into the pool.
+   * (popularity-ordered) and sorted randomly before loading into the pool. Each candidate is
+   * tagged with the {@link SmartAdditionReason} that explains why it was picked.
    */
   private void buildSmartAdditionPool(SongFileEntity coreSong, int factor) {
 
     try {
 
       // Only rebuild the pool when it is empty — preserves the played/not-played cycle.
-      if (backgroundMusicHelper.getSmartAdditionsNotPlayedCount() > 0) {
+      if (!smartNotPlayedIds.isEmpty()) {
         return;
       }
 
       String genreName = coreSong.getAlbum().getParentGenre().getName();
       String artistName = coreSong.getArtistName();
       Integer albumId = coreSong.getAlbum().getPersistentIdentity();
+      String coreSongPath = coreSong.getNaturalIdentity();
 
       // Determine how many same-artist/album vs genre slots this factor calls for.
       int sameArtistSlots;
@@ -272,12 +397,15 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       // Fetch popularity-ranked results for this genre from the song library.
       SearchResultDto genreResults = this.songLibraryService.getGenreMusicByPopularity(genreName);
 
-      List<String> candidatePaths = new ArrayList<>();
+      List<SmartBackgroundMusicSongEntity> newPool = new ArrayList<>();
+      Set<String> excludedPaths = new HashSet<>();
+      excludedPaths.add(coreSongPath);
 
       // ── Same-artist / same-album candidates ──────────────────────────────
       if (sameArtistSlots > 0 && genreResults.getSongs() != null) {
 
         List<SongDto> sameArtistSongs = new ArrayList<>();
+        Map<Integer, SmartAdditionReason> reasonBySongId = new HashMap<>();
         for (SongDto s : genreResults.getSongs()) {
           boolean sameArtist = artistName.equalsIgnoreCase(s.getArtistName());
           boolean sameAlbum = albumId.equals(s.getAlbumId());
@@ -286,6 +414,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
               && albumId.equals(s.getAlbumId());
           if (!isCoreSong && (sameArtist || sameAlbum)) {
             sameArtistSongs.add(s);
+            reasonBySongId.put(s.getSongId(),
+                sameAlbum ? SmartAdditionReason.SAME_ALBUM : SmartAdditionReason.SAME_ARTIST);
           }
         }
 
@@ -298,18 +428,17 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         for (int i = 0; i < Math.min(sameArtistSlots, topSameArtist.size()); i++) {
           SongDto s = topSameArtist.get(i);
           SongFileEntity entity = findSongEntity(s.getAlbumId(), s.getSongId());
-          if (entity != null) {
-            candidatePaths.add(entity.getNaturalIdentity());
+          if (entity != null && !excludedPaths.contains(entity.getNaturalIdentity())) {
+            SmartAdditionReason reason = reasonBySongId.get(s.getSongId());
+            newPool.add(new SmartBackgroundMusicSongEntity(null, entity.getNaturalIdentity(),
+                coreSongPath, reason));
+            excludedPaths.add(entity.getNaturalIdentity());
           }
         }
       }
 
       // ── Genre candidates (different artist/album, popular) ────────────────
       if (genreSlots > 0 && genreResults.getSongs() != null) {
-
-        // Build an exclusion set: paths already in candidatePaths + the core song itself.
-        Set<String> excluded = new HashSet<>(candidatePaths);
-        excluded.add(coreSong.getNaturalIdentity());
 
         List<SongDto> genreSongs = new ArrayList<>();
         for (SongDto s : genreResults.getSongs()) {
@@ -330,19 +459,23 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
           if (added >= genreSlots)
             break;
           SongFileEntity entity = findSongEntity(s.getAlbumId(), s.getSongId());
-          if (entity != null && !excluded.contains(entity.getNaturalIdentity())) {
-            candidatePaths.add(entity.getNaturalIdentity());
-            excluded.add(entity.getNaturalIdentity());
+          if (entity != null && !excludedPaths.contains(entity.getNaturalIdentity())) {
+            newPool.add(new SmartBackgroundMusicSongEntity(null, entity.getNaturalIdentity(),
+                coreSongPath, SmartAdditionReason.POPULAR_SONG_FROM_GENRE));
+            excludedPaths.add(entity.getNaturalIdentity());
             added++;
           }
         }
       }
 
       // Shuffle the final combined list one more time to fully randomise the draw order.
-      Collections.shuffle(candidatePaths, ThreadLocalRandom.current());
+      Collections.shuffle(newPool, ThreadLocalRandom.current());
 
-      if (!candidatePaths.isEmpty()) {
-        backgroundMusicHelper.loadSmartAdditionCandidates(this.rootPath, candidatePaths);
+      if (!newPool.isEmpty()) {
+        // Disposable per-cycle pool — wholesale-replace whatever was persisted before.
+        smartBackgroundMusicRepository.storeAll(newPool);
+        this.smartPool = newPool;
+        rebuildSmartCaches();
       }
 
     } catch (Exception e) {

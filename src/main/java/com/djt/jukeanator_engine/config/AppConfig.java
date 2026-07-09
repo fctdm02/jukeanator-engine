@@ -8,6 +8,10 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.djt.jukeanator_engine.domain.backgroundmusic.config.BackgroundMusicProperties;
+import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepository;
+import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepositoryFileSystemImpl;
+import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgroundMusicRepository;
+import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgroundMusicRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicService;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicServiceImpl;
 import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
@@ -168,6 +172,21 @@ public class AppConfig {
     return new UserRepositoryPostgresImpl();
   }
 
+  // ── Background music repositories ───────────────────────────────────────
+
+  @Bean
+  public BackgroundMusicRepository backgroundMusicRepository(AppProperties appProperties) {
+
+    return new BackgroundMusicRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
+  }
+
+  @Bean
+  public SmartBackgroundMusicRepository smartBackgroundMusicRepository(
+      AppProperties appProperties) {
+
+    return new SmartBackgroundMusicRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
+  }
+
   // ── Services ──────────────────────────────────────────────────────────────
   @Bean
   @Primary
@@ -193,14 +212,18 @@ public class AppConfig {
   public BackgroundMusicService backgroundMusicService(
       AppProperties appProperties,
       BackgroundMusicProperties backgroundMusicProperties,
-      SongLibraryService songLibraryService) {
+      SongLibraryService songLibraryService,
+      BackgroundMusicRepository backgroundMusicRepository,
+      SmartBackgroundMusicRepository smartBackgroundMusicRepository) {
 
     return new BackgroundMusicServiceImpl(
         appProperties.getEffectiveRootPath(),
         appProperties.getRootPathWindows(),
         appProperties.getRootPathUnix(),
         backgroundMusicProperties,
-        songLibraryService);
+        songLibraryService,
+        backgroundMusicRepository,
+        smartBackgroundMusicRepository);
   }
 
   @Bean

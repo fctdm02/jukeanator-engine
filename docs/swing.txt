@@ -1092,3 +1092,20 @@ Have I answered all of your questions?
 There is an issue loading the home page for the Web UI.  Attached is the javscript console output showing 403s.  I would like the backend to be logging any exceptions like to both the console and log file, as I cannot troubleshoot anything with a generic "403" for a given endpoint.
 
 But the main task here is to resolve the issue of not being able to load the home page
+
+
+
+
+
+
+
+
+Do the following:
+
+
+
+Item 1: Create a BackgroundMusicRootEntity that has collections for both BackgroundMusicSongEntity (called "backgroundMusicSongs") and SmartBackgroundMusicSongEntity (called "smartBackgroundMusicSongs")
+
+
+
+Item 2: Refactor BackgroundMusicService so that it takes in a SINGLE repository (that per item 1, operates on both types of background music songs)

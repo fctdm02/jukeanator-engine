@@ -45,7 +45,7 @@ song-queue:
   allow-explicit-songs-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) Only used when allowExplicitSongsAtAllTimes is false
 
 background-music:
-  enable-background-music: false # assumes playlist file called BackgroundMusic.TXT exists in rootPath
+  enable-background-music: true # assumes playlist file called BackgroundMusic.TXT exists in rootPath
   enable-smart-background-music-additions: true # will play songs from same artist/album from background music
   smart-background-music-additions-factor: 2 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
   smart-background-music-additions-begin: 7 # start time for enableSmartBackgroundMusicAdditions
@@ -66,17 +66,16 @@ user-interface:
   enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
   always-on-top: false
   enable-screen-saver: false
+  # HIBERNATE CONFIGURATION  
   enable-hibernation: false
   hibernate-begin: 3 # In 24 hour/military time (e.g. 3:00 hours is 3:00AM) Only used when enableHibernation is true
   hibernate-end: 10 # In 24 hour/military time (e.g. 10:00 hours is 10:00AM) Only used when enableHibernation is true  
-  #
   # CREDIT CONFIGURATION
-  #
   increment-credits-key: a
   num-credits: 0
   priority-cost-multiplier: 2
   credits-per-dollar: 3
   five-dollar-bonus-credits: 3
   ten-dollar-bonus-credits: 10
-  #SEARCH CONFIGURATION
+  # SEARCH CONFIGURATION
   enable-type-ahead-search: true
