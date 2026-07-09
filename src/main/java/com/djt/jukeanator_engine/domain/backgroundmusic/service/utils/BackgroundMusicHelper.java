@@ -18,6 +18,9 @@ public class BackgroundMusicHelper extends FileSystemHelper {
 
   private static final String BACKGROUND_MUSIC = "BackgroundMusic.TXT";
 
+  public static final String SMART_BACKGROUND_MUSIC_GENRE_EXCLUSIONS_FILENAME =
+      "SmartBackgroundMusicGenreExclusions.TXT";
+
   /**
    * Reads the canonical background-music playlist file. If it does not exist, this method does
    * not create it — callers needing the top-songs fallback should catch the resulting
@@ -25,6 +28,21 @@ public class BackgroundMusicHelper extends FileSystemHelper {
    */
   public List<String> readBackgroundMusicPlaylist(String rootPath) throws IOException {
     return readNonBlankLines(rootPath + File.separator + BACKGROUND_MUSIC);
+  }
+
+  /**
+   * Reads {@value #SMART_BACKGROUND_MUSIC_GENRE_EXCLUSIONS_FILENAME} — one genre name per line —
+   * from the same root path as {@code BackgroundMusic.TXT}. Any genre listed in this file is
+   * excluded from smart-addition candidate selection. The file is optional: if it does not exist,
+   * an empty list is returned (no genres excluded).
+   */
+  public List<String> readSmartBackgroundMusicGenreExclusions(String rootPath) throws IOException {
+
+    String path = rootPath + File.separator + SMART_BACKGROUND_MUSIC_GENRE_EXCLUSIONS_FILENAME;
+    if (!exists(path)) {
+      return List.of();
+    }
+    return readNonBlankLines(path);
   }
 
   /**

@@ -50,6 +50,7 @@ background-music:
   smart-background-music-additions-factor: 2 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
   smart-background-music-additions-begin: 7 # start time for enableSmartBackgroundMusicAdditions
   smart-background-music-additions-end: 5 # end time for enableSmartBackgroundMusicAdditions
+  smart-background-music-min-plays: 5 # candidate songs need at least this many plays to be eligible as a smart addition
 
 song-player:
   player-type: vlc   # vlc or detached-vlc (all operating systems) | winamp (windows only)

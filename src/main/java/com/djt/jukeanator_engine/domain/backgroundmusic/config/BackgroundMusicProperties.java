@@ -23,6 +23,8 @@ public class BackgroundMusicProperties {
                                                          // enableSmartBackgroundMusicAdditions
   private int smartBackgroundMusicAdditionsEnd = 5; // end time for
                                                       // enableSmartBackgroundMusicAdditions
+  private int smartBackgroundMusicMinPlays = 0; // minimum number of song plays a candidate must
+                                                  // have to be eligible as a smart addition
 
   public boolean isEnableBackgroundMusic() {
     return enableBackgroundMusic;
@@ -62,5 +64,13 @@ public class BackgroundMusicProperties {
 
   public void setSmartBackgroundMusicAdditionsEnd(int smartBackgroundMusicAdditionsEnd) {
     this.smartBackgroundMusicAdditionsEnd = smartBackgroundMusicAdditionsEnd;
+  }
+
+  public int getSmartBackgroundMusicMinPlays() {
+    return smartBackgroundMusicMinPlays;
+  }
+
+  public void setSmartBackgroundMusicMinPlays(int smartBackgroundMusicMinPlays) {
+    this.smartBackgroundMusicMinPlays = smartBackgroundMusicMinPlays;
   }
 }

@@ -53,12 +53,16 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private final int smartBackgroundMusicAdditionsFactor;
   private final int smartBackgroundMusicAdditionsBegin;
   private final int smartBackgroundMusicAdditionsEnd;
+  private final int smartBackgroundMusicMinPlays;
 
   // ── Core background-music in-memory cache (Item 5) ────────────────────────
   private List<BackgroundMusicSongEntity> allSongs = new ArrayList<>();
   private Map<Integer, BackgroundMusicSongEntity> songsById = new HashMap<>();
   private List<Integer> notPlayedIds = new ArrayList<>();
   private Set<String> currentPlaylistPaths = new HashSet<>();
+
+  // ── Genres excluded from smart-addition candidate selection ───────────────
+  private Set<String> excludedGenres = new HashSet<>();
 
   // ── Smart-additions in-memory cache (disposable per-cycle pool) ───────────
   private List<SmartBackgroundMusicSongEntity> smartPool = new ArrayList<>();
@@ -94,6 +98,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         backgroundMusicProperties.getSmartBackgroundMusicAdditionsBegin();
     this.smartBackgroundMusicAdditionsEnd =
         backgroundMusicProperties.getSmartBackgroundMusicAdditionsEnd();
+    this.smartBackgroundMusicMinPlays = backgroundMusicProperties.getSmartBackgroundMusicMinPlays();
 
     initialize();
   }
@@ -105,6 +110,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     log.info("smartBackgroundMusicAdditionsFactor: " + this.smartBackgroundMusicAdditionsFactor);
     log.info("smartBackgroundMusicAdditionsBegin: " + this.smartBackgroundMusicAdditionsBegin);
     log.info("smartBackgroundMusicAdditionsEnd: " + this.smartBackgroundMusicAdditionsEnd);
+    log.info("smartBackgroundMusicMinPlays: " + this.smartBackgroundMusicMinPlays);
 
     if (!this.enableBackgroundMusic) {
       return;
@@ -144,12 +150,18 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * {@link BackgroundMusicSongEntity} collection, and reconciles the two: any playlist path not
    * yet known becomes a new entity (persisted with {@code timeLastPlayed=null}). Entities for
    * paths no longer present in the playlist are left untouched in the repository, but excluded
-   * from the not-played selection cache.
+   * from the not-played selection cache. Also (re)loads the smart-addition genre exclusions list.
    */
   private void loadAndReconcile() throws IOException {
 
     List<String> playlistPaths = backgroundMusicHelper.readBackgroundMusicPlaylist(this.rootPath);
     this.currentPlaylistPaths = new HashSet<>(playlistPaths);
+
+    List<String> genreExclusions =
+        backgroundMusicHelper.readSmartBackgroundMusicGenreExclusions(this.rootPath);
+    this.excludedGenres = genreExclusions.stream()
+        .map(String::toLowerCase)
+        .collect(Collectors.toCollection(HashSet::new));
 
     this.allSongs = new ArrayList<>(backgroundMusicRepository.loadAll());
     rebuildSongsById();
@@ -375,6 +387,13 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       }
 
       String genreName = coreSong.getAlbum().getParentGenre().getName();
+
+      if (excludedGenres.contains(genreName.toLowerCase())) {
+        log.debug("buildSmartAdditionPool: genre '{}' is excluded from smart additions",
+            genreName);
+        return;
+      }
+
       String artistName = coreSong.getArtistName();
       Integer albumId = coreSong.getAlbum().getPersistentIdentity();
       String coreSongPath = coreSong.getNaturalIdentity();
@@ -412,7 +431,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
           // Exclude the core song itself; prefer same album, fall back to same artist.
           boolean isCoreSong = coreSong.getPersistentIdentity().equals(s.getSongId())
               && albumId.equals(s.getAlbumId());
-          if (!isCoreSong && (sameArtist || sameAlbum)) {
+          if (!isCoreSong && (sameArtist || sameAlbum) && isEligibleByPlayCount(s)) {
             sameArtistSongs.add(s);
             reasonBySongId.put(s.getSongId(),
                 sameAlbum ? SmartAdditionReason.SAME_ALBUM : SmartAdditionReason.SAME_ARTIST);
@@ -444,7 +463,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         for (SongDto s : genreResults.getSongs()) {
           boolean differentArtist = !artistName.equalsIgnoreCase(s.getArtistName());
           boolean differentAlbum = !albumId.equals(s.getAlbumId());
-          if (differentArtist && differentAlbum) {
+          if (differentArtist && differentAlbum && isEligibleByPlayCount(s)) {
             genreSongs.add(s);
           }
         }
@@ -484,6 +503,16 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       log.warn("buildSmartAdditionPool: could not build smart-addition pool for {}: {}", coreSong,
           e.getMessage(), e);
     }
+  }
+
+  /**
+   * Returns {@code true} when {@code s} has at least {@code smartBackgroundMusicMinPlays} plays,
+   * making it eligible as a smart-addition candidate.
+   */
+  private boolean isEligibleByPlayCount(SongDto s) {
+
+    int plays = (s.getNumPlays() == null) ? 0 : s.getNumPlays();
+    return plays >= smartBackgroundMusicMinPlays;
   }
 
   /**
