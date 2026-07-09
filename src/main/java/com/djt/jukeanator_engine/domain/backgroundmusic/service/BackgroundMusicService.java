@@ -3,6 +3,8 @@ package com.djt.jukeanator_engine.domain.backgroundmusic.service;
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
+import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 
 /**
  * Drives the background-music playlist: a played/not-played rotation over
@@ -58,4 +60,23 @@ public interface BackgroundMusicService {
    */
   @PublicServiceMethod
   void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event);
+
+  /**
+   * NOTE: System method, not to be invoked on behalf of a user. Keeps track of what is currently
+   * sitting in the song queue, so selection can avoid picking a song that's already queued but
+   * hasn't played yet.
+   *
+   * @param event
+   */
+  @PublicServiceMethod
+  void handleSongQueueChangedEvent(SongQueueChangedEvent event);
+
+  /**
+   * NOTE: System method, not to be invoked on behalf of a user. Marks a background or
+   * smart-addition song as played if, and only if, it is the song that just started playing.
+   *
+   * @param event
+   */
+  @PublicServiceMethod
+  void handleSongPlaybackStartedEvent(SongPlaybackStartedEvent event);
 }

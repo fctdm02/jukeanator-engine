@@ -31,6 +31,9 @@ import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongs
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
+import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 
 /**
  * @author tmyers
@@ -58,6 +61,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   // ── Core background-music in-memory cache (Item 5) ────────────────────────
   private List<BackgroundMusicSongEntity> allSongs = new ArrayList<>();
   private Map<Integer, BackgroundMusicSongEntity> songsById = new HashMap<>();
+  private Map<String, Integer> normalizedPathToId = new HashMap<>();
   private List<Integer> notPlayedIds = new ArrayList<>();
   private Set<String> currentPlaylistPaths = new HashSet<>();
 
@@ -67,7 +71,13 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   // ── Smart-additions in-memory cache (disposable per-cycle pool) ───────────
   private List<SmartBackgroundMusicSongEntity> smartPool = new ArrayList<>();
   private Map<Integer, SmartBackgroundMusicSongEntity> smartSongsById = new HashMap<>();
+  private Map<String, Integer> smartNormalizedPathToId = new HashMap<>();
   private List<Integer> smartNotPlayedIds = new ArrayList<>();
+
+  // ── Live song-queue contents (normalized paths), kept in sync via
+  // SongQueueChangedEvent — used to avoid picking a song that's already queued but hasn't
+  // played yet. ─────────────────────────────────────────────────────────────
+  private Set<String> currentlyQueuedPaths = new HashSet<>();
 
   public BackgroundMusicServiceImpl(String rootPath, String rootPathWindows, String rootPathUnix,
       BackgroundMusicProperties backgroundMusicProperties, SongLibraryService songLibraryService,
@@ -191,9 +201,16 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private void rebuildSongsById() {
 
     this.songsById = new HashMap<>();
+    this.normalizedPathToId = new HashMap<>();
     for (BackgroundMusicSongEntity song : allSongs) {
       songsById.put(song.getPersistentIdentity(), song);
+      normalizedPathToId.put(normalizedPath(song), song.getPersistentIdentity());
     }
+  }
+
+  private String normalizedPath(BackgroundMusicSongEntity song) {
+    return backgroundMusicHelper.normalizePathForCurrentOS(song.getSongFilePath(),
+        this.rootPathWindows, this.rootPathUnix);
   }
 
   private void rebuildNotPlayedCache() {
@@ -240,40 +257,63 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     return ids.get(index);
   }
 
+  /**
+   * NOTE: Selection is read-only — it does <b>not</b> mark the chosen song as played or remove
+   * it from the not-played pool. A song is only ever marked played (via
+   * {@link #handleSongPlaybackStartedEvent}) once it actually starts playing, since there is no
+   * guarantee a queued song will ever be played (e.g. the queue is flushed, the jukebox goes into
+   * hibernation, or the application restarts before its turn comes up).
+   */
   @Override
   public SongFileEntity getNextSong() {
 
     try {
 
-      if (notPlayedIds.isEmpty()) {
-        // Every song has been played this cycle — reset all of them and start over.
-        for (BackgroundMusicSongEntity song : allSongs) {
-          song.setTimeLastPlayed(null);
-        }
-        rebuildNotPlayedCache();
-      }
-
-      if (notPlayedIds.isEmpty()) {
-        throw new BackgroundMusicServiceException("No background music songs available");
-      }
-
-      Integer chosenId = pickRandom(notPlayedIds);
+      Integer chosenId = pickNextEligibleBackgroundId();
       BackgroundMusicSongEntity chosen = songsById.get(chosenId);
 
-      chosen.markPlayed(Instant.now());
-      notPlayedIds.remove(chosenId);
-
-      backgroundMusicRepository.storeAll(allSongs);
-
-      String normalizedPath = backgroundMusicHelper.normalizePathForCurrentOS(
-          chosen.getSongFilePath(), this.rootPathWindows, this.rootPathUnix);
-
-      return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalizedPath);
+      return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalizedPath(chosen));
 
     } catch (Exception e) {
       throw new BackgroundMusicServiceException(
           "Cannot get next background music song, error: " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Picks a persistent identity from the not-played pool, preferring candidates that are not
+   * already sitting in the song queue (so the same song is never queued twice while waiting for
+   * its turn to actually play). Falls back to the full not-played pool if every remaining
+   * candidate happens to already be queued.
+   *
+   * <p>
+   * When the pool is empty — i.e. every song has actually been played this cycle — resets every
+   * song's {@code timeLastPlayed} back to {@code null} and persists that reset immediately, so it
+   * survives a restart even if none of the reset songs happen to be replayed before then.
+   */
+  private Integer pickNextEligibleBackgroundId() {
+
+    if (notPlayedIds.isEmpty()) {
+      for (BackgroundMusicSongEntity song : allSongs) {
+        song.setTimeLastPlayed(null);
+      }
+      backgroundMusicRepository.storeAll(allSongs);
+      rebuildNotPlayedCache();
+    }
+
+    if (notPlayedIds.isEmpty()) {
+      throw new BackgroundMusicServiceException("No background music songs available");
+    }
+
+    List<Integer> eligible = notPlayedIds.stream()
+        .filter(id -> !isCurrentlyQueued(songsById.get(id)))
+        .collect(Collectors.toList());
+
+    return pickRandom(eligible.isEmpty() ? notPlayedIds : eligible);
+  }
+
+  private boolean isCurrentlyQueued(BackgroundMusicSongEntity song) {
+    return song != null && currentlyQueuedPaths.contains(normalizedPath(song));
   }
 
   /**
@@ -310,6 +350,10 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     return Math.max(1, Math.min(10, smartBackgroundMusicAdditionsFactor));
   }
 
+  /**
+   * NOTE: Selection is read-only — see {@link #getNextSong()} for why a song is only marked
+   * played once it is actually confirmed via {@link #handleSongPlaybackStartedEvent}.
+   */
   @Override
   public SongFileEntity getNextSmartAdditionSong(SongFileEntity coreSong) {
 
@@ -317,20 +361,20 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
       buildSmartAdditionPool(coreSong, getSmartAdditionsFactor());
 
-      if (smartNotPlayedIds.isEmpty()) {
-        // Pool was exhausted/empty; caller should treat this as a miss.
+      List<Integer> eligible = smartNotPlayedIds.stream()
+          .filter(id -> !isCurrentlyQueued(smartSongsById.get(id)))
+          .collect(Collectors.toList());
+
+      if (eligible.isEmpty()) {
+        // Pool exhausted/empty, or every remaining candidate is already queued; caller should
+        // treat this as a miss and fall back to the core playlist.
         return null;
       }
 
-      Integer chosenId = pickRandom(smartNotPlayedIds);
+      Integer chosenId = pickRandom(eligible);
       SmartBackgroundMusicSongEntity chosen = smartSongsById.get(chosenId);
 
-      chosen.markPlayed(Instant.now());
-      smartNotPlayedIds.remove(chosenId);
-      smartBackgroundMusicRepository.storeAll(smartPool);
-
-      String normalizedPath = backgroundMusicHelper.normalizePathForCurrentOS(
-          chosen.getSongFilePath(), this.rootPathWindows, this.rootPathUnix);
+      String normalizedPath = normalizedPath(chosen);
 
       try {
         return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalizedPath);
@@ -349,8 +393,10 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private void rebuildSmartCaches() {
 
     this.smartSongsById = new HashMap<>();
+    this.smartNormalizedPathToId = new HashMap<>();
     for (SmartBackgroundMusicSongEntity song : smartPool) {
       smartSongsById.put(song.getPersistentIdentity(), song);
+      smartNormalizedPathToId.put(normalizedPath(song), song.getPersistentIdentity());
     }
     this.smartNotPlayedIds = smartPool.stream()
         .filter(SmartBackgroundMusicSongEntity::isNotYetPlayed)
@@ -536,5 +582,65 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   @Override
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
     this.rootPath = event.scanPath();
+  }
+
+  /**
+   * Keeps {@link #currentlyQueuedPaths} in sync with the live song queue, so selection can avoid
+   * picking a song that is already sitting in the queue waiting to play.
+   */
+  @EventListener
+  @Override
+  public void handleSongQueueChangedEvent(SongQueueChangedEvent event) {
+
+    try {
+      this.currentlyQueuedPaths = event.queuedSongs().stream()
+          .map(SongQueueEntryDto::getSongPath)
+          .collect(Collectors.toCollection(HashSet::new));
+    } catch (Exception e) {
+      log.warn("handleSongQueueChangedEvent: failed to update queued-paths cache: {}",
+          e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Marks a background or smart-addition song as played — updating {@code timeLastPlayed} and
+   * persisting it — if, and only if, the song that just started playing matches one of them. This
+   * is the sole place {@code timeLastPlayed} is set: selection alone (via {@link #getNextSong()}
+   * / {@link #getNextSmartAdditionSong}) never marks a song played, since a queued song is not
+   * guaranteed to ever actually play (queue flush, hibernation, application restart, etc.).
+   *
+   * <p>
+   * Matching is by song path, and applies regardless of how the song ended up in the queue (auto
+   * -populated by background music, or manually queued by a user) — {@code timeLastPlayed}
+   * reflects whether the file was actually played, not why it was played.
+   */
+  @EventListener
+  @Override
+  public void handleSongPlaybackStartedEvent(SongPlaybackStartedEvent event) {
+
+    try {
+
+      String playedPath = event.songQueueEntry().getSongPath();
+
+      Integer backgroundId = normalizedPathToId.get(playedPath);
+      if (backgroundId != null) {
+        BackgroundMusicSongEntity song = songsById.get(backgroundId);
+        song.markPlayed(Instant.now());
+        notPlayedIds.remove(backgroundId);
+        backgroundMusicRepository.storeAll(allSongs);
+      }
+
+      Integer smartId = smartNormalizedPathToId.get(playedPath);
+      if (smartId != null) {
+        SmartBackgroundMusicSongEntity song = smartSongsById.get(smartId);
+        song.markPlayed(Instant.now());
+        smartNotPlayedIds.remove(smartId);
+        smartBackgroundMusicRepository.storeAll(smartPool);
+      }
+
+    } catch (Exception e) {
+      log.warn("handleSongPlaybackStartedEvent: failed to mark song played for event {}: {}",
+          event, e.getMessage(), e);
+    }
   }
 }
