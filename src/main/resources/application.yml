@@ -38,7 +38,7 @@ song-library:
 song-queue:
   repository-type: filesystem   # filesystem | postgres
   reset-queue-at-startup: true
-  minimum-number-songs-to-keep-in-queue: 10 # Only used when background-music.enable-background-music is true
+  minimum-number-songs-to-keep-in-queue: 3 # Only used when background-music.enable-background-music is true
   minimum-minutes-between-song-plays: 60
   allow-explicit-songs-at-all-times: false
   allow-explicit-songs-begin: 21 # In 24 hour/military time (e.g. 21:00 hours is 9:00PM) Only used when allowExplicitSongsAtAllTimes is false
