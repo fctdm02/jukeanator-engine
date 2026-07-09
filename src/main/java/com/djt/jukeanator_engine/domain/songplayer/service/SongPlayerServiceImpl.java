@@ -93,6 +93,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
     this.playerType = songPlayerProperties.getPlayerType();
     this.playerVolume = songPlayerProperties.getPlayerVolume();
     this.masterVolume = songPlayerProperties.getMasterVolume();
+    
     this.songQueueService = songQueueService;
     this.masterVolumeService = masterVolumeService;
     this.lineInService = lineInService;
@@ -101,8 +102,8 @@ public class SongPlayerServiceImpl implements SongPlayerService {
     OSType osType = OperatingSystemDetector.getOperatingSystem();
     if (this.playerType.equals("winamp") && osType == OSType.WINDOWS) {
 
-      this.player =
-          new WinampMediaPlayer(songPlayerProperties.getWinampExePath(), this.playerVolume);
+      String winampPath = songPlayerProperties.getWinampExePath();
+      this.player = new WinampMediaPlayer(winampPath, this.playerVolume);
 
     } else if (this.playerType.equals("video-vlc")) {
 
