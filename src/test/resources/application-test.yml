@@ -37,19 +37,21 @@ song-library:
 
 song-queue:
   repository-type: filesystem   # filesystem | postgres
-  reset-queue-at-startup: true  
-  enable-background-music: false # assumes playlist file called BackgroundMusic.TXT exists in rootPath
-  enable-smart-background-music-additions: true # will play songs from same artist/album from background music
-  smart-background-music-additions-factor: 2 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs  
-  smart-background-music-additions-begin: 7 # start time for enableSmartBackgroundMusicAdditions
-  smart-background-music-additions-end: 5 # end time for enableSmartBackgroundMusicAdditions  
-  minimum-number-songs-to-keep-in-queue: 5 # Only used when enableBackgroundMusic is true
+  reset-queue-at-startup: true
+  minimum-number-songs-to-keep-in-queue: 5 # Only used when background-music.enable-background-music is true
   minimum-minutes-between-song-plays: 60
   allow-explicit-songs-at-all-times: false
   allow-explicit-songs-begin: 21 # In 24 hour/military time (e.g. 21:00 hours is 9:00PM) Only used when allowExplicitSongsAtAllTimes is false
   allow-explicit-songs-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) Only used when allowExplicitSongsAtAllTimes is false
 
-song-player:  
+background-music:
+  enable-background-music: false # assumes playlist file called BackgroundMusic.TXT exists in rootPath
+  enable-smart-background-music-additions: true # will play songs from same artist/album from background music
+  smart-background-music-additions-factor: 2 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
+  smart-background-music-additions-begin: 7 # start time for enableSmartBackgroundMusicAdditions
+  smart-background-music-additions-end: 5 # end time for enableSmartBackgroundMusicAdditions
+
+song-player:
   player-type: vlc   # vlc or detached-vlc (all operating systems) | winamp (windows only)
   winamp-exe-path: C:\\Program Files (x86)\\Winamp\\winamp.exe
   player-volume: 100 # 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software amplification)

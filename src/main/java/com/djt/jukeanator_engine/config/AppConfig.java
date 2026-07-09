@@ -7,6 +7,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.djt.jukeanator_engine.domain.backgroundmusic.config.BackgroundMusicProperties;
+import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicService;
+import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicServiceImpl;
 import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
@@ -187,19 +190,36 @@ public class AppConfig {
 
   @Bean
   @Primary
+  public BackgroundMusicService backgroundMusicService(
+      AppProperties appProperties,
+      BackgroundMusicProperties backgroundMusicProperties,
+      SongLibraryService songLibraryService) {
+
+    return new BackgroundMusicServiceImpl(
+        appProperties.getEffectiveRootPath(),
+        appProperties.getRootPathWindows(),
+        appProperties.getRootPathUnix(),
+        backgroundMusicProperties,
+        songLibraryService);
+  }
+
+  @Bean
+  @Primary
   public SongQueueService songQueueService(
       AppProperties appProperties,
       SongQueueProperties songQueueProperties,
       SongLibraryService songLibraryService,
+      BackgroundMusicService backgroundMusicService,
       SongQueueRepository songQueueRepository,
       ApplicationEventPublisher eventPublisher) {
-    
+
     return new SongQueueServiceImpl(
         appProperties.getEffectiveRootPath(),
         appProperties.getRootPathWindows(),
         appProperties.getRootPathUnix(),
         songQueueProperties,
         songLibraryService,
+        backgroundMusicService,
         songQueueRepository,
         eventPublisher);
   }

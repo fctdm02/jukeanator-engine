@@ -113,12 +113,6 @@ public interface SongLibraryService {
    */
   SongDto getSongById(Integer albumId, Integer songId);
 
-  /**
-   * 
-   * @return
-   */
-  SongDto getRandomSongFromBackgroundMusicPlaylist();
-
 
   // ADMIN ROLE METHODS
   /**

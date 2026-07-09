@@ -1,4 +1,4 @@
-package com.djt.jukeanator_engine.domain.songlibrary.model.utils;
+package com.djt.jukeanator_engine.domain.common.utils;
 
 import java.io.BufferedWriter;
 import java.io.IOException;

@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.domain.songlibrary.client;
 
 import java.util.List;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.client.RestClient;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
@@ -129,14 +128,6 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
     return restClient.get().uri("/api/song-library/songs/" + albumId + "/" + songId).retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
-
-  @Override
-  @GetMapping("/songs/random")
-  public SongDto getRandomSongFromBackgroundMusicPlaylist() {
-
-    return restClient.get().uri("/api/song-library/songs/random").retrieve().body(SongDto.class);
-  }
-
 
   // ADMIN ROLE METHODS
   @Override

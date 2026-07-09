@@ -1,10 +1,11 @@
-package com.djt.jukeanator_engine.domain.songlibrary.model.utils;
+package com.djt.jukeanator_engine.domain.backgroundmusic.service.utils;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import com.djt.jukeanator_engine.domain.common.utils.FileSystemHelper;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 
@@ -24,8 +25,8 @@ public class BackgroundMusicHelper extends FileSystemHelper {
    * BACKGROUND_MUSIC_NOT_PLAYED
    *
    * Smart additions mirror the same played/not-played pattern using a separate pair of files.
-   * SMART_ADDITIONS_NOT_PLAYED is populated externally (by SongQueueServiceImpl) with song paths
-   * derived from genre/artist/album lookups. As songs are drawn via
+   * SMART_ADDITIONS_NOT_PLAYED is populated externally (by BackgroundMusicServiceImpl) with song
+   * paths derived from genre/artist/album lookups. As songs are drawn via
    * getRandomSmartAdditionSongPath() they migrate to SMART_ADDITIONS_PLAYED. When
    * SMART_ADDITIONS_NOT_PLAYED is exhausted the two lists reset so the cycle restarts.
    */
@@ -128,7 +129,7 @@ public class BackgroundMusicHelper extends FileSystemHelper {
 
   /**
    * Replaces the smart-additions not-played pool with the supplied list of song paths and resets
-   * the played list to empty. Called by {@code SongQueueServiceImpl} whenever a new batch of
+   * the played list to empty. Called by {@code BackgroundMusicServiceImpl} whenever a new batch of
    * smart-addition candidates has been computed.
    *
    * @param rootPath the root data directory

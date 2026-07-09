@@ -523,18 +523,6 @@ public class SongLibraryServiceImpl
     }
   }
 
-  @Override
-  public SongDto getRandomSongFromBackgroundMusicPlaylist() {
-
-    try {
-      return SongLibraryMapper
-          .toSongDto(this.songLibraryRoot.getRandomSongFromBackgroundMusicPlaylist(this.rootPath,
-              this.rootPathWindows, this.rootPathUnix));
-    } catch (IOException e) {
-      throw new SongLibraryServiceException("Could not get random song from background music playlist", e);
-    }
-  }
-
 
   // ADMIN ROLE METHODS
   @Override

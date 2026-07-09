@@ -180,12 +180,6 @@ public class SongLibraryController {
   }
 
 
-  @GetMapping("/songs/random")
-  public SongDto getRandomSongFromBackgroundMusicPlaylist() {
-    return songLibraryService.getRandomSongFromBackgroundMusicPlaylist();
-  }
-
-
   // ADMIN ROLE METHODS
 
   @PostMapping("/scanNoPath")

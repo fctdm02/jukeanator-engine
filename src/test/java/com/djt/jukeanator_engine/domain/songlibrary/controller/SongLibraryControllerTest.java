@@ -174,15 +174,6 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   }
 
   @Test
-  void getRandomSongFromBackgroundMusicPlaylist_delegatesToService() throws Exception {
-    when(songLibraryService.getRandomSongFromBackgroundMusicPlaylist()).thenReturn(aSong());
-
-    mockMvc.perform(get("/api/song-library/songs/random"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.songName", is("Song")));
-  }
-
-  @Test
   void scanFileSystemForSongsNoPath_delegatesToService() throws Exception {
     when(songLibraryService.scanFileSystemForSongs()).thenReturn(5);
 

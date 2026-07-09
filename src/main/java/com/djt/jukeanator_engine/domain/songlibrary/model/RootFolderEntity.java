@@ -15,11 +15,10 @@ import java.util.TreeSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.utils.FileSystemHelper;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
-import com.djt.jukeanator_engine.domain.songlibrary.model.utils.BackgroundMusicHelper;
-import com.djt.jukeanator_engine.domain.songlibrary.model.utils.FileSystemHelper;
 
 public class RootFolderEntity extends FolderEntity {
 
@@ -27,18 +26,13 @@ public class RootFolderEntity extends FolderEntity {
 
   private static final long serialVersionUID = 2L;
 
-  private static final String CD_STATS = "CDStats.TXT";
-  private static final String CD_STATS_BACKUP = "CDStats_backup.TXT";
 
   // Used to read/write CDStats file
+  private static final String CD_STATS = "CDStats.TXT";
+  private static final String CD_STATS_BACKUP = "CDStats_backup.TXT";
   private static final FileSystemHelper fileSystemHelper = new FileSystemHelper();
 
-  // Used only when background music is enabled
-  private static final BackgroundMusicHelper backgroundMusicHelper = new BackgroundMusicHelper();
-
-
   private Set<ArtistFromSongEntity> artistsFromSongs = new TreeSet<ArtistFromSongEntity>();
-
 
   private transient Map<Integer, GenreFolderEntity> genresMap;
   private transient Map<GenreFolderEntity, Set<AlbumFolderEntity>> albumsByGenreMap;
@@ -493,107 +487,5 @@ public class RootFolderEntity extends FolderEntity {
       throw new SongLibraryServiceException(
           "Failed to store song num plays to CD Stats file: " + cdStatsPathName, e);
     }
-  }
-
-  // BACKGROUND MUSIC RELATED
-  public void initializeBackgroundMusic(String rootPath, String rootPathWindows,
-      String rootPathUnix) throws IOException {
-
-    backgroundMusicHelper.initializeBackgroundMusic(rootPath);
-  }
-
-  public SongFileEntity getRandomSongFromBackgroundMusicPlaylist(String rootPath,
-      String rootPathWindows, String rootPathUnix) throws IOException {
-
-    String songPathName = backgroundMusicHelper.getRandomSongFromBackgroundMusicPlaylist(rootPath,
-        rootPathWindows, rootPathUnix);
-
-    if (this.songsByPath == null) {
-      initializeSongsByPath();
-    }
-
-    SongFileEntity song = this.songsByPath.get(songPathName);
-    if (song != null) {
-
-      backgroundMusicHelper.update(rootPath);
-      return song;
-    }
-    throw new IllegalStateException("Could not find song: " + songPathName);
-  }
-
-  // SMART ADDITIONS RELATED
-
-  /**
-   * Delegates to {@link BackgroundMusicHelper#getRandomSmartAdditionSongPath} and resolves the
-   * returned path to a {@link SongFileEntity}.
-   *
-   * @return the next smart-addition song, or {@code null} when the pool is exhausted (the helper
-   *         will have reset itself so the next {@link #loadSmartAdditionCandidates} call starts a
-   *         fresh cycle)
-   */
-  public SongFileEntity getRandomSmartAdditionSong(String rootPath, String rootPathWindows,
-      String rootPathUnix) throws IOException {
-
-    if (this.songsByPath == null) {
-      initializeSongsByPath();
-    }
-    
-    String songPathName = backgroundMusicHelper.getRandomSmartAdditionSongPath(rootPath,
-        rootPathWindows, rootPathUnix);
-
-    if (songPathName == null) {
-      // Pool was exhausted; helper has reset — caller should treat this as a miss.
-      return null;
-    }
-
-    songPathName = songPathName.replace(":\\\\", ":\\");
-
-    SongFileEntity song = this.songsByPath.get(songPathName);
-    if (song != null) {
-      backgroundMusicHelper.updateSmartAdditions(rootPath);
-      return song;
-    }
-
-    // Path not found in library — log and return null so caller falls back gracefully (Item 7).
-    System.err.println("getRandomSmartAdditionSong: could not find song for path: " + songPathName);
-    return null;
-  }
-
-  /**
-   * Loads a new set of smart-addition candidates into the not-played pool.
-   *
-   * @param rootPath the root data directory
-   * @param candidatePathNames the full set of candidate paths for this smart-additions cycle
-   */
-  public void loadSmartAdditionCandidates(String rootPath, List<String> candidatePathNames)
-      throws IOException {
-
-    backgroundMusicHelper.loadSmartAdditionCandidates(rootPath, candidatePathNames);
-  }
-
-  /**
-   * Returns the number of smart-addition songs still remaining in the not-played pool.
-   */
-  public int getSmartAdditionsNotPlayedCount() {
-    return backgroundMusicHelper.getSmartAdditionsNotPlayedCount();
-  }
-
-  public void createBackgroundMusicFromTopSongs(String rootPath) throws IOException {
-
-    List<SongFileEntity> songs = new ArrayList<>(this.songsMap.values());
-
-    songs.sort((s1, s2) -> Integer.compare(s2.getNumPlays() == null ? 0 : s2.getNumPlays(),
-        s1.getNumPlays() == null ? 0 : s1.getNumPlays()));
-
-    List<String> topSongPathNames = new ArrayList<>();
-    for (SongFileEntity song : songs) {
-
-      topSongPathNames.add(song.getNaturalIdentity());
-
-      if (topSongPathNames.size() >= 500) {
-        break;
-      }
-    }
-    backgroundMusicHelper.createBackgroundMusicFromTopSongs(rootPath, topSongPathNames);
   }
 }
