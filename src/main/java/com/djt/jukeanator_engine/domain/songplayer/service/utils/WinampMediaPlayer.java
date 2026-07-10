@@ -96,6 +96,16 @@ public class WinampMediaPlayer implements Player {
       new AtomicReference<>(SongPlayerStatus.STOPPED);
   private final AtomicBoolean callbackFired = new AtomicBoolean(false);
 
+  /**
+   * Poll-thread-private view of the last observed status, used only for PLAYING → STOPPED edge
+   * detection. This is deliberately kept separate from {@link #status}: {@link #getStatus()} is
+   * called from other threads (e.g. REST status polling) and overwrites {@link #status} as a
+   * side effect, which previously could race with this poll loop and "steal" the transition
+   * before the poll loop observed it — permanently suppressing the {@code onFinished} callback.
+   * Only {@link #pollPlaybackState()} reads/writes this field, so it is safe as a plain field.
+   */
+  private SongPlayerStatus lastPolledStatus = SongPlayerStatus.STOPPED;
+
   private volatile Runnable onFinished;
   private volatile int currentVolume; // 0-200 (Player contract)
   private volatile long songLengthMs = 0L;
@@ -178,6 +188,7 @@ public class WinampMediaPlayer implements Player {
       callbackFired.set(false);
       songLengthMs = 0L;
       status.set(SongPlayerStatus.STOPPED);
+      lastPolledStatus = SongPlayerStatus.STOPPED;
 
       // Close any existing Winamp instance so we get a clean playlist.
       HWND existing = findWinampWindow();
@@ -487,17 +498,33 @@ public class WinampMediaPlayer implements Player {
 
       // Winamp was closed externally.
       if (hwnd == null) {
-        if (status.getAndSet(SongPlayerStatus.STOPPED) == SongPlayerStatus.PLAYING) {
+        status.set(SongPlayerStatus.STOPPED);
+        if (lastPolledStatus == SongPlayerStatus.PLAYING) {
+          lastPolledStatus = SongPlayerStatus.STOPPED;
+          cancelPollTask();
           fireOnFinished();
         }
-        cancelPollTask();
         return;
       }
 
       int raw = (int) sendIPC(hwnd, 0, IPC_ISPLAYING);
       SongPlayerStatus live = rawStatusToEnum(raw);
 
-      SongPlayerStatus previous = status.getAndSet(live);
+      // Belt-and-suspenders: if Winamp still reports "playing" but playback position has
+      // already reached (or passed) the track length, treat it as finished. This guards
+      // against IPC_ISPLAYING not flipping to stopped promptly at end-of-track.
+      if (live == SongPlayerStatus.PLAYING && hasReachedEndOfTrack(hwnd)) {
+        live = SongPlayerStatus.STOPPED;
+      }
+
+      status.set(live);
+
+      // Edge-detect on our own poll-thread-private view, NOT on the shared `status` field.
+      // `status` can also be written by getStatus() from other threads (e.g. REST status
+      // reads); using it for edge detection let those reads silently steal the transition
+      // before this loop observed it, so the onFinished callback would never fire.
+      SongPlayerStatus previous = lastPolledStatus;
+      lastPolledStatus = live;
 
       // Fire the callback when transitioning out of PLAYING into STOPPED.
       // We do NOT fire on PLAYING → PAUSED.
@@ -509,6 +536,23 @@ public class WinampMediaPlayer implements Player {
     } catch (Exception e) {
       LOG.log(Level.FINE, "Poll error (Winamp may have just closed)", e);
     }
+  }
+
+  /**
+   * Returns {@code true} when the current playback position has reached or passed the known
+   * track length. Used as a secondary end-of-track signal alongside IPC_ISPLAYING.
+   */
+  private boolean hasReachedEndOfTrack(HWND hwnd) {
+    long lengthMs = songLengthMs;
+    if (lengthMs <= 0) {
+      long lengthSec = sendIPC(hwnd, 1, IPC_GETOUTPUTTIME);
+      if (lengthSec <= 0)
+        return false;
+      lengthMs = lengthSec * 1000L;
+      songLengthMs = lengthMs;
+    }
+    long posMs = sendIPC(hwnd, 0, IPC_GETOUTPUTTIME);
+    return posMs >= 0 && posMs >= lengthMs;
   }
 
   /**
