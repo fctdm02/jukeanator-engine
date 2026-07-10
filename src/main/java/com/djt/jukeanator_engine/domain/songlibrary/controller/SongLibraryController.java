@@ -153,6 +153,9 @@ public class SongLibraryController {
       throws EntityDoesNotExistException, IOException {
 
     AlbumDto album = songLibraryService.getAlbumById(id);
+    if (album == null) {
+      throw new EntityDoesNotExistException("No album found for id: " + id);
+    }
     if (album.getCoverArtPath() == null) {
       throw new EntityDoesNotExistException("No cover art path set for album: " + id);
     }

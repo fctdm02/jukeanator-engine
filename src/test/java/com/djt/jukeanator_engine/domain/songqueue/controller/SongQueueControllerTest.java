@@ -22,11 +22,15 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.user.service.UserService;
 
 class SongQueueControllerTest extends AbstractControllerTest {
 
   @Mock
   private SongQueueService songQueueService;
+
+  @Mock
+  private UserService userService;
 
   @InjectMocks
   private SongQueueController songQueueController;

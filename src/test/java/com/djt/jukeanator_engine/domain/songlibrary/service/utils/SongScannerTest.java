@@ -67,6 +67,17 @@ public class SongScannerTest {
     Files.writeString(dir.resolve(filename), "content", StandardCharsets.UTF_8);
   }
 
+  /**
+   * A leading dot only makes {@link File#isHidden()} true on Unix-like filesystems. On Windows,
+   * hidden-ness is a DOS file attribute, so tests that rely on {@code isHidden()} must set it
+   * explicitly to behave the same way on both platforms.
+   */
+  private void markHidden(Path path) throws IOException {
+    if (Files.getFileStore(path).supportsFileAttributeView("dos")) {
+      Files.setAttribute(path, "dos:hidden", true);
+    }
+  }
+
   // =========================================================================================
   // CONSTRUCTOR VALIDATION
   // =========================================================================================
@@ -242,9 +253,12 @@ public class SongScannerTest {
       throws IOException {
 
     writeFile(root.resolve(".HiddenArtist/AlbumA"), "ArtistA-01-SongOne.mp3");
+    markHidden(root.resolve(".HiddenArtist"));
     Path visibleAlbum = root.resolve("ArtistB/AlbumB");
     writeFile(visibleAlbum, "ArtistB-01-SongTwo.mp3");
-    Files.writeString(visibleAlbum.resolve(".DS_Store"), "junk");
+    Path dsStore = visibleAlbum.resolve(".DS_Store");
+    Files.writeString(dsStore, "junk");
+    markHidden(dsStore);
 
     SongScanner scanner = newScanner(false, false, false);
     RootFolderEntity result = scanner.scanFileSystemForSongs(root.toString());

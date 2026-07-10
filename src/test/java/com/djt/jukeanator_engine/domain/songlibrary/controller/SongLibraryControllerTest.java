@@ -56,12 +56,12 @@ class SongLibraryControllerTest extends AbstractControllerTest {
 
   @Test
   void getMusicBySearch_passesSearchParam() throws Exception {
-    when(songLibraryService.getMusicBySearch("foo")).thenReturn(new SearchResultDto());
+    when(songLibraryService.getMusicBySearch("foo", 20)).thenReturn(new SearchResultDto());
 
     mockMvc.perform(get("/api/song-library/search").param("searchFor", "foo"))
         .andExpect(status().isOk());
 
-    verify(songLibraryService).getMusicBySearch("foo");
+    verify(songLibraryService).getMusicBySearch("foo", 20);
   }
 
   @Test

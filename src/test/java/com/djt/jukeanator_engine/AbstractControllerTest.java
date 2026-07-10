@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine;
 
+import com.djt.jukeanator_engine.domain.common.controller.GlobalExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +19,7 @@ public abstract class AbstractControllerTest {
   @BeforeEach
   void setUpMockMvc() {
     StandaloneMockMvcBuilder builder = MockMvcBuilders.standaloneSetup(getController());
+    builder.setControllerAdvice(new GlobalExceptionHandler(objectMapper));
     configureMockMvc(builder);
     mockMvc = builder.build();
   }
