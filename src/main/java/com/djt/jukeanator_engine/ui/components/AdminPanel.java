@@ -423,23 +423,31 @@ public class AdminPanel extends JPanel {
 
   private void doFlushQueue() {
 
-    int confirm = JOptionPane.showConfirmDialog(this, "Clear the entire song queue?", "Flush Queue",
+    int confirm = JOptionPane.showConfirmDialog(this, "Clear the entire song queue?", "Clear Queue",
         JOptionPane.YES_NO_OPTION);
     if (confirm == JOptionPane.YES_OPTION) {
-      try {
-        songQueueService.flushQueue();
-      } catch (Exception ex) {
-        ex.printStackTrace();
-      }
+      SwingSecurityUtil.runAsync(() -> {
+        try {
+          songQueueService.flushQueue();
+        } catch (Exception ex) {
+          ex.printStackTrace();
+        }
+      });
     }
   }
 
   private void doRandomizeQueue() {
 
-    try {
-      songQueueService.randomizeQueue();
-    } catch (Exception ex) {
-      ex.printStackTrace();
+    int confirm = JOptionPane.showConfirmDialog(this, "Shuffle the entire song queue?", "Shuffle Queue",
+        JOptionPane.YES_NO_OPTION);
+    if (confirm == JOptionPane.YES_OPTION) {
+      SwingSecurityUtil.runAsync(() -> {
+        try {
+          songQueueService.randomizeQueue();
+        } catch (Exception ex) {
+          ex.printStackTrace();
+        }
+      });
     }
   }
 

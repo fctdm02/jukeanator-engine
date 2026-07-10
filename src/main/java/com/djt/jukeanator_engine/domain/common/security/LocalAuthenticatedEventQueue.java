@@ -33,6 +33,16 @@ import com.djt.jukeanator_engine.domain.common.aop.ServiceSecurityAspect;
  * queue: all subsequent event dispatches go through {@link #dispatchEvent(AWTEvent)} on this
  * subclass.
  *
+ * <h3>Reentrancy</h3> Modal dialogs and blocking choosers ({@code JOptionPane.showConfirmDialog},
+ * {@code JFileChooser.showOpenDialog}, etc.) pump a secondary event loop on the EDT that is
+ * serviced by this same queue instance, so {@link #dispatchEvent(AWTEvent)} can be re-entered
+ * before the outer call has returned. Because {@code SecurityContextHolder} is backed by a
+ * {@code ThreadLocal}, an unconditional {@code clearContext()} in the inner call's {@code finally}
+ * block would wipe out the context for the still-running outer dispatch as soon as the dialog
+ * closes — e.g. a handler that shows a confirmation dialog and then calls a service method
+ * afterwards would find itself unauthenticated. To avoid that, each call saves and restores the
+ * context that was active before it ran, rather than clearing unconditionally.
+ *
  * @author tmyers
  */
 public final class LocalAuthenticatedEventQueue extends EventQueue {
@@ -41,9 +51,12 @@ public final class LocalAuthenticatedEventQueue extends EventQueue {
   protected void dispatchEvent(AWTEvent event) {
 
     /*
-     * Install LOCAL auth into this thread's (the EDT's) ThreadLocal security context for the
-     * duration of this event dispatch.
+     * Save whatever context was active before this (possibly nested) dispatch, then install LOCAL
+     * auth into this thread's (the EDT's) ThreadLocal security context for the duration of the
+     * dispatch.
      */
+    SecurityContext previous = SecurityContextHolder.getContext();
+
     SecurityContext ctx = SecurityContextHolder.createEmptyContext();
     ctx.setAuthentication(LocalAuthenticationToken.INSTANCE);
     SecurityContextHolder.setContext(ctx);
@@ -52,10 +65,10 @@ public final class LocalAuthenticatedEventQueue extends EventQueue {
       super.dispatchEvent(event);
     } finally {
       /*
-       * Clear the ThreadLocal so it does not leak between event dispatches. The next
-       * dispatchEvent() call will re-install it fresh.
+       * Restore rather than clear, so a nested dispatch (e.g. from a modal dialog's secondary
+       * event loop) hands control back to the outer dispatch with its context intact.
        */
-      SecurityContextHolder.clearContext();
+      SecurityContextHolder.setContext(previous);
     }
   }
 }

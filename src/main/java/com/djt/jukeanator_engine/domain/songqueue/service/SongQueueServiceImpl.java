@@ -560,9 +560,15 @@ public class SongQueueServiceImpl
   }
 
   @Override
-  public Integer flushQueue() {
+  public synchronized Integer flushQueue() {
     Integer numSongsFlushed = songQueueRoot.flushQueue();
     songQueueRepository.storeAggregateRoot(songQueueRoot);
+
+    // Top the queue back up to minimumNumberSongsToKeepInQueue — the same top-up
+    // that dequeueNextSong()/removeSongDownFromQueue() perform — so a flush never
+    // leaves the queue empty when background music is enabled.
+    autoPopulateQueue();
+
     eventPublisher
         .publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
     return numSongsFlushed;
