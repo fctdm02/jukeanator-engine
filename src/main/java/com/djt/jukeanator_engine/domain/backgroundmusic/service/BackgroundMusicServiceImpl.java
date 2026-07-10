@@ -831,7 +831,11 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    */
   private boolean isFavoriteAlbum(AlbumFolderEntity album) {
 
-    String albumPath = album.getNaturalIdentity().replace('\\', '/');
+    // Normalize a doubled backslash after the drive letter (e.g. "R:\\Rock_On_Third" as loaded
+    // from config) to a single backslash before converting to forward slashes, otherwise it
+    // survives as a double slash ("R://Rock_On_Third") and never matches the single-slash paths
+    // normalized from SmartBackgroundMusicAlbumInclusions.TXT.
+    String albumPath = album.getNaturalIdentity().replace(":\\\\", ":\\").replace('\\', '/');
 
     for (String favoritePath : favoriteAlbumPaths) {
       if (albumPath.equals(favoritePath) || albumPath.endsWith("/" + favoritePath)) {
