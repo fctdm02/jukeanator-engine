@@ -8,5 +8,6 @@ package com.djt.jukeanator_engine.domain.backgroundmusic.model;
 public enum SmartAdditionReason {
   SAME_ARTIST,
   SAME_ALBUM,
-  POPULAR_SONG_FROM_GENRE
+  POPULAR_SONG_FROM_GENRE,
+  SONG_FROM_FAVORITE_ALBUM
 }

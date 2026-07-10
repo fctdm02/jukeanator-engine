@@ -31,6 +31,7 @@ import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
+import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -60,6 +61,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private final int smartBackgroundMusicAdditionsBegin;
   private final int smartBackgroundMusicAdditionsEnd;
   private final int smartBackgroundMusicMinPlays;
+  private final double smartBackgroundMusicFavoriteAlbumsPercentage;
 
   // ── Core background-music in-memory cache (Item 5) ────────────────────────
   private List<BackgroundMusicSongEntity> allSongs = new ArrayList<>();
@@ -70,6 +72,11 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
   // ── Genres excluded from smart-addition candidate selection ───────────────
   private Set<String> excludedGenres = new HashSet<>();
+
+  // ── Favorite albums (forward-slash-normalized path suffixes, see #isFavoriteAlbum) whose songs
+  // are interleaved into the smart-addition pool with no source song — see
+  // SmartAdditionReason.SONG_FROM_FAVORITE_ALBUM.
+  private Set<String> favoriteAlbumPaths = new HashSet<>();
 
   // ── Smart-additions in-memory cache (disposable per-cycle pool) ───────────
   private List<SmartBackgroundMusicSongEntity> smartPool = new ArrayList<>();
@@ -112,6 +119,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     this.smartBackgroundMusicAdditionsEnd =
         backgroundMusicProperties.getSmartBackgroundMusicAdditionsEnd();
     this.smartBackgroundMusicMinPlays = backgroundMusicProperties.getSmartBackgroundMusicMinPlays();
+    this.smartBackgroundMusicFavoriteAlbumsPercentage =
+        backgroundMusicProperties.getSmartBackgroundMusicFavoriteAlbumsPercentage();
 
     initialize();
   }
@@ -145,6 +154,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     log.info("smartBackgroundMusicAdditionsBegin: " + this.smartBackgroundMusicAdditionsBegin);
     log.info("smartBackgroundMusicAdditionsEnd: " + this.smartBackgroundMusicAdditionsEnd);
     log.info("smartBackgroundMusicMinPlays: " + this.smartBackgroundMusicMinPlays);
+    log.info("smartBackgroundMusicFavoriteAlbumsPercentage: "
+        + this.smartBackgroundMusicFavoriteAlbumsPercentage);
 
     if (!this.enableBackgroundMusic) {
       return;
@@ -201,6 +212,12 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         backgroundMusicHelper.readSmartBackgroundMusicGenreExclusions(this.rootPath);
     this.excludedGenres = genreExclusions.stream()
         .map(String::toLowerCase)
+        .collect(Collectors.toCollection(HashSet::new));
+
+    List<String> albumInclusions =
+        backgroundMusicHelper.readSmartBackgroundMusicAlbumInclusions(this.rootPath);
+    this.favoriteAlbumPaths = albumInclusions.stream()
+        .map(BackgroundMusicServiceImpl::normalizeAlbumInclusionPath)
         .collect(Collectors.toCollection(HashSet::new));
 
     this.allSongs = new ArrayList<>(backgroundMusicRepository.loadAll());
@@ -474,11 +491,14 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * <p>
    * Candidates are computed per source song via {@link #computeSmartCandidatesForSource}, using a
    * single shared "reserved paths" set across all sources so the same candidate song is never
-   * claimed by more than one source in the same build pass. The freshly computed candidate set is
-   * then merged against the previous pool by song path: songs that are still valid candidates
-   * keep their persisted identity/play history (only {@code sourceSong}/{@code reason} are
-   * refreshed), brand new candidates start unplayed, and candidates that no longer qualify are
-   * dropped.
+   * claimed by more than one source in the same build pass. Once every source has been processed,
+   * songs from favorite albums (see {@link #favoriteAlbumPaths}) are interleaved in via
+   * {@link #computeFavoriteAlbumCandidates}, targeting
+   * {@code smartBackgroundMusicFavoriteAlbumsPercentage} of the final pool. The freshly computed
+   * candidate set is then merged against the previous pool by song path: songs that are still
+   * valid candidates keep their persisted identity/play history (only {@code sourceSong}/
+   * {@code sourceSongNumPlays}/{@code reason} are refreshed), brand new candidates start unplayed,
+   * and candidates that no longer qualify are dropped.
    */
   private void refreshSmartAdditionPool() {
 
@@ -507,6 +527,14 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         }
       }
 
+      Set<String> favoriteExcludedPaths = new HashSet<>(reservedPaths);
+      favoriteExcludedPaths.addAll(freshByPath.keySet());
+      List<SmartBackgroundMusicSongEntity> favoriteCandidates =
+          computeFavoriteAlbumCandidates(freshByPath.size(), favoriteExcludedPaths);
+      for (SmartBackgroundMusicSongEntity candidate : favoriteCandidates) {
+        freshByPath.put(candidate.getSongFilePath(), candidate);
+      }
+
       Map<String, SmartBackgroundMusicSongEntity> existingByPath = new HashMap<>();
       for (SmartBackgroundMusicSongEntity existing : smartPool) {
         existingByPath.put(existing.getSongFilePath(), existing);
@@ -520,6 +548,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
           // Still a valid candidate — preserve persisted identity/play history, refresh only why
           // it was picked, since a different source may now claim it.
           existing.setSourceSong(fresh.getSourceSong());
+          existing.setSourceSongNumPlays(fresh.getSourceSongNumPlays());
           existing.setReason(fresh.getReason());
           merged.add(existing);
         } else {
@@ -652,7 +681,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
           if (entity != null && !excludedPaths.contains(entity.getNaturalIdentity())) {
             SmartAdditionReason reason = reasonBySongId.get(s.getSongId());
             newPool.add(new SmartBackgroundMusicSongEntity(null, entity.getNaturalIdentity(),
-                coreSongPath, reason));
+                coreSongPath, coreSong.getNumPlays(), reason));
             excludedPaths.add(entity.getNaturalIdentity());
           }
         }
@@ -682,7 +711,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
           SongFileEntity entity = findSongEntity(s.getAlbumId(), s.getSongId());
           if (entity != null && !excludedPaths.contains(entity.getNaturalIdentity())) {
             newPool.add(new SmartBackgroundMusicSongEntity(null, entity.getNaturalIdentity(),
-                coreSongPath, SmartAdditionReason.POPULAR_SONG_FROM_GENRE));
+                coreSongPath, coreSong.getNumPlays(), SmartAdditionReason.POPULAR_SONG_FROM_GENRE));
             excludedPaths.add(entity.getNaturalIdentity());
             added++;
           }
@@ -710,10 +739,122 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * making it eligible as a smart-addition candidate.
    */
   private boolean isEligibleByPlayCount(SongDto s) {
+    return isEligibleByPlayCount(s.getNumPlays());
+  }
 
-    int plays = (s.getNumPlays() == null) ? 0 : s.getNumPlays();
-    boolean isEligibleByPlayCount =  plays >= smartBackgroundMusicMinPlays;
-    return isEligibleByPlayCount;
+  /**
+   * Returns {@code true} when {@code numPlays} is at least {@code smartBackgroundMusicMinPlays},
+   * making a candidate eligible as a smart-addition.
+   */
+  private boolean isEligibleByPlayCount(Integer numPlays) {
+
+    int plays = (numPlays == null) ? 0 : numPlays;
+    return plays >= smartBackgroundMusicMinPlays;
+  }
+
+  /**
+   * Picks songs from {@link #favoriteAlbumPaths} to interleave into the smart-addition pool with
+   * no source song of their own (tagged {@link SmartAdditionReason#SONG_FROM_FAVORITE_ALBUM}) —
+   * see {@link BackgroundMusicHelper#SMART_BACKGROUND_MUSIC_ALBUM_INCLUSIONS_FILENAME}.
+   *
+   * <p>
+   * The number of favorite-album songs picked targets
+   * {@code smartBackgroundMusicFavoriteAlbumsPercentage} of the <em>final</em> pool size — i.e.
+   * solving {@code favoriteCount = pct * (normalCandidateCount + favoriteCount)} for
+   * {@code favoriteCount} — clamping the percentage to [0, 95] so the target never blows up as
+   * {@code pct} approaches 100 %. Candidates still must meet {@link #isEligibleByPlayCount}, and
+   * never overlap {@code excludedPaths} (paths already claimed elsewhere in this build pass).
+   */
+  private List<SmartBackgroundMusicSongEntity> computeFavoriteAlbumCandidates(
+      int normalCandidateCount, Set<String> excludedPaths) {
+
+    List<SmartBackgroundMusicSongEntity> result = new ArrayList<>();
+
+    if (favoriteAlbumPaths.isEmpty()) {
+      return result;
+    }
+
+    try {
+
+      double pct = Math.max(0, Math.min(95, smartBackgroundMusicFavoriteAlbumsPercentage)) / 100.0;
+      int target = (int) Math.round(pct * normalCandidateCount / (1 - pct));
+      if (target <= 0) {
+        return result;
+      }
+
+      List<SongFileEntity> eligibleSongs = new ArrayList<>();
+      for (AlbumFolderEntity album : songLibraryService.getSongLibraryRoot().getAllAlbums()) {
+        if (!isFavoriteAlbum(album)) {
+          continue;
+        }
+        for (SongFileEntity song : album.getChildSongs()) {
+          if (!excludedPaths.contains(song.getNaturalIdentity())
+              && isEligibleByPlayCount(song.getNumPlays())) {
+            eligibleSongs.add(song);
+          }
+        }
+      }
+
+      Collections.shuffle(eligibleSongs, ThreadLocalRandom.current());
+
+      for (int i = 0; i < Math.min(target, eligibleSongs.size()); i++) {
+        SongFileEntity song = eligibleSongs.get(i);
+        result.add(new SmartBackgroundMusicSongEntity(null, song.getNaturalIdentity(), null, null,
+            SmartAdditionReason.SONG_FROM_FAVORITE_ALBUM));
+        excludedPaths.add(song.getNaturalIdentity());
+      }
+
+    } catch (Exception e) {
+      // Fail-safe: if candidate computation fails for any reason, log and return whatever was
+      // gathered so far (typically empty).
+      log.warn("computeFavoriteAlbumCandidates: could not compute favorite-album candidates: {}",
+          e.getMessage(), e);
+    }
+
+    return result;
+  }
+
+  /**
+   * Returns {@code true} when {@code album} matches one of {@link #favoriteAlbumPaths}.
+   *
+   * <p>
+   * Matching is by path <em>suffix</em>, not exact equality: {@code album.getNaturalIdentity()}
+   * is always the full absolute filesystem path (e.g.
+   * {@code /home/user/Music/Rock_On_Third/Pop/Compilations/90s Pub Crawl}), but
+   * {@code SmartBackgroundMusicAlbumInclusions.TXT} entries are typically shorter — anything from
+   * a bare {@code Genre/Artist/Album} to a path rooted at the library's own folder name (e.g.
+   * {@code Rock_On_Third/Pop/Compilations/90s Pub Crawl}) — since requiring the exact absolute
+   * path (including OS-specific drive letters) would make the file impractical to hand-maintain.
+   * A "/" boundary is required immediately before the match so a suffix can't accidentally match
+   * partway through a folder name (e.g. {@code "Compilations"} matching
+   * {@code ".../90s Compilations"}).
+   */
+  private boolean isFavoriteAlbum(AlbumFolderEntity album) {
+
+    String albumPath = album.getNaturalIdentity().replace('\\', '/');
+
+    for (String favoritePath : favoriteAlbumPaths) {
+      if (albumPath.equals(favoritePath) || albumPath.endsWith("/" + favoritePath)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Normalizes a raw line from {@code SmartBackgroundMusicAlbumInclusions.TXT} into the form
+   * {@link #isFavoriteAlbum} compares against: forward slashes, no leading/trailing slash.
+   */
+  private static String normalizeAlbumInclusionPath(String rawPath) {
+
+    String normalized = rawPath.replace('\\', '/').trim();
+    while (normalized.startsWith("/")) {
+      normalized = normalized.substring(1);
+    }
+    while (normalized.endsWith("/")) {
+      normalized = normalized.substring(0, normalized.length() - 1);
+    }
+    return normalized;
   }
 
   /**

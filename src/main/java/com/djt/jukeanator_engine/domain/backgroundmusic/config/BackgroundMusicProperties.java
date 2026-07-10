@@ -25,6 +25,9 @@ public class BackgroundMusicProperties {
                                                       // enableSmartBackgroundMusicAdditions
   private int smartBackgroundMusicMinPlays = 0; // minimum number of song plays a candidate must
                                                   // have to be eligible as a smart addition
+  private double smartBackgroundMusicFavoriteAlbumsPercentage = 20; // target % of the smart pool
+                                                                     // made up of songs from
+                                                                     // SmartBackgroundMusicAlbumInclusions.TXT
 
   public boolean isEnableBackgroundMusic() {
     return enableBackgroundMusic;
@@ -72,5 +75,14 @@ public class BackgroundMusicProperties {
 
   public void setSmartBackgroundMusicMinPlays(int smartBackgroundMusicMinPlays) {
     this.smartBackgroundMusicMinPlays = smartBackgroundMusicMinPlays;
+  }
+
+  public double getSmartBackgroundMusicFavoriteAlbumsPercentage() {
+    return smartBackgroundMusicFavoriteAlbumsPercentage;
+  }
+
+  public void setSmartBackgroundMusicFavoriteAlbumsPercentage(
+      double smartBackgroundMusicFavoriteAlbumsPercentage) {
+    this.smartBackgroundMusicFavoriteAlbumsPercentage = smartBackgroundMusicFavoriteAlbumsPercentage;
   }
 }

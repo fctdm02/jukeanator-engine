@@ -74,6 +74,7 @@ public final class BackgroundMusicMapper {
         entity.getTimeLastPlayed(),
         entity.getNumberOfPlays(),
         entity.getSourceSong(),
+        entity.getSourceSongNumPlays(),
         entity.getReason());
   }
 
@@ -97,6 +98,7 @@ public final class BackgroundMusicMapper {
         dto.getTimeLastPlayed(),
         dto.getNumberOfPlays(),
         dto.getSourceSong(),
+        dto.getSourceSongNumPlays(),
         dto.getReason());
   }
 }

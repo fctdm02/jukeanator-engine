@@ -13,14 +13,17 @@ public class SmartBackgroundMusicSongDto extends BackgroundMusicSongDto {
   private static final long serialVersionUID = 1L;
 
   private String sourceSong;
+  private Integer sourceSongNumPlays;
   private SmartAdditionReason reason;
 
   public SmartBackgroundMusicSongDto() {}
 
   public SmartBackgroundMusicSongDto(Integer persistentIdentity, String songFilePath,
-      Instant timeLastPlayed, int numberOfPlays, String sourceSong, SmartAdditionReason reason) {
+      Instant timeLastPlayed, int numberOfPlays, String sourceSong, Integer sourceSongNumPlays,
+      SmartAdditionReason reason) {
     super(persistentIdentity, songFilePath, timeLastPlayed, numberOfPlays);
     this.sourceSong = sourceSong;
+    this.sourceSongNumPlays = sourceSongNumPlays;
     this.reason = reason;
   }
 
@@ -30,6 +33,14 @@ public class SmartBackgroundMusicSongDto extends BackgroundMusicSongDto {
 
   public void setSourceSong(String sourceSong) {
     this.sourceSong = sourceSong;
+  }
+
+  public Integer getSourceSongNumPlays() {
+    return sourceSongNumPlays;
+  }
+
+  public void setSourceSongNumPlays(Integer sourceSongNumPlays) {
+    this.sourceSongNumPlays = sourceSongNumPlays;
   }
 
   public SmartAdditionReason getReason() {
@@ -42,9 +53,9 @@ public class SmartBackgroundMusicSongDto extends BackgroundMusicSongDto {
 
   @Override
   public String toString() {
-    return "SmartBackgroundMusicSongDto [sourceSong=" + sourceSong + ", reason=" + reason
-        + ", persistentIdentity=" + getPersistentIdentity() + ", songFilePath="
-        + getSongFilePath() + ", timeLastPlayed=" + getTimeLastPlayed() + ", numberOfPlays="
-        + getNumberOfPlays() + "]";
+    return "SmartBackgroundMusicSongDto [sourceSong=" + sourceSong + ", sourceSongNumPlays="
+        + sourceSongNumPlays + ", reason=" + reason + ", persistentIdentity="
+        + getPersistentIdentity() + ", songFilePath=" + getSongFilePath() + ", timeLastPlayed="
+        + getTimeLastPlayed() + ", numberOfPlays=" + getNumberOfPlays() + "]";
   }
 }
