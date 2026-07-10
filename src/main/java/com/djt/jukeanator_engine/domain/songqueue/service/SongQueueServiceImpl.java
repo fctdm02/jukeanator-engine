@@ -275,7 +275,7 @@ public class SongQueueServiceImpl
 
       String coreIneligibility = isSongEligibleForQueue(coreAlbumId, coreSongId, 0);
       if (coreIneligibility == null) {
-        addSongToQueue("BACKGROUND_MUSIC", coreAlbumId, coreSongId, 0);
+        addSongToQueue("BG_MUSIC", coreAlbumId, coreSongId, 0);
       } else {
         log.debug("autoPopulateQueue: core BG song {} not eligible: {}", coreSong,
             coreIneligibility);
@@ -308,7 +308,7 @@ public class SongQueueServiceImpl
 
         String smartIneligibility = isSongEligibleForQueue(smartAlbumId, smartSongId, 0);
         if (smartIneligibility == null) {
-          addSongToQueue("BACKGROUND_MUSIC_SMART", smartAlbumId, smartSongId, 0);
+          addSongToQueue("SMART_BG_MUSIC", smartAlbumId, smartSongId, 0);
         } else {
           log.debug("autoPopulateQueue: smart-addition song {} not eligible: {}", smartSong,
               smartIneligibility);
