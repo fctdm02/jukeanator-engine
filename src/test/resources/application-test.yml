@@ -48,8 +48,8 @@ background-music:
   enable-background-music: false # assumes playlist file called BackgroundMusic.TXT exists in rootPath
   enable-smart-background-music-additions: true # will play songs from same artist/album from background music
   smart-background-music-additions-factor: 3 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
-  smart-background-music-additions-begin: 7 # start time for enableSmartBackgroundMusicAdditions
-  smart-background-music-additions-end: 5 # end time for enableSmartBackgroundMusicAdditions
+  smart-background-music-additions-begin: 19 # In 24 hour/military time (e.g. 19:00 hours is 7:00PM) start time for enableSmartBackgroundMusicAdditions
+  smart-background-music-additions-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) end time for enableSmartBackgroundMusicAdditions
   smart-background-music-min-plays: 5 # candidate songs need at least this many plays to be eligible as a smart addition
   smart-background-music-favorite-albums-percentage: 50 # target % of the smart-addition pool made up of songs from albums listed in SmartBackgroundMusicAlbumInclusions.TXT
 
