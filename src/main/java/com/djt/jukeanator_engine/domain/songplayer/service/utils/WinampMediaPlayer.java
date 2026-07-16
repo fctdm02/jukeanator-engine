@@ -1,6 +1,8 @@
 package com.djt.jukeanator_engine.domain.songplayer.service.utils;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -11,7 +13,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlayerStatus;
 import com.djt.jukeanator_engine.domain.songplayer.exception.SongPlayerServiceException;
+import com.sun.jna.Memory;
 import com.sun.jna.Native;
+import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
+import com.sun.jna.platform.win32.BaseTSD.ULONG_PTR;
 import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.platform.win32.WinDef.LPARAM;
 import com.sun.jna.platform.win32.WinDef.LRESULT;
@@ -51,6 +57,12 @@ import com.sun.jna.win32.W32APIOptions;
  * <b>setOnFinished:</b> Because Winamp does not post an end-of-track event to external processes, a
  * lightweight polling thread samples playback state every 300 ms. The callback fires exactly once
  * when the state transitions from PLAYING → STOPPED.
+ *
+ * <p>
+ * <b>Process lifecycle:</b> winamp.exe is launched once, at construction time, and is not killed
+ * again until {@link #release()} (application shutdown). Loading a new song between plays does
+ * not restart the process — it clears the playlist and loads the file into the already-running
+ * instance via the WM_WA_IPC / WM_COPYDATA messaging API, which is far faster than relaunching.
  */
 public class WinampMediaPlayer implements Player {
 
@@ -69,6 +81,7 @@ public class WinampMediaPlayer implements Player {
   // -----------------------------------------------------------------------
   private static final int WM_COMMAND = 0x0111; // Win32 WM_COMMAND
   private static final int WM_WA_IPC = 0x0400; // WM_USER — Winamp IPC channel
+  private static final int WM_COPYDATA = 0x004A; // Win32 WM_COPYDATA
 
   // -----------------------------------------------------------------------
   // WM_COMMAND button identifiers
@@ -80,6 +93,10 @@ public class WinampMediaPlayer implements Player {
   // -----------------------------------------------------------------------
   // WM_WA_IPC command values (lParam)
   // -----------------------------------------------------------------------
+  private static final int IPC_PLAYFILE = 100; // sent via WM_COPYDATA — enqueues a file only;
+                                                // does NOT change playback state on its own
+  private static final int IPC_DELETE = 101; // clears Winamp's internal playlist
+  private static final int IPC_STARTPLAY = 102; // starts playback — equivalent to pressing Play
   private static final int IPC_ISPLAYING = 104; // 0=stopped, 1=playing, 3=paused
   private static final int IPC_GETOUTPUTTIME = 105; // wParam 0→ms elapsed, wParam 1→length (s)
   private static final int IPC_SETVOLUME = 122; // wParam 0-255 sets volume; wParam -666 reads
@@ -133,13 +150,32 @@ public class WinampMediaPlayer implements Player {
 
     LRESULT SendMessage(HWND hWnd, int uMsg, WPARAM wParam, LPARAM lParam);
 
+    LRESULT SendMessage(HWND hWnd, int uMsg, WPARAM wParam, COPYDATASTRUCT lParam);
+
     boolean PostMessage(HWND hWnd, int uMsg, WPARAM wParam, LPARAM lParam);
+  }
+
+  /**
+   * Win32 {@code COPYDATASTRUCT}, used to pass a file path to a running Winamp instance via
+   * {@code WM_COPYDATA} (see {@link #IPC_PLAYFILE}).
+   */
+  public static class COPYDATASTRUCT extends Structure {
+    public ULONG_PTR dwData;
+    public int cbData;
+    public Pointer lpData;
+
+    @Override
+    protected List<String> getFieldOrder() {
+      return Arrays.asList("dwData", "cbData", "lpData");
+    }
   }
 
   // -----------------------------------------------------------------------
   // Constructor
   // -----------------------------------------------------------------------
   /**
+   * Locates winamp.exe and launches it immediately so it is already warm by the time the first
+   * song is queued. The process is not killed again until {@link #release()}.
    *
    * @param winampExePath absolute path to winamp.exe
    * @param initialVolume initial volume in the Player 0-200 scale
@@ -157,8 +193,33 @@ public class WinampMediaPlayer implements Player {
       }
     }
 
-    this.winampExePath = winampExePath;
+    this.winampExePath = file.getPath();
     this.currentVolume = clampVolume(initialVolume);
+
+    try {
+      HWND hwnd = launchWinamp();
+      if (hwnd == null) {
+        throw new RuntimeException(
+            "Winamp window did not appear after launch at startup (waited 8s).");
+      }
+      applyVolume(hwnd, currentVolume);
+
+      // launchWinamp() may have attached to a Winamp instance left running from a previous
+      // (e.g. crashed/killed) application run rather than starting a fresh one — Winamp is
+      // single-instance, so relaunching it just hands off to the existing window. That leftover
+      // instance can still have an old song loaded (playing, paused, or already finished) that
+      // this session never told it to play, and our end-of-track poll loop only runs while a
+      // song started via playSongMedia() is active — so a leftover song finishing on its own
+      // would never be noticed and the queue would never advance. Force a clean, known STOPPED
+      // state here so this session's queue processing starts from scratch. This does not
+      // restart the winamp.exe process, so it only costs two IPC calls, once, at startup.
+      sendCommand(hwnd, WINAMP_BUTTON4); // Stop
+      sendIPC(hwnd, 0, IPC_DELETE); // Clear playlist
+      status.set(SongPlayerStatus.STOPPED);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while launching winamp.exe at startup", e);
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -171,11 +232,11 @@ public class WinampMediaPlayer implements Player {
    * <p>
    * Algorithm:
    * <ol>
-   * <li>If Winamp is not running, launch it.</li>
-   * <li>Stop any current playback and clear the playlist.</li>
-   * <li>Re-launch Winamp with the file path as a command-line argument — the cleanest, most
-   * compatible way to load a single file without IPC pointer marshalling.</li>
-   * <li>Wait for the window to appear, then start polling.</li>
+   * <li>If Winamp is not running (e.g. the window was closed externally), relaunch it. Otherwise
+   * reuse the already-running process — restarting it for every song was the slow part.</li>
+   * <li>Clear the playlist via {@code IPC_DELETE} so only the requested song plays.</li>
+   * <li>Load and play the file via {@code WM_COPYDATA} / {@code IPC_PLAYFILE}.</li>
+   * <li>Start polling.</li>
    * </ol>
    */
   @Override
@@ -190,27 +251,20 @@ public class WinampMediaPlayer implements Player {
       status.set(SongPlayerStatus.STOPPED);
       lastPolledStatus = SongPlayerStatus.STOPPED;
 
-      // Close any existing Winamp instance so we get a clean playlist.
-      HWND existing = findWinampWindow();
-      if (existing != null) {
-        sendCommand(existing, 40001); // WINAMP_FILE_QUIT
-        waitForWindowToClose(1500);
-      }
-
-      // Launch Winamp with the file as argument — Winamp will enqueue and play it.
-      ProcessBuilder pb = new ProcessBuilder(winampExePath, songPath);
-      pb.inheritIO();
-      pb.start();
-
-      // Wait for Winamp to appear (up to 8 seconds).
-      HWND hwnd = waitForWinampWindow(8000);
+      // Reuse the running Winamp instance; only relaunch if it was closed externally.
+      HWND hwnd = ensureWinampRunning();
       if (hwnd == null) {
         LOG.severe("Winamp window did not appear after launch.");
         status.set(SongPlayerStatus.STOPPED);
         return false;
       }
 
-      // Winamp auto-plays when launched with a file argument.
+      // Clear the playlist, load the new file, then explicitly start playback — IPC_PLAYFILE
+      // only enqueues the file and does not change Winamp's playback state on its own.
+      sendIPC(hwnd, 0, IPC_DELETE);
+      sendPlayFile(hwnd, songPath);
+      sendIPC(hwnd, 0, IPC_STARTPLAY);
+
       status.set(SongPlayerStatus.PLAYING);
 
       // Apply the current volume setting.
@@ -391,6 +445,29 @@ public class WinampMediaPlayer implements Player {
     sendIPC(hwnd, winampVolume, IPC_SETVOLUME);
   }
 
+  /**
+   * Loads {@code songPath} into the given (already-running) Winamp instance's playlist via
+   * {@code WM_COPYDATA} / {@code IPC_PLAYFILE}. This only enqueues the file — it does not start
+   * playback, so callers must follow up with {@code IPC_STARTPLAY}.
+   */
+  private void sendPlayFile(HWND hwnd, String songPath) {
+    byte[] pathBytes = (songPath + "\0").getBytes();
+
+    // SendMessage (unlike PostMessage) blocks until Winamp's window proc has processed
+    // WM_COPYDATA and copied the data out, so it is safe to free the native memory as soon as
+    // the call returns.
+    try (Memory mem = new Memory(pathBytes.length)) {
+      mem.write(0, pathBytes, 0, pathBytes.length);
+
+      COPYDATASTRUCT cds = new COPYDATASTRUCT();
+      cds.dwData = new ULONG_PTR(IPC_PLAYFILE);
+      cds.cbData = pathBytes.length;
+      cds.lpData = mem;
+
+      User32Ex.INSTANCE.SendMessage(hwnd, WM_COPYDATA, new WPARAM(0), cds);
+    }
+  }
+
   // -----------------------------------------------------------------------
   // Private helpers — volume conversion
   // -----------------------------------------------------------------------
@@ -459,15 +536,33 @@ public class WinampMediaPlayer implements Player {
   }
 
   /**
-   * Waits up to {@code timeoutMs} for the Winamp window to disappear (after quit).
+   * Returns the running Winamp window, relaunching the process if it was closed externally (e.g.
+   * the user closed the window). Does nothing if Winamp is already running.
    */
-  private void waitForWindowToClose(long timeoutMs) throws InterruptedException {
-    long deadline = System.currentTimeMillis() + timeoutMs;
-    while (System.currentTimeMillis() < deadline) {
-      if (findWinampWindow() == null)
-        return;
-      Thread.sleep(100);
+  private HWND ensureWinampRunning() throws InterruptedException {
+    HWND hwnd = findWinampWindow();
+    if (hwnd != null) {
+      return hwnd;
     }
+    LOG.warning("Winamp window not found — relaunching winamp.exe.");
+    return launchWinamp();
+  }
+
+  /**
+   * Starts winamp.exe and waits (up to 8 seconds) for its window to appear.
+   *
+   * @return the window handle, or {@code null} on timeout
+   */
+  private HWND launchWinamp() throws InterruptedException {
+    try {
+      ProcessBuilder pb = new ProcessBuilder(winampExePath);
+      pb.inheritIO();
+      pb.start();
+    } catch (java.io.IOException e) {
+      throw new SongPlayerServiceException("Unable to launch winamp.exe at [" + winampExePath
+          + "], error: " + e.getMessage());
+    }
+    return waitForWinampWindow(8000);
   }
 
   // -----------------------------------------------------------------------
@@ -493,6 +588,7 @@ public class WinampMediaPlayer implements Player {
    * {@code onFinished} callback exactly once per song.
    */
   private void pollPlaybackState() {
+    
     try {
       HWND hwnd = findWinampWindow();
 

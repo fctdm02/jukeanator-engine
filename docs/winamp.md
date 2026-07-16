@@ -2,7 +2,7 @@ Key design decisions mirroring your VlcMediaPlayer:
 ConcernVlcMediaPlayerWinampMediaPlayerStatus trackingAtomicReference + VLC eventsAtomicReference + poll threadCallback safetyVLC finished() eventCAS on callbackFired — fires exactly onceVolume statevolatile int currentVolumesame — cached across pause/stopped statesThread modelVLC's internal threadssingle daemon ScheduledExecutorService
 Notable implementation details:
 
-playSongMedia — Closes any running Winamp instance cleanly, then re-launches it with the file path as a command-line argument. This is the most reliable way to load a single file (avoids the COPYDATASTRUCT/pointer-marshalling path of IPC_PLAYFILE).
+playSongMedia — winamp.exe is launched once at construction time and stays running until release() (app shutdown). Each call clears the playlist (IPC_DELETE), loads the new file via WM_COPYDATA/IPC_PLAYFILE, then explicitly starts playback via IPC_STARTPLAY (IPC_PLAYFILE only enqueues the file — it does not change Winamp's playback state on its own), avoiding a process restart between songs. If the window was closed externally, it is relaunched automatically.
 setOnFinished — The 300 ms poll detects PLAYING → STOPPED. It also handles the edge case where the user closes Winamp externally mid-song.
 Volume scale — Converts the Player 0-200 contract to Winamp's internal 0-255 range, with 100 → 128 (unity gain) as the midpoint, exactly matching the Javadoc on the interface.
 Three constructors — new WinampMediaPlayer(), new WinampMediaPlayer(volume), or full new WinampMediaPlayer(exePath, volume) for non-standard install paths.
