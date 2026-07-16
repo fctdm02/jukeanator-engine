@@ -658,8 +658,13 @@ public class WinampMediaPlayer implements Player {
         fireOnFinished();
       }
 
-    } catch (Exception e) {
-      LOG.log(Level.FINE, "Poll error (Winamp may have just closed)", e);
+    } catch (Throwable t) {
+      // Must catch Throwable, not just Exception: scheduleAtFixedRate silently and
+      // permanently stops future executions of this task if anything escapes the Runnable
+      // uncaught, which would orphan end-of-track detection for the rest of the app's
+      // lifetime. Logged at WARNING (not FINE) so a failure here is actually visible instead
+      // of silently starving the queue.
+      LOG.log(Level.WARNING, "Poll error (Winamp may have just closed)", t);
     }
   }
 

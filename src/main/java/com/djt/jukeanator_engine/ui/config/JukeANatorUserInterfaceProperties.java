@@ -7,7 +7,6 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "user-interface")
 public class JukeANatorUserInterfaceProperties {
 
-  private boolean enabled = false; // if true, a JFC UI is launched, otherwise, headless backend
   private boolean alwaysOnTop = false;
   
   //
@@ -39,14 +38,6 @@ public class JukeANatorUserInterfaceProperties {
 
   
   
-  public boolean getEnabled() {
-    return enabled;
-  }
-
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
-  }
-
   public boolean isAlwaysOnTop() {
     return alwaysOnTop;
   }

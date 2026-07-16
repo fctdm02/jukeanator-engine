@@ -5,6 +5,8 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -53,6 +55,23 @@ public class SongPlayerServiceImpl implements SongPlayerService {
     t.setPriority(Thread.MAX_PRIORITY);
     return t;
   });
+
+  /**
+   * Safety net for missed end-of-track detection: some {@link Player} implementations (notably
+   * {@link WinampMediaPlayer}, which has no native "song finished" event and must poll for it)
+   * can fail to notice a PLAYING → STOPPED transition and never invoke {@code onFinished}. This
+   * periodically re-submits queue processing so a stalled queue self-heals within a few seconds
+   * of the player actually stopping. {@link #processQueue()} is a no-op whenever a song is still
+   * genuinely playing, so this is safe to run continuously alongside the event-driven triggers.
+   */
+  private final ScheduledExecutorService watchdogExecutor =
+      Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = Thread.ofPlatform().name("song-queue-watchdog").unstarted(r);
+        t.setDaemon(true);
+        return t;
+      });
+
+  private static final long WATCHDOG_INTERVAL_SECONDS = 3L;
 
   private final String playerType;
   private final int playerVolume;
@@ -133,6 +152,9 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   private void initialize() {
 
     submitQueueProcessing();
+
+    watchdogExecutor.scheduleAtFixedRate(this::submitQueueProcessing, WATCHDOG_INTERVAL_SECONDS,
+        WATCHDOG_INTERVAL_SECONDS, TimeUnit.SECONDS);
   }
 
   @Override
@@ -244,6 +266,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
 
     log.info("Shutting down SongPlayerService");
     eventPublisher.publishEvent(new SongPlaybackShutdownEvent());
+    watchdogExecutor.shutdownNow();
     queueExecutor.shutdownNow();
     player.stop();
     player.release();

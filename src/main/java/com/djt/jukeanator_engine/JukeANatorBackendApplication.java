@@ -16,7 +16,7 @@ public class JukeANatorBackendApplication {
 
     builder.initializers(context -> {
 
-      if (context.getEnvironment().getProperty("user-interface.enabled", Boolean.class, false)) {
+      if (context.getEnvironment().getProperty("app.enabled", Boolean.class, false)) {
 
         System.setProperty("java.awt.headless", "false");
       }
