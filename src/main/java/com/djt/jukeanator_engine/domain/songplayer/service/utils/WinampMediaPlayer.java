@@ -18,10 +18,14 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
 import com.sun.jna.platform.win32.BaseTSD.ULONG_PTR;
+import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.platform.win32.WinDef.LPARAM;
 import com.sun.jna.platform.win32.WinDef.LRESULT;
 import com.sun.jna.platform.win32.WinDef.WPARAM;
+import com.sun.jna.platform.win32.WinNT;
+import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.win32.StdCallLibrary;
 import com.sun.jna.win32.W32APIOptions;
 
@@ -104,7 +108,11 @@ public class WinampMediaPlayer implements Player {
   // -----------------------------------------------------------------------
   // Polling
   // -----------------------------------------------------------------------
-  private static final long POLL_INTERVAL_MS = 300L;
+  private static final long POLL_INTERVAL_MS = 750L;
+
+  // Win32 HIGH_PRIORITY_CLASS (winbase.h) — not consistently re-exported across jna-platform
+  // versions, so we use the raw constant value directly.
+  private static final int HIGH_PRIORITY_CLASS = 0x00000080;
 
   // -----------------------------------------------------------------------
   // State
@@ -557,12 +565,33 @@ public class WinampMediaPlayer implements Player {
     try {
       ProcessBuilder pb = new ProcessBuilder(winampExePath);
       pb.inheritIO();
-      pb.start();
+      Process process = pb.start();
+      raisePriority(process.pid());
     } catch (java.io.IOException e) {
       throw new SongPlayerServiceException("Unable to launch winamp.exe at [" + winampExePath
           + "], error: " + e.getMessage());
     }
     return waitForWinampWindow(8000);
+  }
+
+  /**
+   * Raises winamp.exe's process priority to {@code HIGH_PRIORITY_CLASS} so playback (and our
+   * frequent WM_WA_IPC polling) is not starved by other foreground work on the machine. Best
+   * effort — failure just leaves Winamp at its default priority.
+   */
+  private void raisePriority(long pid) {
+    HANDLE handle = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_SET_INFORMATION, false, (int) pid);
+    if (handle == null) {
+      LOG.warning("Unable to open winamp.exe (pid " + pid + ") to raise its process priority.");
+      return;
+    }
+    try {
+      if (!Kernel32.INSTANCE.SetPriorityClass(handle, new DWORD(HIGH_PRIORITY_CLASS))) {
+        LOG.warning("Unable to set winamp.exe (pid " + pid + ") to high priority.");
+      }
+    } finally {
+      Kernel32.INSTANCE.CloseHandle(handle);
+    }
   }
 
   // -----------------------------------------------------------------------
