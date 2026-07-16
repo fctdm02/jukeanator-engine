@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * Configures Spring Security for the LOCAL / Swing-UI operating mode.
  *
  * <p>
- * This bean is only active when {@code app.enabled=true}. On startup it pushes a
+ * This bean is only active when {@code app.ui-enabled=true}. On startup it pushes a
  * {@link LocalAuthenticatedEventQueue} onto the AWT system event queue so that every event
  * dispatched on the EDT automatically has the LOCAL authentication installed in the
  * {@code SecurityContextHolder} ThreadLocal for the duration of that dispatch.
@@ -38,7 +38,7 @@ import org.springframework.stereotype.Component;
  * @author tmyers
  */
 @Component
-@ConditionalOnProperty(name = "app.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "app.ui-enabled", havingValue = "true")
 public class LocalSecurityContextConfigurer implements ApplicationRunner {
 
   private static final Logger log = LoggerFactory.getLogger(LocalSecurityContextConfigurer.class);

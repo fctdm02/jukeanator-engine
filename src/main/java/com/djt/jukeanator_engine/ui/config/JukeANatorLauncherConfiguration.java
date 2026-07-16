@@ -12,7 +12,7 @@ import com.djt.jukeanator_engine.ui.JukeANatorUserInterfaceApplication;
 
 @Configuration
 @EnableConfigurationProperties(JukeANatorUserInterfaceProperties.class)
-@ConditionalOnProperty(prefix = "app", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "app", name = "ui-enabled", havingValue = "true")
 public class JukeANatorLauncherConfiguration {
 
   private final JukeANatorUserInterfaceApplication jukeANatorUserInterfaceApplication;

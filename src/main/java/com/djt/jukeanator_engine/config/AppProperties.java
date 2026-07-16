@@ -12,7 +12,7 @@ import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OST
 @ConfigurationProperties(prefix = "app")
 public class AppProperties {
 
-  private boolean enabled = false; // if true, a JFC UI is launched, otherwise, headless backend
+  private boolean uiEnabled = false; // if true, a JFC UI is launched, otherwise, headless backend
 
   private String rootPathWindows;
   private String rootPathUnix; // Both Linux and MacOSX
@@ -20,12 +20,12 @@ public class AppProperties {
   private Jwt jwt = new Jwt();
   private Logging logging = new Logging();
 
-  public boolean isEnabled() {
-    return enabled;
+  public boolean isUiEnabled() {
+    return uiEnabled;
   }
 
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
+  public void setUiEnabled(boolean uiEnabled) {
+    this.uiEnabled = uiEnabled;
   }
 
   public String getEffectiveRootPath() {

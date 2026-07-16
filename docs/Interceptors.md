@@ -27,7 +27,7 @@
 
 ## How it works end-to-end
 
-### LOCAL / Swing-UI mode (`app.enabled=true`)
+### LOCAL / Swing-UI mode (`app.ui-enabled=true`)
 
 ```
 Application startup
@@ -47,7 +47,7 @@ any wrapper.
 
 ---
 
-### REST / remote mode (`app.enabled=false`)
+### REST / remote mode (`app.ui-enabled=false`)
 
 ```
 HTTP request thread (JWT populated by Spring Security filter)

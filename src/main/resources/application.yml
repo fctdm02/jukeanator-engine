@@ -1,7 +1,7 @@
 # src/main/resources/application.yml
 
 app:
-  enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
+  ui-enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
   jwt:
     secret: fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP
     expiration-ms: 86400000   # 24 hours
