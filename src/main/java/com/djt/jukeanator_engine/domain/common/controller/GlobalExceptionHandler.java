@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
+import com.djt.jukeanator_engine.domain.location.exception.LocationOfflineException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,6 +35,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidPrincipalException.class)
     public void handleInvalidPrincipal(InvalidPrincipalException ex, HttpServletResponse response) throws IOException {
         write(HttpStatus.UNAUTHORIZED, ex, response);
+    }
+
+    @ExceptionHandler(LocationOfflineException.class)
+    public void handleLocationOffline(LocationOfflineException ex, HttpServletResponse response) throws IOException {
+        write(HttpStatus.SERVICE_UNAVAILABLE, ex, response);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

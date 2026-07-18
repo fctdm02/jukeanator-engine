@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.user.service;
 
+import java.time.Instant;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
@@ -12,6 +13,7 @@ import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
+import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionDto;
 import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
@@ -195,6 +197,17 @@ public interface UserService {
   void handleSongAddedToQueueEvent(SongAddedToQueueEvent event);
 
   /**
+   * Same as {@link #handleSongAddedToQueueEvent(SongAddedToQueueEvent)}, but tags the resulting
+   * ledger entry with {@code locationId} — used by the location-scoped queue controller, since a
+   * location-scoped add executes on a remote slave, so the event never reaches this process's own
+   * event bus the way a standalone/slave instance's local add does.
+   *
+   * @param event
+   * @param locationId the location this queue action was performed at
+   */
+  void handleSongAddedToQueueEvent(SongAddedToQueueEvent event, String locationId);
+
+  /**
    * Charges Web UI credits for a patron reordering or removing a song in the shared queue,
    * mirroring the priority-based cost charged when a song is first added to the queue.
    *
@@ -202,4 +215,26 @@ public interface UserService {
    * @param priority the queue entry's priority level at the time of the action (1 = normal)
    */
   void chargeCreditsForQueueAction(String emailAddress, Integer priority);
+
+  /**
+   * Same as {@link #chargeCreditsForQueueAction(String, Integer)}, but tags the resulting ledger
+   * entry with {@code locationId}.
+   *
+   * @param emailAddress
+   * @param priority
+   * @param locationId the location this queue action was performed at
+   */
+  void chargeCreditsForQueueAction(String emailAddress, Integer priority, String locationId);
+
+  /**
+   * Bar-owner accounting: every credit transaction tagged with {@code locationId} in
+   * {@code [from, to]}. Master-only in practice (only master ever tags transactions with a
+   * locationId), but this method itself has no mode restriction.
+   *
+   * @param locationId
+   * @param from
+   * @param to
+   */
+  List<CreditTransactionDto> getCreditLedgerForLocation(String locationId, Instant from,
+      Instant to);
 }

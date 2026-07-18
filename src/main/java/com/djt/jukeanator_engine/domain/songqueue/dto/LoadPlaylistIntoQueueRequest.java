@@ -1,6 +1,8 @@
 package com.djt.jukeanator_engine.domain.songqueue.dto;
 
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class LoadPlaylistIntoQueueRequest {
 
@@ -9,7 +11,12 @@ public class LoadPlaylistIntoQueueRequest {
 
   public LoadPlaylistIntoQueueRequest() {}
 
-  public LoadPlaylistIntoQueueRequest(String username, String filename) {
+  /** See {@link AddSongToQueueRequest} for why this needs an explicit {@code @JsonCreator} — there
+   * are no setters, so the no-arg constructor above alone isn't enough for Jackson to populate
+   * this from JSON without it. */
+  @JsonCreator
+  public LoadPlaylistIntoQueueRequest(@JsonProperty("username") String username,
+      @JsonProperty("filename") String filename) {
     this.username = username;
     this.filename = filename;
   }

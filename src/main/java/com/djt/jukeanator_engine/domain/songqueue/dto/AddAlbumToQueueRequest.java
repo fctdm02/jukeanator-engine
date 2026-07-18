@@ -1,6 +1,8 @@
 package com.djt.jukeanator_engine.domain.songqueue.dto;
 
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class AddAlbumToQueueRequest {
 
@@ -8,7 +10,10 @@ public class AddAlbumToQueueRequest {
   private Integer albumId;
   private Integer priority;
 
-  public AddAlbumToQueueRequest(String username, Integer albumId, Integer priority) {
+  /** See {@link AddSongToQueueRequest} for why this needs an explicit {@code @JsonCreator}. */
+  @JsonCreator
+  public AddAlbumToQueueRequest(@JsonProperty("username") String username,
+      @JsonProperty("albumId") Integer albumId, @JsonProperty("priority") Integer priority) {
     this.username = username;
     this.albumId = albumId;
     this.priority = priority;

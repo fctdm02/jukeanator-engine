@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.user.service;
 
 import static java.util.Objects.requireNonNull;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -28,6 +29,7 @@ import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
+import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionDto;
 import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
@@ -37,9 +39,13 @@ import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
+import com.djt.jukeanator_engine.domain.user.model.CreditLedgerRootEntity;
+import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.user.model.CreditTransactionType;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
+import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 
 /**
@@ -70,12 +76,16 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private final JwtUtil jwtUtil;
   private final ApplicationEventPublisher eventPublisher;
   private final SongLibraryService songLibraryService;
+  private final CreditLedgerRepository creditLedgerRepository;
+  private final boolean slaveMode;
 
   private UserRootEntity userRoot;
+  private CreditLedgerRootEntity creditLedgerRoot;
 
   public UserServiceImpl(String rootPath, UserRepository userRepository,
       PasswordEncoder passwordEncoder, JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
-      SongLibraryService songLibraryService) {
+      SongLibraryService songLibraryService, CreditLedgerRepository creditLedgerRepository,
+      boolean slaveMode) {
 
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(userRepository, "userRepository cannot be null");
@@ -83,6 +93,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     requireNonNull(jwtUtil, "jwtUtil cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
+    requireNonNull(creditLedgerRepository, "creditLedgerRepository cannot be null");
 
     this.rootPath = rootPath;
     this.userRepository = userRepository;
@@ -90,6 +101,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     this.jwtUtil = jwtUtil;
     this.eventPublisher = eventPublisher;
     this.songLibraryService = songLibraryService;
+    this.creditLedgerRepository = creditLedgerRepository;
+    this.slaveMode = slaveMode;
 
     initialize();
 
@@ -477,8 +490,26 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   @EventListener
   public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
+    handleSongAddedToQueueEvent(event, null);
+  }
+
+  @Override
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event, String locationId) {
 
     String username = event.queueEntry().getUsername();
+
+    // In slave mode, a remotely-dispatched (master-relayed) command's addSongToQueue fires this
+    // exact same local event via SongQueueServiceImpl's own event publish — but the web/mobile
+    // user is never registered on the slave's own user store, since credits/identity are entirely
+    // master-owned once a location is in slave mode. Master charges credits explicitly via the
+    // locationId-aware overload after the command succeeds (see
+    // LocationScopedSongQueueController), so this would otherwise double-charge (or, as here,
+    // throw "user not found" and cancel the whole add). A genuine local walk-up action
+    // (LOCAL_USERNAME) is untouched — it never carries credits through this path either way.
+    if (slaveMode && !LocalPrincipal.LOCAL_USERNAME.equals(username)) {
+      return;
+    }
+
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(username);
     if (user == null && LocalPrincipal.LOCAL_USERNAME.equals(username)) {
 
@@ -506,7 +537,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
       int priority =
           event.queueEntry().getPriority() != null ? event.queueEntry().getPriority() : 1;
-      deductCredits(user, username, priority * WEB_COST_PER_PRIORITY_LEVEL);
+      deductCredits(user, username, priority * WEB_COST_PER_PRIORITY_LEVEL, CreditTransactionType.QUEUE_ADD,
+          locationId, song.getAlbumId(), song.getSongId());
     }
 
     this.userRepository.storeAggregateRoot(this.userRoot);
@@ -514,6 +546,18 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   @Override
   public void chargeCreditsForQueueAction(String emailAddress, Integer priority) {
+    chargeCreditsForQueueAction(emailAddress, priority, null);
+  }
+
+  @Override
+  public void chargeCreditsForQueueAction(String emailAddress, Integer priority, String locationId) {
+
+    // Same rationale as handleSongAddedToQueueEvent above — in slave mode this is only ever
+    // reachable via a direct hit on the slave's own (untouched) endpoints, never via the
+    // locationId-aware path (that only runs on master, which is never slaveMode).
+    if (slaveMode) {
+      return;
+    }
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -522,16 +566,38 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     int cost = Math.max(WEB_QUEUE_ACTION_MIN_COST,
         (priority != null ? priority : 1) * WEB_QUEUE_ACTION_COST_PER_PRIORITY_LEVEL);
-    deductCredits(user, emailAddress, cost);
+    deductCredits(user, emailAddress, cost, CreditTransactionType.QUEUE_ACTION, locationId, null, null);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
   }
 
-  /** Deducts {@code cost} credits (floored at zero) and broadcasts the new balance. */
-  private void deductCredits(UserEntity user, String emailAddress, int cost) {
+  @Override
+  public List<CreditTransactionDto> getCreditLedgerForLocation(String locationId, Instant from,
+      Instant to) {
+
+    return creditLedgerRoot.findByLocationId(locationId, from, to).stream()
+        .map(t -> new CreditTransactionDto(t.getUserEmail(), t.getLocationId(), t.getAmount(),
+            t.getType(), t.getTimestamp(), t.getSongAlbumId(), t.getSongId(),
+            t.getResultingBalance()))
+        .toList();
+  }
+
+  /**
+   * Deducts {@code cost} credits (floored at zero), broadcasts the new balance, and appends a
+   * ledger entry. {@code locationId} is {@code null} for standalone-mode/non-location-attributed
+   * spends.
+   */
+  private void deductCredits(UserEntity user, String emailAddress, int cost,
+      CreditTransactionType type, String locationId, Integer songAlbumId, Integer songId) {
+
     int remaining = Math.max(0, (user.getNumCredits() != null ? user.getNumCredits() : 0) - cost);
     user.setNumCredits(remaining);
     eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, remaining));
+
+    Integer persistentIdentity = Integer.valueOf(creditLedgerRoot.getTransactions().size() + 1);
+    creditLedgerRoot.appendTransaction(new CreditTransactionEntity(persistentIdentity, emailAddress,
+        locationId, -cost, type, Instant.now(), songAlbumId, songId, remaining));
+    creditLedgerRepository.storeAggregateRoot(creditLedgerRoot);
   }
 
   // Repository methods
@@ -577,6 +643,13 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       log.error("Could not load user root from: " + rootPath
           + ", using empty user root for now, error: " + ednee.getMessage());
       this.userRoot = new UserRootEntity();
+    }
+
+    try {
+      this.creditLedgerRoot = this.creditLedgerRepository.loadAggregateRoot(rootPath);
+    } catch (EntityDoesNotExistException ednee) {
+      log.info("No existing credit ledger found at: " + rootPath + " — starting with an empty one");
+      this.creditLedgerRoot = new CreditLedgerRootEntity();
     }
   }
 }

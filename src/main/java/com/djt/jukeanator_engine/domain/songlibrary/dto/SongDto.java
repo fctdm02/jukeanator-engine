@@ -2,9 +2,11 @@ package com.djt.jukeanator_engine.domain.songlibrary.dto;
 
 import java.io.Serializable;
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class SongDto implements Serializable {
-  
+
   private static final long serialVersionUID = 1L;
 
   private final Integer genreId;
@@ -19,9 +21,18 @@ public class SongDto implements Serializable {
   private final Integer trackNumber;
   private final Integer numPlays;
 
-  public SongDto(Integer genreId, String genreName, Integer artistId, String artistName,
-      Integer albumId, String albumName, String coverArtPath, Integer songId, String songName,
-      Integer trackNumber, Integer numPlays) {
+  /**
+   * See {@code AddSongToQueueRequest} for why this needs an explicit {@code @JsonCreator}.
+   */
+  @JsonCreator
+  public SongDto(@JsonProperty("genreId") Integer genreId,
+      @JsonProperty("genreName") String genreName, @JsonProperty("artistId") Integer artistId,
+      @JsonProperty("artistName") String artistName, @JsonProperty("albumId") Integer albumId,
+      @JsonProperty("albumName") String albumName,
+      @JsonProperty("coverArtPath") String coverArtPath, @JsonProperty("songId") Integer songId,
+      @JsonProperty("songName") String songName,
+      @JsonProperty("trackNumber") Integer trackNumber,
+      @JsonProperty("numPlays") Integer numPlays) {
     super();
     this.genreId = genreId;
     this.genreName = genreName;

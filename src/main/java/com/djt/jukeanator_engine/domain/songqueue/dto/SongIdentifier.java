@@ -2,15 +2,20 @@ package com.djt.jukeanator_engine.domain.songqueue.dto;
 
 import java.io.Serializable;
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class SongIdentifier implements Serializable {
 
   private static final long serialVersionUID = 1L;
-  
+
   private Integer albumId;
   private Integer songId;
 
-  public SongIdentifier(Integer albumId, Integer songId) {
+  /** See {@link AddSongToQueueRequest} for why this needs an explicit {@code @JsonCreator}. */
+  @JsonCreator
+  public SongIdentifier(@JsonProperty("albumId") Integer albumId,
+      @JsonProperty("songId") Integer songId) {
     this.albumId = albumId;
     this.songId = songId;
   }

@@ -1,6 +1,8 @@
 package com.djt.jukeanator_engine.domain.songqueue.dto;
 
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class AddSongToQueueRequest {
 
@@ -9,7 +11,18 @@ public class AddSongToQueueRequest {
   private Integer songId;
   private Integer priority;
 
-  public AddSongToQueueRequest(String username, Integer albumId, Integer songId, Integer priority) {
+  /**
+   * Explicit {@code @JsonCreator}/{@code @JsonProperty} rather than relying on Jackson's implicit
+   * single-constructor binding — that requires the {@code jackson-module-parameter-names} module
+   * (registers constructor parameter names via reflection), which is on Spring MVC's
+   * auto-configured {@code ObjectMapper} but not this app's own shared bean (see
+   * {@code ObjectMappers}), so a manually-invoked {@code ObjectMapper.readValue(...)} (e.g.
+   * {@code SlaveConnectionManager} decoding a relayed command) would otherwise fail.
+   */
+  @JsonCreator
+  public AddSongToQueueRequest(@JsonProperty("username") String username,
+      @JsonProperty("albumId") Integer albumId, @JsonProperty("songId") Integer songId,
+      @JsonProperty("priority") Integer priority) {
     this.username = username;
     this.albumId = albumId;
     this.songId = songId;

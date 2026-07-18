@@ -5,6 +5,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.djt.jukeanator_engine.domain.backgroundmusic.config.BackgroundMusicProperties;
@@ -47,6 +48,9 @@ import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryPostgresImpl;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
+import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepository;
+import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepositoryFileSystemImpl;
+import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepositoryPostgresImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryPostgresImpl;
@@ -60,6 +64,15 @@ public class AppConfig {
   @Bean
   public ObjectMapper objectMapper() {
     return ObjectMappers.create();
+  }
+
+  // Defined here rather than SecurityConfig — SecurityConfig depends (via the optional
+  // LocationApiKeyAuthenticationFilter -> LocationService chain) on PasswordEncoder, and a
+  // @Configuration class's own @Bean methods can't be invoked until that class itself has been
+  // fully constructed, so keeping it there created a circular reference.
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
   }
   
   @Bean
@@ -168,8 +181,25 @@ public class AppConfig {
   @Bean
   @ConditionalOnProperty(name = "user.repository-type", havingValue = "postgres")
   public UserRepository userRepositoryPostgresImpl() {
-    
+
     return new UserRepositoryPostgresImpl();
+  }
+
+  // ── Credit ledger repository ──────────────────────────────────────────────
+
+  @Bean
+  @ConditionalOnProperty(name = "credit-ledger.repository-type", havingValue = "filesystem",
+      matchIfMissing = true)
+  public CreditLedgerRepository creditLedgerRepositoryFileSystemImpl(AppProperties appProperties) {
+
+    return new CreditLedgerRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = "credit-ledger.repository-type", havingValue = "postgres")
+  public CreditLedgerRepository creditLedgerRepositoryPostgresImpl() {
+
+    return new CreditLedgerRepositoryPostgresImpl();
   }
 
   // ── Background music repositories ───────────────────────────────────────
@@ -272,7 +302,8 @@ public class AppConfig {
       PasswordEncoder passwordEncoder,
       JwtUtil jwtUtil,
       org.springframework.context.ApplicationEventPublisher eventPublisher,
-      SongLibraryService songLibraryService) {
+      SongLibraryService songLibraryService,
+      CreditLedgerRepository creditLedgerRepository) {
 
     return new UserServiceImpl(
         appProperties.getEffectiveRootPath(),
@@ -280,7 +311,9 @@ public class AppConfig {
         passwordEncoder,
         jwtUtil,
         eventPublisher,
-        songLibraryService);
+        songLibraryService,
+        creditLedgerRepository,
+        appProperties.isSlave());
   }
  
   @Bean

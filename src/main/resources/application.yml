@@ -2,6 +2,10 @@
 
 app:
   ui-enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
+  mode: standalone   # standalone | master | slave
+  master-instance-url: ~   # required if mode=slave, e.g. https://jukeanator.com
+  location-id: ~            # required if mode=slave, assigned at provisioning
+  location-api-key: ~       # required if mode=slave, issued at provisioning
   jwt:
     secret: fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP
     expiration-ms: 86400000   # 24 hours
@@ -64,7 +68,15 @@ song-player:
 
 user:
   repository-type: filesystem   # filesystem | postgres
-  
+
+credit-ledger:
+  repository-type: filesystem   # filesystem | postgres
+
+location:   # only used when app.mode is master or slave
+  repository-type: filesystem   # filesystem | postgres
+  storage-root: ~   # master-only, defaults under app.root-path-* /locations when unset
+  command-timeout-ms: 10000   # master-only: how long to wait for a slave to reply to a command
+
 user-interface:
   always-on-top: false
   enable-screen-saver: false

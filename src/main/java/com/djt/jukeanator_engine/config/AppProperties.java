@@ -17,6 +17,14 @@ public class AppProperties {
   private String rootPathWindows;
   private String rootPathUnix; // Both Linux and MacOSX
 
+  // standalone: today's single-tenant behavior (default). master: headless, location-agnostic,
+  // hosts the location registry and proxies to slaves. slave: a physical location that syncs its
+  // library to the master and accepts remote commands over a persistent connection.
+  private String mode = "standalone";
+  private String masterInstanceUrl; // slave-only: e.g. https://jukeanator.com
+  private String locationId; // slave-only: assigned at provisioning
+  private String locationApiKey; // slave-only: secret issued at provisioning
+
   private Jwt jwt = new Jwt();
   private Logging logging = new Logging();
 
@@ -26,6 +34,50 @@ public class AppProperties {
 
   public void setUiEnabled(boolean uiEnabled) {
     this.uiEnabled = uiEnabled;
+  }
+
+  public String getMode() {
+    return mode;
+  }
+
+  public void setMode(String mode) {
+    this.mode = mode;
+  }
+
+  public boolean isStandalone() {
+    return "standalone".equalsIgnoreCase(mode);
+  }
+
+  public boolean isMaster() {
+    return "master".equalsIgnoreCase(mode);
+  }
+
+  public boolean isSlave() {
+    return "slave".equalsIgnoreCase(mode);
+  }
+
+  public String getMasterInstanceUrl() {
+    return masterInstanceUrl;
+  }
+
+  public void setMasterInstanceUrl(String masterInstanceUrl) {
+    this.masterInstanceUrl = masterInstanceUrl;
+  }
+
+  public String getLocationId() {
+    return locationId;
+  }
+
+  public void setLocationId(String locationId) {
+    this.locationId = locationId;
+  }
+
+  public String getLocationApiKey() {
+    return locationApiKey;
+  }
+
+  public void setLocationApiKey(String locationApiKey) {
+    this.locationApiKey = locationApiKey;
   }
 
   public String getEffectiveRootPath() {
