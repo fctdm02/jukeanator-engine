@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
-import org.springframework.messaging.converter.MappingJackson2MessageConverter;
+import org.springframework.messaging.converter.JacksonJsonMessageConverter;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
@@ -91,7 +91,15 @@ public class SlaveConnectionManager {
     this.objectMapper = objectMapper;
 
     this.stompClient = new WebSocketStompClient(new StandardWebSocketClient());
-    this.stompClient.setMessageConverter(new MappingJackson2MessageConverter(objectMapper));
+    // Not MappingJackson2MessageConverter (deprecated since Spring 7, removed in a future
+    // release) — its replacement, JacksonJsonMessageConverter, is Jackson 3.x-based
+    // (tools.jackson.databind) and can't take this app's Jackson 2.x ObjectMapper. That's fine
+    // here: this converter only handles the outer CommandEnvelope/CommandReplyDto/
+    // LocationEventMessage envelope (plain fields + a generic Object payload), never anything
+    // needing this app's specific Jackson 2 module config — the payload itself is decoded
+    // separately via the app's own ObjectMapper in dispatch()/convert() below, regardless of
+    // which Jackson generation produced the intermediate LinkedHashMap.
+    this.stompClient.setMessageConverter(new JacksonJsonMessageConverter());
 
     // Required by WebSocketStompClient whenever STOMP heartbeats are enabled (see
     // connectHeaders.setHeartbeat below) — it schedules the heartbeat send/expect timers.
