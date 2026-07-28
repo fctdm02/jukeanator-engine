@@ -2,18 +2,34 @@ package com.djt.jukeanator_engine.domain.user.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import com.djt.jukeanator_engine.AbstractServiceIntegrationTest;
+import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
+import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
+import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
-import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
+import com.djt.jukeanator_engine.domain.user.model.UserEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
+import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepository;
+import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 
 /**
  * @author tmyers
@@ -22,8 +38,37 @@ import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 @ActiveProfiles("test") // loads application-test.yml
 public class UserServiceTest extends AbstractServiceIntegrationTest {
 
+  private static final String REGISTERED_EMAIL = "jane.doe@example.com";
+
   @Autowired
   private UserService userService;
+
+  private UserRepository userRepository;
+  private CreditLedgerRepository creditLedgerRepository;
+  private UserRootEntity userRoot;
+  private UserServiceImpl userServiceImpl;
+
+  @BeforeEach
+  void setUp() throws EntityDoesNotExistException {
+
+    userRepository = mock(UserRepository.class);
+    creditLedgerRepository = mock(CreditLedgerRepository.class);
+    PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+    JwtUtil jwtUtil = mock(JwtUtil.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    SongLibraryService songLibraryService = mock(SongLibraryService.class);
+
+    userRoot = new UserRootEntity();
+    userRoot.addUser(new UserEntity(Integer.valueOf(1), "Jane", "Doe", REGISTERED_EMAIL,
+        "hashed-password", Integer.valueOf(6), "ROLE_USER"));
+
+    when(userRepository.loadAggregateRoot(anyString())).thenReturn(userRoot);
+    when(creditLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger for test"));
+
+    userServiceImpl = new UserServiceImpl("test-root", userRepository, passwordEncoder, jwtUtil,
+        eventPublisher, songLibraryService, creditLedgerRepository, false);
+  }
 
   @Test
   void shouldInitializeService() {
@@ -73,5 +118,33 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     // Getting a profile for an unknown email address should fail
     assertThrows(InvalidPrincipalException.class, () -> userService.getProfile("unknown@example.com"));
+  }
+
+  @Test
+  void deleteAccountRemovesRegisteredUserAndPersistsRoot() {
+
+    userServiceImpl.deleteAccount(REGISTERED_EMAIL);
+
+    assertNull(userRoot.getUserByEmailAddressNullIfNotExists(REGISTERED_EMAIL),
+        "user should no longer be present in the user root");
+    verify(userRepository).storeAggregateRoot(userRoot);
+  }
+
+  @Test
+  void deleteAccountIsIdempotentlyRejectedOnSecondCall() {
+
+    userServiceImpl.deleteAccount(REGISTERED_EMAIL);
+
+    assertThrows(InvalidPrincipalException.class,
+        () -> userServiceImpl.deleteAccount(REGISTERED_EMAIL));
+  }
+
+  @Test
+  void deleteAccountThrowsForUnknownEmailAddress() {
+
+    assertThrows(InvalidPrincipalException.class,
+        () -> userServiceImpl.deleteAccount("unknown@example.com"));
+
+    verify(userRepository, never()).storeAggregateRoot(userRoot);
   }
 }
