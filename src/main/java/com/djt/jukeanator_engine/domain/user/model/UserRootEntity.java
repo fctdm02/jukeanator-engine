@@ -59,5 +59,14 @@ public class UserRootEntity extends AbstractPersistentEntity {
 
     return this.users.get(emailAddress);
   }
+
+  public UserEntity removeUser(String emailAddress) {
+
+    UserEntity removed = this.users.remove(emailAddress);
+    if (removed != null) {
+      removed.setUserRoot(null);
+    }
+    return removed;
+  }
 }
 

@@ -33,27 +33,31 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void lifecycle() {
 
+    // Use a unique email address per run so the test is idempotent across repeated
+    // executions against a persistent (non-rolled-back) datastore.
+    String emailAddress = "jane.doe+" + java.util.UUID.randomUUID() + "@example.com";
+
     // Register a new user
     RegisterRequest registerRequest =
-        new RegisterRequest("Jane", "Doe", "jane.doe@example.com", "password123");
+        new RegisterRequest("Jane", "Doe", emailAddress, "password123");
     AuthResponse registerResponse = userService.register(registerRequest);
     assertNotNull(registerResponse, "registerResponse should not be null");
     assertNotNull(registerResponse.token(), "token should not be null");
-    assertEquals("jane.doe@example.com", registerResponse.emailAddress());
+    assertEquals(emailAddress, registerResponse.emailAddress());
     assertEquals("ROLE_USER", registerResponse.role());
 
     // Registering the same email address again should fail
     assertThrows(UserServiceException.class, () -> userService.register(registerRequest));
 
     // Log in with the registered user's credentials
-    LoginRequest loginRequest = new LoginRequest("jane.doe@example.com", "password123");
+    LoginRequest loginRequest = new LoginRequest(emailAddress, "password123");
     AuthResponse loginResponse = userService.login(loginRequest);
     assertNotNull(loginResponse, "loginResponse should not be null");
     assertNotNull(loginResponse.token(), "token should not be null");
-    assertEquals("jane.doe@example.com", loginResponse.emailAddress());
+    assertEquals(emailAddress, loginResponse.emailAddress());
 
     // Logging in with an incorrect password should fail
-    LoginRequest badLoginRequest = new LoginRequest("jane.doe@example.com", "wrongPassword");
+    LoginRequest badLoginRequest = new LoginRequest(emailAddress, "wrongPassword");
     assertThrows(UserServiceException.class, () -> userService.login(badLoginRequest));
 
     // Logging in with an unknown email address should fail
@@ -61,11 +65,11 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     assertThrows(UserServiceException.class, () -> userService.login(unknownLoginRequest));
 
     // Get the profile for the registered user
-    UserProfileDto profile = userService.getProfile("jane.doe@example.com");
+    UserProfileDto profile = userService.getProfile(emailAddress);
     assertNotNull(profile, "profile should not be null");
     assertEquals("Jane", profile.firstName());
     assertEquals("Doe", profile.lastName());
-    assertEquals("jane.doe@example.com", profile.emailAddress());
+    assertEquals(emailAddress, profile.emailAddress());
 
     // Getting a profile for an unknown email address should fail
     assertThrows(InvalidPrincipalException.class, () -> userService.getProfile("unknown@example.com"));

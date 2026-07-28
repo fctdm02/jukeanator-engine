@@ -250,7 +250,13 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public void deleteAccount(String emailAddress) {
 
-    throw new UserServiceException("Delete account not yet implemented");
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    userRoot.removeUser(emailAddress);
+    this.userRepository.storeAggregateRoot(this.userRoot);
   }
 
   @Override
