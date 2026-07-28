@@ -24,8 +24,14 @@ spring:
   application:
     name: JukeANator
   aop:
-    proxy-target-class: false   # use JDK interface proxies, not CGLIB    
-    
+    proxy-target-class: false   # use JDK interface proxies, not CGLIB
+  flyway:
+    # Scope migrations to a subfolder matching the live datasource's vendor (postgresql | mysql |
+    # h2 for the default/test embedded fallback). Without this, Flyway treats db/migration/** as
+    # one flat namespace and errors out as soon as more than one vendor folder defines the same
+    # version -- see db/migration/postgresql and db/migration/mysql.
+    locations: classpath:db/migration/{vendor}
+
 song-library:
   repository-type: filesystem   # filesystem | postgres
   requires-metadata: false
@@ -67,7 +73,7 @@ song-player:
   line-in-volume: 75  
 
 user:
-  repository-type: filesystem   # filesystem | postgres
+  repository-type: filesystem   # filesystem | jpa (jpa works against Postgres or MySQL -- see spring.datasource.*)
 
 credit-ledger:
   repository-type: filesystem   # filesystem | postgres

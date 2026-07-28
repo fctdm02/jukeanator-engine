@@ -2,6 +2,18 @@ package com.djt.jukeanator_engine.domain.user.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.OrderColumn;
+import jakarta.persistence.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
@@ -10,23 +22,63 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
+@Entity
+@Table(name = "users")
 public class UserEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
   private static final Logger log = LoggerFactory.getLogger(UserEntity.class);
 
+  // Persistence-only back-reference to the singleton UserRootEntity row. Kept in sync solely by
+  // UserRootEntity.addUser() -- domain code never touches it directly.
+  @ManyToOne(fetch = FetchType.EAGER)
+  @JoinColumn(name = "user_root_id")
+  private UserRootEntity userRoot;
+
+  @Column(name = "first_name", nullable = false)
   private String firstName;
+
+  @Column(name = "last_name", nullable = false)
   private String lastName;
+
+  @Column(name = "email_address", nullable = false, unique = true)
   private String emailAddress;
+
+  @Column(name = "password_hash", nullable = false)
   private String passwordHash;
+
+  @Column(name = "num_credits", nullable = false)
   private Integer numCredits = 0;
 
+  // fetch = EAGER throughout this aggregate because UserServiceImpl loads the whole user root
+  // once and holds it in memory indefinitely, well outside the scope of any one transaction --
+  // the same "fully materialized" shape that UserRepositoryFileSystemImpl already assumes when it
+  // deserializes the entire file in one shot.
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(name = "user_song_play_history", joinColumns = @JoinColumn(name = "user_id"))
+  @OrderColumn(name = "play_order")
   private List<SongIdentifier> songPlayHistory = new ArrayList<>();
+
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(name = "user_search_history", joinColumns = @JoinColumn(name = "user_id"))
+  @OrderColumn(name = "search_order")
+  @Column(name = "search_query", length = 500)
   private List<String> searchHistory = new ArrayList<>();
+
+  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true,
+      fetch = FetchType.EAGER)
+  @OrderBy("persistentIdentity ASC")
   private List<PlaylistEntity> playlists = new ArrayList<>();
 
+  @Column(nullable = false)
   private String role = "ROLE_USER";
+
+  protected UserEntity() {} // for JPA
+
+  void setUserRoot(UserRootEntity userRoot) {
+    this.userRoot = userRoot;
+  }
 
   public UserEntity(Integer persistentIdentity, String firstName, String lastName,
       String emailAddress, String passwordHash, Integer numCredits, String role) {
@@ -188,6 +240,7 @@ public class UserEntity extends AbstractPersistentEntity {
 
     int index = this.playlists.size();
     PlaylistEntity playlist = new PlaylistEntity(index, this.emailAddress, playlistName);
+    playlist.setUser(this);
     this.playlists.add(playlist);
     return playlist;
   }

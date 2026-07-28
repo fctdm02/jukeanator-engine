@@ -2,15 +2,23 @@ package com.djt.jukeanator_engine.domain.songqueue.dto;
 
 import java.io.Serializable;
 import java.util.Objects;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+@Embeddable
 public class SongIdentifier implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
+  @Column(name = "album_id")
   private Integer albumId;
+
+  @Column(name = "song_id")
   private Integer songId;
+
+  protected SongIdentifier() {} // for JPA
 
   /** See {@link AddSongToQueueRequest} for why this needs an explicit {@code @JsonCreator}. */
   @JsonCreator

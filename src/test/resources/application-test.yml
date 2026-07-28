@@ -20,7 +20,9 @@ spring:
   application:
     name: JukeANator
   aop:
-    proxy-target-class: false   # use JDK interface proxies, not CGLIB    
+    proxy-target-class: false   # use JDK interface proxies, not CGLIB
+  flyway:
+    locations: classpath:db/migration/{vendor}
 
 song-library:
   repository-type: filesystem   # filesystem | postgres
@@ -63,7 +65,7 @@ song-player:
   line-in-volume: 75  
   
 user:
-  repository-type: filesystem   # filesystem | postgres
+  repository-type: filesystem   # filesystem | jpa (jpa works against Postgres or MySQL -- see spring.datasource.*)
   
 user-interface:
   always-on-top: false

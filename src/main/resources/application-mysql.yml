@@ -1,0 +1,23 @@
+# src/main/resources/application-mysql.yml
+#
+# Activate with: --spring.profiles.active=mysql (or SPRING_PROFILES_ACTIVE=mysql)
+# Switches the user repository to the JPA implementation and points it at a real MySQL instance.
+# Credentials are never hardcoded here -- override via the DB_* environment variables below for
+# anything beyond local dev. Requires a MySQL server reachable at DB_URL with the schema created
+# by src/main/resources/db/migration/mysql/V1__init_user_schema.sql (run automatically by Flyway
+# on startup).
+
+user:
+  repository-type: jpa
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/jukeanator}
+    username: ${DB_USERNAME:jukeanator}
+    password: ${DB_PASSWORD:}
+    driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Flyway owns the schema; Hibernate only checks the mapping matches
+  # spring.flyway.locations (classpath:db/migration/{vendor}) is set in the base application.yml
+  # and resolves to db/migration/mysql once this datasource is active.

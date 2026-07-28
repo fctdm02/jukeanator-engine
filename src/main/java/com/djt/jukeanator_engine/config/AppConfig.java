@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.config;
 
+import jakarta.persistence.EntityManagerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -7,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.djt.jukeanator_engine.domain.backgroundmusic.config.BackgroundMusicProperties;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepository;
@@ -53,7 +55,7 @@ import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepositoryFi
 import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepositoryPostgresImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryFileSystemImpl;
-import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryPostgresImpl;
+import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryJpaImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRootObjectPersistor;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
@@ -179,10 +181,11 @@ public class AppConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "user.repository-type", havingValue = "postgres")
-  public UserRepository userRepositoryPostgresImpl() {
+  @ConditionalOnProperty(name = "user.repository-type", havingValue = "jpa")
+  public UserRepository userRepositoryJpaImpl(EntityManagerFactory entityManagerFactory,
+      PlatformTransactionManager transactionManager) {
 
-    return new UserRepositoryPostgresImpl();
+    return new UserRepositoryJpaImpl(entityManagerFactory, transactionManager);
   }
 
   // ── Credit ledger repository ──────────────────────────────────────────────

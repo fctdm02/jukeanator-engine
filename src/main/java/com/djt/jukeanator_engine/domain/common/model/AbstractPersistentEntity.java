@@ -3,15 +3,40 @@ package com.djt.jukeanator_engine.domain.common.model;
 import java.util.Optional;
 import java.util.Set;
 
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.SequenceGenerator;
+
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 
+/**
+ * {@code @MappedSuperclass} is inert for subclasses that aren't themselves {@code @Entity} (e.g.
+ * the file-system-backed aggregates) -- it only takes effect for JPA-backed entities such as
+ * {@link com.djt.jukeanator_engine.domain.user.model.UserRootEntity}. Using
+ * {@code GenerationType.SEQUENCE} rather than vendor-specific DDL keeps id generation portable:
+ * Hibernate emits a real {@code CREATE SEQUENCE} on databases that support it (Postgres) and
+ * transparently emulates one with a backing table on databases that don't (MySQL), so no
+ * per-vendor branching is needed in application code. The generator name/sequence name are
+ * pinned explicitly (rather than left to Hibernate's implicit per-entity naming) so every entity
+ * in this hierarchy shares one predictable, hand-writable sequence -- see the Flyway migrations
+ * under {@code db/migration/postgresql} and {@code db/migration/mysql}.
+ */
+@MappedSuperclass
 public abstract class AbstractPersistentEntity extends AbstractEntity {
   private static final long serialVersionUID = 1L;
-  
+
+  public static final String PERSISTENT_IDENTITY_SEQUENCE = "persistent_identity_seq";
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = PERSISTENT_IDENTITY_SEQUENCE)
+  @SequenceGenerator(name = PERSISTENT_IDENTITY_SEQUENCE,
+      sequenceName = PERSISTENT_IDENTITY_SEQUENCE, allocationSize = 1)
   private Integer persistentIdentity;
-  
-  
+
+
   public AbstractPersistentEntity() {}
 
   public AbstractPersistentEntity(Integer persistentIdentity) {
