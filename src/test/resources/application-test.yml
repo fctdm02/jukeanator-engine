@@ -22,6 +22,10 @@ spring:
   aop:
     proxy-target-class: false   # use JDK interface proxies, not CGLIB
   flyway:
+    # Scope migrations to a subfolder matching the live datasource's vendor (postgresql | mysql |
+    # h2 for the default/test embedded fallback). Without this, Flyway treats db/migration/** as
+    # one flat namespace and errors out as soon as more than one vendor folder defines the same
+    # version -- see db/migration/postgresql and db/migration/mysql.
     locations: classpath:db/migration/{vendor}
 
 song-library:
