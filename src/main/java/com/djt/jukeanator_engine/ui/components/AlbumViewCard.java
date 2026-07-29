@@ -538,8 +538,8 @@ public class AlbumViewCard extends JPanel {
 
     JPanel row = new JPanel(new BorderLayout(10, 0));
     row.setOpaque(false);
-    row.setBorder(new EmptyBorder(LayoutTheme.get().albumViewRowPadV, 16,
-        LayoutTheme.get().albumViewRowPadV, 16));
+    row.setBorder(new EmptyBorder(LayoutTheme.get().albumViewTrackRowPadV, 16,
+        LayoutTheme.get().albumViewTrackRowPadV, 16));
 
     // Give BoxLayout a complete height contract: preferred, minimum, and maximum
     // are all set to the same value so the row height is fully determined and
@@ -547,9 +547,9 @@ public class AlbumViewCard extends JPanel {
     // panel has less vertical space than the sum of row heights. Without a
     // minimum/preferred, BoxLayout is free to shrink rows toward 0 px, which
     // causes the text from one row to be painted on top of the next.
-    Dimension rowSize = new Dimension(Integer.MAX_VALUE, LayoutTheme.get().albumViewRowH);
+    Dimension rowSize = new Dimension(Integer.MAX_VALUE, LayoutTheme.get().albumViewTrackRowH);
     row.setPreferredSize(rowSize);
-    row.setMinimumSize(new Dimension(0, LayoutTheme.get().albumViewRowH));
+    row.setMinimumSize(new Dimension(0, LayoutTheme.get().albumViewTrackRowH));
     row.setMaximumSize(rowSize);
 
     if (listener != null) {

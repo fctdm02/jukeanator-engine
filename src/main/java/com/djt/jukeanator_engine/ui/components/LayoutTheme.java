@@ -274,6 +274,8 @@ public class LayoutTheme {
     albumViewRowH = 56; // was implicitly 72 (=resultRowMaxH); reduced to fit 12 rows
     albumViewTracksPerPage = 12; // was 15 (pre-fix) / 10 (interim fix); now matches 12 visible rows
     albumViewRowPadV = 10; // top+bottom EmptyBorder padding inside each track row
+    albumViewTrackRowH = albumViewRowH; // AlbumViewCard-only; unchanged from shared value here
+    albumViewTrackRowPadV = albumViewRowPadV; // AlbumViewCard-only; unchanged from shared value here
     albumViewPlaysColW = 64;
     albumViewTrkNumColW = 48;
     albumViewCompilationArtistW = 260;
@@ -435,6 +437,8 @@ public class LayoutTheme {
       albumViewRowH = 72; // portrait: keep full row height (same as resultRowMaxH)
       albumViewTracksPerPage = 15;
       albumViewRowPadV = 10; // portrait: same top+bottom row padding as landscape
+      albumViewTrackRowH = albumViewRowH; // AlbumViewCard-only; unchanged from shared value here
+      albumViewTrackRowPadV = albumViewRowPadV; // AlbumViewCard-only; unchanged from shared value here
       albumViewPlaysColW = 64;
       albumViewTrkNumColW = 48;
       albumViewCompilationArtistW = 260;
@@ -690,30 +694,27 @@ public class LayoutTheme {
 
       // ── AlbumViewCard track list ────────────────────────────────────────────
       //
-      // Target: 10 fully visible track rows on 1024 × 768.
+      // albumViewRowH/albumViewRowPadV below stay at their original 1024×768 values
+      // because QueuePanel.buildQueueRow also reads them (to keep queue rows visually
+      // matched to album track rows) — see their javadoc. AlbumViewCard itself uses
+      // the dedicated albumViewTrackRowH/albumViewTrackRowPadV fields below instead, so
+      // it can be re-tuned independently of the queue panel if ever needed.
       //
-      // Empirical calibration from v2 screenshot:
-      // - 9 rows of 50px are confirmed fully visible (9×50 + 8 sep + 8 pad = 466px fits)
-      // - 10 rows at 50px (517px) do NOT fit — the 10th is clipped by AlbumDetailCard
-      // footer chrome (← BACK button + add-to-queue bar) that was not in the original
-      // formula.
+      // Historical note: an earlier pass here assumed a ~466px ceiling for trackRowsPanel
+      // (based on a stale v2-screenshot calibration) and shrank the row height to 27px to
+      // fit 16 rows inside it. That assumption was wrong — later layout changes elsewhere
+      // (search bar, keyboard, nav border reductions) freed up more room than the old
+      // comment accounted for. Confirmed via screenshot: 16 rows at the original 44px row
+      // height fit fully visible with room to spare, so the row height/padding are kept
+      // identical to the shared albumViewRowH/albumViewRowPadV values — only the page size
+      // changes.
       //
-      // The trackRowsPanel visible height is therefore in the range [466, 516] px.
-      //
-      // To guarantee 10 rows fit inside the proven lower bound of 466px:
-      // 10 rows + 9 separators (1px) + 8px panel border = 10×H + 17 ≤ 466
-      // → H ≤ 44.9 → albumViewRowH = 44 px
-      // check: 10×44 + 9 + 8 = 457 px (fits with 9px headroom) ✓
-      //
-      // albumViewRowPadV=4 gives 8px total vertical padding per row, leaving
-      // 36px of content height — sufficient for popularity bars + track labels.
-      //
-      // albumViewTracksPerPage=10 ensures TRACKS_PER_PAGE=10 == lastRenderedCount,
-      // so page-down always jumps by exactly 10: page 1 → 1-10, page 2 → 11-20.
-      //
-      albumViewRowH = 44; // landscape default: 56; empirically derived for 1024×768
-      albumViewTracksPerPage = 10; // landscape default: 12
-      albumViewRowPadV = 4; // landscape default: 10 (EmptyBorder top+bottom)
+      albumViewRowH = 44; // landscape default: 56; empirically derived for 1024×768; shared w/ QueuePanel
+      albumViewRowPadV = 4; // landscape default: 10 (EmptyBorder top+bottom); shared w/ QueuePanel
+
+      albumViewTracksPerPage = 16; // AlbumViewCard-only page size; landscape default: 12; was 10
+      albumViewTrackRowH = albumViewRowH; // AlbumViewCard-only; confirmed 16 rows fit at original height
+      albumViewTrackRowPadV = albumViewRowPadV; // AlbumViewCard-only; confirmed fit at original padding
 
       // ── AlbumViewCard column widths ───────────────────────────────────────────
       //
@@ -1512,15 +1513,21 @@ public class LayoutTheme {
   public final int albumViewTracksPerPage;
 
   /**
-   * Fixed height of each track row in the AlbumViewCard track list (px). This is the combined
-   * height of the row content plus its top+bottom {@code EmptyBorder} padding. BoxLayout is given
-   * this value as both preferred, minimum, and maximum so rows never compress.
+   * Fixed row height (px) shared by {@link AlbumViewCard}'s track list AND
+   * {@code QueuePanel.buildQueueRow} (which reads this field so queue rows stay visually matched to
+   * album track rows). BoxLayout is given this value as both preferred, minimum, and maximum so rows
+   * never compress.
+   *
+   * <p>
+   * Because it is shared with the queue panel, this field is <em>not</em> shrunk to fit more
+   * AlbumViewCard rows — see {@link #albumViewTrackRowH} for the AlbumViewCard-only equivalent used
+   * for that purpose.
    *
    * <p>
    * Landscape (1920 × 1080): 56 px — fits 12 rows in the ~764px body. Small-landscape (1024 × 768):
-   * 44 px — fits 10 rows; empirically derived: 9 rows of 50px were confirmed visible, so
-   * trackRowsPanel height ∈ [466, 516] px; 10×44+9+8=457px ✓. Portrait (1080 × 1920): 72 px —
-   * matches the original resultRowMaxH.
+   * 44 px; empirically derived: 9 rows of 50px were confirmed visible, so trackRowsPanel height ∈
+   * [466, 516] px; 10×44+9+8=457px ✓. Portrait (1080 × 1920): 72 px — matches the original
+   * resultRowMaxH.
    */
   public final int albumViewRowH;
 
@@ -1535,6 +1542,30 @@ public class LayoutTheme {
    * content height inside the 50px row).
    */
   public final int albumViewRowPadV;
+
+  /**
+   * Fixed height of each track row in {@link AlbumViewCard}'s track listing (px), specifically.
+   *
+   * <p>
+   * Deliberately separate from {@link #albumViewRowH} — that field is also read by
+   * {@code QueuePanel.buildQueueRow} to keep queue rows visually matched to album track rows, so it
+   * cannot be shrunk to fit more AlbumViewCard rows without also shrinking the queue. This field lets
+   * AlbumViewCard's row height (and therefore {@link #albumViewTracksPerPage}) be tuned independently.
+   *
+   * <p>
+   * Currently equal to {@link #albumViewRowH} in every orientation, including small-landscape (1024
+   * × 768) — confirmed by screenshot that 16 rows fit fully visible at the original 44px row height,
+   * so only {@link #albumViewTracksPerPage} changes there (10 → 16). Kept as a separate field so row
+   * height can still be tuned for AlbumViewCard alone in the future without touching the queue panel.
+   */
+  public final int albumViewTrackRowH;
+
+  /**
+   * Top and bottom {@code EmptyBorder} padding (px) applied to each track row inside
+   * {@link AlbumViewCard} only — see {@link #albumViewTrackRowH} for why this is separate from
+   * {@link #albumViewRowPadV} (shared with {@code QueuePanel}).
+   */
+  public final int albumViewTrackRowPadV;
 
   /** Width allocated for the "# Plays" (popularity bars) column header and cells. */
   public final int albumViewPlaysColW;
