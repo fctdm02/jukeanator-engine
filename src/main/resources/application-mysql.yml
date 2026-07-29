@@ -9,7 +9,7 @@
 # sudo apt update
 # sudo apt install mysql-server
 # sudo mysql_secure_installation
-# sudo snap install dbeaver-ce
+# flatpak install flathub io.dbeaver.DBeaverCommunity
 
 user:
   repository-type: jpa

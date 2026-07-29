@@ -414,7 +414,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
           rebuildResultsCard();
         }, item -> handleRowClick("SONGS", item)));
 
-    resultsKeyboard = buildSearchKeyboard();
+    if (resultsKeyboard == null)
+      resultsKeyboard = buildSearchKeyboard();
 
     resultsCard.add(buildSearchBarPanel(true), BorderLayout.NORTH);
     resultsCard.add(columnsLayoutContainer, BorderLayout.CENTER);
