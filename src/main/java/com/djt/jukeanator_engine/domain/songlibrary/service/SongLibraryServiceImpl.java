@@ -626,6 +626,24 @@ public class SongLibraryServiceImpl
       throw new SongLibraryServiceException("Could not restore song statistics from: " + filename, e);
     }
   }
+  
+  @Override
+  public Integer storeSongLibraryAndStatistics() {
+
+    try {
+      
+      // Store the song library
+      this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
+      
+      // Store the song statistics
+      this.songLibraryRoot.storeSongStatistics(this.rootPath);
+
+      return Integer.valueOf(songLibraryRoot.getAlbums().size());
+
+    } catch (Exception e) {
+      throw new SongLibraryServiceException("Could not store song library and statistics to: " + this.rootPath, e);
+    }
+  }
 
   @Override
   public List<AlbumMetadataDto> searchInternetForAlbumMetadata(String artistName, String albumName,

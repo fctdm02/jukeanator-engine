@@ -271,6 +271,11 @@ public class SongLibraryServiceLocationProxy implements SongLibraryService {
   }
 
   @Override
+  public Integer storeSongLibraryAndStatistics() {
+    throw new UnsupportedOperationException(ADMIN_METHOD_MESSAGE);
+  }
+  
+  @Override
   public List<AlbumMetadataDto> searchInternetForAlbumMetadata(String artistName, String albumName,
       int limit) {
     throw new UnsupportedOperationException(ADMIN_METHOD_MESSAGE);

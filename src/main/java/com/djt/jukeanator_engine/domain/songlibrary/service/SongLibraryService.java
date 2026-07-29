@@ -144,6 +144,12 @@ public interface SongLibraryService {
 
   /**
    * 
+   * @return
+   */
+  Integer storeSongLibraryAndStatistics();
+  
+  /**
+   * 
    * @param artistName
    * @param albumName
    * @param limit

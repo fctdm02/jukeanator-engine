@@ -156,7 +156,14 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
     return restClient.post().uri("/api/song-library/restoreSongStatistics").body(filename)
         .retrieve().body(Integer.class);
   }
-
+  
+  @Override
+  public Integer storeSongLibraryAndStatistics() {
+    
+    return restClient.post().uri("/api/song-library/storeSongLibraryAndStatistics")
+        .retrieve().body(Integer.class);
+  }
+ 
   @Override
   public List<AlbumMetadataDto> searchInternetForAlbumMetadata(@RequestParam String artistName,
       @RequestParam String albumName, @RequestParam int limit) {

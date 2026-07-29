@@ -56,55 +56,46 @@ public class SongLibraryController {
     return songLibraryService.getMusicByPopularity();
   }
 
-
   @GetMapping("/search")
   public SearchResultDto getMusicBySearch(@RequestParam String searchFor,
       @RequestParam(defaultValue = "20") int limit) {
     return songLibraryService.getMusicBySearch(searchFor, limit);
   }
 
-
   @GetMapping("/genres")
   public List<GenreDto> getGenres() {
     return songLibraryService.getGenres();
   }
-
 
   @GetMapping("/genres/popular")
   public SearchResultDto getGenreMusicByPopularity(@RequestParam String genreName) {
     return songLibraryService.getGenreMusicByPopularity(genreName);
   }
 
-
   @GetMapping("/genres/title")
   public SearchResultDto getGenreMusicByTitle(@RequestParam String genreName) {
     return songLibraryService.getGenreMusicByTitle(genreName);
   }
-
 
   @GetMapping("/artists")
   public List<ArtistDto> getArtists() {
     return songLibraryService.getArtists();
   }
 
-
   @GetMapping("/artist")
   public ArtistDto getArtistByName(@RequestParam String artistName) {
     return songLibraryService.getArtistByName(artistName);
   }
-
 
   @GetMapping("/albums")
   public List<AlbumDto> getAlbums() {
     return songLibraryService.getAlbums();
   }
 
-
   @GetMapping("/genres/{genreId}/albums")
   public List<AlbumDto> getAlbumsForGenre(@PathVariable Integer genreId) {
     return songLibraryService.getAlbumsForGenre(genreId);
   }
-
 
   @GetMapping("/albums/{id}")
   public AlbumDto getAlbumById(@PathVariable Integer id) {
@@ -120,7 +111,6 @@ public class SongLibraryController {
   public ArtistDto getArtistByAlbumId(@PathVariable Integer albumId) {
     return songLibraryService.getArtistByAlbumId(albumId);
   }
-
 
   @GetMapping("/artists/{id}/coverArt")
   public ResponseEntity<Resource> getArtistCoverArt(@PathVariable Integer id)
@@ -146,7 +136,6 @@ public class SongLibraryController {
         .cacheControl(CacheControl.maxAge(Duration.ofDays(1)))
         .body(new FileSystemResource(coverArtPath));
   }
-
 
   @GetMapping("/albums/{id}/coverArt")
   public ResponseEntity<Resource> getAlbumCoverArt(@PathVariable Integer id)
@@ -176,21 +165,17 @@ public class SongLibraryController {
         .body(new FileSystemResource(coverArtPath));
   }
 
-
   @GetMapping("/songs/{albumId}/{songId}")
   public SongDto getSongById(@PathVariable Integer albumId, @PathVariable Integer songId) {
     return songLibraryService.getSongById(albumId, songId);
   }
 
-
   // ADMIN ROLE METHODS
-
   @PostMapping("/scanNoPath")
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 
     return songLibraryService.scanFileSystemForSongs();
   }
-
 
   @PostMapping("/scan")
   public Integer scanFileSystemForSongs(@RequestBody ScanRequest scanRequest)
@@ -199,13 +184,11 @@ public class SongLibraryController {
     return songLibraryService.scanFileSystemForSongs(scanRequest);
   }
 
-
   @PostMapping("/resetSongStatistics")
   public Integer resetSongStatistics() {
 
     return songLibraryService.resetSongStatistics();
   }
-
 
   @PostMapping("/restoreSongStatistics")
   public Integer restoreSongStatistics(@RequestBody String filename) {
@@ -213,14 +196,18 @@ public class SongLibraryController {
     return songLibraryService.restoreSongStatistics(filename);
   }
 
+  @PostMapping("/storeSongLibraryAndStatistics")
+  public Integer storeSongLibraryAndStatistics() {
 
+    return songLibraryService.storeSongLibraryAndStatistics();
+  }
+  
   @GetMapping("/searchInternetForAlbumMetadata")
   public List<AlbumMetadataDto> searchInternetForAlbumMetadata(@RequestParam String artistName,
       @RequestParam String albumName, int limit) {
 
     return songLibraryService.searchInternetForAlbumMetadata(artistName, albumName, limit);
   }
-
 
   @PostMapping("/albums/{albumId}/updateAlbumMetadata")
   public AlbumMetadataDto updateAlbumMetadata(@PathVariable Integer albumId,
@@ -229,7 +216,6 @@ public class SongLibraryController {
     return songLibraryService.updateAlbumMetadata(albumId, albumMetadata);
   }
 
-
   @PostMapping("/downloadAlbumCoverArt")
   public String downloadAlbumCoverArt(
       @RequestBody DownloadAlbumCoverArtRequest downloadAlbumCoverArtRequest) {
@@ -237,12 +223,9 @@ public class SongLibraryController {
     return songLibraryService.downloadAlbumCoverArt(downloadAlbumCoverArtRequest);
   }
 
-
   @PostMapping("/authenticateForAdminPanel")
   public Boolean authenticateForAdminPanel(
       @RequestBody AuthenticateForAdminPanelRequest authenticateForAdminPanelRequest) {
     return songLibraryService.authenticateForAdminPanel(authenticateForAdminPanelRequest);
   }
-
-
 }
