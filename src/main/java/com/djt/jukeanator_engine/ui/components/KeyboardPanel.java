@@ -267,6 +267,17 @@ public class KeyboardPanel extends JPanel {
     return back;
   }
 
+  /**
+   * Resets the keyboard to {@link KeyboardMode#ABC}, e.g. when the owning screen is freshly
+   * entered. Does nothing (and does not rebuild) if already in ABC mode.
+   */
+  public void resetMode() {
+    if (keyboardMode != KeyboardMode.ABC) {
+      keyboardMode = KeyboardMode.ABC;
+      refreshKeyboard();
+    }
+  }
+
   private void refreshKeyboard() {
     JPanel frostedBody = (JPanel) outerWrapper.getComponent(0);
     frostedBody.removeAll();

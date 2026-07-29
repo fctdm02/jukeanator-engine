@@ -62,8 +62,12 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
   private final JPanel resultsCard = new JPanel(new BorderLayout());
 
-  private KeyboardPanel entryKeyboard;
-  private KeyboardPanel resultsKeyboard;
+  // ── Single shared on-screen keyboard ─────────────────────────────────────
+  // Built once and moved between the entry card and the results card so its
+  // ABC / NUMERIC mode persists across searches; only explicitly reset to ABC
+  // when the Search tab is (re-)entered via resetSearch().
+  private KeyboardPanel keyboard;
+  private JPanel entryKeyboardSlot;
 
   private AlbumDetailCard currentDetailCard;
 
@@ -212,26 +216,25 @@ public class SearchPanel extends JPanel implements TabNavigator {
     JPanel searchBar = buildSearchBarPanel(false);
     searchBar.setPreferredSize(new Dimension(100, LayoutTheme.get().searchBarHeight));
 
-    entryKeyboard = buildSearchKeyboard();
+    if (keyboard == null)
+      keyboard = buildSearchKeyboard();
 
     root.add(searchBar, BorderLayout.NORTH);
     root.add(heroWrapper, BorderLayout.CENTER);
 
     // Item 1.3: small spacer between hero area and keyboard panel (small-landscape only;
     // zero height on other resolutions so no visual change elsewhere).
+    entryKeyboardSlot = new JPanel(new BorderLayout());
+    entryKeyboardSlot.setOpaque(false);
     int spacerH = LayoutTheme.get().searchHeroSpacerH;
     if (spacerH > 0) {
       JPanel spacer = new JPanel();
       spacer.setOpaque(false);
       spacer.setPreferredSize(new Dimension(1, spacerH));
-      JPanel southStack = new JPanel(new BorderLayout());
-      southStack.setOpaque(false);
-      southStack.add(spacer, BorderLayout.NORTH);
-      southStack.add(entryKeyboard, BorderLayout.CENTER);
-      root.add(southStack, BorderLayout.SOUTH);
-    } else {
-      root.add(entryKeyboard, BorderLayout.SOUTH);
+      entryKeyboardSlot.add(spacer, BorderLayout.NORTH);
     }
+    entryKeyboardSlot.add(keyboard, BorderLayout.CENTER);
+    root.add(entryKeyboardSlot, BorderLayout.SOUTH);
     return root;
   }
 
@@ -359,6 +362,12 @@ public class SearchPanel extends JPanel implements TabNavigator {
     resultsCard.removeAll();
     resultsCard.revalidate();
     resultsCard.repaint();
+    if (keyboard != null) {
+      keyboard.resetMode();
+      entryKeyboardSlot.add(keyboard, BorderLayout.CENTER);
+      entryKeyboardSlot.revalidate();
+      entryKeyboardSlot.repaint();
+    }
     cardLayout.show(rootPanel, CARD_ENTRY);
   }
 
@@ -414,12 +423,11 @@ public class SearchPanel extends JPanel implements TabNavigator {
           rebuildResultsCard();
         }, item -> handleRowClick("SONGS", item)));
 
-    if (resultsKeyboard == null)
-      resultsKeyboard = buildSearchKeyboard();
-
     resultsCard.add(buildSearchBarPanel(true), BorderLayout.NORTH);
     resultsCard.add(columnsLayoutContainer, BorderLayout.CENTER);
-    resultsCard.add(resultsKeyboard, BorderLayout.SOUTH);
+    // Reparents the same KeyboardPanel instance used on the entry card so its
+    // ABC / NUMERIC mode carries over into the results view.
+    resultsCard.add(keyboard, BorderLayout.SOUTH);
     resultsCard.revalidate();
     resultsCard.repaint();
   }

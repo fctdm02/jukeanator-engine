@@ -10,6 +10,7 @@
 # sudo apt install mysql-server
 # sudo mysql_secure_installation
 # flatpak install flathub io.dbeaver.DBeaverCommunity
+# sudo systemctl status mysql
 
 user:
   repository-type: jpa
