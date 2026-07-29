@@ -6,6 +6,10 @@
 # anything beyond local dev. Requires a MySQL server reachable at DB_URL with the schema created
 # by src/main/resources/db/migration/mysql/V1__init_user_schema.sql (run automatically by Flyway
 # on startup).
+# sudo apt update
+# sudo apt install mysql-server
+# sudo mysql_secure_installation
+# sudo snap install dbeaver-ce
 
 user:
   repository-type: jpa
