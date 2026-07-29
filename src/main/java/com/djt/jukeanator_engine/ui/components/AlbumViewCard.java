@@ -63,10 +63,14 @@ public class AlbumViewCard extends JPanel {
   private int trackOffset = 0;
   /**
    * The number of track rows actually rendered on the most recent call to
-   * {@link #rebuildTrackRows()}. Used as the page-jump size for the prev/next buttons so that the
-   * navigation always advances by exactly as many rows as are visible — regardless of the
-   * {@code TRACKS_PER_PAGE} constant, which may differ from the visible count when the panel height
-   * is constrained (e.g. on a 1024 × 768 display).
+   * {@link #rebuildTrackRows()}. Used as the forward page-jump size for the "next" button so it
+   * always advances by exactly as many rows as are currently visible — this matters on the last
+   * page of an album whose track count isn't a multiple of {@code TRACKS_PER_PAGE}, where fewer
+   * rows are rendered than the constant.
+   *
+   * <p>
+   * The "prev" button intentionally steps back by {@code TRACKS_PER_PAGE} instead (not this field)
+   * — see its listener for why.
    */
   private int lastRenderedCount = TRACKS_PER_PAGE;
   private List<SongDto> trackSongs;
@@ -356,7 +360,12 @@ public class AlbumViewCard extends JPanel {
 
     trackPrevBtn = trackNavButton(true);
     trackPrevBtn.addActionListener(e -> {
-      trackOffset = Math.max(0, trackOffset - lastRenderedCount);
+      // Step back by a full page (TRACKS_PER_PAGE), not lastRenderedCount: the current
+      // page may be a short final page (e.g. 4 songs left on a 100-song, 16-per-page
+      // album), and stepping back by that short count would only rewind a few rows
+      // instead of a full page. Forward navigation always advances offsets in multiples
+      // of TRACKS_PER_PAGE, so subtracting it here always lands on a page boundary.
+      trackOffset = Math.max(0, trackOffset - TRACKS_PER_PAGE);
       rebuildTrackRows();
     });
 
