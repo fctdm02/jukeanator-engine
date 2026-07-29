@@ -90,9 +90,9 @@ public class WinampMediaPlayer implements Player {
   // -----------------------------------------------------------------------
   // WM_COMMAND button identifiers
   // -----------------------------------------------------------------------
-  private static final int WINAMP_BUTTON2_PAUSE = 40046; // Play / Resume
-  private static final int WINAMP_BUTTON3 = 40047; // Pause toggle
-  private static final int WINAMP_BUTTON4 = 40048; // Stop
+  private static final int WINAMP_BUTTON_PAUSE = 40046; // Pause toggle (pauses when playing,
+                                                         // resumes when paused)
+  private static final int WINAMP_BUTTON_STOP = 40047; // Stop
 
   // -----------------------------------------------------------------------
   // WM_WA_IPC command values (lParam)
@@ -221,7 +221,7 @@ public class WinampMediaPlayer implements Player {
       // would never be noticed and the queue would never advance. Force a clean, known STOPPED
       // state here so this session's queue processing starts from scratch. This does not
       // restart the winamp.exe process, so it only costs two IPC calls, once, at startup.
-      sendCommand(hwnd, WINAMP_BUTTON4); // Stop
+      sendCommand(hwnd, WINAMP_BUTTON_STOP); // Stop
       sendIPC(hwnd, 0, IPC_DELETE); // Clear playlist
       status.set(SongPlayerStatus.STOPPED);
     } catch (InterruptedException e) {
@@ -300,10 +300,10 @@ public class WinampMediaPlayer implements Player {
 
     SongPlayerStatus current = status.get();
     if (current == SongPlayerStatus.PLAYING) {
-      sendCommand(hwnd, WINAMP_BUTTON3); // Pause
+      sendCommand(hwnd, WINAMP_BUTTON_PAUSE); // Pause
       status.set(SongPlayerStatus.PAUSED);
     } else if (current == SongPlayerStatus.PAUSED) {
-      sendCommand(hwnd, WINAMP_BUTTON2_PAUSE); // Resume
+      sendCommand(hwnd, WINAMP_BUTTON_PAUSE); // Resume (same toggle button)
       status.set(SongPlayerStatus.PLAYING);
     }
   }
@@ -313,7 +313,7 @@ public class WinampMediaPlayer implements Player {
 
     HWND hwnd = findWinampWindow();
     if (hwnd != null) {
-      sendCommand(hwnd, WINAMP_BUTTON4); // Stop
+      sendCommand(hwnd, WINAMP_BUTTON_STOP); // Stop
     }
     status.set(SongPlayerStatus.STOPPED);
     cancelPollTask();
