@@ -1,7 +1,13 @@
-# Read Me First
+spring-boot:build# Read Me First
 The following was discovered as part of building this project:
 
 * The original package name 'com.djt.jukeanator-engine' is invalid and this project uses 'com.djt.jukeanator_engine' instead.
+
+# Building/Running the Application
+```
+mvn clean package -DskipTests
+java -jar target/jukeanator-engine-0.0.1-SNAPSHOT.war
+```
 
 # Getting Started
 
