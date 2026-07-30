@@ -33,10 +33,9 @@ import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
  */
 public abstract class AbstractServiceIntegrationTest {
 
-  /** Path to the scanner output file written under the test-resources tree. */
+  /** Path to the scanner output file written under {@code app.data-dir} (see application-test.yml). */
   private static final String SCANNER_OOS_PATH =
-      "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/"
-          + "utils/SongScannerTest/RequireMetadataUseGenreTopFolder/JukeANator.oos";
+      "src/test/resources/com/djt/jukeanator_engine/test-data-dir/JukeANator.oos";
 
   // ── Security context lifecycle ────────────────────────────────────────────
 

@@ -8,9 +8,12 @@ app:
   logging:
     file-path: logs/jukeanator-service.log
     max-file-size: 10MB
-  # Shared root path used by song-library, song-queue, and user services.
+  # The song library location ONLY -- where the actual music files live. Not used for app state.
   root-path-windows: C:\\Users\jukeanator\Music\Rock_On_Third # windows
   root-path-unix: /home/tmyers/Music/Rock_On_Third # linux / macOS
+  # Isolates the engine's own state files under test-resources so tests never touch the real
+  # <user.home>/.jukeanator.
+  data-dir: src/test/resources/com/djt/jukeanator_engine/test-data-dir
 
 logging:
   level:

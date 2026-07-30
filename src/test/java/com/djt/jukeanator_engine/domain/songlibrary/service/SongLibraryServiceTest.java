@@ -101,9 +101,8 @@ public class SongLibraryServiceTest extends AbstractServiceIntegrationTest {
             + "utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
     songLibraryService.scanFileSystemForSongs(scanRequest);
 
-    Path cdStatsPath = Path.of(
-        "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/"
-            + "utils/SongScannerTest/RequireMetadataUseGenreTopFolderCDStats.TXT");
+    Path cdStatsPath =
+        Path.of("src/test/resources/com/djt/jukeanator_engine/test-data-dir/CDStats.TXT");
     byte[] originalCdStatsBytes =
         Files.exists(cdStatsPath) ? Files.readAllBytes(cdStatsPath) : null;
 

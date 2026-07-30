@@ -121,8 +121,8 @@ public class AppConfig {
   @ConditionalOnProperty(name = "song-library.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
   public SongLibraryRepository songLibraryRepositoryFileSystemImpl(AppProperties appProperties) {
-    
-    return new SongLibraryRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
+
+    return new SongLibraryRepositoryFileSystemImpl(appProperties.getDataDir());
   }
 
   @Bean
@@ -159,8 +159,8 @@ public class AppConfig {
   @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
   public SongQueueRepository songQueueRepositoryFileSystemImpl(AppProperties appProperties) {
-    
-    return new SongQueueRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
+
+    return new SongQueueRepositoryFileSystemImpl(appProperties.getDataDir());
   }
 
   @Bean
@@ -176,8 +176,8 @@ public class AppConfig {
   @ConditionalOnProperty(name = "user.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
   public UserRepository userRepositoryFileSystemImpl(AppProperties appProperties) {
-    
-    return new UserRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
+
+    return new UserRepositoryFileSystemImpl(appProperties.getDataDir());
   }
 
   @Bean
@@ -195,7 +195,7 @@ public class AppConfig {
       matchIfMissing = true)
   public CreditLedgerRepository creditLedgerRepositoryFileSystemImpl(AppProperties appProperties) {
 
-    return new CreditLedgerRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
+    return new CreditLedgerRepositoryFileSystemImpl(appProperties.getDataDir());
   }
 
   @Bean
@@ -210,14 +210,14 @@ public class AppConfig {
   @Bean
   public BackgroundMusicRepository backgroundMusicRepository(AppProperties appProperties) {
 
-    return new BackgroundMusicRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
+    return new BackgroundMusicRepositoryFileSystemImpl(appProperties.getDataDir());
   }
 
   @Bean
   public SmartBackgroundMusicRepository smartBackgroundMusicRepository(
       AppProperties appProperties) {
 
-    return new SmartBackgroundMusicRepositoryFileSystemImpl(appProperties.getEffectiveRootPath());
+    return new SmartBackgroundMusicRepositoryFileSystemImpl(appProperties.getDataDir());
   }
 
   // ── Services ──────────────────────────────────────────────────────────────
@@ -231,6 +231,7 @@ public class AppConfig {
       ApplicationEventPublisher eventPublisher) {
     
     return new SongLibraryServiceImpl(
+        appProperties.getDataDir(),
         appProperties.getEffectiveRootPath(),
         appProperties.getRootPathWindows(),
         appProperties.getRootPathUnix(),
@@ -250,7 +251,7 @@ public class AppConfig {
       SmartBackgroundMusicRepository smartBackgroundMusicRepository) {
 
     return new BackgroundMusicServiceImpl(
-        appProperties.getEffectiveRootPath(),
+        appProperties.getDataDir(),
         appProperties.getRootPathWindows(),
         appProperties.getRootPathUnix(),
         backgroundMusicProperties,

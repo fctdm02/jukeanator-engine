@@ -1,5 +1,11 @@
 package com.djt.jukeanator_engine.config;
 
+import jakarta.annotation.PostConstruct;
+import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
@@ -16,6 +22,11 @@ public class AppProperties {
 
   private String rootPathWindows;
   private String rootPathUnix; // Both Linux and MacOSX
+
+  // Where the engine reads/writes its own state (song library, song queue, users, credit ledger,
+  // background-music playlists, CD stats, admin/owner password hashes) -- independent of
+  // rootPath-*, which is strictly the song library location.
+  private String dataDir = System.getProperty("user.home") + File.separator + ".jukeanator";
 
   // standalone: today's single-tenant behavior (default). master: headless, location-agnostic,
   // hosts the location registry and proxies to slaves. slave: a physical location that syncs its
@@ -102,6 +113,23 @@ public class AppProperties {
   
   public void setRootPathWindows(String rootPathWindows) {
     this.rootPathWindows = rootPathWindows;
+  }
+
+  public String getDataDir() {
+    return dataDir;
+  }
+
+  public void setDataDir(String dataDir) {
+    this.dataDir = dataDir;
+  }
+
+  @PostConstruct
+  public void ensureDataDirExists() {
+    try {
+      Files.createDirectories(Path.of(dataDir));
+    } catch (IOException e) {
+      throw new UncheckedIOException("Could not create data-dir: " + dataDir, e);
+    }
   }
 
   public Jwt getJwt() {

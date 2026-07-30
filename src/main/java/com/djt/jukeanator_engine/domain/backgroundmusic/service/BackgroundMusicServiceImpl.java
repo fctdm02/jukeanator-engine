@@ -51,9 +51,9 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private final SmartBackgroundMusicRepository smartBackgroundMusicRepository;
   private final BackgroundMusicHelper backgroundMusicHelper = new BackgroundMusicHelper();
 
-  private String rootPath;
   private final String rootPathWindows;
   private final String rootPathUnix;
+  private final String dataDir;
 
   private boolean enableBackgroundMusic;
   private final boolean enableSmartBackgroundMusicAdditions;
@@ -89,12 +89,12 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   // played yet. ─────────────────────────────────────────────────────────────
   private Set<String> currentlyQueuedPaths = new HashSet<>();
 
-  public BackgroundMusicServiceImpl(String rootPath, String rootPathWindows, String rootPathUnix,
-      BackgroundMusicProperties backgroundMusicProperties, SongLibraryService songLibraryService,
-      BackgroundMusicRepository backgroundMusicRepository,
+  public BackgroundMusicServiceImpl(String dataDir, String rootPathWindows,
+      String rootPathUnix, BackgroundMusicProperties backgroundMusicProperties,
+      SongLibraryService songLibraryService, BackgroundMusicRepository backgroundMusicRepository,
       SmartBackgroundMusicRepository smartBackgroundMusicRepository) {
 
-    requireNonNull(rootPath, "rootPath cannot be null");
+    requireNonNull(dataDir, "dataDir cannot be null");
     requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
     requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
     requireNonNull(backgroundMusicProperties, "backgroundMusicProperties cannot be null");
@@ -102,7 +102,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     requireNonNull(backgroundMusicRepository, "backgroundMusicRepository cannot be null");
     requireNonNull(smartBackgroundMusicRepository, "smartBackgroundMusicRepository cannot be null");
 
-    this.rootPath = rootPath;
+    this.dataDir = dataDir;
     this.rootPathWindows = rootPathWindows;
     this.rootPathUnix = rootPathUnix;
     this.songLibraryService = songLibraryService;
@@ -205,17 +205,17 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    */
   private void loadAndReconcile() throws IOException {
 
-    List<String> playlistPaths = backgroundMusicHelper.readBackgroundMusicPlaylist(this.rootPath);
+    List<String> playlistPaths = backgroundMusicHelper.readBackgroundMusicPlaylist(this.dataDir);
     this.currentPlaylistPaths = new HashSet<>(playlistPaths);
 
     List<String> genreExclusions =
-        backgroundMusicHelper.readSmartBackgroundMusicGenreExclusions(this.rootPath);
+        backgroundMusicHelper.readSmartBackgroundMusicGenreExclusions(this.dataDir);
     this.excludedGenres = genreExclusions.stream()
         .map(String::toLowerCase)
         .collect(Collectors.toCollection(HashSet::new));
 
     List<String> albumInclusions =
-        backgroundMusicHelper.readSmartBackgroundMusicAlbumInclusions(this.rootPath);
+        backgroundMusicHelper.readSmartBackgroundMusicAlbumInclusions(this.dataDir);
     this.favoriteAlbumPaths = albumInclusions.stream()
         .map(BackgroundMusicServiceImpl::normalizeAlbumInclusionPath)
         .collect(Collectors.toCollection(HashSet::new));
@@ -295,7 +295,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       }
     }
 
-    backgroundMusicHelper.createBackgroundMusicFromTopSongs(this.rootPath, topSongPathNames);
+    backgroundMusicHelper.createBackgroundMusicFromTopSongs(this.dataDir, topSongPathNames);
   }
 
   @Override
@@ -878,10 +878,11 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     return null;
   }
 
+  // No-op: background-music file locations live under dataDir, independent of the song library's
+  // scan path, so this service has nothing left to track when it changes.
   @EventListener
   @Override
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
-    this.rootPath = event.scanPath();
   }
 
   /**

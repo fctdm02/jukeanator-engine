@@ -104,6 +104,6 @@ public class LocationConfig {
         && !locationProperties.getStorageRoot().isBlank()) {
       return locationProperties.getStorageRoot();
     }
-    return appProperties.getEffectiveRootPath() + java.io.File.separator + "locations";
+    return appProperties.getDataDir() + java.io.File.separator + "locations";
   }
 }

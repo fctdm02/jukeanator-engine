@@ -68,6 +68,7 @@ public class SongLibraryServiceImpl
   private String rootPath;
   private String rootPathWindows;
   private String rootPathUnix;
+  private final String dataDir;
   private final SongLibraryRepository songLibraryRepository;
   private final SongScanner songScanner;
   private final Integer searchResultSize;
@@ -75,10 +76,11 @@ public class SongLibraryServiceImpl
   private RootFolderEntity songLibraryRoot;
   private boolean isInitialized;
 
-  public SongLibraryServiceImpl(String rootPath, String rootPathWindows, String rootPathUnix,
-      SongLibraryRepository songLibraryRepository, SongScanner songScanner,
+  public SongLibraryServiceImpl(String dataDir, String rootPath, String rootPathWindows,
+      String rootPathUnix, SongLibraryRepository songLibraryRepository, SongScanner songScanner,
       Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
 
+    requireNonNull(dataDir, "dataDir cannot be null");
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
     requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
@@ -87,6 +89,7 @@ public class SongLibraryServiceImpl
     requireNonNull(searchResultSize, "searchResultSize cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
+    this.dataDir = dataDir;
     this.rootPath = rootPath;
     this.rootPathWindows = rootPathWindows;
     this.rootPathUnix = rootPathUnix;
@@ -141,9 +144,9 @@ public class SongLibraryServiceImpl
 
   private void restoreSongStatisticsIfCdStatsFileIsNewer() {
 
-    Path cdStatsPath = Path.of(this.rootPath, RootFolderEntity.CD_STATS);
+    Path cdStatsPath = Path.of(this.dataDir, RootFolderEntity.CD_STATS);
     Path songLibraryPath =
-        Path.of(this.rootPath, SongLibraryRepositoryFileSystemImpl.SONG_LIBRARY_FILENAME);
+        Path.of(this.dataDir, SongLibraryRepositoryFileSystemImpl.SONG_LIBRARY_FILENAME);
 
     if (!Files.exists(cdStatsPath) || !Files.exists(songLibraryPath)) {
       return;
@@ -574,7 +577,7 @@ public class SongLibraryServiceImpl
 
       // Scan the file system for songs
       this.rootPath = scanRequest.getScanPath();
-      this.songLibraryRoot.storeSongStatistics(this.rootPath);
+      this.songLibraryRoot.storeSongStatistics(this.dataDir);
 
       OSType osType = OperatingSystemDetector.getOperatingSystem();
       if (osType == OSType.WINDOWS) {
@@ -586,13 +589,9 @@ public class SongLibraryServiceImpl
       this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath);
 
       // Restore song num plays, persist, then re-initialize the songLibraryRoot
-      this.songLibraryRoot.restoreSongStatisticsForRootPath(this.rootPath, this.rootPathWindows,
-          this.rootPathUnix);
+      this.songLibraryRoot.restoreSongStatisticsForRootPath(this.dataDir, this.rootPath,
+          this.rootPathWindows, this.rootPathUnix);
 
-      if (this.songLibraryRepository instanceof SongLibraryRepositoryFileSystemImpl) {
-        ((SongLibraryRepositoryFileSystemImpl) this.songLibraryRepository)
-            .setBasePath(this.rootPath);
-      }
       this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
       this.songLibraryRoot.initialize();
 
@@ -672,12 +671,12 @@ public class SongLibraryServiceImpl
       this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
       
       // Store the song statistics
-      this.songLibraryRoot.storeSongStatistics(this.rootPath);
+      this.songLibraryRoot.storeSongStatistics(this.dataDir);
 
       return Integer.valueOf(songLibraryRoot.getAlbums().size());
 
     } catch (Exception e) {
-      throw new SongLibraryServiceException("Could not store song library and statistics to: " + this.rootPath, e);
+      throw new SongLibraryServiceException("Could not store song library and statistics to: " + this.dataDir, e);
     }
   }
 
@@ -762,7 +761,7 @@ public class SongLibraryServiceImpl
   private Boolean authenticatePassword(String password, String hashFileName) {
 
     try {
-      Path hashFile = Path.of(this.rootPath, hashFileName);
+      Path hashFile = Path.of(this.dataDir, hashFileName);
 
       if (!Files.exists(hashFile)) {
         return Boolean.FALSE;

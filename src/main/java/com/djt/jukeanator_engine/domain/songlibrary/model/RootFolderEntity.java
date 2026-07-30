@@ -341,10 +341,10 @@ public class RootFolderEntity extends FolderEntity {
   }
 
   // CD STATS RELATED
-  public int restoreSongStatisticsForRootPath(String rootPath, String rootPathWindows,
-      String rootPathUnix) {
+  public int restoreSongStatisticsForRootPath(String dataDir, String rootPath,
+      String rootPathWindows, String rootPathUnix) {
 
-    String cdStatsPathName = rootPath + File.separator + RootFolderEntity.CD_STATS;
+    String cdStatsPathName = dataDir + File.separator + RootFolderEntity.CD_STATS;
     if (!fileSystemHelper.exists(cdStatsPathName)) {
 
       System.err.println("CD stats file does not exist: " + cdStatsPathName);
@@ -356,7 +356,7 @@ public class RootFolderEntity extends FolderEntity {
     if (numRestored == 0) {
 
       numRestored = restoreSongStatisticsForFile(rootPath, rootPathWindows, rootPathUnix,
-          rootPath + File.separator + RootFolderEntity.CD_STATS_BACKUP);
+          dataDir + File.separator + RootFolderEntity.CD_STATS_BACKUP);
     }
     return numRestored;
   }
@@ -460,9 +460,9 @@ public class RootFolderEntity extends FolderEntity {
     return restoredCount;
   }
 
-  public void storeSongStatistics(String rootPath) {
+  public void storeSongStatistics(String dataDir) {
 
-    String cdStatsPathName = rootPath + RootFolderEntity.CD_STATS;
+    String cdStatsPathName = dataDir + File.separator + RootFolderEntity.CD_STATS;
 
     List<SongFileEntity> songs = new ArrayList<>(this.songsMap.values());
 
