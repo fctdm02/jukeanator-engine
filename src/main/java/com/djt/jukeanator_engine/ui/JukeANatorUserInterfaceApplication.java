@@ -76,6 +76,15 @@ public class JukeANatorUserInterfaceApplication {
         frame.setGenres(genres);
         frame.setNowPlaying(playing);
         frame.setQueue(queue);
+
+        // Grab native OS keyboard focus now that the UI is fully initialized with
+        // real data, so hardware inputs (e.g. the bill acceptor's 'a' keystroke)
+        // work immediately without the operator having to click the screen first.
+        // requestFocus() (not requestFocusInWindow()) is required here because the
+        // frame itself may not yet be the OS-focused window at this point.
+        frame.toFront();
+        frame.requestFocus();
+
         log.info("JukeANator UI data load complete");
       });
     });

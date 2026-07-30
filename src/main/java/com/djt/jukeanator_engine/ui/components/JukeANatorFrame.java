@@ -367,13 +367,6 @@ public class JukeANatorFrame extends JFrame {
 
         hideOverlay();
 
-        // Safe lazy initialization of AdminPanel
-        if (adminPanel == null) {
-          adminPanel = buildAdminPanel();
-          contentPanelTabs.setComponentAt(6, adminPanel);
-          adminPanel.setQueue(currentQueue);
-        }
-
         // Save the current tab index before jumping to AdminPanel (index 6)
         preAdminTabIndex = contentPanelTabs.getSelectedIndex();
 
@@ -731,9 +724,11 @@ public class JukeANatorFrame extends JFrame {
     queuePanel = buildQueuePanel();
     tabs.addTab("QUEUE", queuePanel); // index 5
 
-    // AdminPanel is lazy — the placeholder is swapped out on first successful login.
-    // Do NOT call buildAdminPanel() here; it triggers a slow album-library load.
-    tabs.addTab("ADMIN", new JPanel()); // index 6 (placeholder — replaced on first login)
+    // AdminPanel is built eagerly at startup. Its album list no longer renders cover
+    // art (single-line text renderer), so constructing it here is cheap and avoids
+    // the pause that used to occur the first time an operator toggled into Admin.
+    adminPanel = buildAdminPanel();
+    tabs.addTab("ADMIN", adminPanel); // index 6
 
     // Invisible zero-size header for the left dummy tab (index 0)
     JPanel dummyTabHeader = new JPanel();
@@ -1175,10 +1170,7 @@ public class JukeANatorFrame extends JFrame {
 
     SwingUtilities.invokeLater(() -> {
       currentQueue = queue != null ? queue : new java.util.ArrayList<>();
-      // adminPanel is lazy — only push the queue if it has already been instantiated.
-      if (adminPanel != null) {
-        adminPanel.setQueue(queue);
-      }
+      adminPanel.setQueue(queue);
       queuePanel.setQueue(currentQueue);
     });
   }
@@ -1450,14 +1442,6 @@ public class JukeANatorFrame extends JFrame {
     loginToAdminPanelCard = new LoginToAdminPanelCard(songLibraryService,
         /* onSuccess */ () -> SwingUtilities.invokeLater(() -> {
           hideOverlay();
-
-          if (adminPanel == null) {
-            adminPanel = buildAdminPanel();
-            // Swap the lightweight placeholder out for the real panel.
-            contentPanelTabs.setComponentAt(6, adminPanel);
-            // Push any queue updates that arrived before the panel existed.
-            adminPanel.setQueue(currentQueue);
-          }
 
           // Capture the screen they were looking at before the login overlay took over
           preAdminTabIndex = contentPanelTabs.getSelectedIndex();
