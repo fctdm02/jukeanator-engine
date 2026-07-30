@@ -4,8 +4,11 @@ import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import com.djt.jukeanator_engine.config.AppProperties;
+import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
 /**
@@ -44,11 +47,22 @@ public class SongLibraryStatisticsScheduler {
       return;
     }
 
+    /*
+     * Runs on Spring's scheduling thread (cron trigger) or the JVM shutdown hook thread (PreDestroy)
+     * — neither carries a security context, so seed one with the internal SYSTEM principal to
+     * satisfy ServiceSecurityAspect, mirroring SongPlayerServiceImpl's submitQueueProcessing().
+     */
+    SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+    ctx.setAuthentication(SystemPrincipal.SystemAuthenticationToken.INSTANCE);
+    SecurityContextHolder.setContext(ctx);
+
     try {
       songLibraryService.storeSongLibraryAndStatistics();
       log.info("Stored song library and statistics ({})", trigger);
     } catch (Exception e) {
       log.error("Failed to store song library and statistics ({})", trigger, e);
+    } finally {
+      SecurityContextHolder.clearContext();
     }
   }
 }
