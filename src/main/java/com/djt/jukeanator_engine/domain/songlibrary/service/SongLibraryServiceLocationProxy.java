@@ -311,4 +311,9 @@ public class SongLibraryServiceLocationProxy implements SongLibraryService {
   public RootFolderEntity getSongLibraryRoot() {
     throw new UnsupportedOperationException(SYSTEM_METHOD_MESSAGE);
   }
+
+  @Override
+  public Boolean isLibraryLoadFailedAtStartup() {
+    throw new UnsupportedOperationException(SYSTEM_METHOD_MESSAGE);
+  }
 }

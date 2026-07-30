@@ -106,9 +106,10 @@ public class JukeANatorEventListener {
   
   private void initializeUi() {
 
+    frame.setAlbums(songLibraryService.getAlbums(), songLibraryService.getMusicByPopularity());
     frame.refreshMusicByPopularityResults();
     frame.setGenres(songLibraryService.getGenres());
     frame.setNowPlaying(songPlayerService.getNowPlayingSong());
     frame.setQueue(songQueueService.getQueuedSongs());
-  }  
+  }
 }

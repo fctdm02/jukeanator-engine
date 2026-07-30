@@ -13,13 +13,13 @@ app:
     file-path: logs/jukeanator-service.log
     max-file-size: 10MB
   # The song library location ONLY -- where the actual music files live. Not used for app state.
-  root-path-windows: C:\\Users\jukeanator\Music\Rock_On_Third # windows
+  root-path-windows: C:\Music\Rock_On_Third # windows
   root-path-unix: /home/tmyers/Music/Rock_On_Third # linux / macOS
   # Where the engine reads/writes its own state: song library/queue/users/credit-ledger,
   # background-music playlists, CD stats, admin/owner password hashes. Independent of root-path-*,
   # and OS-agnostic (unlike root-path-*). Defaults to <user.home>/.jukeanator when unset -- override
   # here to store it elsewhere.
-  # data-dir: ~
+  data-dir: C:\kiosk\data
 
 logging:
   level:
@@ -61,8 +61,8 @@ song-queue:
   allow-explicit-songs-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) Only used when allowExplicitSongsAtAllTimes is false
 
 background-music:
-  enable-background-music: true # assumes playlist file called BackgroundMusic.TXT exists in rootPath
-  enable-smart-background-music-additions: true # will play songs from same artist/album from background music
+  enable-background-music: false # assumes playlist file called BackgroundMusic.TXT exists in rootPath
+  enable-smart-background-music-additions: false # will play songs from same artist/album from background music
   smart-background-music-additions-factor: 3 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
   smart-background-music-additions-begin: 19 # In 24 hour/military time (e.g. 19:00 hours is 7:00PM) start time for enableSmartBackgroundMusicAdditions
   smart-background-music-additions-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) end time for enableSmartBackgroundMusicAdditions

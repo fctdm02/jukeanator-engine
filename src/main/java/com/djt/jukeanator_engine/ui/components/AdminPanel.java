@@ -38,6 +38,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
@@ -438,6 +439,39 @@ public class AdminPanel extends JPanel {
             ex.printStackTrace();
           }
         }));
+  }
+
+  /**
+   * Opens a directory chooser so the operator can pick the file-system folder to scan for music,
+   * then kicks off a scan against the selected path. Invoked automatically at startup (via
+   * {@link JukeANatorFrame#promptForInitialLibraryScan()}) when no persisted song library could be
+   * loaded, so the operator can point the app at a music folder on first use.
+   */
+  public void showScanFileSystemDialog() {
+
+    JFileChooser chooser = new JFileChooser();
+    chooser.setDialogTitle("Select Music Folder to Scan");
+    chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+    chooser.setAcceptAllFileFilterUsed(false);
+
+    if (chooser.showDialog(this, "Scan") != JFileChooser.APPROVE_OPTION)
+      return;
+
+    String scanPath = chooser.getSelectedFile().getAbsolutePath();
+
+    SwingSecurityUtil.runAsync(() -> {
+      try {
+        songLibraryService.scanFileSystemForSongs(new ScanRequest(scanPath));
+        SwingUtilities.invokeLater(() -> {
+          refreshAlbumList();
+          showOverlayMessage("Scan Complete", "Scanned " + scanPath, ColorTheme.get().accentGreen);
+        });
+      } catch (Exception ex) {
+        ex.printStackTrace();
+        SwingUtilities.invokeLater(() -> showOverlayMessage("Scan Failed",
+            "Could not scan: " + ex.getMessage(), ColorTheme.get().accentRed));
+      }
+    });
   }
 
   private void doRescan() {

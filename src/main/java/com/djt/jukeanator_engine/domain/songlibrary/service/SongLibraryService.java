@@ -208,4 +208,14 @@ public interface SongLibraryService {
    */
   @PublicServiceMethod
   RootFolderEntity getSongLibraryRoot();
+
+  /**
+   * Indicates whether the song library could not be loaded from persisted storage the last time it
+   * was (re)initialized — e.g. a fresh install with no library file yet, or a persisted file that
+   * could not be read — meaning the in-memory library is currently a freshly-created empty one. Used
+   * by the UI to prompt the user to pick a directory to scan for music.
+   *
+   * @return true if the last load attempt fell back to an empty library
+   */
+  Boolean isLibraryLoadFailedAtStartup();
 }

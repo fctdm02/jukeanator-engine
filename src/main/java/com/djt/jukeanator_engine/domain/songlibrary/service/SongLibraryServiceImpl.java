@@ -75,6 +75,7 @@ public class SongLibraryServiceImpl
 
   private RootFolderEntity songLibraryRoot;
   private boolean isInitialized;
+  private boolean libraryLoadFailedAtStartup;
 
   public SongLibraryServiceImpl(String dataDir, String rootPath, String rootPathWindows,
       String rootPathUnix, SongLibraryRepository songLibraryRepository, SongScanner songScanner,
@@ -117,6 +118,7 @@ public class SongLibraryServiceImpl
     try {
 
       this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(this.rootPath);
+      this.libraryLoadFailedAtStartup = false;
 
     } catch (EntityDoesNotExistException ednee) {
 
@@ -125,6 +127,7 @@ public class SongLibraryServiceImpl
 
       this.songLibraryRoot = new RootFolderEntity(this.rootPath);
       this.songLibraryRoot.initialize();
+      this.libraryLoadFailedAtStartup = true;
     }
 
     this.isInitialized = true;
@@ -787,6 +790,11 @@ public class SongLibraryServiceImpl
       sb.append(String.format("%02x", b));
     }
     return sb.toString();
+  }
+
+  @Override
+  public Boolean isLibraryLoadFailedAtStartup() {
+    return this.libraryLoadFailedAtStartup;
   }
 
   // Repository methods

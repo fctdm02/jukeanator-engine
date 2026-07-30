@@ -61,6 +61,11 @@ public class JukeANatorUserInterfaceApplication {
     this.frame.showFullscreen();
     this.frame.setVisible(true);
 
+    if (Boolean.TRUE.equals(songLibraryService.isLibraryLoadFailedAtStartup())) {
+      log.info("No song library could be loaded at startup — prompting for initial library scan");
+      frame.promptForInitialLibraryScan();
+    }
+
     log.info("JukeANator UI launched — fetching library data in background");
 
     SwingSecurityUtil.runAsync(() -> {

@@ -1461,6 +1461,22 @@ public class JukeANatorFrame extends JFrame {
     loginToAdminPanelCard.onShown();
   }
 
+  /**
+   * Switches directly to the Admin panel and opens its "scan file system" directory picker,
+   * bypassing the normal Admin login. Called once at startup by
+   * {@link com.djt.jukeanator_engine.ui.JukeANatorUserInterfaceApplication#launch()} when
+   * {@code SongLibraryService#isLibraryLoadFailedAtStartup()} reports that no persisted song library
+   * could be loaded (e.g. a fresh install) — this is the app itself asking for a music folder, not
+   * an operator-initiated Admin visit, so no credentials are required.
+   */
+  public void promptForInitialLibraryScan() {
+
+    preAdminTabIndex = contentPanelTabs.getSelectedIndex();
+    contentPanelTabs.setSelectedIndex(6);
+    lastSelectedTabIndex = 6;
+    adminPanel.showScanFileSystemDialog();
+  }
+
   // TOGGLE MUSIC PLAY STATE ICON
   public void toggleMusicPlayStateIcon() {
 
