@@ -45,9 +45,6 @@ public class LoginToAdminPanelCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
-  // ── Timeout — sourced from LayoutTheme ───────────────────────────────────
-  // Previously: private static final int TIMEOUT_SECONDS = 120;
-
   // ── Field focus ───────────────────────────────────────────────────────────
   private enum ActiveField {
     USERNAME, PASSWORD
