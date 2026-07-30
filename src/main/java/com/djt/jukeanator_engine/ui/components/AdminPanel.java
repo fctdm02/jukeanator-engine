@@ -11,6 +11,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.RenderingHints;
@@ -27,8 +29,8 @@ import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JLayeredPane;
 import javax.swing.JList;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ListSelectionModel;
@@ -82,6 +84,36 @@ public class AdminPanel extends JPanel {
   // ── Invalid Metadata Tracking Cache ──────────────────────────────────────
   private final List<AlbumDto> albumsWithInvalidMetadata = new ArrayList<>();
 
+  // ── In-place modal overlay ────────────────────────────────────────────────
+  /**
+   * A modal-style notice/confirm card painted on top of the panel's own content instead of in a
+   * separate top-level window. While {@link JukeANatorFrame#showFullscreen()} holds true full-screen
+   * exclusive mode, Windows does not reliably hand keyboard focus to a newly created window, so a
+   * dialog in its own window would appear unfocused and force the user to Alt+Tab back to it.
+   * Painting the notice inside the existing window (via {@link JLayeredPane}) avoids that entirely.
+   */
+  private Color overlayCardAccent = Color.WHITE;
+  private final JPanel overlayCard = new JPanel() {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    protected void paintComponent(Graphics g) {
+      Graphics2D g2 = (Graphics2D) g.create();
+      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+      g2.setColor(ColorTheme.get().bgAdminHeader);
+      g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
+      g2.setColor(overlayCardAccent);
+      g2.setStroke(new java.awt.BasicStroke(2f));
+      g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
+      g2.dispose();
+    }
+  };
+  private final JPanel overlayScrim = new JPanel();
+  private final JLabel overlayTitleLabel = new JLabel();
+  private final JLabel overlayMessageLabel = new JLabel();
+  private final JButton overlayPrimaryBtn = new JButton();
+  private final JButton overlaySecondaryBtn = new JButton();
+
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
@@ -96,17 +128,143 @@ public class AdminPanel extends JPanel {
     this.creditManager = creditManager;
     this.imageLoader = imageLoader;
 
+    initOverlay();
+
+    JPanel contentPanel = new JPanel(new BorderLayout(0, 0));
+    contentPanel.setOpaque(false);
+    contentPanel.add(buildLibraryButtons(), BorderLayout.WEST);
+    contentPanel.add(buildListsCenter(), BorderLayout.CENTER);
+    contentPanel.add(buildQueueButtons(), BorderLayout.EAST);
+
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
-
-    add(buildLibraryButtons(), BorderLayout.WEST);
-    add(buildListsCenter(), BorderLayout.CENTER);
-    add(buildQueueButtons(), BorderLayout.EAST);
+    add(buildOverlayHost(contentPanel), BorderLayout.CENTER);
 
     loadAlbumList();
     setQueue(songQueueService.getQueuedSongs());
 
     requestFocusInWindow();
+  }
+
+  /**
+   * Stacks {@code contentPanel} and {@link #overlayScrim} in a {@link JLayeredPane} so the overlay
+   * can be painted on top without a separate window. Both children are kept sized to fill the
+   * layered pane, since {@code JLayeredPane} otherwise has no layout manager of its own.
+   */
+  private JLayeredPane buildOverlayHost(JPanel contentPanel) {
+
+    JLayeredPane layeredPane = new JLayeredPane();
+    layeredPane.setLayout(null);
+    layeredPane.add(contentPanel, JLayeredPane.DEFAULT_LAYER);
+    layeredPane.add(overlayScrim, JLayeredPane.MODAL_LAYER);
+
+    layeredPane.addComponentListener(new java.awt.event.ComponentAdapter() {
+      @Override
+      public void componentResized(java.awt.event.ComponentEvent e) {
+        contentPanel.setBounds(0, 0, layeredPane.getWidth(), layeredPane.getHeight());
+        overlayScrim.setBounds(0, 0, layeredPane.getWidth(), layeredPane.getHeight());
+      }
+    });
+    return layeredPane;
+  }
+
+  /** Builds the (initially hidden) scrim + card chrome reused by every overlay message/confirm. */
+  private void initOverlay() {
+
+    overlayScrim.setLayout(new GridBagLayout());
+    overlayScrim.setOpaque(false);
+    overlayScrim.setVisible(false);
+
+    overlayCard.setOpaque(false);
+    overlayCard.setLayout(new BoxLayout(overlayCard, BoxLayout.Y_AXIS));
+    overlayCard.setBorder(new EmptyBorder(20, 28, 18, 28));
+
+    overlayTitleLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+    overlayTitleLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+
+    overlayMessageLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+    overlayMessageLabel.setForeground(ColorTheme.get().textPrimary);
+    overlayMessageLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+
+    JPanel buttonRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
+    buttonRow.setOpaque(false);
+    buttonRow.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+    styleOverlayButton(overlaySecondaryBtn);
+    styleOverlayButton(overlayPrimaryBtn);
+    buttonRow.add(overlayPrimaryBtn);
+    buttonRow.add(overlaySecondaryBtn);
+
+    overlayCard.add(overlayTitleLabel);
+    overlayCard.add(Box.createVerticalStrut(10));
+    overlayCard.add(overlayMessageLabel);
+    overlayCard.add(Box.createVerticalStrut(18));
+    overlayCard.add(buttonRow);
+
+    overlayScrim.add(overlayCard, new GridBagConstraints());
+  }
+
+  private static void styleOverlayButton(JButton btn) {
+    btn.setFocusPainted(false);
+    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSideBtn2));
+    btn.setForeground(ColorTheme.get().textPrimary);
+    btn.setBackground(ColorTheme.get().bgListSelected);
+    btn.setBorder(BorderFactory.createCompoundBorder(
+        BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
+        new EmptyBorder(6, 18, 6, 18)));
+    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+  }
+
+  /** Shows an OK-only overlay notice. */
+  private void showOverlayMessage(String title, String message, Color accent) {
+    showOverlay(title, message, accent, false, null);
+  }
+
+  /** Shows a Yes/No overlay, running {@code onConfirm} only if the user picks Yes. */
+  private void showOverlayConfirm(String title, String message, Color accent, Runnable onConfirm) {
+    showOverlay(title, message, accent, true, onConfirm);
+  }
+
+  private void showOverlay(String title, String message, Color accent, boolean confirmMode,
+      Runnable onConfirm) {
+
+    overlayCardAccent = accent;
+    overlayTitleLabel.setText(title);
+    overlayTitleLabel.setForeground(accent);
+    overlayMessageLabel.setText(htmlWrap(message));
+
+    overlaySecondaryBtn.setVisible(confirmMode);
+    overlaySecondaryBtn.setText("No");
+    overlayPrimaryBtn.setText(confirmMode ? "Yes" : "OK");
+
+    for (java.awt.event.ActionListener al : overlayPrimaryBtn.getActionListeners()) {
+      overlayPrimaryBtn.removeActionListener(al);
+    }
+    for (java.awt.event.ActionListener al : overlaySecondaryBtn.getActionListeners()) {
+      overlaySecondaryBtn.removeActionListener(al);
+    }
+    overlayPrimaryBtn.addActionListener(e -> {
+      hideOverlay();
+      if (confirmMode && onConfirm != null) {
+        onConfirm.run();
+      }
+    });
+    overlaySecondaryBtn.addActionListener(e -> hideOverlay());
+
+    overlayScrim.setVisible(true);
+    overlayCard.repaint();
+    overlayScrim.revalidate();
+    JButton toFocus = confirmMode ? overlaySecondaryBtn : overlayPrimaryBtn;
+    SwingUtilities.invokeLater(toFocus::requestFocusInWindow);
+  }
+
+  private void hideOverlay() {
+    overlayScrim.setVisible(false);
+  }
+
+  private static String htmlWrap(String message) {
+    String escaped = message == null ? ""
+        : message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    return "<html><body style='width: 260px; text-align:center;'>" + escaped + "</body></html>";
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -222,8 +380,8 @@ public class AdminPanel extends JPanel {
     AlbumDto selected = albumList.getSelectedValue();
 
     if (selected == null) {
-      JOptionPane.showMessageDialog(this, "Please select an album first.", "No Selection",
-          JOptionPane.WARNING_MESSAGE);
+      showOverlayMessage("No Selection", "Please select an album first.",
+          ColorTheme.get().accentOrange);
       return;
     }
 
@@ -259,8 +417,8 @@ public class AdminPanel extends JPanel {
       if (!albumsWithInvalidMetadata.isEmpty()) {
         selected = albumsWithInvalidMetadata.getFirst();
       } else {
-        JOptionPane.showMessageDialog(this, "Please select an album first.", "No Selection",
-            JOptionPane.WARNING_MESSAGE);
+        showOverlayMessage("No Selection", "Please select an album first.",
+            ColorTheme.get().accentOrange);
         return;
       }
     }
@@ -272,34 +430,27 @@ public class AdminPanel extends JPanel {
 
   private void doResetStats() {
 
-    int confirm = JOptionPane.showConfirmDialog(this, "Reset all song play statistics?",
-        "Reset Statistics", JOptionPane.YES_NO_OPTION);
-    if (confirm == JOptionPane.YES_OPTION) {
-      SwingSecurityUtil.runAsync(() -> {
-        try {
-          songLibraryService.resetSongStatistics();
-        } catch (Exception ex) {
-          ex.printStackTrace();
-        }
-      });
-    }
+    showOverlayConfirm("Reset Statistics", "Reset all song play statistics?",
+        ColorTheme.get().accentOrange, () -> SwingSecurityUtil.runAsync(() -> {
+          try {
+            songLibraryService.resetSongStatistics();
+          } catch (Exception ex) {
+            ex.printStackTrace();
+          }
+        }));
   }
 
   private void doRescan() {
 
-    int confirm =
-        JOptionPane.showConfirmDialog(this, "Rescan the song library? This may take a moment.",
-            "Rescan Library", JOptionPane.YES_NO_OPTION);
-    if (confirm == JOptionPane.YES_OPTION) {
-      SwingSecurityUtil.runAsync(() -> {
-        try {
-          songLibraryService.scanFileSystemForSongs();
-          SwingUtilities.invokeLater(this::refreshAlbumList);
-        } catch (Exception ex) {
-          ex.printStackTrace();
-        }
-      });
-    }
+    showOverlayConfirm("Rescan Library", "Rescan the song library? This may take a moment.",
+        ColorTheme.get().accentViolet, () -> SwingSecurityUtil.runAsync(() -> {
+          try {
+            songLibraryService.scanFileSystemForSongs();
+            SwingUtilities.invokeLater(this::refreshAlbumList);
+          } catch (Exception ex) {
+            ex.printStackTrace();
+          }
+        }));
   }
 
   private void doMinimize() {
@@ -317,11 +468,8 @@ public class AdminPanel extends JPanel {
 
   private void doExit() {
 
-    int confirm = JOptionPane.showConfirmDialog(this, "Exit JukeANator?", "Confirm Exit",
-        JOptionPane.YES_NO_OPTION);
-    if (confirm == JOptionPane.YES_OPTION) {
-      System.exit(0);
-    }
+    showOverlayConfirm("Confirm Exit", "Exit JukeANator?", ColorTheme.get().accentRed,
+        () -> System.exit(0));
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -349,8 +497,8 @@ public class AdminPanel extends JPanel {
 
     SongQueueEntryDto selected = queueList.getSelectedValue();
     if (selected == null) {
-      JOptionPane.showMessageDialog(this, "Please select a song in the queue first.",
-          "No Selection", JOptionPane.WARNING_MESSAGE);
+      showOverlayMessage("No Selection", "Please select a song in the queue first.",
+          ColorTheme.get().accentOrange);
       return;
     }
     try {
@@ -409,8 +557,8 @@ public class AdminPanel extends JPanel {
 
     SongQueueEntryDto selected = queueList.getSelectedValue();
     if (selected == null) {
-      JOptionPane.showMessageDialog(this, "Please select a song in the queue first.",
-          "No Selection", JOptionPane.WARNING_MESSAGE);
+      showOverlayMessage("No Selection", "Please select a song in the queue first.",
+          ColorTheme.get().accentOrange);
       return;
     }
     try {
@@ -423,32 +571,26 @@ public class AdminPanel extends JPanel {
 
   private void doFlushQueue() {
 
-    int confirm = JOptionPane.showConfirmDialog(this, "Clear the entire song queue?", "Clear Queue",
-        JOptionPane.YES_NO_OPTION);
-    if (confirm == JOptionPane.YES_OPTION) {
-      SwingSecurityUtil.runAsync(() -> {
-        try {
-          songQueueService.flushQueue();
-        } catch (Exception ex) {
-          ex.printStackTrace();
-        }
-      });
-    }
+    showOverlayConfirm("Clear Queue", "Clear the entire song queue?", ColorTheme.get().accentRed,
+        () -> SwingSecurityUtil.runAsync(() -> {
+          try {
+            songQueueService.flushQueue();
+          } catch (Exception ex) {
+            ex.printStackTrace();
+          }
+        }));
   }
 
   private void doRandomizeQueue() {
 
-    int confirm = JOptionPane.showConfirmDialog(this, "Shuffle the entire song queue?", "Shuffle Queue",
-        JOptionPane.YES_NO_OPTION);
-    if (confirm == JOptionPane.YES_OPTION) {
-      SwingSecurityUtil.runAsync(() -> {
-        try {
-          songQueueService.randomizeQueue();
-        } catch (Exception ex) {
-          ex.printStackTrace();
-        }
-      });
-    }
+    showOverlayConfirm("Shuffle Queue", "Shuffle the entire song queue?",
+        ColorTheme.get().accentViolet, () -> SwingSecurityUtil.runAsync(() -> {
+          try {
+            songQueueService.randomizeQueue();
+          } catch (Exception ex) {
+            ex.printStackTrace();
+          }
+        }));
   }
 
   private void doIncrementCredits() {
@@ -477,13 +619,13 @@ public class AdminPanel extends JPanel {
             new LoadPlaylistIntoQueueRequest(SongQueueService.LOCAL_USERNAME, filename);
         this.songQueueService.loadPlaylistIntoQueue(loadPlaylistIntoQueueRequest);
 
-        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Loaded " + filename,
-            " playlist", JOptionPane.INFORMATION_MESSAGE));
+        SwingUtilities.invokeLater(() -> showOverlayMessage("Playlist Loaded", "Loaded " + filename,
+            ColorTheme.get().accentGreen));
 
       } catch (Exception ex) {
         ex.printStackTrace();
-        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this,
-            "Failed to load playlist: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE));
+        SwingUtilities.invokeLater(() -> showOverlayMessage("Error",
+            "Failed to load playlist: " + ex.getMessage(), ColorTheme.get().accentRed));
       }
     });
   }
@@ -502,13 +644,13 @@ public class AdminPanel extends JPanel {
       try {
         this.songQueueService.saveQueueAsPlaylist(filename);
 
-        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Saved " + filename,
-            " playlist", JOptionPane.INFORMATION_MESSAGE));
+        SwingUtilities.invokeLater(() -> showOverlayMessage("Playlist Saved", "Saved " + filename,
+            ColorTheme.get().accentGreen));
 
       } catch (Exception ex) {
         ex.printStackTrace();
-        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this,
-            "Failed to save playlist: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE));
+        SwingUtilities.invokeLater(() -> showOverlayMessage("Error",
+            "Failed to save playlist: " + ex.getMessage(), ColorTheme.get().accentRed));
       }
     });
   }
