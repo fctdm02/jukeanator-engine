@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -96,6 +97,11 @@ public class SongLibraryServiceImpl
 
     // Initialize the song library
     initialize();
+
+    // If the CD Stats file was hand-edited (e.g. to tweak song play counts for manual testing)
+    // after the song library was last persisted, restore statistics from it now so the edits
+    // take effect at startup.
+    restoreSongStatisticsIfCdStatsFileIsNewer();
   }
 
   public void initialize() {
@@ -131,6 +137,36 @@ public class SongLibraryServiceImpl
     log.info("rootPathUnix: " + this.rootPathUnix);
     log.info("searchResultSize: " + this.searchResultSize);
     log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
+  }
+
+  private void restoreSongStatisticsIfCdStatsFileIsNewer() {
+
+    Path cdStatsPath = Path.of(this.rootPath, RootFolderEntity.CD_STATS);
+    Path songLibraryPath =
+        Path.of(this.rootPath, SongLibraryRepositoryFileSystemImpl.SONG_LIBRARY_FILENAME);
+
+    if (!Files.exists(cdStatsPath) || !Files.exists(songLibraryPath)) {
+      return;
+    }
+
+    try {
+
+      FileTime cdStatsLastModified = Files.getLastModifiedTime(cdStatsPath);
+      FileTime songLibraryLastModified = Files.getLastModifiedTime(songLibraryPath);
+
+      if (cdStatsLastModified.compareTo(songLibraryLastModified) > 0) {
+
+        log.info(
+            "CD stats file {} was modified after {} was last persisted, restoring song statistics from it.",
+            cdStatsPath, songLibraryPath);
+
+        restoreSongStatistics(cdStatsPath.toString());
+      }
+
+    } catch (IOException e) {
+      log.warn("Could not compare last modified timestamps of {} and {}", cdStatsPath,
+          songLibraryPath, e);
+    }
   }
 
   // Service methods

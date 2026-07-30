@@ -28,7 +28,7 @@ public class RootFolderEntity extends FolderEntity {
 
 
   // Used to read/write CDStats file
-  private static final String CD_STATS = "CDStats.TXT";
+  public static final String CD_STATS = "CDStats.TXT";
   private static final String CD_STATS_BACKUP = "CDStats_backup.TXT";
   private static final FileSystemHelper fileSystemHelper = new FileSystemHelper();
 
