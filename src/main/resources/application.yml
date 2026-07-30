@@ -19,7 +19,8 @@ app:
   # background-music playlists, CD stats, admin/owner password hashes. Independent of root-path-*,
   # and OS-agnostic (unlike root-path-*). Defaults to <user.home>/.jukeanator when unset -- override
   # here to store it elsewhere.
-  data-dir: C:\kiosk\data
+  # data-dir: ~
+  # data-dir: C:\kiosk\data
 
 logging:
   level:
