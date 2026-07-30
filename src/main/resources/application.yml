@@ -13,7 +13,7 @@ app:
     file-path: logs/jukeanator-service.log
     max-file-size: 10MB
   # The song library location ONLY -- where the actual music files live. Not used for app state.
-  root-path-windows: C:\Music\Rock_On_Third # windows
+  root-path-windows: C:\Music # windows
   root-path-unix: /home/tmyers/Music/Rock_On_Third # linux / macOS
   # Where the engine reads/writes its own state: song library/queue/users/credit-ledger,
   # background-music playlists, CD stats, admin/owner password hashes. Independent of root-path-*,

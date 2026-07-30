@@ -704,16 +704,18 @@ public class LayoutTheme {
       // (based on a stale v2-screenshot calibration) and shrank the row height to 27px to
       // fit 16 rows inside it. That assumption was wrong — later layout changes elsewhere
       // (search bar, keyboard, nav border reductions) freed up more room than the old
-      // comment accounted for. Confirmed via screenshot: 16 rows at the original 44px row
-      // height fit fully visible with room to spare, so the row height/padding are kept
-      // identical to the shared albumViewRowH/albumViewRowPadV values — only the page size
-      // changes.
+      // comment accounted for. A subsequent pass set this to 16, but that was confirmed
+      // against a screenshot mistakenly taken at 1280×1024 (a taller SMALL_LANDSCAPE
+      // screen than the canonical 1024×768 this profile targets), so 16 rows fit there but
+      // not on the smaller reference display. Reverted to the original working value of 10;
+      // the row height/padding stay identical to the shared albumViewRowH/albumViewRowPadV
+      // values — only the page size changes.
       //
       albumViewRowH = 44; // landscape default: 56; empirically derived for 1024×768; shared w/ QueuePanel
       albumViewRowPadV = 4; // landscape default: 10 (EmptyBorder top+bottom); shared w/ QueuePanel
 
-      albumViewTracksPerPage = 16; // AlbumViewCard-only page size; landscape default: 12; was 10
-      albumViewTrackRowH = albumViewRowH; // AlbumViewCard-only; confirmed 16 rows fit at original height
+      albumViewTracksPerPage = 10; // AlbumViewCard-only page size; landscape default: 12; was 16 (mis-tuned at 1280×1024)
+      albumViewTrackRowH = albumViewRowH; // AlbumViewCard-only; confirmed 10 rows fit at original height
       albumViewTrackRowPadV = albumViewRowPadV; // AlbumViewCard-only; confirmed fit at original padding
 
       // ── AlbumViewCard column widths ───────────────────────────────────────────
@@ -1554,8 +1556,8 @@ public class LayoutTheme {
    *
    * <p>
    * Currently equal to {@link #albumViewRowH} in every orientation, including small-landscape (1024
-   * × 768) — confirmed by screenshot that 16 rows fit fully visible at the original 44px row height,
-   * so only {@link #albumViewTracksPerPage} changes there (10 → 16). Kept as a separate field so row
+   * × 768) — confirmed by screenshot that 10 rows fit fully visible at the original 44px row height,
+   * so only {@link #albumViewTracksPerPage} changes there (originally 10). Kept as a separate field so row
    * height can still be tuned for AlbumViewCard alone in the future without touching the queue panel.
    */
   public final int albumViewTrackRowH;

@@ -361,7 +361,7 @@ public class AlbumViewCard extends JPanel {
     trackPrevBtn = trackNavButton(true);
     trackPrevBtn.addActionListener(e -> {
       // Step back by a full page (TRACKS_PER_PAGE), not lastRenderedCount: the current
-      // page may be a short final page (e.g. 4 songs left on a 100-song, 16-per-page
+      // page may be a short final page (e.g. 4 songs left on a 100-song, 10-per-page
       // album), and stepping back by that short count would only rewind a few rows
       // instead of a full page. Forward navigation always advances offsets in multiples
       // of TRACKS_PER_PAGE, so subtracting it here always lands on a page boundary.
