@@ -1210,6 +1210,8 @@ public class JukeANatorFrame extends JFrame {
         playStatus.setIcon(imageLoader.loadAnimatedGif("music_playing.gif",
             LayoutTheme.get().nowPlayingGifW, topPanelProfile.iconSize()));
       }
+
+      refreshScreenSaverIfVisible();
     });
   }
 
@@ -1229,6 +1231,19 @@ public class JukeANatorFrame extends JFrame {
     currentNowPlayingSong = null;
 
     nowPlayingPanel.setVisible(false);
+
+    refreshScreenSaverIfVisible();
+  }
+
+  // The screensaver only redraws its cover art when it (re)appears or, if idle,
+  // once every MOVE_INTERVAL_MS. Without this hook, starting a new song (or
+  // playback stopping) while the screensaver is already up left the old
+  // album's cover art on screen instead of following the now-playing song.
+  private void refreshScreenSaverIfVisible() {
+
+    if (screenSaverWindow != null && screenSaverWindow.isVisible()) {
+      screenSaverWindow.updateContent();
+    }
   }
 
   // ============================================================

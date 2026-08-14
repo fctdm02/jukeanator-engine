@@ -9,7 +9,7 @@ import javax.swing.Timer;
 
 public class IdleMonitor {
 
-  private static final long IDLE_TIMEOUT_MS = 120_000;
+  private static final long IDLE_TIMEOUT_MS = 60_000;
 
   /**
    * How long (ms) to suppress the onActive callback after the screensaver is triggered. This

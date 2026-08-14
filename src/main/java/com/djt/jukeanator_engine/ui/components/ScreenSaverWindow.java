@@ -61,9 +61,25 @@ public class ScreenSaverWindow extends JWindow {
     Image transparentStrippedImage = ImageLoader.createTransparentImage(icon.getImage(), false, 15);
     this.logo = new ImageIcon(transparentStrippedImage);
 
-    // Load and process "ScreenSaverText.png" exactly the same as the logo
+    // Scale "ScreenSaverText.png" to fit within the same box as the logo
+    // (screenWidth * 0.30 wide, 120 tall) while preserving its native aspect
+    // ratio. Stretching it to exactly that box (as before) squished it
+    // horizontally on narrower screens — e.g. at 1024px wide the box is
+    // 307x120 (2.56:1) but the source image is 2172x724 (3:1), so forcing it
+    // into the box compressed the width.
+    java.awt.Dimension textNativeSize = nativeImageSize("ScreenSaverText.png");
+    int textMaxWidth = (int) (screenWidth * 0.30);
+    int textMaxHeight = 120;
+    int textTargetWidth = textMaxWidth;
+    int textTargetHeight = textMaxHeight;
+    if (textNativeSize != null && textNativeSize.width > 0 && textNativeSize.height > 0) {
+      double scale = Math.min((double) textMaxWidth / textNativeSize.width,
+          (double) textMaxHeight / textNativeSize.height);
+      textTargetWidth = Math.max(1, (int) Math.round(textNativeSize.width * scale));
+      textTargetHeight = Math.max(1, (int) Math.round(textNativeSize.height * scale));
+    }
     ImageIcon textIcon =
-        imageLoader.loadImage("ScreenSaverText.png", (int) (screenWidth * 0.30), 120);
+        imageLoader.loadImage("ScreenSaverText.png", textTargetWidth, textTargetHeight);
     Image transparentStrippedText =
         ImageLoader.createTransparentImage(textIcon.getImage(), false, 15);
     this.textImage = new ImageIcon(transparentStrippedText);
@@ -110,7 +126,19 @@ public class ScreenSaverWindow extends JWindow {
     setContentPane(background);
 
     int panelWidth = (int) (screenWidth * 0.35);
-    int panelHeight = (int) (panelWidth * 1.4);
+
+    // Height must fit every stacked child at its actual rendered size — logo
+    // (120) + strut (20) + cover art (350, fixed regardless of screen size) +
+    // strut (20) + touch-to-start text (120) — or BoxLayout will lay the
+    // trailing components out below the panel's bottom edge, where Swing
+    // clips them during paint. A screenWidth-derived fraction (e.g. 0.35 *
+    // 1.4) undershoots this on smaller screens (e.g. 1024px wide), which is
+    // why the touch label was invisible.
+    int logoTextHeight = 120;
+    int coverArtSize = 350;
+    int strutHeight = 20;
+    int panelHeight =
+        logoTextHeight + strutHeight + coverArtSize + strutHeight + logoTextHeight;
 
     floatingPanel = new JPanel();
     floatingPanel.setLayout(new BoxLayout(floatingPanel, BoxLayout.Y_AXIS));
@@ -147,6 +175,20 @@ public class ScreenSaverWindow extends JWindow {
       moveFloatingPanel();
     });
     moveTimer.start();
+  }
+
+  // Reads the unscaled pixel dimensions of a classpath image, so callers can
+  // compute a scale that fits a target box without distorting the aspect
+  // ratio. ImageIcon(URL) loads synchronously, so the dimensions are valid
+  // immediately after construction.
+  private java.awt.Dimension nativeImageSize(String classpathResourceName) {
+
+    java.net.URL url = getClass().getResource(classpathResourceName);
+    if (url == null) {
+      return null;
+    }
+    ImageIcon probe = new ImageIcon(url);
+    return new java.awt.Dimension(probe.getIconWidth(), probe.getIconHeight());
   }
 
   private void moveFloatingPanel() {
