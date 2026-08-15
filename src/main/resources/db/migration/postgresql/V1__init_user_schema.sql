@@ -45,3 +45,16 @@ CREATE TABLE playlist_songs (
     album_id    INTEGER,
     song_id     INTEGER
 );
+
+-- Append-only credit transaction history, owned by the user it belongs to.
+CREATE TABLE credit_transactions (
+    persistent_identity INTEGER PRIMARY KEY,
+    user_id              INTEGER REFERENCES users (persistent_identity),
+    location_id          VARCHAR(255),
+    amount                INTEGER NOT NULL,
+    type                  VARCHAR(255) NOT NULL,
+    timestamp             TIMESTAMP NOT NULL,
+    song_album_id         INTEGER,
+    song_id               INTEGER,
+    resulting_balance     INTEGER NOT NULL
+);

@@ -15,8 +15,9 @@ app:
   # The song library location ONLY -- where the actual music files live. Not used for app state.
   root-path-windows: C:\Music # windows
   root-path-unix: /home/tmyers/Music/Rock_On_Third # linux / macOS
-  # Where the engine reads/writes its own state: song library/queue/users/credit-ledger,
-  # background-music playlists, CD stats, admin/owner password hashes. Independent of root-path-*,
+  # Where the engine reads/writes its own state: song library/queue/users (which include their
+  # credit transaction history), background-music playlists, CD stats, admin/owner password
+  # hashes. Independent of root-path-*,
   # and OS-agnostic (unlike root-path-*). Defaults to <user.home>/.jukeanator when unset -- override
   # here to store it elsewhere.
   # data-dir: ~
@@ -80,9 +81,6 @@ song-player:
 
 user:
   repository-type: filesystem   # filesystem | jpa (jpa works against Postgres or MySQL -- see spring.datasource.*)
-
-credit-ledger:
-  repository-type: filesystem   # filesystem | postgres
 
 location:   # only used when app.mode is master or slave
   repository-type: filesystem   # filesystem | postgres

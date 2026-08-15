@@ -28,7 +28,6 @@ import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
-import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 
 /**
@@ -44,7 +43,6 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   private UserService userService;
 
   private UserRepository userRepository;
-  private CreditLedgerRepository creditLedgerRepository;
   private UserRootEntity userRoot;
   private UserServiceImpl userServiceImpl;
 
@@ -52,7 +50,6 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void setUp() throws EntityDoesNotExistException {
 
     userRepository = mock(UserRepository.class);
-    creditLedgerRepository = mock(CreditLedgerRepository.class);
     PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
     JwtUtil jwtUtil = mock(JwtUtil.class);
     ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
@@ -63,11 +60,9 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
         "hashed-password", Integer.valueOf(6), "ROLE_USER"));
 
     when(userRepository.loadAggregateRoot(anyString())).thenReturn(userRoot);
-    when(creditLedgerRepository.loadAggregateRoot(anyString()))
-        .thenThrow(new EntityDoesNotExistException("no ledger for test"));
 
     userServiceImpl = new UserServiceImpl("test-root", userRepository, passwordEncoder, jwtUtil,
-        eventPublisher, songLibraryService, creditLedgerRepository, false);
+        eventPublisher, songLibraryService, false);
   }
 
   @Test

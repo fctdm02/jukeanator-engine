@@ -50,9 +50,6 @@ import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryPostgresImpl;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
-import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepository;
-import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepositoryFileSystemImpl;
-import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepositoryPostgresImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryJpaImpl;
@@ -188,23 +185,6 @@ public class AppConfig {
     return new UserRepositoryJpaImpl(entityManagerFactory, transactionManager);
   }
 
-  // ── Credit ledger repository ──────────────────────────────────────────────
-
-  @Bean
-  @ConditionalOnProperty(name = "credit-ledger.repository-type", havingValue = "filesystem",
-      matchIfMissing = true)
-  public CreditLedgerRepository creditLedgerRepositoryFileSystemImpl(AppProperties appProperties) {
-
-    return new CreditLedgerRepositoryFileSystemImpl(appProperties.getDataDir());
-  }
-
-  @Bean
-  @ConditionalOnProperty(name = "credit-ledger.repository-type", havingValue = "postgres")
-  public CreditLedgerRepository creditLedgerRepositoryPostgresImpl() {
-
-    return new CreditLedgerRepositoryPostgresImpl();
-  }
-
   // ── Background music repositories ───────────────────────────────────────
 
   @Bean
@@ -306,8 +286,7 @@ public class AppConfig {
       PasswordEncoder passwordEncoder,
       JwtUtil jwtUtil,
       org.springframework.context.ApplicationEventPublisher eventPublisher,
-      SongLibraryService songLibraryService,
-      CreditLedgerRepository creditLedgerRepository) {
+      SongLibraryService songLibraryService) {
 
     return new UserServiceImpl(
         appProperties.getEffectiveRootPath(),
@@ -316,7 +295,6 @@ public class AppConfig {
         jwtUtil,
         eventPublisher,
         songLibraryService,
-        creditLedgerRepository,
         appProperties.isSlave());
   }
  

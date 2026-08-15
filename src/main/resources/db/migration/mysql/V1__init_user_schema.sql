@@ -58,3 +58,17 @@ CREATE TABLE playlist_songs (
     song_id     INT,
     CONSTRAINT fk_playlist_songs_playlist FOREIGN KEY (playlist_id) REFERENCES playlists (persistent_identity)
 ) ENGINE=InnoDB;
+
+-- Append-only credit transaction history, owned by the user it belongs to.
+CREATE TABLE credit_transactions (
+    persistent_identity INT PRIMARY KEY,
+    user_id              INT,
+    location_id          VARCHAR(255),
+    amount                INT NOT NULL,
+    type                  VARCHAR(255) NOT NULL,
+    timestamp             TIMESTAMP NOT NULL,
+    song_album_id         INT,
+    song_id               INT,
+    resulting_balance     INT NOT NULL,
+    CONSTRAINT fk_credit_transactions_user FOREIGN KEY (user_id) REFERENCES users (persistent_identity)
+) ENGINE=InnoDB;

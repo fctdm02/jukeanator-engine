@@ -1,7 +1,9 @@
 package com.djt.jukeanator_engine.domain.user.model;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -70,6 +72,13 @@ public class UserEntity extends AbstractPersistentEntity {
       fetch = FetchType.EAGER)
   @OrderBy("persistentIdentity ASC")
   private List<PlaylistEntity> playlists = new ArrayList<>();
+
+  // Same "load once, hold in memory" rationale as the other collections above -- see
+  // UserServiceImpl, which loads the whole user root once and holds it for the app's lifetime.
+  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true,
+      fetch = FetchType.EAGER)
+  @OrderBy("timestamp ASC")
+  private Set<CreditTransactionEntity> transactions = new HashSet<>();
 
   @Column(nullable = false)
   private String role = "ROLE_USER";
@@ -273,6 +282,22 @@ public class UserEntity extends AbstractPersistentEntity {
         new SongIdentifier(song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity());
 
     return playlist.removeSong(songIdentifier);
+  }
+
+  public Set<CreditTransactionEntity> getTransactions() {
+
+    if (transactions == null) {
+      transactions = new HashSet<>();
+    }
+
+    return transactions;
+  }
+
+  public CreditTransactionEntity addTransaction(CreditTransactionEntity transaction) {
+
+    transaction.setUser(this);
+    this.transactions.add(transaction);
+    return transaction;
   }
 
   public String getRole() {

@@ -39,13 +39,11 @@ import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
-import com.djt.jukeanator_engine.domain.user.model.CreditLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.CreditTransactionType;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
-import com.djt.jukeanator_engine.domain.user.repository.CreditLedgerRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 
 /**
@@ -76,16 +74,13 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private final JwtUtil jwtUtil;
   private final ApplicationEventPublisher eventPublisher;
   private final SongLibraryService songLibraryService;
-  private final CreditLedgerRepository creditLedgerRepository;
   private final boolean slaveMode;
 
   private UserRootEntity userRoot;
-  private CreditLedgerRootEntity creditLedgerRoot;
 
   public UserServiceImpl(String rootPath, UserRepository userRepository,
       PasswordEncoder passwordEncoder, JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
-      SongLibraryService songLibraryService, CreditLedgerRepository creditLedgerRepository,
-      boolean slaveMode) {
+      SongLibraryService songLibraryService, boolean slaveMode) {
 
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(userRepository, "userRepository cannot be null");
@@ -93,7 +88,6 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     requireNonNull(jwtUtil, "jwtUtil cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
-    requireNonNull(creditLedgerRepository, "creditLedgerRepository cannot be null");
 
     this.rootPath = rootPath;
     this.userRepository = userRepository;
@@ -101,7 +95,6 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     this.jwtUtil = jwtUtil;
     this.eventPublisher = eventPublisher;
     this.songLibraryService = songLibraryService;
-    this.creditLedgerRepository = creditLedgerRepository;
     this.slaveMode = slaveMode;
 
     initialize();
@@ -581,7 +574,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public List<CreditTransactionDto> getCreditLedgerForLocation(String locationId, Instant from,
       Instant to) {
 
-    return creditLedgerRoot.findByLocationId(locationId, from, to).stream()
+    return userRoot.getUsers().stream()
+        .flatMap(u -> u.getTransactions().stream())
+        .filter(t -> locationId.equals(t.getLocationId()))
+        .filter(t -> !t.getTimestamp().isBefore(from) && !t.getTimestamp().isAfter(to))
+        .sorted(java.util.Comparator.comparing(CreditTransactionEntity::getTimestamp))
         .map(t -> new CreditTransactionDto(t.getUserEmail(), t.getLocationId(), t.getAmount(),
             t.getType(), t.getTimestamp(), t.getSongAlbumId(), t.getSongId(),
             t.getResultingBalance()))
@@ -590,8 +587,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   /**
    * Deducts {@code cost} credits (floored at zero), broadcasts the new balance, and appends a
-   * ledger entry. {@code locationId} is {@code null} for standalone-mode/non-location-attributed
-   * spends.
+   * ledger entry to the user's own transaction set. {@code locationId} is {@code null} for
+   * standalone-mode/non-location-attributed spends. Callers are responsible for persisting the
+   * user root afterward.
    */
   private void deductCredits(UserEntity user, String emailAddress, int cost,
       CreditTransactionType type, String locationId, Integer songAlbumId, Integer songId) {
@@ -600,10 +598,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     user.setNumCredits(remaining);
     eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, remaining));
 
-    Integer persistentIdentity = Integer.valueOf(creditLedgerRoot.getTransactions().size() + 1);
-    creditLedgerRoot.appendTransaction(new CreditTransactionEntity(persistentIdentity, emailAddress,
-        locationId, -cost, type, Instant.now(), songAlbumId, songId, remaining));
-    creditLedgerRepository.storeAggregateRoot(creditLedgerRoot);
+    Integer persistentIdentity = Integer.valueOf(user.getTransactions().size() + 1);
+    user.addTransaction(new CreditTransactionEntity(persistentIdentity, locationId, -cost, type,
+        Instant.now(), songAlbumId, songId, remaining));
   }
 
   // Repository methods
@@ -649,13 +646,6 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       log.error("Could not load user root from: " + rootPath
           + ", using empty user root for now, error: " + ednee.getMessage());
       this.userRoot = new UserRootEntity();
-    }
-
-    try {
-      this.creditLedgerRoot = this.creditLedgerRepository.loadAggregateRoot(rootPath);
-    } catch (EntityDoesNotExistException ednee) {
-      log.info("No existing credit ledger found at: " + rootPath + " — starting with an empty one");
-      this.creditLedgerRoot = new CreditLedgerRootEntity();
     }
   }
 }
