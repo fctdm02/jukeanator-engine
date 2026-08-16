@@ -39,6 +39,7 @@ import org.junit.jupiter.api.BeforeEach;
  */
 public abstract class AbstractSongLibraryEntityTest {
 
+  protected static final String LOCATION_NAME = "LocationName";
   protected static final String ROOT_PATH = "/test-root";
 
   protected static final int ALBUM_ID_LIKE_A_VIRGIN = 0;
@@ -61,7 +62,7 @@ public abstract class AbstractSongLibraryEntityTest {
   @BeforeEach
   void setUpLibrary() throws Exception {
 
-    root = new RootFolderEntity(ROOT_PATH);
+    root = new RootFolderEntity(LOCATION_NAME, ROOT_PATH);
 
     GenreFolderEntity genreRock = new GenreFolderEntity(root, "Rock");
     root.addChildFolder(genreRock);

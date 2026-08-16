@@ -46,7 +46,6 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.LibraryItem;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
-import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
@@ -65,6 +64,7 @@ public class SongLibraryServiceImpl
 
   private final ApplicationEventPublisher eventPublisher;
 
+  private String locationName;
   private String rootPath;
   private String rootPathWindows;
   private String rootPathUnix;
@@ -77,10 +77,11 @@ public class SongLibraryServiceImpl
   private boolean isInitialized;
   private boolean libraryLoadFailedAtStartup;
 
-  public SongLibraryServiceImpl(String dataDir, String rootPath, String rootPathWindows,
+  public SongLibraryServiceImpl(String locationName, String dataDir, String rootPath, String rootPathWindows,
       String rootPathUnix, SongLibraryRepository songLibraryRepository, SongScanner songScanner,
       Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
 
+    requireNonNull(locationName, "locationName cannot be null");
     requireNonNull(dataDir, "dataDir cannot be null");
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
@@ -90,6 +91,7 @@ public class SongLibraryServiceImpl
     requireNonNull(searchResultSize, "searchResultSize cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
+    this.locationName = locationName;
     this.dataDir = dataDir;
     this.rootPath = rootPath;
     this.rootPathWindows = rootPathWindows;
@@ -117,7 +119,7 @@ public class SongLibraryServiceImpl
     // startup.
     try {
 
-      this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(this.rootPath);
+      this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(this.locationName);
       this.libraryLoadFailedAtStartup = false;
 
     } catch (EntityDoesNotExistException ednee) {
@@ -125,9 +127,11 @@ public class SongLibraryServiceImpl
       log.error("Could not load song library from: " + rootPath
           + ", using empty song library songLibraryRoot for now, error: " + ednee.getMessage());
 
-      this.songLibraryRoot = new RootFolderEntity(this.rootPath);
+      this.songLibraryRoot = new RootFolderEntity(this.locationName, this.rootPath);
       this.songLibraryRoot.initialize();
       this.libraryLoadFailedAtStartup = true;
+      
+      this.songLibraryRepository.storeAggregateRoot(songLibraryRoot);
     }
 
     this.isInitialized = true;
@@ -138,6 +142,7 @@ public class SongLibraryServiceImpl
       this.songLibraryRoot.initialize();
     }
 
+    log.info("locationName: " + this.locationName);
     log.info("rootPath: " + this.rootPath);
     log.info("rootPathWindows: " + this.rootPathWindows);
     log.info("rootPathUnix: " + this.rootPathUnix);
@@ -145,11 +150,11 @@ public class SongLibraryServiceImpl
     log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
   }
 
+  // TODO: No need to restore stats if JPA repository
   private void restoreSongStatisticsIfCdStatsFileIsNewer() {
 
     Path cdStatsPath = Path.of(this.dataDir, RootFolderEntity.CD_STATS);
-    Path songLibraryPath =
-        Path.of(this.dataDir, SongLibraryRepositoryFileSystemImpl.SONG_LIBRARY_FILENAME);
+    Path songLibraryPath =Path.of(this.dataDir, SongLibraryRepository.DEFAULT_SONG_LIBRARY_LOCATION_NAME);
 
     if (!Files.exists(cdStatsPath) || !Files.exists(songLibraryPath)) {
       return;

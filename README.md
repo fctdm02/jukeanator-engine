@@ -9,6 +9,11 @@ mvn clean package -DskipTests
 java -jar target/jukeanator-engine-0.0.1-SNAPSHOT.war
 ```
 
+# How to start Docker
+```
+sudo systemctl start docker
+```
+
 # Getting Started
 
 ### Reference Documentation

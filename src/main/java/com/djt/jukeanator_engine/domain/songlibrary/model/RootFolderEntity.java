@@ -32,6 +32,7 @@ public class RootFolderEntity extends FolderEntity {
   private static final String CD_STATS_BACKUP = "CDStats_backup.TXT";
   private static final FileSystemHelper fileSystemHelper = new FileSystemHelper();
 
+  private String locationName;
   private Set<ArtistFromSongEntity> artistsFromSongs = new TreeSet<ArtistFromSongEntity>();
 
   private transient Map<Integer, GenreFolderEntity> genresMap;
@@ -44,8 +45,15 @@ public class RootFolderEntity extends FolderEntity {
   // Used to load playlists into the queue
   private transient Map<String, SongFileEntity> songsByPath;
 
+  /*
   public RootFolderEntity(String rootPath) {
     super(null, rootPath);
+  }
+  */
+  
+  public RootFolderEntity(String locationName, String rootPath) {
+    super(null, rootPath);
+    this.locationName = locationName;
   }
 
   public void initialize() {
@@ -108,6 +116,14 @@ public class RootFolderEntity extends FolderEntity {
         this.songsMap.put(buildSongKey(albumId, song.getPersistentIdentity()), song);
       }
     }
+  }
+  
+  public String getLocationName() {
+    return this.locationName;
+  }
+  
+  public void setLocationName(String locationName) {
+    this.locationName = locationName;
   }
 
   public String getRootPath() {

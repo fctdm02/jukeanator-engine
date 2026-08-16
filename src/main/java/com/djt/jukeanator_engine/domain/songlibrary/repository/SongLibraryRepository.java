@@ -9,6 +9,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
  */
 public interface SongLibraryRepository extends AggregateRootRepository<RootFolderEntity> {
 
+  String DEFAULT_SONG_LIBRARY_LOCATION_NAME = "JukeANator";
+  
   /**
    * 
    * @throws EntityDoesNotExistException

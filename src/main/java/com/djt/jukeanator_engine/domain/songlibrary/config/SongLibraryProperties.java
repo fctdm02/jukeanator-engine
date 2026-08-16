@@ -16,6 +16,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "song-library")
 public class SongLibraryProperties {
 
+  private String locationName;
   private String repositoryType; // "filesystem" or "postgres"
   private boolean requiresMetadata;
   private boolean useGenre;
@@ -45,6 +46,14 @@ public class SongLibraryProperties {
     public void setConsumerSecret(String consumerSecret) {
       this.consumerSecret = consumerSecret;
     }
+  }
+  
+  public String getLocationName() {
+    return locationName;
+  }
+  
+  public void setLocationName(String locationName) {
+    this.locationName = locationName;
   }
 
   public String getRepositoryType() {

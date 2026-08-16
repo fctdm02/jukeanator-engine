@@ -25,6 +25,7 @@ public final class SongScanner {
 
   private static final String IGNORE_MARKER_FILENAME = "ignore.me";
 
+  private String locationName;
   private RootFolderEntity rootFolder;
   private boolean requiresMetadata;
   private boolean useGenre;
@@ -36,10 +37,11 @@ public final class SongScanner {
   private JAudioTaggerClient jAudioTaggerClient;
   private CoverArtDownloader coverArtDownloader;
 
-  public SongScanner(DiscogsClientWrapper discogsClientWrapper,
+  public SongScanner(String locationName, DiscogsClientWrapper discogsClientWrapper,
       MusicBrainzClientWrapper musicBrainzClientWrapper, JAudioTaggerClient jAudioTaggerClient,
       CoverArtDownloader coverArtDownloader, boolean requiresMetadata, boolean useGenre,
       boolean useTopFolderForGenre, Set<String> acceptedSongFileExtensions) {
+    requireNonNull(locationName, "locationName cannot be null");
     requireNonNull(discogsClientWrapper, "discogsClientWrapper cannot be null");
     requireNonNull(musicBrainzClientWrapper, "musicBrainzClientWrapper cannot be null");
     requireNonNull(jAudioTaggerClient, "jAudioTaggerClient cannot be null");
@@ -72,7 +74,7 @@ public final class SongScanner {
 
     String rootName = file.getAbsolutePath();
 
-    rootFolder = new RootFolderEntity(rootName);
+    rootFolder = new RootFolderEntity(locationName, rootName);
 
     process(rootFolder);
 
