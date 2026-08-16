@@ -437,6 +437,19 @@ public class JukeANatorFrame extends JFrame {
       public void windowOpened(java.awt.event.WindowEvent e) {
         requestFocusInWindow();
       }
+
+      // AdminPanel.doMinimize() calls GraphicsDevice#setFullScreenWindow(null)
+      // before iconifying, because Windows won't iconify a window that owns the
+      // screen in full-screen exclusive mode. Nothing else re-claims the screen
+      // afterward, so an Alt+Tab restore came back as a plain windowed frame at
+      // whatever bounds AWT happened to leave it — independent of alwaysOnTop,
+      // which only guards the separate un-minimize listener below. Re-entering
+      // full-screen exclusive mode here makes every restore path (Alt+Tab, taskbar,
+      // dock) come back correctly.
+      @Override
+      public void windowDeiconified(java.awt.event.WindowEvent e) {
+        SwingUtilities.invokeLater(JukeANatorFrame.this::showFullscreen);
+      }
     });
 
     // Keep the jukebox visible on the primary display when the operator works on

@@ -89,7 +89,7 @@ location:   # only used when app.mode is master or slave
   command-timeout-ms: 10000   # master-only: how long to wait for a slave to reply to a command
 
 user-interface:
-  always-on-top: true
+  always-on-top: false
   enable-screen-saver: true
   # HIBERNATE CONFIGURATION  
   enable-hibernation: true
