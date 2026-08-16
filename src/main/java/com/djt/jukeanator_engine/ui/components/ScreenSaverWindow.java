@@ -78,6 +78,9 @@ public class ScreenSaverWindow extends JWindow {
       textTargetWidth = Math.max(1, (int) Math.round(textNativeSize.width * scale));
       textTargetHeight = Math.max(1, (int) Math.round(textNativeSize.height * scale));
     }
+    // Widen the fitted image by 20% so it doesn't look squished, independent
+    // of screen resolution.
+    textTargetWidth = (int) Math.round(textTargetWidth * 1.2);
     ImageIcon textIcon =
         imageLoader.loadImage("ScreenSaverText.png", textTargetWidth, textTargetHeight);
     Image transparentStrippedText =
