@@ -14,6 +14,7 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.security.LocalPrincipal;
+import com.djt.jukeanator_engine.domain.common.security.UserRole;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResponse;
@@ -105,6 +106,15 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   // Service methods
   @Override
   public AuthResponse register(RegisterRequest request) {
+    return registerWithRole(request, UserRole.ROLE_USER);
+  }
+
+  @Override
+  public AuthResponse addAdminUser(RegisterRequest request) {
+    return registerWithRole(request, UserRole.ROLE_ADMIN);
+  }
+
+  private AuthResponse registerWithRole(RegisterRequest request, UserRole role) {
 
     UserEntity check = userRoot.getUserByEmailAddressNullIfNotExists(request.emailAddress());
     if (check != null) {
@@ -115,13 +125,13 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     UserEntity user = new UserEntity(persistentIdentity, request.firstName(), request.lastName(),
         request.emailAddress(), passwordEncoder.encode(request.password()), Integer.valueOf(6),
-        "ROLE_USER");
+        role);
 
     this.userRoot.addUser(user);
     this.userRepository.storeAggregateRoot(this.userRoot);
 
-    String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole());
-    return new AuthResponse(token, user.getEmailAddress(), user.getRole());
+    String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole().name());
+    return new AuthResponse(token, user.getEmailAddress(), user.getRole().name());
   }
 
   @Override
@@ -136,8 +146,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new UserServiceException("Invalid credentials");
     }
 
-    String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole());
-    return new AuthResponse(token, user.getEmailAddress(), user.getRole());
+    String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole().name());
+    return new AuthResponse(token, user.getEmailAddress(), user.getRole().name());
   }
 
   private static final int DEFAULT_CREDITS = 6;

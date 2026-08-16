@@ -39,19 +39,21 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class JukeANatorFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
-  
+
   private final boolean alwaysOnTop;
 
   private final JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
+  private final UserService userService;
 
   private final ImageLoader imageLoader = new ImageLoader();
   private static final int POPULARITY_THRESHOLD_1 = 10;
@@ -203,13 +205,14 @@ public class JukeANatorFrame extends JFrame {
   // ─────────────────────────────────────────────────────────────────────────
   public JukeANatorFrame(JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
       SongLibraryService songLibraryService, SongQueueService songQueueService,
-      SongPlayerService songPlayerService) {
+      SongPlayerService songPlayerService, UserService userService) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
-    
+    this.userService = userService;
+
     this.alwaysOnTop = jukeANatorUserInterfaceProperties.isAlwaysOnTop();
 
     this.incrementCreditsKey = jukeANatorUserInterfaceProperties.getIncrementCreditsKey();
@@ -912,7 +915,7 @@ public class JukeANatorFrame extends JFrame {
   private AdminPanel buildAdminPanel() {
 
     return new AdminPanel(this, songLibraryService, songQueueService, songPlayerService,
-        creditManager, imageLoader);
+        userService, creditManager, imageLoader);
   }
 
   // ============================================================

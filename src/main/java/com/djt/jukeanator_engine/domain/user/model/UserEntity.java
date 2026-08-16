@@ -9,6 +9,8 @@ import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -21,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
+import com.djt.jukeanator_engine.domain.common.security.UserRole;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
@@ -80,8 +83,9 @@ public class UserEntity extends AbstractPersistentEntity {
   @OrderBy("timestamp ASC")
   private Set<CreditTransactionEntity> transactions = new HashSet<>();
 
+  @Enumerated(EnumType.STRING)
   @Column(nullable = false)
-  private String role = "ROLE_USER";
+  private UserRole role = UserRole.ROLE_USER;
 
   protected UserEntity() {} // for JPA
 
@@ -90,7 +94,7 @@ public class UserEntity extends AbstractPersistentEntity {
   }
 
   public UserEntity(Integer persistentIdentity, String firstName, String lastName,
-      String emailAddress, String passwordHash, Integer numCredits, String role) {
+      String emailAddress, String passwordHash, Integer numCredits, UserRole role) {
     super(persistentIdentity);
     this.firstName = firstName;
     this.lastName = lastName;
@@ -312,11 +316,11 @@ public class UserEntity extends AbstractPersistentEntity {
     return transaction;
   }
 
-  public String getRole() {
+  public UserRole getRole() {
     return role;
   }
 
-  public void setRole(String role) {
+  public void setRole(UserRole role) {
     this.role = role;
   }
 

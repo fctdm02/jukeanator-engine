@@ -26,13 +26,16 @@ import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
+import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
@@ -46,6 +49,8 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
+import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 import com.djt.jukeanator_engine.ui.security.SwingSecurityUtil;
 
@@ -65,6 +70,7 @@ public class AdminPanel extends JPanel {
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
+  private final UserService userService;
   private final CreditManager creditManager;
   private final Frame ownerFrame;
   private final ImageLoader imageLoader;
@@ -120,12 +126,13 @@ public class AdminPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   public AdminPanel(Frame ownerFrame, SongLibraryService songLibraryService,
       SongQueueService songQueueService, SongPlayerService songPlayerService,
-      CreditManager creditManager, ImageLoader imageLoader) {
+      UserService userService, CreditManager creditManager, ImageLoader imageLoader) {
 
     this.ownerFrame = ownerFrame;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
+    this.userService = userService;
     this.creditManager = creditManager;
     this.imageLoader = imageLoader;
 
@@ -328,6 +335,8 @@ public class AdminPanel extends JPanel {
     strip.add(sideButton("Reset\nStats", ColorTheme.get().accentOrange, e -> doResetStats()));
     strip.add(sideButton("Rescan\nLibrary", ColorTheme.get().accentViolet, e -> doRescan()));
     strip.add(Box.createVerticalGlue());
+    strip.add(sideButton("Add Admin\nUser", ColorTheme.get().accentGold, e -> doAddAdminUser()));
+    strip.add(Box.createVerticalGlue());
     strip.add(sideButton("⊟ Minimize", ColorTheme.get().accentBlue, e -> doMinimize()));
     strip.add(sideButton("✕ Exit", ColorTheme.get().accentRed, e -> doExit()));
 
@@ -485,6 +494,148 @@ public class AdminPanel extends JPanel {
             ex.printStackTrace();
           }
         }));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // ADMIN USER ACTIONS (UserService)
+  // ─────────────────────────────────────────────────────────────────────────
+  private void doAddAdminUser() {
+    new AddAdminUserDialog(ownerFrame).setVisible(true);
+  }
+
+  /**
+   * Custom (non-{@code JOptionPane}) modal prompt collecting the fields for a
+   * {@link RegisterRequest}, then calling {@link UserService#addAdminUser(RegisterRequest)} with
+   * {@code ROLE_ADMIN}. Styled to match the rest of the admin panel's dark theme rather than
+   * relying on the platform look-and-feel of a stock dialog.
+   */
+  private class AddAdminUserDialog extends JDialog {
+
+    private static final long serialVersionUID = 1L;
+
+    private final JTextField firstNameField = new JTextField(18);
+    private final JTextField lastNameField = new JTextField(18);
+    private final JTextField emailField = new JTextField(18);
+    private final JPasswordField passwordField = new JPasswordField(18);
+    private final JLabel errorLabel = new JLabel(" ");
+
+    AddAdminUserDialog(Frame owner) {
+      super(owner, "Add Admin User", true);
+
+      getContentPane().setBackground(ColorTheme.get().bgOverlayCard);
+      setLayout(new BorderLayout(0, 16));
+      ((JPanel) getContentPane()).setBorder(new EmptyBorder(20, 24, 16, 24));
+
+      JLabel title = new JLabel("Create Admin User");
+      title.setForeground(ColorTheme.get().accentGold);
+      title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+      add(title, BorderLayout.NORTH);
+
+      add(buildFieldsPanel(), BorderLayout.CENTER);
+      add(buildButtonRow(), BorderLayout.SOUTH);
+
+      getRootPane().registerKeyboardAction(e -> dispose(),
+          javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+          javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+      pack();
+      setResizable(false);
+      setLocationRelativeTo(owner);
+    }
+
+    private JPanel buildFieldsPanel() {
+
+      JPanel fields = new JPanel(new GridBagLayout());
+      fields.setOpaque(false);
+
+      GridBagConstraints c = new GridBagConstraints();
+      c.insets = new Insets(6, 6, 6, 6);
+      c.anchor = GridBagConstraints.WEST;
+
+      addFieldRow(fields, c, 0, "First Name:", firstNameField);
+      addFieldRow(fields, c, 1, "Last Name:", lastNameField);
+      addFieldRow(fields, c, 2, "Email:", emailField);
+      addFieldRow(fields, c, 3, "Password:", passwordField);
+
+      c.gridx = 0;
+      c.gridy = 4;
+      c.gridwidth = 2;
+      c.insets = new Insets(2, 6, 0, 6);
+      errorLabel.setForeground(ColorTheme.get().accentRed);
+      errorLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      fields.add(errorLabel, c);
+
+      return fields;
+    }
+
+    private void addFieldRow(JPanel fields, GridBagConstraints c, int row, String labelText,
+        JTextField field) {
+
+      JLabel label = new JLabel(labelText);
+      label.setForeground(ColorTheme.get().textSecondary);
+      label.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
+
+      field.setForeground(ColorTheme.get().textPrimary);
+      field.setBackground(ColorTheme.get().bgFieldDark);
+      field.setCaretColor(ColorTheme.get().accentBlue);
+      field.setBorder(BorderFactory.createCompoundBorder(
+          BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
+          new EmptyBorder(4, 6, 4, 6)));
+
+      c.gridx = 0;
+      c.gridy = row;
+      c.gridwidth = 1;
+      fields.add(label, c);
+
+      c.gridx = 1;
+      fields.add(field, c);
+    }
+
+    private JPanel buildButtonRow() {
+
+      JButton createBtn = new JButton("Create Admin");
+      styleOverlayButton(createBtn);
+      createBtn.addActionListener(e -> attemptCreate());
+
+      JButton cancelBtn = new JButton("Cancel");
+      styleOverlayButton(cancelBtn);
+      cancelBtn.addActionListener(e -> dispose());
+
+      JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
+      row.setOpaque(false);
+      row.add(createBtn);
+      row.add(cancelBtn);
+      return row;
+    }
+
+    private void attemptCreate() {
+
+      String firstName = firstNameField.getText().trim();
+      String lastName = lastNameField.getText().trim();
+      String email = emailField.getText().trim();
+      String password = new String(passwordField.getPassword());
+
+      if (firstName.isEmpty() || lastName.isEmpty() || email.isEmpty() || password.isEmpty()) {
+        errorLabel.setText("All fields are required.");
+        return;
+      }
+
+      RegisterRequest request = new RegisterRequest(firstName, lastName, email, password);
+
+      SwingSecurityUtil.runAsync(() -> {
+        try {
+          userService.addAdminUser(request);
+          SwingUtilities.invokeLater(() -> {
+            dispose();
+            showOverlayMessage("Admin User Created", "Created admin user: " + email,
+                ColorTheme.get().accentGreen);
+          });
+        } catch (Exception ex) {
+          SwingUtilities.invokeLater(() -> errorLabel.setText(
+              ex.getMessage() != null ? ex.getMessage() : "Could not create admin user."));
+        }
+      });
+    }
   }
 
   private void doMinimize() {

@@ -36,7 +36,18 @@ public interface UserService {
   AuthResponse register(RegisterRequest request);
 
   /**
-   * 
+   * Admin-only: registers a new user with {@code ROLE_ADMIN} instead of the default
+   * {@code ROLE_USER}. Unlike {@link #register(RegisterRequest)}, this is not a
+   * {@link PublicServiceMethod} — the caller must already be authenticated (e.g. an operator who
+   * has logged into the JFC/Swing admin panel).
+   *
+   * @param request
+   * @return
+   */
+  AuthResponse addAdminUser(RegisterRequest request);
+
+  /**
+   *
    * @param request
    * @return
    */

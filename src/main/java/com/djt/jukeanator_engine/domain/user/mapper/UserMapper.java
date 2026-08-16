@@ -3,6 +3,7 @@ package com.djt.jukeanator_engine.domain.user.mapper;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import com.djt.jukeanator_engine.domain.common.security.UserRole;
 import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionEntryDto;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserDto;
@@ -43,7 +44,7 @@ public final class UserMapper {
         entity.getSearchHistory(),
         toPlaylistDtos(entity.getPlaylists()),
         toTransactionDtos(entity.getTransactions()),
-        entity.getRole());
+        entity.getRole().name());
   }
 
   public static List<PlaylistDto> toPlaylistDtos(List<PlaylistEntity> entities) {
@@ -98,7 +99,7 @@ public final class UserMapper {
         dto.getEmailAddress(),
         dto.getPasswordHash(),
         dto.getNumCredits(),
-        dto.getRole());
+        UserRole.valueOf(dto.getRole()));
 
     user.setSongPlayHistory(dto.getSongPlayHistory());
     user.setSearchHistory(dto.getSearchHistory());
