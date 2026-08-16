@@ -47,6 +47,7 @@ public final class SongScanner {
     requireNonNull(jAudioTaggerClient, "jAudioTaggerClient cannot be null");
     requireNonNull(coverArtDownloader, "coverArtDownloader cannot be null");
     requireNonNull(acceptedSongFileExtensions, "acceptedSongFileExtensions cannot be null");
+    this.locationName = locationName;
     this.discogsClientWrapper = discogsClientWrapper;
     this.musicBrainzClientWrapper = musicBrainzClientWrapper;
     this.jAudioTaggerClient = jAudioTaggerClient;

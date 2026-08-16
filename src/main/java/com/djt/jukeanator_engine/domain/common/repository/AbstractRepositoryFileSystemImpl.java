@@ -99,6 +99,38 @@ public class AbstractRepositoryFileSystemImpl {
     }
   }
 
+  /**
+   * Reads a single JSON object file into an instance of the given type. Returns {@code null},
+   * rather than throwing, when the file does not yet exist so callers can distinguish first-run
+   * bootstrap from a genuine read failure.
+   */
+  protected <T> T readJson(String filePath, Class<T> type) {
+
+    Path path = Path.of(filePath);
+    if (!Files.exists(path)) {
+      return null;
+    }
+
+    try {
+      return MAPPER.readValue(path.toFile(), type);
+    } catch (IOException ioe) {
+      throw new UncheckedIOException("Could not read JSON from file: " + filePath, ioe);
+    }
+  }
+
+  /**
+   * Writes {@code item} to disk as a single JSON object (pretty-printed when
+   * {@link #USE_PRETTY_PRINT} is enabled), overwriting any existing file.
+   */
+  protected <T> void writeJson(String filePath, T item) {
+
+    try {
+      getObjectWriter().writeValue(Path.of(filePath).toFile(), item);
+    } catch (IOException ioe) {
+      throw new UncheckedIOException("Could not write JSON to file: " + filePath, ioe);
+    }
+  }
+
   protected String basePath;
 
   public AbstractRepositoryFileSystemImpl() {

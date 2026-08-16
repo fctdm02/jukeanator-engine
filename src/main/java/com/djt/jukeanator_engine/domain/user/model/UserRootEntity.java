@@ -25,7 +25,7 @@ public class UserRootEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
-  public static final String USER_LIST_FILENAME = "JukeANator_Users.oos";
+  public static final String USER_LIST_FILENAME = "JukeANator_Users.json";
 
   // Field type must be the Map interface, not TreeMap: once this entity is loaded by JPA,
   // Hibernate substitutes its own managed Map implementation here. Callers only ever use Map

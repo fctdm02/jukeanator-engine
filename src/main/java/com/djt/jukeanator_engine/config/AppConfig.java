@@ -53,7 +53,6 @@ import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryJpaImpl;
-import com.djt.jukeanator_engine.domain.user.repository.UserRootObjectPersistor;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
 
@@ -105,11 +104,6 @@ public class AppConfig {
   @Bean
   public SongQueueObjectPersistor songQueueObjectPersistor() {
     return new SongQueueObjectPersistor();
-  }
-
-  @Bean
-  public UserRootObjectPersistor userRootObjectPersistor() {
-    return new UserRootObjectPersistor();
   }
 
   // ── Song library repository ───────────────────────────────────────────────

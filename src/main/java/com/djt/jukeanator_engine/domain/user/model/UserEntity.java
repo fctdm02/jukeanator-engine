@@ -254,6 +254,18 @@ public class UserEntity extends AbstractPersistentEntity {
     return playlist;
   }
 
+  /**
+   * Re-attaches a fully-formed {@link PlaylistEntity} (persisted identity, songs, and all)
+   * without going through {@link #createPlaylist(String)}, which mints a brand new playlist.
+   * Used when rehydrating a user from persisted state, where the playlist already exists.
+   */
+  public PlaylistEntity restorePlaylist(PlaylistEntity playlist) {
+
+    playlist.setUser(this);
+    this.getPlaylists().add(playlist);
+    return playlist;
+  }
+
   public boolean deletePlaylist(String playlistName) throws EntityDoesNotExistException {
 
     if (PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(playlistName)) {
