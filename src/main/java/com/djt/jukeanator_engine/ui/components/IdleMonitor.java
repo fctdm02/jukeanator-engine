@@ -9,7 +9,7 @@ import javax.swing.Timer;
 
 public class IdleMonitor {
 
-  private static final long IDLE_TIMEOUT_MS = 60_000;
+  private static final long DEFAULT_IDLE_TIMEOUT_MS = 60_000;
 
   /**
    * How long (ms) to suppress the onActive callback after the screensaver is triggered. This
@@ -19,6 +19,8 @@ public class IdleMonitor {
    */
   private static final long ACTIVATION_GRACE_PERIOD_MS = 2_000;
 
+  private final long idleTimeoutMs;
+
   private long lastActivity = System.currentTimeMillis();
 
   /** Timestamp of the most recent onIdle call, or 0 if never fired. */
@@ -27,6 +29,12 @@ public class IdleMonitor {
   private final Timer timer;
 
   public IdleMonitor(Runnable onIdle, Runnable onActive) {
+    this(DEFAULT_IDLE_TIMEOUT_MS, onIdle, onActive);
+  }
+
+  public IdleMonitor(long idleTimeoutMs, Runnable onIdle, Runnable onActive) {
+
+    this.idleTimeoutMs = idleTimeoutMs;
 
     Toolkit.getDefaultToolkit().addAWTEventListener(e -> {
 
@@ -50,7 +58,7 @@ public class IdleMonitor {
 
     timer = new Timer(1000, e -> {
 
-      if (System.currentTimeMillis() - lastActivity >= IDLE_TIMEOUT_MS) {
+      if (System.currentTimeMillis() - lastActivity >= idleTimeoutMs) {
 
         lastIdleFiredAt = System.currentTimeMillis();
         onIdle.run();

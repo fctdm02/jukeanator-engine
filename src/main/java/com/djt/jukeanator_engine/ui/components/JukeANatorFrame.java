@@ -410,6 +410,24 @@ public class JukeANatorFrame extends JFrame {
           }));
     }
 
+    // After 10 minutes of no mouse/keyboard activity, return the jukebox to the
+    // HOT HERE tab (index 3) so an idle machine settles back on the promotional
+    // screen. Don't yank the Admin panel (tab index 6) out from under a
+    // technician who is reading the screen with no input.
+    new IdleMonitor(10 * 60_000L,
+
+        () -> SwingUtilities.invokeLater(() -> {
+
+          if (contentPanelTabs.getSelectedIndex() == 6) {
+            return;
+          }
+
+          contentPanelTabs.setSelectedIndex(3);
+        }),
+
+        () -> {
+        });
+
     // ── HIBERNATION ────────────────────────────────────────────────────
     if (this.enableHibernation) {
 
@@ -778,9 +796,9 @@ public class JukeANatorFrame extends JFrame {
     invisibleTabHeader.setPreferredSize(new Dimension(0, 0));
     tabs.setTabComponentAt(6, invisibleTabHeader);
 
-    // Select HOME (index 1) as the default visible tab
-    tabs.setSelectedIndex(1);
-    lastSelectedTabIndex = 1;
+    // Select HOT HERE (index 3) as the default visible tab
+    tabs.setSelectedIndex(3);
+    lastSelectedTabIndex = 3;
 
     // Reset each tab to its default state when the user switches to it.
     // Suppress resets triggered by the overlay card system showing/hiding
