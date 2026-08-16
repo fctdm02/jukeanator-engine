@@ -387,6 +387,13 @@ public class JukeANatorFrame extends JFrame {
 
           () -> SwingUtilities.invokeLater(() -> {
 
+            // Don't cover the Admin panel (tab index 6) — a technician reading
+            // or working the screen with no mouse/keyboard activity shouldn't
+            // get interrupted by the screensaver.
+            if (contentPanelTabs.getSelectedIndex() == 6) {
+              return;
+            }
+
             if (!this.screenSaverWindow.isVisible()) {
 
               this.screenSaverWindow.updateContent();
