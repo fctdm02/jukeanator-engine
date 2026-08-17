@@ -19,8 +19,6 @@ public class IdleMonitor {
    */
   private static final long ACTIVATION_GRACE_PERIOD_MS = 2_000;
 
-  private final long idleTimeoutMs;
-
   private long lastActivity = System.currentTimeMillis();
 
   /** Timestamp of the most recent onIdle call, or 0 if never fired. */
@@ -33,8 +31,6 @@ public class IdleMonitor {
   }
 
   public IdleMonitor(long idleTimeoutMs, Runnable onIdle, Runnable onActive) {
-
-    this.idleTimeoutMs = idleTimeoutMs;
 
     Toolkit.getDefaultToolkit().addAWTEventListener(e -> {
 
