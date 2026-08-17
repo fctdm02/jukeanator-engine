@@ -1,6 +1,11 @@
 package com.djt.jukeanator_engine.domain.location.model;
 
 import java.time.Instant;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
@@ -8,17 +13,34 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
  *
  * @author tmyers
  */
+@Entity
+@Table(name = "locations")
 public class LocationEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
-  private String locationId; // natural identity, UUID generated at provisioning
+  // natural identity, UUID generated at provisioning
+  @Column(name = "location_id", nullable = false, unique = true)
+  private String locationId;
+
+  @Column(nullable = false)
   private String name;
+
   private Double latitude;
   private Double longitude;
-  private String apiKeyHash; // bcrypt hash of the location's API secret; plaintext is never stored
+
+  // bcrypt hash of the location's API secret; plaintext is never stored
+  @Column(name = "api_key_hash", nullable = false)
+  private String apiKeyHash;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
   private LocationStatus status = LocationStatus.PENDING;
+
+  @Column(name = "last_seen_at")
   private Instant lastSeenAt;
+
+  @Column(name = "library_last_synced_at")
   private Instant libraryLastSyncedAt;
 
   public LocationEntity() {}

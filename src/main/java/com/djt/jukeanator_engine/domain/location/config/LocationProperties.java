@@ -12,7 +12,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "location")
 public class LocationProperties {
 
-  private String repositoryType = "filesystem"; // "filesystem" or "postgres"
+  private String repositoryType = "filesystem"; // "filesystem" or "jpa"
   private String storageRoot; // master-only: where per-location library/cover-art syncs land
   private long commandTimeoutMs = 10_000L; // master-only: Phase 2 slave command round-trip timeout
 

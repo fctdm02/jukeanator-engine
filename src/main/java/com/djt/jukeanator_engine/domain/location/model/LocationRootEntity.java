@@ -5,7 +5,11 @@ import java.util.TreeMap;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
- * Master-only aggregate root holding every provisioned location, keyed by locationId.
+ * Master-only in-memory aggregate root holding every provisioned location, keyed by locationId.
+ * Not itself JPA-mapped: there is no {@code location_root} table -- {@code
+ * LocationRepositoryJpaImpl} loads every {@link LocationEntity} row directly and assembles this
+ * aggregate around them in memory, since a relational schema has no need for a singleton "root"
+ * row to own a one-table collection. Same pattern as {@code UserRootEntity}.
  *
  * @author tmyers
  */

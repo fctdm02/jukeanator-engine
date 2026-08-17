@@ -74,7 +74,10 @@ song-player:
   
 user:
   repository-type: filesystem   # filesystem | jpa (jpa works against Postgres or MySQL -- see spring.datasource.*)
-  
+
+location:   # only used when app.mode is master or slave
+  repository-type: filesystem   # filesystem | jpa (jpa works against Postgres or MySQL -- see spring.datasource.*)
+
 user-interface:
   always-on-top: false
   enable-screen-saver: false
