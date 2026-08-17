@@ -130,5 +130,10 @@ public class SongQueueServiceLocationProxy implements SongQueueService {
         loadPlaylistIntoQueueRequest, Integer.class);
   }
 
+  @Override
+  public Integer storeSongQueue() {
+    throw new UnsupportedOperationException(SYSTEM_METHOD_MESSAGE);
+  }
+
   private record EligibilityCheckPayload(Integer albumId, Integer songId, Integer priority) {}
 }

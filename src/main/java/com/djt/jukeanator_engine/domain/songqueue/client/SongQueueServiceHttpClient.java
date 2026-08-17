@@ -155,4 +155,15 @@ public class SongQueueServiceHttpClient implements SongQueueService {
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
     throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
+
+  /**
+   * NOTE: System method, not to be invoked on behalf of a user
+   *
+   * @return
+   */
+  @Override
+  public Integer storeSongQueue() {
+    throw new UnsupportedOperationException(
+        "System method, not to be invoked on behalf of a user!");
+  }
 }

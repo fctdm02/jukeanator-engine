@@ -129,12 +129,19 @@ public interface SongQueueService {
   Integer saveQueueAsPlaylist(String filename);
 
   /**
-   * 
+   *
    * @param loadPlaylistIntoQueueRequest
    * @return
    */
   Integer loadPlaylistIntoQueue(LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest);
-  
+
+  /**
+   * Persists the current song queue to disk.
+   *
+   * @return the number of songs currently in the queue
+   */
+  Integer storeSongQueue();
+
   /**
    * 
    * @param event

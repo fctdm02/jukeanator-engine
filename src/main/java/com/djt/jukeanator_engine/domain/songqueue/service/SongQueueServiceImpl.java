@@ -746,6 +746,12 @@ public class SongQueueServiceImpl
     }
   }
 
+  @Override
+  public synchronized Integer storeSongQueue() {
+    songQueueRepository.storeAggregateRoot(songQueueRoot);
+    return Integer.valueOf(songQueueRoot.getSongs().size());
+  }
+
   private SongQueueEntryDto addSongToQueue(String username, Integer albumId, Integer songId,
       Integer priority) {
 

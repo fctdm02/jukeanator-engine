@@ -1,6 +1,5 @@
 package com.djt.jukeanator_engine.config;
 
-import jakarta.persistence.EntityManagerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -9,7 +8,6 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.djt.jukeanator_engine.domain.backgroundmusic.config.BackgroundMusicProperties;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepository;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepositoryFileSystemImpl;
@@ -44,10 +42,8 @@ import com.djt.jukeanator_engine.domain.songplayer.config.SongPlayerProperties;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerServiceImpl;
 import com.djt.jukeanator_engine.domain.songqueue.config.SongQueueProperties;
-import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueObjectPersistor;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryFileSystemImpl;
-import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryPostgresImpl;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
@@ -55,6 +51,8 @@ import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryFileSystem
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryJpaImpl;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManagerFactory;
 
 @Configuration
 public class AppConfig {
@@ -101,11 +99,6 @@ public class AppConfig {
     return new SongLibraryObjectPersistor();
   }
 
-  @Bean
-  public SongQueueObjectPersistor songQueueObjectPersistor() {
-    return new SongQueueObjectPersistor();
-  }
-
   // ── Song library repository ───────────────────────────────────────────────
 
   @Bean
@@ -150,16 +143,10 @@ public class AppConfig {
   @Bean
   @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
-  public SongQueueRepository songQueueRepositoryFileSystemImpl(AppProperties appProperties) {
+  public SongQueueRepository songQueueRepositoryFileSystemImpl(AppProperties appProperties,
+      SongLibraryService songLibraryService) {
 
-    return new SongQueueRepositoryFileSystemImpl(appProperties.getDataDir());
-  }
-
-  @Bean
-  @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "postgres")
-  public SongQueueRepository songQueueRepositoryPostgresImpl() {
-    
-    return new SongQueueRepositoryPostgresImpl();
+    return new SongQueueRepositoryFileSystemImpl(appProperties.getDataDir(), songLibraryService);
   }
 
   // ── User repository ───────────────────────────────────────────────────────
