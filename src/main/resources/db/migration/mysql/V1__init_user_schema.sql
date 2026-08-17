@@ -12,20 +12,14 @@ CREATE TABLE persistent_identity_seq (
 
 INSERT INTO persistent_identity_seq (next_val) VALUES (1);
 
-CREATE TABLE user_root (
-    persistent_identity INT PRIMARY KEY
-) ENGINE=InnoDB;
-
 CREATE TABLE users (
     persistent_identity INT PRIMARY KEY,
-    user_root_id        INT,
     first_name           VARCHAR(255) NOT NULL,
     last_name            VARCHAR(255) NOT NULL,
     email_address        VARCHAR(255) NOT NULL UNIQUE,
     password_hash        VARCHAR(255) NOT NULL,
     num_credits          INT NOT NULL,
-    role                 VARCHAR(255) NOT NULL,
-    CONSTRAINT fk_users_user_root FOREIGN KEY (user_root_id) REFERENCES user_root (persistent_identity)
+    role                 VARCHAR(255) NOT NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE playlists (

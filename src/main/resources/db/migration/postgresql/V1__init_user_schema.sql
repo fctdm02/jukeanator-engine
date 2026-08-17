@@ -4,13 +4,8 @@
 -- database (MySQL) that has no native CREATE SEQUENCE.
 CREATE SEQUENCE persistent_identity_seq START WITH 1 INCREMENT BY 1;
 
-CREATE TABLE user_root (
-    persistent_identity INTEGER PRIMARY KEY
-);
-
 CREATE TABLE users (
     persistent_identity INTEGER PRIMARY KEY,
-    user_root_id        INTEGER REFERENCES user_root (persistent_identity),
     first_name          VARCHAR(255) NOT NULL,
     last_name            VARCHAR(255) NOT NULL,
     email_address        VARCHAR(255) NOT NULL UNIQUE,

@@ -13,7 +13,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.OrderColumn;
@@ -34,12 +33,6 @@ public class UserEntity extends AbstractPersistentEntity {
   private static final long serialVersionUID = 1L;
 
   private static final Logger log = LoggerFactory.getLogger(UserEntity.class);
-
-  // Persistence-only back-reference to the singleton UserRootEntity row. Kept in sync solely by
-  // UserRootEntity.addUser() -- domain code never touches it directly.
-  @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "user_root_id")
-  private UserRootEntity userRoot;
 
   @Column(name = "first_name", nullable = false)
   private String firstName;
@@ -88,10 +81,6 @@ public class UserEntity extends AbstractPersistentEntity {
   private UserRole role = UserRole.ROLE_USER;
 
   protected UserEntity() {} // for JPA
-
-  void setUserRoot(UserRootEntity userRoot) {
-    this.userRoot = userRoot;
-  }
 
   public UserEntity(Integer persistentIdentity, String firstName, String lastName,
       String emailAddress, String passwordHash, Integer numCredits, UserRole role) {
