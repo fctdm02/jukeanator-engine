@@ -205,16 +205,20 @@ public class WinampMediaPlayer implements Player {
     this.currentVolume = clampVolume(initialVolume);
 
     try {
-      HWND hwnd = launchWinamp();
+      // If winamp.exe is already running (e.g. left over from a previous app run), attach to
+      // that instance instead of spawning another winamp.exe process.
+      HWND hwnd = findWinampWindow();
+      if (hwnd == null) {
+        hwnd = launchWinamp();
+      }
       if (hwnd == null) {
         throw new RuntimeException(
             "Winamp window did not appear after launch at startup (waited 8s).");
       }
       applyVolume(hwnd, currentVolume);
 
-      // launchWinamp() may have attached to a Winamp instance left running from a previous
-      // (e.g. crashed/killed) application run rather than starting a fresh one — Winamp is
-      // single-instance, so relaunching it just hands off to the existing window. That leftover
+      // The window found above may belong to a Winamp instance left running from a previous
+      // (e.g. crashed/killed) application run rather than one we just launched. That leftover
       // instance can still have an old song loaded (playing, paused, or already finished) that
       // this session never told it to play, and our end-of-track poll loop only runs while a
       // song started via playSongMedia() is active — so a leftover song finishing on its own
