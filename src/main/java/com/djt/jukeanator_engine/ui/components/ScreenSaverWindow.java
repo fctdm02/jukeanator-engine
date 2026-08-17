@@ -169,6 +169,13 @@ public class ScreenSaverWindow extends JWindow {
     moveFloatingPanel();
 
     moveTimer = new Timer(MOVE_INTERVAL_MS, e -> {
+      // Only do work while actually showing — in particular, while hibernation
+      // is active this window is hidden and must stay fully idle rather than
+      // continuing to refresh content in the background (screensaver and
+      // hibernation are mutually exclusive).
+      if (!isVisible()) {
+        return;
+      }
       // Always reposition the panel to prevent burn-in.
       // When no song is playing, also pick a fresh random cover art so the
       // screensaver shows variety instead of the same album every 30 seconds.

@@ -387,6 +387,14 @@ public class JukeANatorFrame extends JFrame {
 
           () -> SwingUtilities.invokeLater(() -> {
 
+            // Hibernation and the screen-saver are mutually exclusive — the
+            // hibernation overlay already owns the screen during the
+            // hibernate window, so an idle timeout firing during (or right as
+            // we enter) hibernation must not pop the screensaver on top of it.
+            if (hibernationActive) {
+              return;
+            }
+
             // Don't cover the Admin panel (tab index 6) — a technician reading
             // or working the screen with no mouse/keyboard activity shouldn't
             // get interrupted by the screensaver.
