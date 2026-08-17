@@ -13,7 +13,7 @@ public class LocationRootEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
-  public static final String LOCATION_LIST_FILENAME = "JukeANator_Locations.oos";
+  public static final String LOCATION_LIST_FILENAME = "JukeANator_Locations.json";
 
   private TreeMap<String, LocationEntity> locations = new TreeMap<>();
 
