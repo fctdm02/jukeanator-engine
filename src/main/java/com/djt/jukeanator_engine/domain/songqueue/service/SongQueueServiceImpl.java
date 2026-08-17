@@ -13,6 +13,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.djt.jukeanator_engine.domain.backgroundmusic.exception.BackgroundMusicServiceException;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicService;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
@@ -268,7 +269,17 @@ public class SongQueueServiceImpl
       attempts++;
 
       // ── Draw one core background-music song ──────────────────────────────
-      SongFileEntity coreSong = backgroundMusicService.getNextSong();
+      SongFileEntity coreSong;
+      try {
+        coreSong = backgroundMusicService.getNextSong();
+      } catch (BackgroundMusicServiceException bmse) {
+        // No eligible background-music candidate could be resolved against the song library
+        // (e.g. the library is empty/stale). Stop trying rather than let this fail queue
+        // seeding — and, during initializeInternal(), application startup itself.
+        log.warn("autoPopulateQueue: could not get next background music song, stopping: {}",
+            bmse.getMessage());
+        break;
+      }
 
       Integer coreAlbumId = coreSong.getAlbum().getPersistentIdentity();
       Integer coreSongId = coreSong.getPersistentIdentity();

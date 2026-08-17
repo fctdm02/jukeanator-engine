@@ -318,21 +318,54 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * {@link #handleSongPlaybackStartedEvent}) once it actually starts playing, since there is no
    * guarantee a queued song will ever be played (e.g. the queue is flushed, the jukebox goes into
    * hibernation, or the application restarts before its turn comes up).
+   *
+   * <p>
+   * A background-music entry can reference a path that is no longer present in the song library
+   * (e.g. the library was rescanned/reloaded and is stale relative to {@code BackgroundMusic.TXT}).
+   * Such candidates are skipped rather than allowed to fail the whole call — one bad path should
+   * not prevent every other eligible song from being selected, and previously this crashed
+   * application startup via {@code SongQueueServiceImpl}'s cold-start queue seeding.
    */
   @Override
   public SongFileEntity getNextSong() {
 
-    try {
+    Set<Integer> triedIds = new HashSet<>();
+    BackgroundMusicServiceException lastNotFoundFailure = null;
 
-      Integer chosenId = pickNextEligibleBackgroundId();
+    int maxAttempts = Math.max(1, allSongs.size());
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+
+      Integer chosenId;
+      try {
+        chosenId = pickNextEligibleBackgroundId(triedIds);
+      } catch (Exception e) {
+        if (lastNotFoundFailure != null) {
+          throw lastNotFoundFailure;
+        }
+        throw new BackgroundMusicServiceException(
+            "Cannot get next background music song, error: " + e.getMessage(), e);
+      }
+
       BackgroundMusicSongEntity chosen = songsById.get(chosenId);
 
-      return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalizedPath(chosen));
-
-    } catch (Exception e) {
-      throw new BackgroundMusicServiceException(
-          "Cannot get next background music song, error: " + e.getMessage(), e);
+      try {
+        return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalizedPath(chosen));
+      } catch (EntityDoesNotExistException ednee) {
+        log.warn(
+            "getNextSong: background music song id {} not found in song library, path: {}, "
+                + "skipping and trying another candidate",
+            chosenId, chosen.getSongFilePath());
+        triedIds.add(chosenId);
+        lastNotFoundFailure = new BackgroundMusicServiceException(
+            "Cannot get next background music song, error: " + ednee.getMessage(), ednee);
+      } catch (Exception e) {
+        throw new BackgroundMusicServiceException(
+            "Cannot get next background music song, error: " + e.getMessage(), e);
+      }
     }
+
+    throw lastNotFoundFailure != null ? lastNotFoundFailure
+        : new BackgroundMusicServiceException("No background music songs available");
   }
 
   /**
@@ -347,8 +380,12 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * survives a restart even if none of the reset songs happen to be replayed before then. Since
    * song popularity may have shifted over a full cycle, the smart-additions pool is refreshed at
    * the same time — see {@link #refreshSmartAdditionPool()}.
+   *
+   * @param excludedIds ids to leave out of consideration, e.g. candidates already tried and
+   *        rejected earlier in the same {@link #getNextSong()} call because their path could not
+   *        be found in the song library
    */
-  private Integer pickNextEligibleBackgroundId() {
+  private Integer pickNextEligibleBackgroundId(Set<Integer> excludedIds) {
 
     if (notPlayedIds.isEmpty()) {
       for (BackgroundMusicSongEntity song : allSongs) {
@@ -366,11 +403,18 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       throw new BackgroundMusicServiceException("No background music songs available");
     }
 
-    List<Integer> eligible = notPlayedIds.stream()
+    List<Integer> notExcluded = notPlayedIds.stream().filter(id -> !excludedIds.contains(id))
+        .collect(Collectors.toList());
+
+    if (notExcluded.isEmpty()) {
+      throw new BackgroundMusicServiceException("No background music songs available");
+    }
+
+    List<Integer> eligible = notExcluded.stream()
         .filter(id -> !isCurrentlyQueued(songsById.get(id)))
         .collect(Collectors.toList());
 
-    return pickRandom(eligible.isEmpty() ? notPlayedIds : eligible);
+    return pickRandom(eligible.isEmpty() ? notExcluded : eligible);
   }
 
   private boolean isCurrentlyQueued(BackgroundMusicSongEntity song) {
@@ -419,7 +463,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * Selection draws from the whole smart-additions pool (built up-front from every source song in
    * {@code BackgroundMusic.TXT} — see {@link #refreshSmartAdditionPool()}), not just candidates
    * seeded from {@code coreSong}. When every smart song has been played this cycle, their
-   * {@code timeLastPlayed} is simply reset (mirroring {@link #pickNextEligibleBackgroundId()}) —
+   * {@code timeLastPlayed} is simply reset (mirroring {@link #pickNextEligibleBackgroundId(Set)}) —
    * a full recompute only happens when the core background-music list itself cycles.
    */
   @Override
@@ -485,7 +529,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * <ul>
    * <li>at startup, when {@code SmartBackgroundMusicSongs.json} does not yet exist</li>
    * <li>whenever the core background-music list itself finishes a full played cycle (see
-   * {@link #pickNextEligibleBackgroundId()}), since song popularity may have shifted</li>
+   * {@link #pickNextEligibleBackgroundId(Set)}), since song popularity may have shifted</li>
    * </ul>
    *
    * <p>
