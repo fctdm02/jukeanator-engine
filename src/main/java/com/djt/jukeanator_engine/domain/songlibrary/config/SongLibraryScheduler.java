@@ -18,14 +18,14 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
  * headless/location-agnostic and doesn't own a local song library to persist.
  */
 @Component
-public class SongLibraryStatisticsScheduler {
+public class SongLibraryScheduler {
 
-  private static final Logger log = LoggerFactory.getLogger(SongLibraryStatisticsScheduler.class);
+  private static final Logger log = LoggerFactory.getLogger(SongLibraryScheduler.class);
 
   private final AppProperties appProperties;
   private final SongLibraryService songLibraryService;
 
-  public SongLibraryStatisticsScheduler(
+  public SongLibraryScheduler(
       AppProperties appProperties, SongLibraryService songLibraryService) {
     this.appProperties = appProperties;
     this.songLibraryService = songLibraryService;
