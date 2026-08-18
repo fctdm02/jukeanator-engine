@@ -1,31 +1,7 @@
 # src/main/resources/application-mysql.yml
 #
-# Activate with: --spring.profiles.active=mysql (or SPRING_PROFILES_ACTIVE=mysql)
-# Switches the user/location repositories to their JPA implementations and points them at a real
-# MySQL instance. Credentials are never hardcoded here -- override via the DB_* environment
-# variables below for anything beyond local dev. Requires a MySQL server reachable at DB_URL with
-# the schema created by src/main/resources/db/migration/mysql/V1__init_user_schema.sql and
-# V2__init_location_schema.sql (run automatically by Flyway on startup).
-# sudo apt update
-# sudo apt install mysql-server
-# sudo mysql_secure_installation
-# flatpak install flathub io.dbeaver.DBeaverCommunity
-# sudo systemctl status mysql
-
-user:
-  repository-type: jpa
-
-location:   # only takes effect when app.mode is master
-  repository-type: jpa
-
-spring:
-  datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/jukeanator}
-    username: ${DB_USERNAME:jukeanator}
-    password: ${DB_PASSWORD:}
-    driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
-  jpa:
-    hibernate:
-      ddl-auto: validate   # Flyway owns the schema; Hibernate only checks the mapping matches
-  # spring.flyway.locations (classpath:db/migration/{vendor}) is set in the base application.yml
-  # and resolves to db/migration/mysql once this datasource is active.
+# RETIRED -- no longer needed. MySQL is now the unconditional default in application.yml (spring
+# .datasource.*, spring.jpa.hibernate.ddl-auto, user/location repository-type: jpa), so nothing
+# activates this profile anymore. It's kept as an empty placeholder only because this tooling can't
+# delete files on your machine -- safe to delete this file yourself (git rm
+# src/main/resources/application-mysql.yml).

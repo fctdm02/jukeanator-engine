@@ -1,14 +1,18 @@
 package com.djt.jukeanator_engine.domain.songqueue.config;
 
-import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+
 import com.djt.jukeanator_engine.config.AppProperties;
+import com.djt.jukeanator_engine.config.NotMasterModeCondition;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+
+import jakarta.annotation.PreDestroy;
 
 /**
  * On slave/standalone instances, saves the song queue to disk on shutdown so it can be restored
@@ -16,6 +20,7 @@ import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
  * headless/location-agnostic and doesn't own a local song queue to persist.
  */
 @Component
+@Conditional(NotMasterModeCondition.class)   // exists everywhere except master
 public class SongQueueScheduler {
 
   private static final Logger log = LoggerFactory.getLogger(SongQueueScheduler.class);

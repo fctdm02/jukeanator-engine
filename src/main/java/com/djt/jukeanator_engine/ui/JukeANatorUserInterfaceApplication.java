@@ -1,23 +1,28 @@
 package com.djt.jukeanator_engine.ui;
 
+import java.util.List;
+
 import javax.swing.SwingUtilities;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
+
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
-import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.djt.jukeanator_engine.ui.event.JukeANatorEventListener;
 import com.djt.jukeanator_engine.ui.security.SwingSecurityUtil;
-import java.util.List;
 
 @Component
+@ConditionalOnProperty(name = "app.ui-enabled", havingValue = "true")
 public class JukeANatorUserInterfaceApplication {
 
   private static final Logger log = LoggerFactory.getLogger(JukeANatorUserInterfaceApplication.class);

@@ -41,7 +41,7 @@ import com.djt.jukeanator_engine.domain.user.service.UserService;
  */
 @RestController
 @RequestMapping("/api/locations/{locationId}/song-queue")
-@ConditionalOnProperty(name = "app.mode", havingValue = "master")
+@ConditionalOnProperty(name = "app.mode", havingValue = "master")   // exists only on master
 public class LocationScopedSongQueueController {
 
   private final LocationServiceRegistry locationServiceRegistry;

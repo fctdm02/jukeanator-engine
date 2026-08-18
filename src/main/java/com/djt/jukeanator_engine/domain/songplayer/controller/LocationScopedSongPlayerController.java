@@ -1,12 +1,14 @@
 package com.djt.jukeanator_engine.domain.songplayer.controller;
 
 import static java.util.Objects.requireNonNull;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
 import com.djt.jukeanator_engine.domain.location.service.LocationServiceRegistry;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlaybackStatusDto;
@@ -20,7 +22,7 @@ import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlaybackStatusDto;
  */
 @RestController
 @RequestMapping("/api/locations/{locationId}/song-player")
-@ConditionalOnProperty(name = "app.mode", havingValue = "master")
+@ConditionalOnProperty(name = "app.mode", havingValue = "master")   // exists only on master
 public class LocationScopedSongPlayerController {
 
   private final LocationServiceRegistry locationServiceRegistry;

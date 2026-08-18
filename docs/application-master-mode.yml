@@ -1,8 +1,8 @@
 # src/main/resources/application.yml
 
 app:
-  ui-enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
-  mode: standalone   # standalone | master | slave
+  ui-enabled: false   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
+  mode: master   # standalone | master | slave
   master-instance-url: ~   # required if mode=slave, e.g. https://jukeanator.com
   location-id: ~            # required if mode=slave, assigned at provisioning
   location-api-key: ~       # required if mode=slave, issued at provisioning
@@ -94,10 +94,10 @@ song-player:
   line-in-volume: 75  
 
 user:
-  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
+  repository-type: jpa   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
 
 location:   # repository/service beans exist regardless of app.mode; see LocationConfig
-  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
+  repository-type: jpa   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
   storage-root: ~   # defaults under app.data-dir/locations when unset
   command-timeout-ms: 10000   # master-only: how long to wait for a slave to reply to a command
 

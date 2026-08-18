@@ -1,11 +1,15 @@
 package com.djt.jukeanator_engine.domain.songplayer.controller;
 
 import static java.util.Objects.requireNonNull;
+
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.djt.jukeanator_engine.config.NotMasterModeCondition;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlaybackStatusDto;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
@@ -15,6 +19,7 @@ import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
  */
 @RestController
 @RequestMapping("/api/song-player")
+@Conditional(NotMasterModeCondition.class)   // exists everywhere except master
 public class SongPlayerController {
 
   private final SongPlayerService songPlayerService;

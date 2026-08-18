@@ -3,6 +3,7 @@ package com.djt.jukeanator_engine.config;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -206,6 +207,7 @@ public class AppConfig {
 
   @Bean
   @Primary
+  @Conditional(NotMasterModeCondition.class)
   public BackgroundMusicService backgroundMusicService(
       AppProperties appProperties,
       BackgroundMusicProperties backgroundMusicProperties,
@@ -225,6 +227,7 @@ public class AppConfig {
 
   @Bean
   @Primary
+  @Conditional(NotMasterModeCondition.class)
   public SongQueueService songQueueService(
       AppProperties appProperties,
       SongQueueProperties songQueueProperties,
@@ -246,6 +249,7 @@ public class AppConfig {
 
   @Bean
   @Primary
+  @Conditional(NotMasterModeCondition.class)
   public SongPlayerService songPlayerService(
       SongPlayerProperties songPlayerProperties,
       SongQueueService songQueueService,
@@ -283,6 +287,7 @@ public class AppConfig {
  
   @Bean
   @Primary
+  @Conditional(NotMasterModeCondition.class)
   public MasterVolumeService masterVolumeService() {
     
     OSType osType = OperatingSystemDetector.getOperatingSystem();
@@ -299,6 +304,7 @@ public class AppConfig {
 
   @Bean
   @Primary
+  @Conditional(NotMasterModeCondition.class)
   public LineInService lineInService(SongPlayerProperties songPlayerProperties) {
     
     return new LineInServiceImpl(
@@ -309,6 +315,7 @@ public class AppConfig {
   
   @Bean
   @Primary
+  @Conditional(NotMasterModeCondition.class)
   public JukeboxAudioCoordinator jukeboxAudioCoordinator(
       LineInService lineInService,
       SongQueueService songQueueService,

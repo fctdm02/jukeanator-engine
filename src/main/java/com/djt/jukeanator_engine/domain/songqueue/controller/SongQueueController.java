@@ -1,8 +1,11 @@
 package com.djt.jukeanator_engine.domain.songqueue.controller;
 
 import static java.util.Objects.requireNonNull;
+
 import java.util.List;
+
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.djt.jukeanator_engine.config.NotMasterModeCondition;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
@@ -24,6 +29,7 @@ import com.djt.jukeanator_engine.domain.user.service.UserService;
  */
 @RestController
 @RequestMapping("/api/song-queue")
+@Conditional(NotMasterModeCondition.class)   // exists everywhere except master
 public class SongQueueController {
 
   private final SongQueueService songQueueService;

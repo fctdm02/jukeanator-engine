@@ -1,8 +1,11 @@
 package com.djt.jukeanator_engine.web.event;
 
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
+
+import com.djt.jukeanator_engine.config.NotMasterModeCondition;
 import com.djt.jukeanator_engine.domain.common.security.LocalPrincipal;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
@@ -24,6 +27,7 @@ import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
  * domain events over STOMP topics instead of updating Swing components.
  */
 @Component
+@Conditional(NotMasterModeCondition.class)
 public class WebSocketEventBroadcaster {
 
   private final SimpMessagingTemplate messagingTemplate;

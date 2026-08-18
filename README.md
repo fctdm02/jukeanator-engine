@@ -14,6 +14,21 @@ java -jar target/jukeanator-engine-0.0.1-SNAPSHOT.war
 sudo systemctl start docker
 ```
 
+# Master Mode
+Setting up MySQL database for first time use:
+
+```
+CREATE DATABASE IF NOT EXISTS jukeanator;
+
+CREATE USER IF NOT EXISTS 'jukeanator'@'%' IDENTIFIED BY 'password';
+CREATE USER IF NOT EXISTS 'jukeanator'@'localhost' IDENTIFIED BY 'password';
+
+GRANT ALL PRIVILEGES ON jukeanator.* TO 'jukeanator'@'%';
+GRANT ALL PRIVILEGES ON jukeanator.* TO 'jukeanator'@'localhost';
+
+FLUSH PRIVILEGES;
+```
+
 # Getting Started
 
 ### Reference Documentation
