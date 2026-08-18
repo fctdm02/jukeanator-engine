@@ -45,12 +45,6 @@ public class RootFolderEntity extends FolderEntity {
   // Used to load playlists into the queue
   private transient Map<String, SongFileEntity> songsByPath;
 
-  /*
-  public RootFolderEntity(String rootPath) {
-    super(null, rootPath);
-  }
-  */
-  
   public RootFolderEntity(String locationName, String rootPath) {
     super(null, rootPath);
     this.locationName = locationName;
