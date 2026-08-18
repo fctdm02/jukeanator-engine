@@ -83,9 +83,9 @@ song-player:
 user:
   repository-type: filesystem   # filesystem | jpa (jpa works against Postgres or MySQL -- see spring.datasource.*)
 
-location:   # only used when app.mode is master or slave
+location:   # repository/service beans exist regardless of app.mode; see LocationConfig
   repository-type: filesystem   # filesystem | jpa (jpa works against Postgres or MySQL -- see spring.datasource.*)
-  storage-root: ~   # master-only, defaults under app.root-path-* /locations when unset
+  storage-root: ~   # defaults under app.data-dir/locations when unset
   command-timeout-ms: 10000   # master-only: how long to wait for a slave to reply to a command
 
 user-interface:

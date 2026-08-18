@@ -10,7 +10,11 @@ import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
 
 /**
- * Master-only. Provisions locations and receives their library syncs.
+ * Provisions locations and receives their library syncs. {@link #registerLocation} and
+ * {@link #listLocations} are usable in any {@code app.mode} — e.g. a standalone/slave instance can
+ * register a location locally so its JSON persistence gives the operator a ready-made record to
+ * turn into a SQL insert against the master's hosted database. The sync-receiving methods below are
+ * meaningful only when this instance is the master actually being synced to by slaves.
  *
  * @author tmyers
  */

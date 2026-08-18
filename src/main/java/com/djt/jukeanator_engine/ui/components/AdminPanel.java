@@ -49,6 +49,9 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
+import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
@@ -71,6 +74,7 @@ public class AdminPanel extends JPanel {
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
   private final UserService userService;
+  private final LocationService locationService;
   private final CreditManager creditManager;
   private final Frame ownerFrame;
   private final ImageLoader imageLoader;
@@ -126,13 +130,15 @@ public class AdminPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   public AdminPanel(Frame ownerFrame, SongLibraryService songLibraryService,
       SongQueueService songQueueService, SongPlayerService songPlayerService,
-      UserService userService, CreditManager creditManager, ImageLoader imageLoader) {
+      UserService userService, LocationService locationService, CreditManager creditManager,
+      ImageLoader imageLoader) {
 
     this.ownerFrame = ownerFrame;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
     this.userService = userService;
+    this.locationService = locationService;
     this.creditManager = creditManager;
     this.imageLoader = imageLoader;
 
@@ -336,6 +342,7 @@ public class AdminPanel extends JPanel {
     strip.add(sideButton("Rescan\nLibrary", ColorTheme.get().accentViolet, e -> doRescan()));
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton("Add Admin\nUser", ColorTheme.get().accentGold, e -> doAddAdminUser()));
+    strip.add(sideButton("Add\nLocation", ColorTheme.get().accentGold, e -> doAddLocation()));
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton("⊟ Minimize", ColorTheme.get().accentBlue, e -> doMinimize()));
     strip.add(sideButton("✕ Exit", ColorTheme.get().accentRed, e -> doExit()));
@@ -635,6 +642,242 @@ public class AdminPanel extends JPanel {
               ex.getMessage() != null ? ex.getMessage() : "Could not create admin user."));
         }
       });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // LOCATION ACTIONS (LocationService)
+  // ─────────────────────────────────────────────────────────────────────────
+  private void doAddLocation() {
+    new AddLocationDialog(ownerFrame).setVisible(true);
+  }
+
+  /**
+   * Custom (non-{@code JOptionPane}) modal prompt collecting the fields for a
+   * {@link RegisterLocationRequest}, then calling
+   * {@link LocationService#registerLocation(RegisterLocationRequest)}. Available regardless of
+   * {@code app.mode} — on a standalone/slave instance, this just appends the location to this
+   * instance's own JSON-backed location store, giving the operator a ready-made record (including
+   * the {@code apiKeyHash}) to hand-write into a SQL insert against the master's hosted database.
+   * On success, the response's {@code apiKey} is shown in a selectable field since it is returned
+   * exactly once and can never be recovered afterward — only its hash is persisted.
+   */
+  private class AddLocationDialog extends JDialog {
+
+    private static final long serialVersionUID = 1L;
+
+    private final JTextField nameField = new JTextField(18);
+    private final JTextField latitudeField = new JTextField(18);
+    private final JTextField longitudeField = new JTextField(18);
+    private final JLabel errorLabel = new JLabel(" ");
+
+    AddLocationDialog(Frame owner) {
+      super(owner, "Add Location", true);
+
+      getContentPane().setBackground(ColorTheme.get().bgOverlayCard);
+      setLayout(new BorderLayout(0, 16));
+      ((JPanel) getContentPane()).setBorder(new EmptyBorder(20, 24, 16, 24));
+
+      JLabel title = new JLabel("Register Location");
+      title.setForeground(ColorTheme.get().accentGold);
+      title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+      add(title, BorderLayout.NORTH);
+
+      add(buildFieldsPanel(), BorderLayout.CENTER);
+      add(buildButtonRow(), BorderLayout.SOUTH);
+
+      getRootPane().registerKeyboardAction(e -> dispose(),
+          javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+          javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+      pack();
+      setResizable(false);
+      setLocationRelativeTo(owner);
+    }
+
+    private JPanel buildFieldsPanel() {
+
+      JPanel fields = new JPanel(new GridBagLayout());
+      fields.setOpaque(false);
+
+      GridBagConstraints c = new GridBagConstraints();
+      c.insets = new Insets(6, 6, 6, 6);
+      c.anchor = GridBagConstraints.WEST;
+
+      addFieldRow(fields, c, 0, "Name:", nameField);
+      addFieldRow(fields, c, 1, "Latitude:", latitudeField);
+      addFieldRow(fields, c, 2, "Longitude:", longitudeField);
+
+      c.gridx = 0;
+      c.gridy = 3;
+      c.gridwidth = 2;
+      c.insets = new Insets(2, 6, 0, 6);
+      errorLabel.setForeground(ColorTheme.get().accentRed);
+      errorLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      fields.add(errorLabel, c);
+
+      return fields;
+    }
+
+    private void addFieldRow(JPanel fields, GridBagConstraints c, int row, String labelText,
+        JTextField field) {
+
+      JLabel label = new JLabel(labelText);
+      label.setForeground(ColorTheme.get().textSecondary);
+      label.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
+
+      field.setForeground(ColorTheme.get().textPrimary);
+      field.setBackground(ColorTheme.get().bgFieldDark);
+      field.setCaretColor(ColorTheme.get().accentBlue);
+      field.setBorder(BorderFactory.createCompoundBorder(
+          BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
+          new EmptyBorder(4, 6, 4, 6)));
+
+      c.gridx = 0;
+      c.gridy = row;
+      c.gridwidth = 1;
+      fields.add(label, c);
+
+      c.gridx = 1;
+      fields.add(field, c);
+    }
+
+    private JPanel buildButtonRow() {
+
+      JButton registerBtn = new JButton("Register Location");
+      styleOverlayButton(registerBtn);
+      registerBtn.addActionListener(e -> attemptRegister());
+
+      JButton cancelBtn = new JButton("Cancel");
+      styleOverlayButton(cancelBtn);
+      cancelBtn.addActionListener(e -> dispose());
+
+      JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
+      row.setOpaque(false);
+      row.add(registerBtn);
+      row.add(cancelBtn);
+      return row;
+    }
+
+    private void attemptRegister() {
+
+      String name = nameField.getText().trim();
+      String latitudeText = latitudeField.getText().trim();
+      String longitudeText = longitudeField.getText().trim();
+
+      if (name.isEmpty() || latitudeText.isEmpty() || longitudeText.isEmpty()) {
+        errorLabel.setText("All fields are required.");
+        return;
+      }
+
+      final double latitude;
+      final double longitude;
+      try {
+        latitude = Double.parseDouble(latitudeText);
+        longitude = Double.parseDouble(longitudeText);
+      } catch (NumberFormatException nfe) {
+        errorLabel.setText("Latitude and longitude must be numbers.");
+        return;
+      }
+
+      if (latitude < -90 || latitude > 90) {
+        errorLabel.setText("Latitude must be between -90 and 90.");
+        return;
+      }
+      if (longitude < -180 || longitude > 180) {
+        errorLabel.setText("Longitude must be between -180 and 180.");
+        return;
+      }
+
+      RegisterLocationRequest request =
+          new RegisterLocationRequest(name, Double.valueOf(latitude), Double.valueOf(longitude));
+
+      SwingSecurityUtil.runAsync(() -> {
+        try {
+          ProvisionedLocationDto provisioned = locationService.registerLocation(request);
+          SwingUtilities.invokeLater(() -> showProvisionedResult(provisioned));
+        } catch (Exception ex) {
+          SwingUtilities.invokeLater(() -> errorLabel.setText(
+              ex.getMessage() != null ? ex.getMessage() : "Could not register location."));
+        }
+      });
+    }
+
+    /**
+     * Swaps the form for a one-time result view. {@code apiKey} is never recoverable after this
+     * dialog closes — only its bcrypt hash is persisted — so it is shown here in a selectable
+     * (copyable) field rather than a transient overlay toast that the operator could dismiss before
+     * copying it down.
+     */
+    private void showProvisionedResult(ProvisionedLocationDto provisioned) {
+
+      getContentPane().removeAll();
+
+      JLabel resultTitle = new JLabel("Location Registered");
+      resultTitle.setForeground(ColorTheme.get().accentGreen);
+      resultTitle
+          .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+      add(resultTitle, BorderLayout.NORTH);
+
+      JPanel result = new JPanel(new GridBagLayout());
+      result.setOpaque(false);
+      GridBagConstraints c = new GridBagConstraints();
+      c.insets = new Insets(6, 6, 6, 6);
+      c.anchor = GridBagConstraints.WEST;
+
+      addReadOnlyRow(result, c, 0, "Location ID:", provisioned.locationId());
+      addReadOnlyRow(result, c, 1, "API Key:", provisioned.apiKey());
+
+      JLabel warning = new JLabel("<html><body style='width: 260px;'>Copy this API key now "
+          + "— it will not be shown again. Only its hash is saved.</body></html>");
+      warning.setForeground(ColorTheme.get().accentOrange);
+      warning.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      c.gridx = 0;
+      c.gridy = 2;
+      c.gridwidth = 2;
+      c.insets = new Insets(12, 6, 0, 6);
+      result.add(warning, c);
+
+      add(result, BorderLayout.CENTER);
+
+      JButton doneBtn = new JButton("Done");
+      styleOverlayButton(doneBtn);
+      doneBtn.addActionListener(e -> dispose());
+      JPanel buttonRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
+      buttonRow.setOpaque(false);
+      buttonRow.add(doneBtn);
+      add(buttonRow, BorderLayout.SOUTH);
+
+      getContentPane().revalidate();
+      getContentPane().repaint();
+      pack();
+      setLocationRelativeTo(ownerFrame);
+    }
+
+    private void addReadOnlyRow(JPanel panel, GridBagConstraints c, int row, String labelText,
+        String value) {
+
+      JLabel label = new JLabel(labelText);
+      label.setForeground(ColorTheme.get().textSecondary);
+      label.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
+
+      JTextField field = new JTextField(value, 24);
+      field.setEditable(false);
+      field.setForeground(ColorTheme.get().textPrimary);
+      field.setBackground(ColorTheme.get().bgFieldDark);
+      field.setCaretColor(ColorTheme.get().accentBlue);
+      field.setBorder(BorderFactory.createCompoundBorder(
+          BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
+          new EmptyBorder(4, 6, 4, 6)));
+      field.setCaretPosition(0);
+
+      c.gridx = 0;
+      c.gridy = row;
+      c.gridwidth = 1;
+      panel.add(label, c);
+
+      c.gridx = 1;
+      panel.add(field, c);
     }
   }
 

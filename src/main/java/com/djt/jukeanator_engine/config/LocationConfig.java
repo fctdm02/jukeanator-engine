@@ -22,15 +22,18 @@ import com.djt.jukeanator_engine.domain.location.service.LocationServiceRegistry
 import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
 
 /**
- * Wires the {@code location} domain's master-only beans. None of these beans exist unless
- * {@code app.mode=master} — standalone and slave deployments never construct them, so this
- * feature carries zero risk for existing single-tenant installs.
+ * Wires the {@code location} domain's beans. {@link LocationRepository} and {@link LocationService}
+ * are available regardless of {@code app.mode} — a standalone or slave instance can locally register
+ * a location (persisted to its own JSON/JPA store) so the operator has a ready-made record to turn
+ * into a SQL insert against the master's hosted database. The remaining beans below (slave-connection
+ * tracking, API-key auth for incoming slave traffic, and the master→slave command gateway) are
+ * meaningful only when this instance <em>is</em> the master, so they stay gated on
+ * {@code app.mode=master}.
  */
 @Configuration
 public class LocationConfig {
 
   @Bean
-  @ConditionalOnProperty(name = "app.mode", havingValue = "master")
   @ConditionalOnProperty(name = "location.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
   public LocationRepository locationRepositoryFileSystemImpl(AppProperties appProperties,
@@ -40,7 +43,6 @@ public class LocationConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "app.mode", havingValue = "master")
   @ConditionalOnProperty(name = "location.repository-type", havingValue = "jpa")
   public LocationRepository locationRepositoryJpaImpl(EntityManagerFactory entityManagerFactory,
       PlatformTransactionManager transactionManager) {
@@ -49,13 +51,11 @@ public class LocationConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "app.mode", havingValue = "master")
   public ConnectedSlaveRegistry connectedSlaveRegistry() {
     return new ConnectedSlaveRegistry();
   }
 
   @Bean
-  @ConditionalOnProperty(name = "app.mode", havingValue = "master")
   public LocationService locationService(AppProperties appProperties,
       LocationProperties locationProperties, LocationRepository locationRepository,
       PasswordEncoder passwordEncoder, ApplicationEventPublisher eventPublisher,

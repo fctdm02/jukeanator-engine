@@ -9,6 +9,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
@@ -26,6 +27,7 @@ public class JukeANatorUserInterfaceApplication {
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
   private final UserService userService;
+  private final LocationService locationService;
   private final JukeANatorEventListener jukeANatorEventListener;
 
   private JukeANatorFrame frame;
@@ -36,6 +38,7 @@ public class JukeANatorUserInterfaceApplication {
       SongQueueService songQueueService,
       SongPlayerService songPlayerService,
       UserService userService,
+      LocationService locationService,
       JukeANatorEventListener jukeANatorEventListener) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
@@ -43,6 +46,7 @@ public class JukeANatorUserInterfaceApplication {
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
     this.userService = userService;
+    this.locationService = locationService;
     this.jukeANatorEventListener = jukeANatorEventListener;
   }
 
@@ -53,7 +57,8 @@ public class JukeANatorUserInterfaceApplication {
         songLibraryService,
         songQueueService,
         songPlayerService,
-        userService);
+        userService,
+        locationService);
 
     this.jukeANatorEventListener.setFrame(frame);
     this.jukeANatorEventListener.setSongLibraryService(songLibraryService);

@@ -39,9 +39,8 @@ import com.djt.jukeanator_engine.domain.location.repository.LocationRepository;
 /**
  * Covers every method declared on {@link LocationService}, run against
  * {@link #locationServiceImpl}, a locally constructed instance with fully mocked dependencies
- * (fast, deterministic, no Spring context needed) -- {@link LocationConfig}'s beans are
- * master-mode-gated, so there is no Spring-managed {@code LocationService} bean to exercise
- * end-to-end the way {@code UserServiceTest} does for {@code UserService}.
+ * (fast, deterministic, no Spring context needed) -- unlike {@code UserServiceTest}, which exercises
+ * a Spring-managed {@code UserService} bean end-to-end.
  *
  * @author tmyers
  */

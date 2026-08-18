@@ -39,6 +39,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
@@ -54,6 +55,7 @@ public class JukeANatorFrame extends JFrame {
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
   private final UserService userService;
+  private final LocationService locationService;
 
   private final ImageLoader imageLoader = new ImageLoader();
   private static final int POPULARITY_THRESHOLD_1 = 10;
@@ -205,13 +207,15 @@ public class JukeANatorFrame extends JFrame {
   // ─────────────────────────────────────────────────────────────────────────
   public JukeANatorFrame(JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
       SongLibraryService songLibraryService, SongQueueService songQueueService,
-      SongPlayerService songPlayerService, UserService userService) {
+      SongPlayerService songPlayerService, UserService userService,
+      LocationService locationService) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
     this.userService = userService;
+    this.locationService = locationService;
 
     this.alwaysOnTop = jukeANatorUserInterfaceProperties.isAlwaysOnTop();
 
@@ -948,7 +952,7 @@ public class JukeANatorFrame extends JFrame {
   private AdminPanel buildAdminPanel() {
 
     return new AdminPanel(this, songLibraryService, songQueueService, songPlayerService,
-        userService, creditManager, imageLoader);
+        userService, locationService, creditManager, imageLoader);
   }
 
   // ============================================================
