@@ -57,7 +57,7 @@ public class JukeANatorFrame extends JFrame {
   private final UserService userService;
   private final LocationService locationService;
 
-  private final ImageLoader imageLoader = new ImageLoader();
+  private final ImageLoader imageLoader;
   private static final int POPULARITY_THRESHOLD_1 = 10;
   private static final int POPULARITY_THRESHOLD_2 = 25;
   private static final int POPULARITY_THRESHOLD_3 = 50;
@@ -208,7 +208,7 @@ public class JukeANatorFrame extends JFrame {
   public JukeANatorFrame(JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
       SongLibraryService songLibraryService, SongQueueService songQueueService,
       SongPlayerService songPlayerService, UserService userService,
-      LocationService locationService) {
+      LocationService locationService, String dataDir) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
     this.songLibraryService = songLibraryService;
@@ -216,6 +216,7 @@ public class JukeANatorFrame extends JFrame {
     this.songPlayerService = songPlayerService;
     this.userService = userService;
     this.locationService = locationService;
+    this.imageLoader = new ImageLoader(dataDir);
 
     this.alwaysOnTop = jukeANatorUserInterfaceProperties.isAlwaysOnTop();
 
@@ -1001,9 +1002,22 @@ public class JukeANatorFrame extends JFrame {
         .setPreferredSize(new Dimension(topPanelProfile.iconSize(), topPanelProfile.iconSize()));
     locationLogo.setBorder(BorderFactory.createLineBorder(ColorTheme.get().coverArtBorder, 1));
 
+    // Operator-configured logo override, e.g. dataDir/images/RockOnThirdLogo.jpg
+    ImageIcon logoIcon = null;
+    if (songLibraryService != null && songLibraryService.getSongLibraryRoot() != null
+        && songLibraryService.getSongLibraryRoot().getMetadata() != null) {
+      String logoName = songLibraryService.getSongLibraryRoot().getMetadata().getLogoName();
+      if (logoName != null && !logoName.isBlank()) {
+        logoIcon = imageLoader.loadImageFromDataDir(logoName, topPanelProfile.iconSize(),
+            topPanelProfile.iconSize());
+      }
+    }
+
     // Try JPG first
-    ImageIcon logoIcon = imageLoader.loadImage("locationLogo.jpg", topPanelProfile.iconSize(),
-        topPanelProfile.iconSize());
+    if (logoIcon == null) {
+      logoIcon = imageLoader.loadImage("locationLogo.jpg", topPanelProfile.iconSize(),
+          topPanelProfile.iconSize());
+    }
 
     // Fallback PNG
     if (logoIcon == null) {

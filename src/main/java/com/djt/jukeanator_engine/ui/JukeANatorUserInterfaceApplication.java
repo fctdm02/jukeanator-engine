@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
@@ -28,6 +29,7 @@ public class JukeANatorUserInterfaceApplication {
   private static final Logger log = LoggerFactory.getLogger(JukeANatorUserInterfaceApplication.class);
 
   private final JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties;
+  private final AppProperties appProperties;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
@@ -39,6 +41,7 @@ public class JukeANatorUserInterfaceApplication {
 
   public JukeANatorUserInterfaceApplication(
       JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
+      AppProperties appProperties,
       SongLibraryService songLibraryService,
       SongQueueService songQueueService,
       SongPlayerService songPlayerService,
@@ -47,6 +50,7 @@ public class JukeANatorUserInterfaceApplication {
       JukeANatorEventListener jukeANatorEventListener) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
+    this.appProperties = appProperties;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
@@ -63,7 +67,8 @@ public class JukeANatorUserInterfaceApplication {
         songQueueService,
         songPlayerService,
         userService,
-        locationService);
+        locationService,
+        appProperties.getDataDir());
 
     this.jukeANatorEventListener.setFrame(frame);
     this.jukeANatorEventListener.setSongLibraryService(songLibraryService);

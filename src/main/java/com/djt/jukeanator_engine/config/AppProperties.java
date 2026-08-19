@@ -126,7 +126,11 @@ public class AppProperties {
   @PostConstruct
   public void ensureDataDirExists() {
     try {
-      Files.createDirectories(Path.of(dataDir));
+      // Also creates dataDir itself, since createDirectories creates missing parents.
+      // The "images" subdirectory is where operators drop per-install image overrides
+      // (see ImageLoader.loadImageFromDataDir) -- created eagerly so it's ready to drop
+      // files into without the user having to make it themselves.
+      Files.createDirectories(Path.of(dataDir, "images"));
     } catch (IOException e) {
       throw new UncheckedIOException("Could not create data-dir: " + dataDir, e);
     }

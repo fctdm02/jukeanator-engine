@@ -382,13 +382,14 @@ public class GenrePanel extends JPanel implements TabNavigator {
         imageLabel.setIcon(cached);
       } else {
         String resource = name + ".png";
-        if (getClass().getResource(resource) != null) {
-          ImageIcon icon = imageLoader.loadImage(resource, imgSize, imgSize);
-          if (icon != null) {
-            Image transparentStrippedImage =
-                ImageLoader.createTransparentImage(icon.getImage(), true, 245);
-            icon = new ImageIcon(transparentStrippedImage);
-          }
+        ImageIcon icon = imageLoader.loadImageFromDataDir(resource, imgSize, imgSize);
+        if (icon == null && getClass().getResource(resource) != null) {
+          icon = imageLoader.loadImage(resource, imgSize, imgSize);
+        }
+        if (icon != null) {
+          Image transparentStrippedImage =
+              ImageLoader.createTransparentImage(icon.getImage(), true, 245);
+          icon = new ImageIcon(transparentStrippedImage);
           genreIconCache.put(name, icon);
           imageLabel.setIcon(icon);
         } else {

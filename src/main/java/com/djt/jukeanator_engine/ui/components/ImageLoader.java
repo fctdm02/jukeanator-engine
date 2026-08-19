@@ -5,6 +5,7 @@ import java.awt.Toolkit;
 import java.awt.image.FilteredImageSource;
 import java.awt.image.ImageProducer;
 import java.awt.image.RGBImageFilter;
+import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
@@ -18,6 +19,8 @@ public class ImageLoader {
 
   private static final int MAX_CACHE_SIZE = 1000;
 
+  private final String dataDir;
+
   public final Map<CacheKey, ImageIcon> cache = new LinkedHashMap<>(16, 0.75f, true) {
     private static final long serialVersionUID = -2034534390673299070L;
 
@@ -26,6 +29,26 @@ public class ImageLoader {
       return size() > MAX_CACHE_SIZE;
     }
   };
+
+  public ImageLoader(String dataDir) {
+    this.dataDir = dataDir;
+  }
+
+  /**
+   * Looks up an operator-supplied override image under {@code <dataDir>/images/<fileName>},
+   * letting a per-install/per-location image replace the canned defaults bundled into the WAR
+   * without a rebuild. Returns {@code null} if no {@code dataDir} is configured, no
+   * {@code fileName} was given, or no such file exists — callers should fall back to their
+   * existing classpath/default lookup in that case.
+   */
+  public ImageIcon loadImageFromDataDir(String fileName, int width, int height) {
+
+    if (dataDir == null || dataDir.isBlank() || fileName == null || fileName.isBlank()) {
+      return null;
+    }
+    String overridePath = dataDir + File.separator + "images" + File.separator + fileName;
+    return loadFilesystemImage(overridePath, width, height);
+  }
 
   public ImageIcon loadImage(String resourceName, int width, int height) {
 

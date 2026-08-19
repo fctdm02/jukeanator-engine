@@ -93,7 +93,10 @@ public class GenreDetailPanel extends JPanel {
       String resourceName = genre.getGenreName() + ".png";
       int imgW = LayoutTheme.get().detailHeaderImageW;
       int imgH = LayoutTheme.get().detailHeaderImageH;
-      genreImage = imageLoader.loadImage(resourceName, imgW, imgH);
+      genreImage = imageLoader.loadImageFromDataDir(resourceName, imgW, imgH);
+      if (genreImage == null) {
+        genreImage = imageLoader.loadImage(resourceName, imgW, imgH);
+      }
       if (genreImage != null) {
         java.awt.Image transparentStrippedImage =
             ImageLoader.createTransparentImage(genreImage.getImage(), true, 245);
