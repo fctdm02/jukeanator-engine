@@ -112,6 +112,14 @@ public class SongLibraryServiceImpl
 
   public void initialize() {
 
+    // The persisted .oos filename tracks the location's live display name (see
+    // LocationMetaDataFileEntity / docs/multi-tenant-mode.md Item 2), which lives under rootPath
+    // independent of the .oos file itself -- so we can resolve the current name via a cheap
+    // "peek" RootFolderEntity (it only reads/creates locationMetadata.txt, it doesn't scan songs)
+    // before deciding which .oos file to load.
+    RootFolderEntity locationPeek = new RootFolderEntity(this.rootPath);
+    this.locationName = locationPeek.getMetadata().getLocationName();
+
     // If we cannot load the song library from disk at startup, then assume a new install and return
     // an
     // empty songLibraryRoot folder. The application will automatically ask the user to scan for
@@ -127,10 +135,10 @@ public class SongLibraryServiceImpl
       log.error("Could not load song library from: " + rootPath
           + ", using empty song library songLibraryRoot for now, error: " + ednee.getMessage());
 
-      this.songLibraryRoot = new RootFolderEntity(this.rootPath);
+      this.songLibraryRoot = locationPeek;
       this.songLibraryRoot.initialize();
       this.libraryLoadFailedAtStartup = true;
-      
+
       this.songLibraryRepository.storeAggregateRoot(songLibraryRoot);
     }
 
@@ -153,8 +161,13 @@ public class SongLibraryServiceImpl
   // TODO: No need to restore stats if JPA repository
   private void restoreSongStatisticsIfCdStatsFileIsNewer() {
 
+    String resolvedSongLibraryPath = this.songLibraryRepository.getResolvedFilePath();
+    if (resolvedSongLibraryPath == null) {
+      return;
+    }
+
     Path cdStatsPath = Path.of(this.dataDir, RootFolderEntity.CD_STATS);
-    Path songLibraryPath = Path.of(this.dataDir, SongLibraryRepository.SONG_LIBRARY_FILENAME);
+    Path songLibraryPath = Path.of(resolvedSongLibraryPath);
 
     if (!Files.exists(cdStatsPath) || !Files.exists(songLibraryPath)) {
       return;

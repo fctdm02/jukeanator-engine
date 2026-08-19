@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine;
 
 import java.io.IOException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
@@ -25,17 +26,19 @@ import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
  * tests.
  *
  * <h3>Test fixture cleanup</h3>
- * {@link #cleanup()} deletes the serialised song-library object file written by the
- * scanner under {@code src/test/resources}.  It runs before and after the entire test
- * class so each run starts and finishes with a clean slate.
+ * {@link #cleanup()} deletes the serialised song-library object file(s) written by the
+ * scanner/repository under {@code src/test/resources}.  The persisted filename is derived from
+ * the current location name (see {@code SongLibraryRepositoryFileSystemImpl}), so this sweeps
+ * every {@code *.oos} file in the data dir rather than a single fixed name.  It runs before and
+ * after the entire test class so each run starts and finishes with a clean slate.
  *
  * @author tmyers
  */
 public abstract class AbstractServiceIntegrationTest {
 
-  /** Path to the scanner output file written under {@code app.data-dir} (see application-test.yml). */
-  private static final String SCANNER_OOS_PATH =
-      "src/test/resources/com/djt/jukeanator_engine/test-data-dir/JukeANator.oos";
+  /** {@code app.data-dir} for tests (see application-test.yml); entirely transient/gitignored. */
+  private static final String TEST_DATA_DIR =
+      "src/test/resources/com/djt/jukeanator_engine/test-data-dir";
 
   // ── Security context lifecycle ────────────────────────────────────────────
 
@@ -70,10 +73,20 @@ public abstract class AbstractServiceIntegrationTest {
   }
 
   /**
-   * Deletes the serialised object-store file produced by the song scanner so that
-   * each test run starts from a known empty state.
+   * Deletes every serialised object-store ({@code *.oos}) file produced by the song scanner /
+   * repository so that each test run starts from a known empty state.
    */
   public static void cleanup() throws IOException {
-    Files.deleteIfExists(Path.of(SCANNER_OOS_PATH));
+
+    Path dataDir = Path.of(TEST_DATA_DIR);
+    if (!Files.isDirectory(dataDir)) {
+      return;
+    }
+
+    try (DirectoryStream<Path> stream = Files.newDirectoryStream(dataDir, "*.oos")) {
+      for (Path oosFile : stream) {
+        Files.deleteIfExists(oosFile);
+      }
+    }
   }
 }

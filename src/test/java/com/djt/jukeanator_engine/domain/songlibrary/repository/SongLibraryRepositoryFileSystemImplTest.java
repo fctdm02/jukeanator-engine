@@ -1,0 +1,145 @@
+package com.djt.jukeanator_engine.domain.songlibrary.repository;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
+
+/** Unit tests for {@link SongLibraryRepositoryFileSystemImpl}. */
+public class SongLibraryRepositoryFileSystemImplTest {
+
+  // ── sanitizeLocationNameForFilename ─────────────────────────────────────
+
+  @Test
+  void sanitize_replacesSpacesWithUnderscores() {
+    assertEquals("Rock_On_Third",
+        SongLibraryRepositoryFileSystemImpl.sanitizeLocationNameForFilename("Rock On Third"));
+  }
+
+  @Test
+  void sanitize_replacesUnsafeCharactersWithUnderscores() {
+    assertEquals("Rox_on_3rd_",
+        SongLibraryRepositoryFileSystemImpl.sanitizeLocationNameForFilename("Rox/on:3rd?"));
+    assertEquals("a_b_c_d_e_f_g_h",
+        SongLibraryRepositoryFileSystemImpl.sanitizeLocationNameForFilename(
+            "a/b\\c:d*e?f\"g<h"));
+  }
+
+  @Test
+  void sanitize_fallsBackToDefault_whenNullOrBlank() {
+    assertEquals("SongLibrary", SongLibraryRepositoryFileSystemImpl.sanitizeLocationNameForFilename(null));
+    assertEquals("SongLibrary", SongLibraryRepositoryFileSystemImpl.sanitizeLocationNameForFilename("   "));
+  }
+
+  // ── loadAggregateRoot / storeAggregateRoot ──────────────────────────────
+
+  @Test
+  void loadAggregateRoot_loadsDirectly_whenExpectedFileExists(@TempDir Path basePath,
+      @TempDir Path rootPath) throws Exception {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+    repository.storeAggregateRoot(newRoot(rootPath, "Rock On Third"));
+
+    RootFolderEntity loaded = repository.loadAggregateRoot("Rock On Third");
+
+    assertEquals("Rock On Third", loaded.getLocationName());
+    assertEquals(basePath.resolve("Rock_On_Third.oos").toString(), repository.getResolvedFilePath());
+    assertTrue(Files.exists(basePath.resolve("Rock_On_Third.oos")));
+  }
+
+  @Test
+  void loadAggregateRoot_renamesOtherOosFile_whenExpectedFileMissing(@TempDir Path basePath,
+      @TempDir Path rootPath) throws Exception {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+    repository.storeAggregateRoot(newRoot(rootPath, "Rock On Third"));
+
+    Path oldPath = basePath.resolve("Rock_On_Third.oos");
+    Path renamedAwayPath = basePath.resolve("SongLibrary.oos");
+    Files.move(oldPath, renamedAwayPath);
+
+    RootFolderEntity loaded = repository.loadAggregateRoot("Rox on 3rd");
+
+    assertEquals(rootPath.toString(), loaded.getRootPath(),
+        "Deserialized content should be preserved, not just an empty new library");
+    assertFalse(Files.exists(renamedAwayPath), "Old-named file should no longer exist");
+    assertTrue(Files.exists(basePath.resolve("Rox_on_3rd.oos")), "New-named file should exist");
+    assertEquals(basePath.resolve("Rox_on_3rd.oos").toString(), repository.getResolvedFilePath());
+  }
+
+  @Test
+  void loadAggregateRoot_throws_whenNoOosFilesExist(@TempDir Path basePath) {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+
+    assertThrows(EntityDoesNotExistException.class,
+        () -> repository.loadAggregateRoot("Rock On Third"));
+  }
+
+  @Test
+  void loadAggregateRoot_choosesMostRecentlyModified_whenMultipleOtherOosFilesExist(
+      @TempDir Path basePath) throws Exception {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+
+    Path older = basePath.resolve("Older.oos");
+    Path newer = basePath.resolve("Newer.oos");
+    Files.writeString(older, "older");
+    Files.writeString(newer, "newer");
+    Files.setLastModifiedTime(older, FileTime.fromMillis(1_000));
+    Files.setLastModifiedTime(newer, FileTime.fromMillis(2_000));
+
+    // Both are unreadable as real song libraries -- the newer one should be picked and attempted
+    // (and fail on deserialization), proving selection happened before any load error surfaces.
+    EntityDoesNotExistException ex = assertThrows(EntityDoesNotExistException.class,
+        () -> repository.loadAggregateRoot("Rock On Third"));
+
+    assertTrue(ex.getMessage().contains("Newer.oos"),
+        "Should have attempted the most recently modified candidate: " + ex.getMessage());
+    assertTrue(Files.exists(older), "Non-chosen candidates should be left untouched");
+    assertTrue(Files.exists(newer));
+  }
+
+  @Test
+  void storeAggregateRoot_writesUnderCurrentLocationName(@TempDir Path basePath,
+      @TempDir Path rootPath) throws Exception {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+
+    repository.storeAggregateRoot(newRoot(rootPath, "Rox on 3rd?"));
+
+    assertTrue(Files.exists(basePath.resolve("Rox_on_3rd_.oos")));
+    assertEquals(basePath.resolve("Rox_on_3rd_.oos").toString(), repository.getResolvedFilePath());
+  }
+
+  @Test
+  void getResolvedFilePath_isNull_beforeAnyLoadOrStore(@TempDir Path basePath) {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+
+    assertNull(repository.getResolvedFilePath());
+  }
+
+  private RootFolderEntity newRoot(Path rootPath, String locationName) {
+
+    RootFolderEntity root = new RootFolderEntity(rootPath.toString());
+    root.getMetadata().setLocationName(locationName);
+    root.initialize();
+    return root;
+  }
+}

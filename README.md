@@ -6,7 +6,7 @@ The following was discovered as part of building this project:
 # Building/Running the Application
 ```
 mvn clean package -DskipTests
-java -jar target/jukeanator-engine-0.0.1-SNAPSHOT.war
+java -jar --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 jukeanator-engine-0.0.1-SNAPSHOT.war
 ```
 
 # How to start Docker
