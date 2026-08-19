@@ -24,7 +24,7 @@ public class RootFolderEntity extends FolderEntity {
 
   private static final Logger log = LoggerFactory.getLogger(RootFolderEntity.class);
   
-  private static final long serialVersionUID = 2L;
+  private static final long serialVersionUID = 3L;
 
 
   // Used to read/write CDStats file
@@ -361,14 +361,15 @@ public class RootFolderEntity extends FolderEntity {
       String rootPathWindows, String rootPathUnix) {
 
     String cdStatsPathName = dataDir + File.separator + RootFolderEntity.CD_STATS;
-    if (!fileSystemHelper.exists(cdStatsPathName)) {
 
+    int numRestored = 0;
+    if (fileSystemHelper.exists(cdStatsPathName)) {
+      numRestored =
+          restoreSongStatisticsForFile(rootPath, rootPathWindows, rootPathUnix, cdStatsPathName);
+    } else {
       System.err.println("CD stats file does not exist: " + cdStatsPathName);
-      return 0;
     }
 
-    int numRestored =
-        restoreSongStatisticsForFile(rootPath, rootPathWindows, rootPathUnix, cdStatsPathName);
     if (numRestored == 0) {
 
       numRestored = restoreSongStatisticsForFile(rootPath, rootPathWindows, rootPathUnix,

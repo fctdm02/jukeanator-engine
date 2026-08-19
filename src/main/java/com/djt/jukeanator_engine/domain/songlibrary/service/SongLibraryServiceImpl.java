@@ -601,6 +601,7 @@ public class SongLibraryServiceImpl
           this.rootPathWindows, this.rootPathUnix);
 
       this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
+      this.songLibraryRoot.storeSongStatistics(this.dataDir);
       this.songLibraryRoot.initialize();
 
       // Initialize the song library
