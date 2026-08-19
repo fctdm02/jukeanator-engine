@@ -7,10 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 
 /**
@@ -85,7 +87,7 @@ public class RootFolderEntityTest extends AbstractSongLibraryEntityTest {
 
   @Test
   void getRootPath_returnsRootPath() {
-    assertEquals(ROOT_PATH, root.getRootPath());
+    assertEquals(rootPath, root.getRootPath());
   }
 
   @Test
@@ -100,7 +102,7 @@ public class RootFolderEntityTest extends AbstractSongLibraryEntityTest {
 
   @Test
   void getNaturalIdentity_returnsRootPath() {
-    assertEquals(ROOT_PATH, root.getNaturalIdentity());
+    assertEquals(rootPath, root.getNaturalIdentity());
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -380,10 +382,11 @@ public class RootFolderEntityTest extends AbstractSongLibraryEntityTest {
   // ─────────────────────────────────────────────────────────────────────────
 
   @Test
-  void pruneNonAlbumContainingChildFolders_removesEmptyLeafFolders() throws Exception {
+  void pruneNonAlbumContainingChildFolders_removesEmptyLeafFolders(@TempDir Path pruneRootPath)
+      throws Exception {
 
     // Build a small library that has an empty branch to prune
-    RootFolderEntity pruneRoot = new RootFolderEntity("/prune-root");
+    RootFolderEntity pruneRoot = new RootFolderEntity(pruneRootPath.toString());
 
     // Genre "Rock" → Artist "Empty" (leaf, no albums) — should be pruned along with "EmptyGenre"
     GenreFolderEntity emptyGenre = new GenreFolderEntity(pruneRoot, "EmptyGenre");
@@ -416,10 +419,11 @@ public class RootFolderEntityTest extends AbstractSongLibraryEntityTest {
   }
 
   @Test
-  void pruneNonAlbumContainingChildFolders_doesNotPruneAlbumFolders() throws Exception {
+  void pruneNonAlbumContainingChildFolders_doesNotPruneAlbumFolders(@TempDir Path fullRootPath)
+      throws Exception {
 
     // Library that is fully populated — nothing to prune
-    RootFolderEntity fullRoot = new RootFolderEntity("/full-root");
+    RootFolderEntity fullRoot = new RootFolderEntity(fullRootPath.toString());
     GenreFolderEntity rock = new GenreFolderEntity(fullRoot, "Rock");
     fullRoot.addChildFolder(rock);
     ArtistFolderEntity lz = new ArtistFolderEntity(rock, "Led Zeppelin");

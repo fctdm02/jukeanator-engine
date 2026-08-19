@@ -459,9 +459,10 @@ public class SongScannerTest {
   }
 
   @Test
-  public void searchInternetForAlbumMetadataOverloadUsesParentFolderNameAndDefaultLimit() {
+  public void searchInternetForAlbumMetadataOverloadUsesParentFolderNameAndDefaultLimit(
+      @TempDir Path root) {
 
-    FolderEntity parentFolder = new FolderEntity(new RootFolderEntity("root"), "SomeArtist");
+    FolderEntity parentFolder = new FolderEntity(new RootFolderEntity(root.toString()), "SomeArtist");
     AlbumFolderEntity album = new AlbumFolderEntity(parentFolder, "SomeAlbum");
 
     when(musicBrainzClientWrapper.searchForAlbumMetadata("SomeArtist", "SomeAlbum", false, 3))

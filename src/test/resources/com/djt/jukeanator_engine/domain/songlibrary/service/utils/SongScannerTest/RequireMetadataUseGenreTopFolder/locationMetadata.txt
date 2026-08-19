@@ -1,0 +1,6 @@
+LocationID=1
+LocationName=Rock On Third
+LogoName=RockOnThirdLogo.jpg
+Latitude=42.4883
+Longitude=-83.143
+IsGeoFenced=true

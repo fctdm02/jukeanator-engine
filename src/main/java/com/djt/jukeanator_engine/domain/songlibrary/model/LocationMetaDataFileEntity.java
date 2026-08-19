@@ -27,6 +27,7 @@ public class LocationMetaDataFileEntity extends AbstractFileEntity implements Se
 
   public LocationMetaDataFileEntity(RootFolderEntity root) {
     super(root, LOCATION_METADATA_FILENAME);
+    ensureLoaded();
   }
 
   public Integer getLocationId() {
@@ -94,7 +95,8 @@ public class LocationMetaDataFileEntity extends AbstractFileEntity implements Se
     Path path = Path.of(getNaturalIdentity());
 
     if (!Files.exists(path)) {
-      isLoaded = true;
+      // No metadata file yet -- persist the defaults so the user has a file to edit.
+      writeMetadataToFileSystem();
       return;
     }
 

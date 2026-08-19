@@ -1,7 +1,9 @@
 package com.djt.jukeanator_engine.domain.songlibrary.model;
 
+import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Base fixture for tests that operate on entities drawn from a populated in-memory song library.
@@ -39,7 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
  */
 public abstract class AbstractSongLibraryEntityTest {
 
-  protected static final String ROOT_PATH = "/test-root";
+  protected String rootPath;
 
   protected static final int ALBUM_ID_LIKE_A_VIRGIN = 0;
   protected static final int ALBUM_ID_CLASSIC_ROCK_MIX = 1;
@@ -59,9 +61,10 @@ public abstract class AbstractSongLibraryEntityTest {
   protected SongFileEntity songLikeAVirgin;
 
   @BeforeEach
-  void setUpLibrary() throws Exception {
+  void setUpLibrary(@TempDir Path tempDir) throws Exception {
 
-    root = new RootFolderEntity(ROOT_PATH);
+    rootPath = tempDir.toString();
+    root = new RootFolderEntity(rootPath);
 
     GenreFolderEntity genreRock = new GenreFolderEntity(root, "Rock");
     root.addChildFolder(genreRock);
