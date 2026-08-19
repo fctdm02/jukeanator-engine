@@ -34,6 +34,11 @@ via the web/mobile app, choose "Rock on Third" for location and then interact wi
 
 Let me know if you have any questions before formulating an implementation plan.
 
+location-id: c2d40f77-41c2-4194-acbe-aed3920f66db # required if mode=slave, assigned at provisioning
+
+location-api-key: 3Onc4eEaQqOI-3OKOsnKA8aQsoFZYy9Tt4cg4ERvrkY # required if mode=slave, issued at provisioning
+
+
 
 
 
