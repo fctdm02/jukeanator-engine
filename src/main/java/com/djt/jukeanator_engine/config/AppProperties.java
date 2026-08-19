@@ -33,7 +33,7 @@ public class AppProperties {
   // library to the master and accepts remote commands over a persistent connection.
   private String mode = "standalone";
   private String masterInstanceUrl; // slave-only: e.g. https://jukeanator.com
-  private String locationId; // slave-only: assigned at provisioning
+  private Integer locationId; // slave-only: this slave's own initial guess at its locationId
   private String locationApiKey; // slave-only: secret issued at provisioning
 
   private Jwt jwt = new Jwt();
@@ -75,11 +75,11 @@ public class AppProperties {
     this.masterInstanceUrl = masterInstanceUrl;
   }
 
-  public String getLocationId() {
+  public Integer getLocationId() {
     return locationId;
   }
 
-  public void setLocationId(String locationId) {
+  public void setLocationId(Integer locationId) {
     this.locationId = locationId;
   }
 

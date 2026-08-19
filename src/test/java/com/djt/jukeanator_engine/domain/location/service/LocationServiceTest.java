@@ -46,7 +46,7 @@ import com.djt.jukeanator_engine.domain.location.repository.LocationRepository;
  */
 public class LocationServiceTest {
 
-  private static final String REGISTERED_LOCATION_ID = "11111111-1111-1111-1111-111111111111";
+  private static final Integer REGISTERED_LOCATION_ID = Integer.valueOf(1);
   private static final String REGISTERED_API_KEY_HASH = "hashed-api-key";
 
   @TempDir
@@ -68,12 +68,13 @@ public class LocationServiceTest {
     connectedSlaveRegistry = new ConnectedSlaveRegistry();
 
     locationRoot = new LocationRootEntity();
-    LocationEntity registered = new LocationEntity(Integer.valueOf(1), REGISTERED_LOCATION_ID,
+    LocationEntity registered = new LocationEntity(REGISTERED_LOCATION_ID,
         "Rock On Third", 40.0, -105.0, REGISTERED_API_KEY_HASH);
     registered.setStatus(LocationStatus.PROVISIONED);
     locationRoot.addLocation(registered);
 
     when(locationRepository.loadAggregateRoot(anyString())).thenReturn(locationRoot);
+    when(locationRepository.nextPersistentIdentity()).thenReturn(null);
 
     locationServiceImpl = new LocationServiceImpl(locationRepository, passwordEncoder,
         eventPublisher, ObjectMappers.create(), storageRoot.toString(), connectedSlaveRegistry);
@@ -146,7 +147,7 @@ public class LocationServiceTest {
   @Test
   void verifyApiKey_falseWhenLocationUnknown() {
 
-    assertFalse(locationServiceImpl.verifyApiKey("unknown-location", "any-key"));
+    assertFalse(locationServiceImpl.verifyApiKey(Integer.valueOf(999), "any-key"));
   }
 
   @Test
@@ -170,9 +171,26 @@ public class LocationServiceTest {
   @Test
   void recordHeartbeat_noopWhenLocationUnknown() {
 
-    locationServiceImpl.recordHeartbeat("unknown-location");
+    locationServiceImpl.recordHeartbeat(Integer.valueOf(999));
 
     verify(locationRepository, never()).storeAggregateRoot(any());
+  }
+
+  @Test
+  void resolveAndVerifyByApiKey_returnsLocationIdWhenHashMatches() {
+
+    when(passwordEncoder.matches("plaintext-key", REGISTERED_API_KEY_HASH)).thenReturn(true);
+
+    assertEquals(REGISTERED_LOCATION_ID,
+        locationServiceImpl.resolveAndVerifyByApiKey("plaintext-key"));
+  }
+
+  @Test
+  void resolveAndVerifyByApiKey_nullWhenNoHashMatches() {
+
+    when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
+
+    assertNull(locationServiceImpl.resolveAndVerifyByApiKey("wrong-key"));
   }
 
   private LibrarySnapshotDto emptySnapshot() {

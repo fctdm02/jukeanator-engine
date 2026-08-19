@@ -47,10 +47,10 @@ public class SongLibraryServiceLocationProxy implements SongLibraryService {
       "Admin/scan methods are not supported on a master-side location proxy — they are inherently "
           + "local to the slave that owns the library.";
 
-  private final String locationId;
+  private final Integer locationId;
   private final LocationService locationService;
 
-  public SongLibraryServiceLocationProxy(String locationId, LocationService locationService) {
+  public SongLibraryServiceLocationProxy(Integer locationId, LocationService locationService) {
     this.locationId = locationId;
     this.locationService = locationService;
   }

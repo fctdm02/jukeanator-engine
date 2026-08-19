@@ -32,7 +32,18 @@ public interface LocationService {
    * is the credential check that establishes it, exactly like {@code UserService.login()}.
    */
   @PublicServiceMethod
-  boolean verifyApiKey(String locationId, String apiKey);
+  boolean verifyApiKey(Integer locationId, String apiKey);
+
+  /**
+   * Resolves the location whose bcrypt hash matches {@code apiKey}, without trusting any
+   * caller-declared id — needed for the initial {@code /ws-slave} handshake, where a fresh slave's
+   * own guess at its locationId (from {@code app.location-id}) may not match the id an admin
+   * later assigns by hand when inserting its row into master's database (see
+   * {@code StompLocationApiKeyChannelInterceptor}). Returns {@code null} if no location's hash
+   * matches.
+   */
+  @PublicServiceMethod
+  Integer resolveAndVerifyByApiKey(String apiKey);
 
   /**
    * Updates {@code lastSeenAt}; called whenever a slave successfully authenticates a request.
@@ -43,17 +54,17 @@ public interface LocationService {
    * per-thread auth), so this must be exempt like {@link #verifyApiKey}.
    */
   @PublicServiceMethod
-  void recordHeartbeat(String locationId);
+  void recordHeartbeat(Integer locationId);
 
   /**
    * Persists the slave's metadata snapshot under its own per-location storage root and returns
    * which albums' cover art master still needs (missing or stale hash).
    */
-  LibrarySyncAckDto receiveLibraryMetadataSync(String locationId, String apiKey,
+  LibrarySyncAckDto receiveLibraryMetadataSync(Integer locationId, String apiKey,
       LibrarySnapshotDto snapshot) throws LocationServiceException;
 
   /** Persists a single album's cover art image for {@code locationId}. */
-  void receiveLibraryCoverArt(String locationId, String apiKey, Integer sourceAlbumId,
+  void receiveLibraryCoverArt(Integer locationId, String apiKey, Integer sourceAlbumId,
       byte[] imageBytes) throws LocationServiceException;
 
   /**
@@ -61,8 +72,8 @@ public interface LocationService {
    * location has never synced. Used by {@code SongLibraryServiceLocationProxy} to serve
    * browse/search reads without a live round-trip to the slave.
    */
-  LibrarySnapshotDto getLibrarySnapshot(String locationId);
+  LibrarySnapshotDto getLibrarySnapshot(Integer locationId);
 
   /** Filesystem path to a previously-synced album's cover art, or {@code null} if not present. */
-  java.nio.file.Path getCoverArtPath(String locationId, Integer sourceAlbumId);
+  java.nio.file.Path getCoverArtPath(Integer locationId, Integer sourceAlbumId);
 }

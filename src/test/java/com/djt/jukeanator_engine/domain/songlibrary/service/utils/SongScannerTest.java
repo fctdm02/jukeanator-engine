@@ -41,7 +41,6 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
  */
 public class SongScannerTest {
 
-  private static final String LOCATION_NAME = "LocationName";
   private static final Set<String> MP3_ONLY = Set.of(".mp3");
 
   private DiscogsClientWrapper discogsClientWrapper;
@@ -59,7 +58,7 @@ public class SongScannerTest {
 
   private SongScanner newScanner(boolean requiresMetadata, boolean useGenre,
       boolean useTopFolderForGenre) {
-    return new SongScanner(LOCATION_NAME, discogsClientWrapper, musicBrainzClientWrapper, jAudioTaggerClient,
+    return new SongScanner(discogsClientWrapper, musicBrainzClientWrapper, jAudioTaggerClient,
         coverArtDownloader, requiresMetadata, useGenre, useTopFolderForGenre, MP3_ONLY);
   }
 
@@ -85,39 +84,39 @@ public class SongScannerTest {
 
   @Test
   public void constructorRejectsNullDiscogsClientWrapper() {
-    assertThrows(NullPointerException.class, () -> new SongScanner(LOCATION_NAME, null, musicBrainzClientWrapper,
+    assertThrows(NullPointerException.class, () -> new SongScanner(null, musicBrainzClientWrapper,
         jAudioTaggerClient, coverArtDownloader, false, false, false, MP3_ONLY));
   }
 
   @Test
   public void constructorRejectsNullMusicBrainzClientWrapper() {
-    assertThrows(NullPointerException.class, () -> new SongScanner(LOCATION_NAME, discogsClientWrapper, null,
+    assertThrows(NullPointerException.class, () -> new SongScanner(discogsClientWrapper, null,
         jAudioTaggerClient, coverArtDownloader, false, false, false, MP3_ONLY));
   }
 
   @Test
   public void constructorRejectsNullJAudioTaggerClient() {
-    assertThrows(NullPointerException.class, () -> new SongScanner(LOCATION_NAME, discogsClientWrapper,
+    assertThrows(NullPointerException.class, () -> new SongScanner(discogsClientWrapper,
         musicBrainzClientWrapper, null, coverArtDownloader, false, false, false, MP3_ONLY));
   }
 
   @Test
   public void constructorRejectsNullCoverArtDownloader() {
-    assertThrows(NullPointerException.class, () -> new SongScanner(LOCATION_NAME, discogsClientWrapper,
+    assertThrows(NullPointerException.class, () -> new SongScanner(discogsClientWrapper,
         musicBrainzClientWrapper, jAudioTaggerClient, null, false, false, false, MP3_ONLY));
   }
 
   @Test
   public void constructorRejectsNullAcceptedExtensions() {
     assertThrows(NullPointerException.class,
-        () -> new SongScanner(LOCATION_NAME, discogsClientWrapper, musicBrainzClientWrapper, jAudioTaggerClient,
+        () -> new SongScanner(discogsClientWrapper, musicBrainzClientWrapper, jAudioTaggerClient,
             coverArtDownloader, false, false, false, null));
   }
 
   @Test
   public void constructorRejectsEmptyAcceptedExtensions() {
     assertThrows(IllegalStateException.class,
-        () -> new SongScanner(LOCATION_NAME, discogsClientWrapper, musicBrainzClientWrapper, jAudioTaggerClient,
+        () -> new SongScanner(discogsClientWrapper, musicBrainzClientWrapper, jAudioTaggerClient,
             coverArtDownloader, false, false, false, Set.of()));
   }
 
@@ -462,7 +461,7 @@ public class SongScannerTest {
   @Test
   public void searchInternetForAlbumMetadataOverloadUsesParentFolderNameAndDefaultLimit() {
 
-    FolderEntity parentFolder = new FolderEntity(new RootFolderEntity(LOCATION_NAME, "root"), "SomeArtist");
+    FolderEntity parentFolder = new FolderEntity(new RootFolderEntity("root"), "SomeArtist");
     AlbumFolderEntity album = new AlbumFolderEntity(parentFolder, "SomeAlbum");
 
     when(musicBrainzClientWrapper.searchForAlbumMetadata("SomeArtist", "SomeAlbum", false, 3))
@@ -502,7 +501,7 @@ public class SongScannerTest {
     boolean useGenre = true;
     boolean useTopFolderForGenre = true;
     Set<String> acceptedSongFileExtensions = Set.of(".mp3");
-    SongScanner songScanner = new SongScanner(LOCATION_NAME, discogsClientWrapper, musicBrainzClientWrapper,
+    SongScanner songScanner = new SongScanner(discogsClientWrapper, musicBrainzClientWrapper,
         jAudioTaggerClient, coverArtDownloader, requiresMetadata, useGenre, useTopFolderForGenre,
         acceptedSongFileExtensions);
     String rootPath =

@@ -71,10 +71,11 @@ public class LibrarySyncService {
   private void syncLibrary() {
 
     LibrarySnapshotDto snapshot = buildSnapshot();
+    Integer locationId = songLibraryService.getSongLibraryRoot().getMetadata().getLocationId();
 
     LibrarySyncAckDto ack = restClient.post()
-        .uri("/api/locations/{locationId}/library-sync/metadata", appProperties.getLocationId())
-        .header("location-id", appProperties.getLocationId())
+        .uri("/api/locations/{locationId}/library-sync/metadata", locationId)
+        .header("location-id", String.valueOf(locationId))
         .header("location-api-key", appProperties.getLocationApiKey())
         .contentType(MediaType.APPLICATION_JSON)
         .body(snapshot)
@@ -137,10 +138,12 @@ public class LibrarySyncService {
       return;
     }
 
+    Integer locationId = songLibraryService.getSongLibraryRoot().getMetadata().getLocationId();
+
     restClient.post()
         .uri("/api/locations/{locationId}/library-sync/cover-art/{sourceAlbumId}",
-            appProperties.getLocationId(), album.getAlbumId())
-        .header("location-id", appProperties.getLocationId())
+            locationId, album.getAlbumId())
+        .header("location-id", String.valueOf(locationId))
         .header("location-api-key", appProperties.getLocationApiKey())
         .contentType(MediaType.IMAGE_JPEG)
         .body(imageBytes)

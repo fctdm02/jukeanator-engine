@@ -97,6 +97,24 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
     });
   }
 
+  @Override
+  public Integer nextPersistentIdentity() {
+
+    // Emulates Hibernate's own org.hibernate.id.enhanced.TableStructure read-then-increment
+    // allocation against the same persistent_identity_seq backing table every
+    // AbstractPersistentEntity subclass shares (see PERSISTENT_IDENTITY_SEQUENCE) -- needed here
+    // because registerLocation() must know the assigned id immediately (to return it to the
+    // caller and add it to the in-memory root), before the entity itself is ever persisted.
+    return transactionTemplate.execute(status -> {
+
+      entityManager.createNativeQuery("update persistent_identity_seq set next_val = next_val + 1")
+          .executeUpdate();
+      Number nextVal = (Number) entityManager
+          .createNativeQuery("select next_val from persistent_identity_seq").getSingleResult();
+      return Integer.valueOf(nextVal.intValue() - 1);
+    });
+  }
+
   private LocationRootEntity loadOrCreateRoot() {
 
     return transactionTemplate.execute(status -> {

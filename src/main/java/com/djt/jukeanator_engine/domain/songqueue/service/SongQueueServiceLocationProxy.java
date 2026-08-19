@@ -26,10 +26,10 @@ public class SongQueueServiceLocationProxy implements SongQueueService {
   private static final String SYSTEM_METHOD_MESSAGE =
       "System method, not to be invoked on behalf of a user!";
 
-  private final String locationId;
+  private final Integer locationId;
   private final SlaveCommandGateway slaveCommandGateway;
 
-  public SongQueueServiceLocationProxy(String locationId, SlaveCommandGateway slaveCommandGateway) {
+  public SongQueueServiceLocationProxy(Integer locationId, SlaveCommandGateway slaveCommandGateway) {
     this.locationId = locationId;
     this.slaveCommandGateway = slaveCommandGateway;
   }

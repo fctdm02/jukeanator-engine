@@ -58,4 +58,9 @@ public final class LocationRepositoryFileSystemImpl extends AbstractRepositoryFi
 
     throw new LocationServiceException("This method is unsupported for the file system implementation");
   }
+
+  @Override
+  public Integer nextPersistentIdentity() {
+    return null;
+  }
 }

@@ -3,7 +3,6 @@
 -- AbstractPersistentEntity.PERSISTENT_IDENTITY_SEQUENCE.
 CREATE TABLE locations (
     persistent_identity     INT PRIMARY KEY,
-    location_id             VARCHAR(255) NOT NULL UNIQUE,
     name                    VARCHAR(255) NOT NULL,
     latitude                DOUBLE,
     longitude               DOUBLE,

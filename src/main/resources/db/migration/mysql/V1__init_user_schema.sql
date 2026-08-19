@@ -57,7 +57,7 @@ CREATE TABLE playlist_songs (
 CREATE TABLE credit_transactions (
     persistent_identity INT PRIMARY KEY,
     user_id              INT,
-    location_id          VARCHAR(255),
+    location_id          INT,
     amount                INT NOT NULL,
     type                  VARCHAR(255) NOT NULL,
     timestamp             TIMESTAMP NOT NULL,

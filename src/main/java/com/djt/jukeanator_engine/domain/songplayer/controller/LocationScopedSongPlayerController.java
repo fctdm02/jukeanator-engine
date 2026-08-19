@@ -33,37 +33,37 @@ public class LocationScopedSongPlayerController {
   }
 
   @GetMapping("/nowPlayingSong")
-  public SongDto getNowPlayingSong(@PathVariable String locationId) {
+  public SongDto getNowPlayingSong(@PathVariable Integer locationId) {
     return locationServiceRegistry.resolveSongPlayerService(locationId).getNowPlayingSong();
   }
 
   @GetMapping("/playbackStatus")
-  public SongPlaybackStatusDto getPlaybackStatus(@PathVariable String locationId) {
+  public SongPlaybackStatusDto getPlaybackStatus(@PathVariable Integer locationId) {
     return locationServiceRegistry.resolveSongPlayerService(locationId).getPlaybackStatus();
   }
 
   @PostMapping("/next")
-  public void playNextTrack(@PathVariable String locationId) {
+  public void playNextTrack(@PathVariable Integer locationId) {
     locationServiceRegistry.resolveSongPlayerService(locationId).playNextTrack();
   }
 
   @PostMapping("/pause")
-  public void pause(@PathVariable String locationId) {
+  public void pause(@PathVariable Integer locationId) {
     locationServiceRegistry.resolveSongPlayerService(locationId).pause();
   }
 
   @PostMapping("/stop")
-  public void stop(@PathVariable String locationId) {
+  public void stop(@PathVariable Integer locationId) {
     locationServiceRegistry.resolveSongPlayerService(locationId).stop();
   }
 
   @PostMapping("/lockQueue")
-  public void lockQueue(@PathVariable String locationId) {
+  public void lockQueue(@PathVariable Integer locationId) {
     locationServiceRegistry.resolveSongPlayerService(locationId).lockQueue();
   }
 
   @PostMapping("/unlockQueue")
-  public void unlockQueue(@PathVariable String locationId) {
+  public void unlockQueue(@PathVariable Integer locationId) {
     locationServiceRegistry.resolveSongPlayerService(locationId).unlockQueue();
   }
 }

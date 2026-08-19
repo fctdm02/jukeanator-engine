@@ -32,8 +32,9 @@ public class LocationApiKeyAuthenticationFilter extends OncePerRequestFilter {
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
       FilterChain filterChain) throws ServletException, IOException {
 
-    String locationId = request.getHeader(LocationController.LOCATION_ID_HEADER);
+    String locationIdHeader = request.getHeader(LocationController.LOCATION_ID_HEADER);
     String apiKey = request.getHeader(LocationController.LOCATION_API_KEY_HEADER);
+    Integer locationId = parseLocationId(locationIdHeader);
 
     if (locationId != null && apiKey != null && locationService.verifyApiKey(locationId, apiKey)) {
 
@@ -44,5 +45,16 @@ public class LocationApiKeyAuthenticationFilter extends OncePerRequestFilter {
     }
 
     filterChain.doFilter(request, response);
+  }
+
+  private static Integer parseLocationId(String locationIdHeader) {
+    if (locationIdHeader == null) {
+      return null;
+    }
+    try {
+      return Integer.valueOf(locationIdHeader);
+    } catch (NumberFormatException nfe) {
+      return null;
+    }
   }
 }

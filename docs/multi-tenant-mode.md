@@ -230,3 +230,118 @@ An admin can pull `GET /api/locations/{locationId}/credit-ledger?from=...&to=...
 
 ## The offline guarantee, at every step
 If master is unreachable — at slave startup or any time later — the physical jukebox's touchscreen, bill acceptor, local queue, and player keep working exactly as they always have. The master relationship only affects *remote* web/mobile access to that location; it's never a dependency for the location running on its own.
+
+---
+---
+
+# RootFolderEntity / LocationEntity Refactor — Integer Location IDs + Metadata File + Master ID Handoff
+
+**Status: Implemented.** Verified via `mvn clean compile`, `mvn test-compile`, and the full test suite (212 tests, 0 failures — 2 pre-existing network-dependent test errors and 2 Docker-dependent skips, both unrelated to this refactor).
+
+## Context
+
+The multi-tenant master/slave design (this document) is already substantially built: `LocationEntity`, `LocationService`, the `/ws-slave` STOMP handshake, location-scoped controllers/proxies, filesystem and JPA location repositories, etc. Three things were tightened up in this refactor:
+
+1. **`LocationEntity.locationId` was a UUID string**, generated randomly at `registerLocation()` time and used as the natural identity everywhere (path variables, STOMP principal name, JSON map keys, DB column). The real-world provisioning flow is manual: an admin hand-inserts a row into master's MySQL `locations` table via phpMyAdmin, copying values off a standalone instance's local JSON. A random UUID is awkward for that; a small sequential integer (matching the existing `persistentIdentity` pattern already used by `AlbumFolderEntity`/`SongFileEntity` as their public domain id) was wanted instead.
+
+2. **`RootFolderEntity.locationName` was a weak, easily-desynced reference** to a `LocationEntity.name` — just a plain string set at construction time from `song-library.location-name` config, with no way for a bar owner to independently edit the physical location's real-world identity (display name, logo, coordinates, geofencing) without touching YAML. Item 2 replaced it with a self-contained metadata file (`locationMetadata.txt`) inside the library's `rootPath`, following the exact pattern `AlbumMetaDataFileEntity` already uses for per-album metadata files.
+
+3. Because the master's manually-assigned integer id can differ from what a fresh slave locally believes its id is, the master↔slave handshake needed to authenticate by API key alone (not by an exact id match) and hand the confirmed id back to the slave, which then corrects its local metadata file. This is what makes the manual-provisioning workflow (an admin's hand-inserted row carrying a different id than the slave's local guess) actually converge.
+
+Decisions confirmed with the user before implementation:
+- **Unify `locationId` into `persistentIdentity`** — no separate field. `LocationEntity`'s existing JPA-sequence-generated (JPA mode) / count+1 (filesystem mode) `persistentIdentity` *is* the location id going forward. This also means a manual SQL insert on master only needs to set one PK column, not two.
+- **Master authenticates the slave→master handshake by API key alone** (bcrypt-iterate over known locations), not by trusting the slave's self-reported id, then returns the authoritative id.
+- **The confirmed id is pushed back to the slave over the established connection** right after it's fully authenticated (see the "Actual implementation note" under Item 3 below), which then corrects and persists the local `locationMetadata.txt`.
+
+This was a real breaking-type change across the location subsystem (`locationId` went from `String` UUID to `Integer` everywhere it appears) — every file listed below needed updating for the code to compile and behave consistently, not just the ones Items 1-3 explicitly name.
+
+---
+
+## Item 1 — `LocationEntity.locationId` → unified `Integer` (was separate `String` UUID)
+
+**`LocationEntity.java`** (`src/main/java/com/djt/jukeanator_engine/domain/location/model/LocationEntity.java`):
+- Removed the `locationId` field entirely. `getNaturalIdentity()` returns `String.valueOf(getPersistentIdentity())`.
+- Constructor became `(Integer persistentIdentity, String name, Double latitude, Double longitude, String apiKeyHash)` — `persistentIdentity` passed straight to `super(...)`.
+
+**`LocationRootEntity.java`**: `TreeMap<String, LocationEntity>` → `TreeMap<Integer, LocationEntity>`, keyed by `getPersistentIdentity()`. `getLocationByIdNullIfNotExists(Integer)`.
+
+**`LocationDto.java`**: dropped the redundant `locationId` field (already carries `persistentIdentity`). **`LocationMapper.java`**: updated both directions accordingly.
+
+**`LocationRepositoryFileSystemImpl` / `LocationRepositoryJpaImpl`**: no structural change needed — `loadAggregateRoot(String naturalIdentity)` still works (natural identity is now `Integer.toString(persistentIdentity)`), `loadAggregateRoot(int persistentIdentity)` for JPA already takes an int.
+
+**`LocationServiceImpl.registerLocation()`** — previously always did `locationRoot.getLocations().size() + 1` for `persistentIdentity` regardless of repository type, which is fine for filesystem but never actually engaged the DB sequence for JPA. Now branches on repository type —
+- Filesystem: keeps `size() + 1` (Item 1's literal spec).
+- JPA: allocates the next id from `AbstractPersistentEntity.PERSISTENT_IDENTITY_SEQUENCE` before constructing the entity, via a new `LocationRepository.nextPersistentIdentity()` method (implemented in `LocationRepositoryJpaImpl` as a transactional read-then-increment against the `persistent_identity_seq` backing table, emulating Hibernate's own `TableStructure` allocation), so a manually-set id is never reused/collided by Hibernate's own generator later. `LocationRepositoryFileSystemImpl.nextPersistentIdentity()` returns `null` (unsupported), so `registerLocation()` falls back to count+1 there.
+- `ProvisionedLocationDto.locationId` and `LocationSummaryDto.locationId`: `String` → `Integer`.
+
+**Flyway migrations** — `src/main/resources/db/migration/{mysql,postgresql}/V2__init_location_schema.sql`: dropped the separate `location_id VARCHAR(255) UNIQUE` column; `persistent_identity` is already the `PRIMARY KEY` and now doubles as the business id. Also retyped `credit_transactions.location_id` from `VARCHAR(255)` to `INT`/`INTEGER` in both `V1__init_user_schema.sql` files.
+
+**Cascading `locationId: String → Integer` retype** (mechanical, once the type at the source changed, everything downstream had to follow):
+- `LocationController` — `@PathVariable Integer locationId` on all three location-scoped mappings; `LOCATION_ID_HEADER` value parsed with `Integer.valueOf(...)`.
+- `LocationService` interface + `LocationServiceImpl` — every `String locationId` parameter → `Integer` (`verifyApiKey`, `recordHeartbeat`, `receiveLibraryMetadataSync`, `receiveLibraryCoverArt`, `getLibrarySnapshot`, `getCoverArtPath`, `locationStorageRoot`). Storage subtree becomes `{storage-root}/{integer}/...` instead of `{storage-root}/{uuid}/...`.
+- `LocationApiKeyAuthenticationFilter` — header parsed to `Integer` (invalid/non-numeric header ⇒ treated as unauthenticated, not a 500).
+- `ConnectedSlaveRegistry` — `ConcurrentHashMap<Integer, String>`.
+- `LocationServiceRegistry` — `Map<Integer, ...>`, `resolve*(Integer locationId)`.
+- `SlaveCommandGateway`, `SongQueueServiceLocationProxy`, `SongPlayerServiceLocationProxy`, `SongLibraryServiceLocationProxy` — `locationId` field/param became `Integer`; `convertAndSendToUser(...)` calls convert to `String.valueOf(locationId)` at the actual Spring Messaging call site (that API needs a String user name).
+- `LocationScopedSongQueueController`, `LocationScopedSongLibraryController`, `LocationScopedSongPlayerController` — `@PathVariable Integer locationId`.
+- `LocationPrincipal` — kept `Principal.getName()` returning `String` (interface contract), but now stores/exposes the resolved `Integer locationId` as a record component; `getName()` returns `String.valueOf(locationId)`.
+- `CreditTransactionEntity`/`CreditTransactionDto`/`CreditTransactionEntryDto`, `UserService.getCreditLedgerForLocation(...)` — `locationId` param/field `String → Integer`.
+- `AppProperties.locationId` — `String → Integer`; `getLocationApiKey()` stays `String`. `AppModeValidator` switched from a blank-string check to a null check for this property.
+- `AdminPanel`'s "Add Location" result dialog now wraps `provisioned.locationId()` in `String.valueOf(...)` before handing it to the read-only text field.
+- Tests referencing any of the above (`LocationServiceTest`, `UserServiceTest`) updated to use `Integer` literals instead of UUID strings; `LocationServiceTest` gained coverage for the new `resolveAndVerifyByApiKey` method.
+
+**New handshake auth method** — `LocationService` gained `Integer resolveAndVerifyByApiKey(String apiKey)` (bcrypt-iterates `locationRoot.getLocations()`, returns the matching `persistentIdentity` or `null`). Used only by `StompLocationApiKeyChannelInterceptor` (see Item 3). The existing exact-match `verifyApiKey(Integer, String)` stays as-is for the HTTP library-sync endpoints, which run after the STOMP correction has already happened in practice.
+
+---
+
+## Item 2 — `RootFolderEntity.locationName` → `metadata` (`LocationMetaDataFileEntity`)
+
+`LocationMetadataDto.java` and `LocationMetaDataFileEntity.java` (`domain/songlibrary/dto` and `domain/songlibrary/model`) wrap a `locationMetadata.txt` file living in the library's `rootPath`, exactly like `AlbumMetaDataFileEntity` wraps each album's `metadata.txt`. Defaults: `locationId=1`, `locationName="Rock On Third"`, `logoName="RockOnThirdLogo.jpg"`, `latitude=42.4883`, `longitude=-83.143`, `isGeoFenced=true` — all overridable by hand-editing the file. One bug was found and fixed while wiring this up: `readMetadataFromFileSystem()` looked for the line prefix `LocationID=` but `writeMetadataToFileSystem()` wrote `LocationId=` (case mismatch), so a value written by the app was never read back correctly on the next load — fixed by making the writer emit `LocationID=` to match the reader.
+
+**`RootFolderEntity.java`** changes:
+- Removed the `locationName` field.
+- Added `private LocationMetaDataFileEntity metadata;`, constructed in the constructor via `this.metadata = new LocationMetaDataFileEntity(this);` (mirrors how `AlbumFolderEntity` wires up its `AlbumMetaDataFileEntity`). Not `final`: `getMetadata()` lazily self-heals to a fresh instance if a pre-existing serialized (`.oos`) library predates this field — Java deserialization never runs a constructor, so an old file would otherwise leave it `null`.
+- Constructor signature changed from `RootFolderEntity(String locationName, String rootPath)` to `RootFolderEntity(String rootPath)`.
+- `getLocationName()` now delegates to `metadata.getLocationName()`; `setLocationName(String)` was dropped (no longer meaningful — the metadata file is edited directly by the bar owner, or corrected programmatically via `getMetadata().setLocationId(...)` + `writeMetadataToFileSystem()`, see Item 3).
+- Added `public LocationMetaDataFileEntity getMetadata()` accessor — used by `SlaveConnectionManager`/`LibrarySyncService` (Item 3) to read/correct the location id.
+
+**Call-site fallout from dropping the `locationName` constructor param:**
+- `SongLibraryServiceImpl.java`: `new RootFolderEntity(this.locationName, this.rootPath)` → `new RootFolderEntity(this.rootPath)`. `SongLibraryServiceImpl.locationName` itself is unrelated and stayed — it's the repository lookup key sourced from `song-library.location-name` config (`loadAggregateRoot(this.locationName)`), a separate concept from the metadata file's display name; only the `RootFolderEntity` constructor call changed.
+- `SongScanner.java`: `new RootFolderEntity(locationName, rootName)` → `new RootFolderEntity(rootName)`. Since this was `SongScanner.locationName`'s only use, that field and constructor parameter were dropped too, along with the one production call site in `AppConfig.java` and the test call sites in `SongScannerTest.java`.
+- `RootFolderEntityTest.java` and `AbstractSongLibraryEntityTest.java`: dropped the `LOCATION_NAME` constructor arg (and the now-unused constant itself).
+
+**Real bug found and fixed as part of this item**: `SongLibraryRepositoryFileSystemImpl.storeAggregateRoot()` used to derive the `.oos` persistence filename from `root.getLocationName()` (`{basePath}/{locationName}.oos`), while `loadAggregateRoot(locationName)` used the *config-supplied* `song-library.location-name` value. Those always matched before, because `RootFolderEntity.locationName` was just an echo of the constructor argument. After this refactor, `getLocationName()` became bar-owner-editable independent of the config value — so `storeAggregateRoot()` would have silently started writing to a *different* file the moment someone edited the location name in `locationMetadata.txt`, while `loadAggregateRoot()` kept reading the *old* file on the next restart, silently orphaning the just-scanned library. Fixed: `SongLibraryRepositoryFileSystemImpl` now uses a fixed `SongLibrary.oos` filename under `basePath`, decoupled entirely from `getLocationName()` — matching how `LocationRepositoryFileSystemImpl` already uses a fixed `LOCATION_LIST_FILENAME` constant regardless of content. The now-unnecessary `DEFAULT_SONG_LIBRARY_LOCATION_NAME`-driven fallback logic was removed; `SongLibraryRepository.SONG_LIBRARY_FILENAME` replaced it as a shared constant (also fixing a latent, unrelated staleness bug in `SongLibraryServiceImpl.restoreSongStatisticsIfCdStatsFileIsNewer()`, which had been comparing timestamps against a path that never matched the real persisted filename).
+
+---
+
+## Item 3 — Manual-provisioning workflow: API-key-only handshake + id correction
+
+**`StompLocationApiKeyChannelInterceptor.java`** (inbound `CONNECT` handling): replaced `locationService.verifyApiKey(locationId, apiKey)` with `Integer resolvedId = locationService.resolveAndVerifyByApiKey(apiKey);` — auth succeeds solely on the API key matching some location, regardless of what `location-id` header the slave sent. On success: `accessor.setUser(new LocationPrincipal(resolvedId))`, `connectedSlaveRegistry.markConnected(resolvedId, accessor.getSessionId())`, `locationService.recordHeartbeat(resolvedId)`.
+
+**Actual implementation note**: the original design called for injecting a `location-id` header into the outbound STOMP `CONNECTED` frame via a new `configureClientOutboundChannel` interceptor. That was dropped in favor of a more robust, already-proven mechanism in this codebase: `LocationEventStompController` gained an `@EventListener` for Spring's `SessionConnectedEvent` (fired once a `/ws-slave` session is fully established and its user registered), which — when `event.getUser()` is a `LocationPrincipal` — pushes the resolved id via `SimpMessagingTemplate.convertAndSendToUser(locationId, "/queue/location-id-confirmed", locationId)`, the same `convertAndSendToUser` idiom `SlaveCommandGateway` already uses for commands. This avoids depending on unverified Spring internals for mutating a framework-generated CONNECTED frame's headers, and avoids a real timing risk (mutating/reading session-scoped state before the broker's user registry is guaranteed populated).
+
+**`SlaveConnectionManager.afterConnected(StompSession, StompHeaders connectedHeaders)`**: now additionally subscribes to `/user/queue/location-id-confirmed`. Its frame handler compares the received id against the slave's current `songLibraryService.getSongLibraryRoot().getMetadata().getLocationId()`; if different, calls `metadata.setLocationId(confirmedId); metadata.writeMetadataToFileSystem();` and logs the correction. Required adding a `SongLibraryService` dependency to `SlaveConnectionManager`'s constructor (previously had `SongQueueService`/`SongPlayerService`/`AppProperties`/`ObjectMapper`). The `location-id` header still sent on the initial STOMP CONNECT (sourced from the corrected metadata when available, falling back to `appProperties.getLocationId()`) is now purely informational/diagnostic, since auth no longer depends on it.
+
+**`LibrarySyncService.syncLibrary()`/`uploadCoverArt()`**: switched the locationId used for the URL path variable and `location-id` header from `appProperties.getLocationId()` to `songLibraryService.getSongLibraryRoot().getMetadata().getLocationId()` (it already had `songLibraryService` injected) — this is the corrected, authoritative value once the STOMP handshake has run, avoiding the id going stale after a manual-SQL-insert provisioning where master's assigned id differs from the slave's original config guess.
+
+**`AppProperties.locationId`** stays as the slave's *initial* guess (per `application.yml`'s `app.location-id`) — still sent as the very first `location-id` header on `SlaveConnectionManager`'s first connection attempt, but no longer load-bearing for auth (API-key-only) and superseded by the corrected metadata value everywhere else once the handshake has run at least once.
+
+---
+
+## Files touched
+
+**Item 1 (retype):** `LocationEntity`, `LocationRootEntity`, `LocationDto`, `LocationMapper`, `LocationRepository`(+2 impls), `LocationService`(+Impl), `LocationController`, `LocationApiKeyAuthenticationFilter`, `ConnectedSlaveRegistry`, `LocationServiceRegistry`, `SlaveCommandGateway`, `SongQueueServiceLocationProxy`, `SongPlayerServiceLocationProxy`, `SongLibraryServiceLocationProxy`, `LocationScopedSongQueueController`, `LocationScopedSongLibraryController`, `LocationScopedSongPlayerController`, `LocationPrincipal`, `ProvisionedLocationDto`, `LocationSummaryDto`, `LocationRegisteredEvent`, `LocationLibrarySyncedEvent`, `LocationOfflineException`, `CreditTransactionEntity`, `CreditTransactionDto`, `CreditTransactionEntryDto`, `UserService`(+Impl), `AppProperties`, `AppModeValidator`, `AdminPanel`, both `V1`/`V2` migration pairs, `LocationServiceTest`, `UserServiceTest`.
+
+**Item 2:** `LocationMetaDataFileEntity` (bug fix), `LocationMetadataDto`, `RootFolderEntity`, `SongLibraryServiceImpl`, `SongScanner`, `AppConfig`, `SongLibraryRepository`, `SongLibraryRepositoryFileSystemImpl`, `SongScannerTest`, `RootFolderEntityTest`, `AbstractSongLibraryEntityTest`.
+
+**Item 3:** `StompLocationApiKeyChannelInterceptor`, `LocationEventStompController` (new `SessionConnectedEvent` listener, in place of the originally-planned `WebSocketConfig` outbound interceptor), `SlaveConnectionManager`, `LibrarySyncService`.
+
+Not in scope (explicitly deferred): `SongIdentifier` gaining a `locationId`, per-call `locationId` propagation through every service/controller, and collapsing `LocationScopedSongLibraryController`/`LocationScopedSongQueueController` into single controllers — noted above as future direction only.
+
+---
+
+## Verification performed
+
+- `mvn clean compile` and `mvn test-compile` both succeed.
+- Full `mvn test`: 212 tests run, 0 failures. 2 errors (`CoverArtDownloaderTest`, `MusicBrainzClientWrapperTest`) are pre-existing, network-loopback failures unrelated to this refactor (no network access in the sandbox this was built in). 2 skipped are the Testcontainers-based MySQL context tests (`MySqlJukeanatorEngineApplicationTests`, `MySqlMasterModeJukeanatorEngineApplicationTests`), skipped for lack of a local Docker daemon — **these have not been exercised against this refactor and are worth running explicitly wherever Docker is available**, since they're the only tests that fully load the master-mode Spring context this refactor touches heavily (`LocationController`, `SlaveCommandGateway`, `LocationEventStompController`, etc.).
+- Still to do manually: standalone-mode smoke test (confirm `locationMetadata.txt` defaults and round-trips correctly, confirm the song library `.oos` file no longer moves when the location name is edited); master+slave smoke test with a deliberately mismatched `app.location-id` to confirm the API-key-only handshake and `locationMetadata.txt` correction actually converge end-to-end over real network sockets.

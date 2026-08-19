@@ -13,9 +13,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ConnectedSlaveRegistry {
 
-  private final ConcurrentHashMap<String, String> sessionIdByLocationId = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Integer, String> sessionIdByLocationId = new ConcurrentHashMap<>();
 
-  public void markConnected(String locationId, String sessionId) {
+  public void markConnected(Integer locationId, String sessionId) {
     sessionIdByLocationId.put(locationId, sessionId);
   }
 
@@ -23,7 +23,7 @@ public class ConnectedSlaveRegistry {
     sessionIdByLocationId.values().removeIf(sessionId::equals);
   }
 
-  public boolean isConnected(String locationId) {
+  public boolean isConnected(Integer locationId) {
     return sessionIdByLocationId.containsKey(locationId);
   }
 }

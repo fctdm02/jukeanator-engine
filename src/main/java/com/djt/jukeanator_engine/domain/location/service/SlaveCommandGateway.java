@@ -50,7 +50,7 @@ public class SlaveCommandGateway {
   }
 
   /** Sends a command and awaits the reply, converting its payload to {@code replyType}. */
-  public <T> T sendCommand(String locationId, String commandType, Object payload,
+  public <T> T sendCommand(Integer locationId, String commandType, Object payload,
       Class<T> replyType) {
 
     CommandReplyDto reply = sendCommandAndAwaitReply(locationId, commandType, payload);
@@ -65,8 +65,8 @@ public class SlaveCommandGateway {
     }
   }
 
-  /** Same as {@link #sendCommand(String, String, Object, Class)} but for generic/list reply types. */
-  public <T> T sendCommand(String locationId, String commandType, Object payload,
+  /** Same as {@link #sendCommand(Integer, String, Object, Class)} but for generic/list reply types. */
+  public <T> T sendCommand(Integer locationId, String commandType, Object payload,
       TypeReference<T> replyTypeRef) {
 
     CommandReplyDto reply = sendCommandAndAwaitReply(locationId, commandType, payload);
@@ -83,11 +83,11 @@ public class SlaveCommandGateway {
   }
 
   /** Convenience for commands with no meaningful reply payload (e.g. {@code pause()}). */
-  public void sendCommand(String locationId, String commandType, Object payload) {
+  public void sendCommand(Integer locationId, String commandType, Object payload) {
     sendCommandAndAwaitReply(locationId, commandType, payload);
   }
 
-  private CommandReplyDto sendCommandAndAwaitReply(String locationId, String commandType,
+  private CommandReplyDto sendCommandAndAwaitReply(Integer locationId, String commandType,
       Object payload) {
 
     // Fail fast rather than waiting out a full timeout for a location that is obviously not
@@ -102,7 +102,8 @@ public class SlaveCommandGateway {
 
     try {
       CommandEnvelope envelope = new CommandEnvelope(correlationId, commandType, payload);
-      messagingTemplate.convertAndSendToUser(locationId, COMMAND_DESTINATION, envelope);
+      messagingTemplate.convertAndSendToUser(String.valueOf(locationId), COMMAND_DESTINATION,
+          envelope);
 
       CommandReplyDto reply;
       try {

@@ -503,7 +503,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event, String locationId) {
+  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event, Integer locationId) {
 
     String username = event.queueEntry().getUsername();
 
@@ -559,7 +559,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public void chargeCreditsForQueueAction(String emailAddress, Integer priority, String locationId) {
+  public void chargeCreditsForQueueAction(String emailAddress, Integer priority, Integer locationId) {
 
     // Same rationale as handleSongAddedToQueueEvent above — in slave mode this is only ever
     // reachable via a direct hit on the slave's own (untouched) endpoints, never via the
@@ -581,7 +581,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public List<CreditTransactionDto> getCreditLedgerForLocation(String locationId, Instant from,
+  public List<CreditTransactionDto> getCreditLedgerForLocation(Integer locationId, Instant from,
       Instant to) {
 
     return userRoot.getUsers().stream()
@@ -602,7 +602,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
    * user root afterward.
    */
   private void deductCredits(UserEntity user, String emailAddress, int cost,
-      CreditTransactionType type, String locationId, Integer songAlbumId, Integer songId) {
+      CreditTransactionType type, Integer locationId, Integer songAlbumId, Integer songId) {
 
     int remaining = Math.max(0, (user.getNumCredits() != null ? user.getNumCredits() : 0) - cost);
     user.setNumCredits(remaining);

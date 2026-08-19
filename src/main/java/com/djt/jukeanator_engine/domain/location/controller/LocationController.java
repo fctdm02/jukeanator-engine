@@ -62,7 +62,7 @@ public class LocationController {
 
   @PostMapping("/{locationId}/library-sync/metadata")
   public ResponseEntity<LibrarySyncAckDto> syncLibraryMetadata(
-      @PathVariable String locationId,
+      @PathVariable Integer locationId,
       @RequestHeader(LOCATION_API_KEY_HEADER) String apiKey,
       @RequestBody LibrarySnapshotDto snapshot) {
 
@@ -72,7 +72,7 @@ public class LocationController {
 
   @PostMapping("/{locationId}/library-sync/cover-art/{sourceAlbumId}")
   public ResponseEntity<Void> syncCoverArt(
-      @PathVariable String locationId,
+      @PathVariable Integer locationId,
       @PathVariable Integer sourceAlbumId,
       @RequestHeader(LOCATION_API_KEY_HEADER) String apiKey,
       @RequestBody byte[] imageBytes) {
@@ -84,7 +84,7 @@ public class LocationController {
   /** Admin-only, bar-owner accounting: every credit transaction tagged with this location. */
   @GetMapping("/{locationId}/credit-ledger")
   public ResponseEntity<List<CreditTransactionDto>> getCreditLedger(
-      @PathVariable String locationId,
+      @PathVariable Integer locationId,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
 

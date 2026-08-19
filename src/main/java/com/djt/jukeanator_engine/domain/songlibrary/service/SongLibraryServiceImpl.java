@@ -127,7 +127,7 @@ public class SongLibraryServiceImpl
       log.error("Could not load song library from: " + rootPath
           + ", using empty song library songLibraryRoot for now, error: " + ednee.getMessage());
 
-      this.songLibraryRoot = new RootFolderEntity(this.locationName, this.rootPath);
+      this.songLibraryRoot = new RootFolderEntity(this.rootPath);
       this.songLibraryRoot.initialize();
       this.libraryLoadFailedAtStartup = true;
       
@@ -154,7 +154,7 @@ public class SongLibraryServiceImpl
   private void restoreSongStatisticsIfCdStatsFileIsNewer() {
 
     Path cdStatsPath = Path.of(this.dataDir, RootFolderEntity.CD_STATS);
-    Path songLibraryPath =Path.of(this.dataDir, SongLibraryRepository.DEFAULT_SONG_LIBRARY_LOCATION_NAME);
+    Path songLibraryPath = Path.of(this.dataDir, SongLibraryRepository.SONG_LIBRARY_FILENAME);
 
     if (!Files.exists(cdStatsPath) || !Files.exists(songLibraryPath)) {
       return;

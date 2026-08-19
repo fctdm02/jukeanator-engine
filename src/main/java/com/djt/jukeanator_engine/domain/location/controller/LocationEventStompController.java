@@ -2,11 +2,14 @@ package com.djt.jukeanator_engine.domain.location.controller;
 
 import java.security.Principal;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
+import com.djt.jukeanator_engine.domain.location.security.LocationPrincipal;
 import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
 
 /**
@@ -21,6 +24,8 @@ import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
 @Controller
 @ConditionalOnProperty(name = "app.mode", havingValue = "master")
 public class LocationEventStompController {
+
+  private static final String LOCATION_ID_CONFIRMED_DESTINATION = "/queue/location-id-confirmed";
 
   private final SimpMessagingTemplate messagingTemplate;
   private final SlaveCommandGateway slaveCommandGateway;
@@ -42,5 +47,22 @@ public class LocationEventStompController {
   @MessageMapping("/location-command-reply")
   public void handleCommandReply(CommandReplyDto reply) {
     slaveCommandGateway.completeReply(reply);
+  }
+
+  /**
+   * Fires for every established {@code /ws-slave} session (this event type is shared with the
+   * browser-facing {@code /ws} endpoint, hence the {@code instanceof} guard). {@code
+   * StompLocationApiKeyChannelInterceptor} authenticates purely by API key, never trusting the
+   * slave's self-reported {@code location-id} header, so this is how the slave learns its true,
+   * master-assigned id — see {@code SlaveConnectionManager}'s subscription to this destination,
+   * which corrects the slave's local {@code locationMetadata.txt} if it was wrong.
+   */
+  @EventListener
+  public void handleSessionConnected(SessionConnectedEvent event) {
+
+    if (event.getUser() instanceof LocationPrincipal locationPrincipal) {
+      messagingTemplate.convertAndSendToUser(locationPrincipal.getName(),
+          LOCATION_ID_CONFIRMED_DESTINATION, locationPrincipal.locationId());
+    }
   }
 }

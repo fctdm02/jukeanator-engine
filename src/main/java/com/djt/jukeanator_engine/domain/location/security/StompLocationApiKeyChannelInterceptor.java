@@ -10,11 +10,17 @@ import com.djt.jukeanator_engine.domain.location.service.ConnectedSlaveRegistry;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 
 /**
- * Master-only. Reads {@code location-id}/{@code location-api-key} native headers from the
- * {@code /ws-slave} STOMP CONNECT frame, verifies them the same way the HTTP library-sync
- * endpoints do, and — on success — sets a {@link LocationPrincipal} on the session (enabling
+ * Master-only. Reads the {@code location-api-key} native header from the {@code /ws-slave} STOMP
+ * CONNECT frame and resolves the location by that key alone (never trusting the slave's
+ * self-reported {@code location-id} header) — a fresh slave's own guess at its locationId (from
+ * {@code app.location-id}) may not match the id an admin later assigns by hand when inserting its
+ * row into master's database, so authentication can't require them to match up front. On success,
+ * sets a {@link LocationPrincipal} on the session (enabling
  * {@code convertAndSendToUser(locationId, ...)} routing) and marks the location connected in
- * {@link ConnectedSlaveRegistry}. Mirrors {@code StompJwtChannelInterceptor}'s shape for JWT.
+ * {@link ConnectedSlaveRegistry}; the resolved id is then pushed back to the slave as soon as the
+ * session is fully established (see {@code LocationEventStompController}'s {@code
+ * SessionConnectedEvent} listener), which corrects its local {@code locationMetadata.txt} if it
+ * was wrong. Mirrors {@code StompJwtChannelInterceptor}'s shape for JWT.
  */
 public class StompLocationApiKeyChannelInterceptor implements ChannelInterceptor {
 
@@ -34,9 +40,9 @@ public class StompLocationApiKeyChannelInterceptor implements ChannelInterceptor
         MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
     if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
-      String locationId = accessor.getFirstNativeHeader("location-id");
       String apiKey = accessor.getFirstNativeHeader("location-api-key");
-      if (locationId != null && apiKey != null && locationService.verifyApiKey(locationId, apiKey)) {
+      Integer locationId = locationService.resolveAndVerifyByApiKey(apiKey);
+      if (locationId != null) {
         accessor.setUser(new LocationPrincipal(locationId));
         connectedSlaveRegistry.markConnected(locationId, accessor.getSessionId());
         locationService.recordHeartbeat(locationId);

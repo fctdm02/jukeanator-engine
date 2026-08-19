@@ -13,7 +13,6 @@ public final class LocationDto implements Serializable {
   private static final long serialVersionUID = 1L;
 
   private Integer persistentIdentity;
-  private String locationId;
   private String name;
   private Double latitude;
   private Double longitude;
@@ -24,12 +23,11 @@ public final class LocationDto implements Serializable {
 
   public LocationDto() {}
 
-  public LocationDto(Integer persistentIdentity, String locationId, String name,
+  public LocationDto(Integer persistentIdentity, String name,
       Double latitude, Double longitude, String apiKeyHash, String status, Instant lastSeenAt,
       Instant libraryLastSyncedAt) {
 
     this.persistentIdentity = persistentIdentity;
-    this.locationId = locationId;
     this.name = name;
     this.latitude = latitude;
     this.longitude = longitude;
@@ -45,14 +43,6 @@ public final class LocationDto implements Serializable {
 
   public void setPersistentIdentity(Integer persistentIdentity) {
     this.persistentIdentity = persistentIdentity;
-  }
-
-  public String getLocationId() {
-    return locationId;
-  }
-
-  public void setLocationId(String locationId) {
-    this.locationId = locationId;
   }
 
   public String getName() {
@@ -113,7 +103,7 @@ public final class LocationDto implements Serializable {
 
   @Override
   public int hashCode() {
-    return Objects.hash(locationId);
+    return Objects.hash(persistentIdentity);
   }
 
   @Override
@@ -123,12 +113,12 @@ public final class LocationDto implements Serializable {
     if (obj == null || getClass() != obj.getClass())
       return false;
     LocationDto other = (LocationDto) obj;
-    return Objects.equals(locationId, other.locationId);
+    return Objects.equals(persistentIdentity, other.persistentIdentity);
   }
 
   @Override
   public String toString() {
-    return "LocationDto [persistentIdentity=" + persistentIdentity + ", locationId=" + locationId
+    return "LocationDto [persistentIdentity=" + persistentIdentity
         + ", name=" + name + ", status=" + status + "]";
   }
 }

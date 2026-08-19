@@ -27,7 +27,7 @@ public class AppModeValidator implements ApplicationRunner {
 
     if (appProperties.isSlave()) {
       requireNonBlank("app.master-instance-url", appProperties.getMasterInstanceUrl());
-      requireNonBlank("app.location-id", appProperties.getLocationId());
+      requireNonNull("app.location-id", appProperties.getLocationId());
       requireNonBlank("app.location-api-key", appProperties.getLocationApiKey());
     }
 
@@ -42,6 +42,13 @@ public class AppModeValidator implements ApplicationRunner {
 
   private void requireNonBlank(String propertyName, String value) {
     if (value == null || value.isBlank()) {
+      throw new IllegalStateException(
+          "app.mode=slave requires " + propertyName + " to be set, but it was blank/missing.");
+    }
+  }
+
+  private void requireNonNull(String propertyName, Object value) {
+    if (value == null) {
       throw new IllegalStateException(
           "app.mode=slave requires " + propertyName + " to be set, but it was blank/missing.");
     }

@@ -216,7 +216,7 @@ public interface UserService {
    * @param event
    * @param locationId the location this queue action was performed at
    */
-  void handleSongAddedToQueueEvent(SongAddedToQueueEvent event, String locationId);
+  void handleSongAddedToQueueEvent(SongAddedToQueueEvent event, Integer locationId);
 
   /**
    * Charges Web UI credits for a patron reordering or removing a song in the shared queue,
@@ -235,7 +235,7 @@ public interface UserService {
    * @param priority
    * @param locationId the location this queue action was performed at
    */
-  void chargeCreditsForQueueAction(String emailAddress, Integer priority, String locationId);
+  void chargeCreditsForQueueAction(String emailAddress, Integer priority, Integer locationId);
 
   /**
    * Bar-owner accounting: every credit transaction tagged with {@code locationId} in
@@ -246,6 +246,6 @@ public interface UserService {
    * @param from
    * @param to
    */
-  List<CreditTransactionDto> getCreditLedgerForLocation(String locationId, Instant from,
+  List<CreditTransactionDto> getCreditLedgerForLocation(Integer locationId, Instant from,
       Instant to);
 }

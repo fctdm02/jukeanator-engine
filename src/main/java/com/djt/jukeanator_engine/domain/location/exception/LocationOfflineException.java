@@ -6,7 +6,7 @@ package com.djt.jukeanator_engine.domain.location.exception;
 public class LocationOfflineException extends RuntimeException {
   private static final long serialVersionUID = 1L;
 
-  public LocationOfflineException(String locationId) {
+  public LocationOfflineException(Integer locationId) {
     super("Location is offline: " + locationId);
   }
 }

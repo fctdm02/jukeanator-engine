@@ -78,7 +78,6 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
  */
 public class RootFolderEntityTest extends AbstractSongLibraryEntityTest {
   
-  protected static final String LOCATION_NAME = "LocationName";
 
   // ─────────────────────────────────────────────────────────────────────────
   // getRootPath / setRootPath
@@ -384,7 +383,7 @@ public class RootFolderEntityTest extends AbstractSongLibraryEntityTest {
   void pruneNonAlbumContainingChildFolders_removesEmptyLeafFolders() throws Exception {
 
     // Build a small library that has an empty branch to prune
-    RootFolderEntity pruneRoot = new RootFolderEntity(LOCATION_NAME, "/prune-root");
+    RootFolderEntity pruneRoot = new RootFolderEntity("/prune-root");
 
     // Genre "Rock" → Artist "Empty" (leaf, no albums) — should be pruned along with "EmptyGenre"
     GenreFolderEntity emptyGenre = new GenreFolderEntity(pruneRoot, "EmptyGenre");
@@ -420,7 +419,7 @@ public class RootFolderEntityTest extends AbstractSongLibraryEntityTest {
   void pruneNonAlbumContainingChildFolders_doesNotPruneAlbumFolders() throws Exception {
 
     // Library that is fully populated — nothing to prune
-    RootFolderEntity fullRoot = new RootFolderEntity(LOCATION_NAME, "/full-root");
+    RootFolderEntity fullRoot = new RootFolderEntity("/full-root");
     GenreFolderEntity rock = new GenreFolderEntity(fullRoot, "Rock");
     fullRoot.addChildFolder(rock);
     ArtistFolderEntity lz = new ArtistFolderEntity(rock, "Led Zeppelin");

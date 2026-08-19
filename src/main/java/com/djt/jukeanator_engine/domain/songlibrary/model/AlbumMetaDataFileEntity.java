@@ -54,8 +54,6 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
 
   private transient boolean isLoaded = false;
 
-  public AlbumMetaDataFileEntity() {}
-
   public AlbumMetaDataFileEntity(AlbumFolderEntity parentAlbum, String name) {
     super(parentAlbum, name);
   }

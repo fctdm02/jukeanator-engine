@@ -87,20 +87,27 @@ public class LocationServiceImpl implements LocationService {
   @Override
   public ProvisionedLocationDto registerLocation(RegisterLocationRequest request) {
 
-    String locationId = java.util.UUID.randomUUID().toString();
     String apiKey = generateApiKey();
 
-    Integer persistentIdentity = Integer.valueOf(this.locationRoot.getLocations().size() + 1);
-    LocationEntity location = new LocationEntity(persistentIdentity, locationId, request.name(),
+    // JPA-backed stores allocate from the shared persistent-identity sequence, so a
+    // registration-assigned id can never later collide with one Hibernate generates itself;
+    // nextPersistentIdentity() returns null for the filesystem-backed store, which has no such
+    // sequence, so we fall back to count+1 there.
+    Integer persistentIdentity = this.locationRepository.nextPersistentIdentity();
+    if (persistentIdentity == null) {
+      persistentIdentity = Integer.valueOf(this.locationRoot.getLocations().size() + 1);
+    }
+
+    LocationEntity location = new LocationEntity(persistentIdentity, request.name(),
         request.latitude(), request.longitude(), passwordEncoder.encode(apiKey));
     location.setStatus(LocationStatus.PROVISIONED);
 
     this.locationRoot.addLocation(location);
     this.locationRepository.storeAggregateRoot(this.locationRoot);
 
-    eventPublisher.publishEvent(new LocationRegisteredEvent(locationId, request.name()));
+    eventPublisher.publishEvent(new LocationRegisteredEvent(persistentIdentity, request.name()));
 
-    return new ProvisionedLocationDto(locationId, apiKey, request.name());
+    return new ProvisionedLocationDto(persistentIdentity, apiKey, request.name());
   }
 
   @Override
@@ -108,15 +115,15 @@ public class LocationServiceImpl implements LocationService {
 
     List<LocationSummaryDto> summaries = new ArrayList<>();
     for (LocationEntity location : this.locationRoot.getLocations()) {
-      boolean online = connectedSlaveRegistry.isConnected(location.getLocationId());
-      summaries.add(new LocationSummaryDto(location.getLocationId(), location.getName(),
+      boolean online = connectedSlaveRegistry.isConnected(location.getPersistentIdentity());
+      summaries.add(new LocationSummaryDto(location.getPersistentIdentity(), location.getName(),
           location.getLatitude(), location.getLongitude(), online));
     }
     return summaries;
   }
 
   @Override
-  public boolean verifyApiKey(String locationId, String apiKey) {
+  public boolean verifyApiKey(Integer locationId, String apiKey) {
 
     LocationEntity location = this.locationRoot.getLocationByIdNullIfNotExists(locationId);
     if (location == null || apiKey == null) {
@@ -126,7 +133,21 @@ public class LocationServiceImpl implements LocationService {
   }
 
   @Override
-  public void recordHeartbeat(String locationId) {
+  public Integer resolveAndVerifyByApiKey(String apiKey) {
+
+    if (apiKey == null) {
+      return null;
+    }
+    for (LocationEntity location : this.locationRoot.getLocations()) {
+      if (passwordEncoder.matches(apiKey, location.getApiKeyHash())) {
+        return location.getPersistentIdentity();
+      }
+    }
+    return null;
+  }
+
+  @Override
+  public void recordHeartbeat(Integer locationId) {
 
     LocationEntity location = this.locationRoot.getLocationByIdNullIfNotExists(locationId);
     if (location == null) {
@@ -138,7 +159,7 @@ public class LocationServiceImpl implements LocationService {
   }
 
   @Override
-  public LibrarySyncAckDto receiveLibraryMetadataSync(String locationId, String apiKey,
+  public LibrarySyncAckDto receiveLibraryMetadataSync(Integer locationId, String apiKey,
       LibrarySnapshotDto snapshot) {
 
     requireValidLocation(locationId, apiKey);
@@ -174,7 +195,7 @@ public class LocationServiceImpl implements LocationService {
   }
 
   @Override
-  public void receiveLibraryCoverArt(String locationId, String apiKey, Integer sourceAlbumId,
+  public void receiveLibraryCoverArt(Integer locationId, String apiKey, Integer sourceAlbumId,
       byte[] imageBytes) {
 
     requireValidLocation(locationId, apiKey);
@@ -193,7 +214,7 @@ public class LocationServiceImpl implements LocationService {
   }
 
   @Override
-  public LibrarySnapshotDto getLibrarySnapshot(String locationId) {
+  public LibrarySnapshotDto getLibrarySnapshot(Integer locationId) {
 
     Path libraryFile = locationStorageRoot(locationId).resolve("library.json");
     if (!Files.exists(libraryFile)) {
@@ -208,25 +229,25 @@ public class LocationServiceImpl implements LocationService {
   }
 
   @Override
-  public Path getCoverArtPath(String locationId, Integer sourceAlbumId) {
+  public Path getCoverArtPath(Integer locationId, Integer sourceAlbumId) {
 
     Path coverArtFile = locationStorageRoot(locationId).resolve("cover-art")
         .resolve(sourceAlbumId + ".jpg");
     return Files.exists(coverArtFile) ? coverArtFile : null;
   }
 
-  private void requireValidLocation(String locationId, String apiKey) {
+  private void requireValidLocation(Integer locationId, String apiKey) {
 
     if (!verifyApiKey(locationId, apiKey)) {
       throw new LocationServiceException("Invalid locationId/apiKey for locationId: " + locationId);
     }
   }
 
-  private Path locationStorageRoot(String locationId) {
-    return Path.of(this.storageRoot, locationId);
+  private Path locationStorageRoot(Integer locationId) {
+    return Path.of(this.storageRoot, String.valueOf(locationId));
   }
 
-  private Map<Integer, String> loadPreviousCoverArtHashes(String locationId) {
+  private Map<Integer, String> loadPreviousCoverArtHashes(Integer locationId) {
 
     Path libraryFile = locationStorageRoot(locationId).resolve("library.json");
     if (!Files.exists(libraryFile)) {

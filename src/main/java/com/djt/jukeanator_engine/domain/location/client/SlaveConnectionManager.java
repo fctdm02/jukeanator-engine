@@ -25,6 +25,8 @@ import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
+import com.djt.jukeanator_engine.domain.songlibrary.model.LocationMetaDataFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.event.AllSongsDonePlayingEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackPausedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
@@ -69,6 +71,7 @@ public class SlaveConnectionManager {
   private final AppProperties appProperties;
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
+  private final SongLibraryService songLibraryService;
   private final ObjectMapper objectMapper;
 
   private final WebSocketStompClient stompClient;
@@ -83,11 +86,13 @@ public class SlaveConnectionManager {
   private final AtomicBoolean connecting = new AtomicBoolean(false);
 
   public SlaveConnectionManager(AppProperties appProperties, SongQueueService songQueueService,
-      SongPlayerService songPlayerService, ObjectMapper objectMapper) {
+      SongPlayerService songPlayerService, SongLibraryService songLibraryService,
+      ObjectMapper objectMapper) {
 
     this.appProperties = appProperties;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
+    this.songLibraryService = songLibraryService;
     this.objectMapper = objectMapper;
 
     this.stompClient = new WebSocketStompClient(new StandardWebSocketClient());
@@ -137,7 +142,13 @@ public class SlaveConnectionManager {
     try {
       String wsUrl = toWebSocketUrl(appProperties.getMasterInstanceUrl()) + "/ws-slave";
       StompHeaders connectHeaders = new StompHeaders();
-      connectHeaders.set("location-id", appProperties.getLocationId());
+      // Purely informational: master authenticates by location-api-key alone (see
+      // StompLocationApiKeyChannelInterceptor) and hands back the authoritative id, since this
+      // slave's own guess (its locally corrected metadata locationId, if known yet) may not match
+      // the id an admin assigns by hand when provisioning it on master.
+      Integer currentLocationId = currentLocationId();
+      connectHeaders.set("location-id",
+          String.valueOf(currentLocationId != null ? currentLocationId : appProperties.getLocationId()));
       connectHeaders.set("location-api-key", appProperties.getLocationApiKey());
       connectHeaders.setHeartbeat(new long[] {10_000, 10_000});
 
@@ -153,6 +164,14 @@ public class SlaveConnectionManager {
     } catch (Exception e) {
       connecting.set(false);
       log.debug("Could not initiate connection to master", e);
+    }
+  }
+
+  private Integer currentLocationId() {
+    try {
+      return songLibraryService.getSongLibraryRoot().getMetadata().getLocationId();
+    } catch (Exception e) {
+      return null;
     }
   }
 
@@ -216,6 +235,7 @@ public class SlaveConnectionManager {
       log.info("Connected to master at {}", appProperties.getMasterInstanceUrl());
       currentSession.set(session);
       session.subscribe("/user/queue/commands", new CommandFrameHandler());
+      session.subscribe("/user/queue/location-id-confirmed", new LocationIdConfirmedFrameHandler());
     }
 
     @Override
@@ -246,6 +266,41 @@ public class SlaveConnectionManager {
       StompSession session = currentSession.get();
       if (session != null && session.isConnected()) {
         session.send("/location-command-reply", reply);
+      }
+    }
+  }
+
+  /**
+   * Receives the authoritative locationId master resolved via {@code location-api-key} alone
+   * (see {@code StompLocationApiKeyChannelInterceptor}) and corrects this slave's local {@code
+   * locationMetadata.txt} if it doesn't already match — this is the "communicate back the actual
+   * locationId" step of the manual-provisioning workflow: an admin's hand-inserted row on master
+   * can carry a different id than this slave's own initial guess.
+   */
+  private class LocationIdConfirmedFrameHandler
+      implements org.springframework.messaging.simp.stomp.StompFrameHandler {
+
+    @Override
+    public Type getPayloadType(StompHeaders headers) {
+      return Integer.class;
+    }
+
+    @Override
+    public void handleFrame(StompHeaders headers, Object payload) {
+
+      Integer confirmedLocationId = (Integer) payload;
+      try {
+        LocationMetaDataFileEntity metadata = songLibraryService.getSongLibraryRoot().getMetadata();
+        if (!confirmedLocationId.equals(metadata.getLocationId())) {
+          log.info("Master assigned locationId {} (was {} locally) — correcting {}",
+              confirmedLocationId, metadata.getLocationId(),
+              LocationMetaDataFileEntity.LOCATION_METADATA_FILENAME);
+          metadata.setLocationId(confirmedLocationId);
+          metadata.writeMetadataToFileSystem();
+        }
+      } catch (Exception e) {
+        log.warn("Could not reconcile confirmed locationId {} with local metadata",
+            confirmedLocationId, e);
       }
     }
   }

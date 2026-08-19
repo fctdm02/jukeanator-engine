@@ -17,10 +17,10 @@ public class SongPlayerServiceLocationProxy implements SongPlayerService {
   private static final String SYSTEM_METHOD_MESSAGE =
       "System method, not to be invoked on behalf of a user!";
 
-  private final String locationId;
+  private final Integer locationId;
   private final SlaveCommandGateway slaveCommandGateway;
 
-  public SongPlayerServiceLocationProxy(String locationId,
+  public SongPlayerServiceLocationProxy(Integer locationId,
       SlaveCommandGateway slaveCommandGateway) {
     this.locationId = locationId;
     this.slaveCommandGateway = slaveCommandGateway;

@@ -52,78 +52,78 @@ public class LocationScopedSongLibraryController {
     this.locationService = requireNonNull(locationService, "locationService cannot be null");
   }
 
-  private SongLibraryService libraryService(String locationId) {
+  private SongLibraryService libraryService(Integer locationId) {
     return locationServiceRegistry.resolveSongLibraryService(locationId);
   }
 
   @GetMapping("/popular")
-  public SearchResultDto getMusicByPopularity(@PathVariable String locationId) {
+  public SearchResultDto getMusicByPopularity(@PathVariable Integer locationId) {
     return libraryService(locationId).getMusicByPopularity();
   }
 
   @GetMapping("/search")
-  public SearchResultDto getMusicBySearch(@PathVariable String locationId,
+  public SearchResultDto getMusicBySearch(@PathVariable Integer locationId,
       @RequestParam String searchFor, @RequestParam(defaultValue = "20") int limit) {
     return libraryService(locationId).getMusicBySearch(searchFor, limit);
   }
 
   @GetMapping("/genres")
-  public List<GenreDto> getGenres(@PathVariable String locationId) {
+  public List<GenreDto> getGenres(@PathVariable Integer locationId) {
     return libraryService(locationId).getGenres();
   }
 
   @GetMapping("/genres/popular")
-  public SearchResultDto getGenreMusicByPopularity(@PathVariable String locationId,
+  public SearchResultDto getGenreMusicByPopularity(@PathVariable Integer locationId,
       @RequestParam String genreName) {
     return libraryService(locationId).getGenreMusicByPopularity(genreName);
   }
 
   @GetMapping("/genres/title")
-  public SearchResultDto getGenreMusicByTitle(@PathVariable String locationId,
+  public SearchResultDto getGenreMusicByTitle(@PathVariable Integer locationId,
       @RequestParam String genreName) {
     return libraryService(locationId).getGenreMusicByTitle(genreName);
   }
 
   @GetMapping("/artists")
-  public List<ArtistDto> getArtists(@PathVariable String locationId) {
+  public List<ArtistDto> getArtists(@PathVariable Integer locationId) {
     return libraryService(locationId).getArtists();
   }
 
   @GetMapping("/artist")
-  public ArtistDto getArtistByName(@PathVariable String locationId,
+  public ArtistDto getArtistByName(@PathVariable Integer locationId,
       @RequestParam String artistName) {
     return libraryService(locationId).getArtistByName(artistName);
   }
 
   @GetMapping("/albums")
-  public List<AlbumDto> getAlbums(@PathVariable String locationId) {
+  public List<AlbumDto> getAlbums(@PathVariable Integer locationId) {
     return libraryService(locationId).getAlbums();
   }
 
   @GetMapping("/genres/{genreId}/albums")
-  public List<AlbumDto> getAlbumsForGenre(@PathVariable String locationId,
+  public List<AlbumDto> getAlbumsForGenre(@PathVariable Integer locationId,
       @PathVariable Integer genreId) {
     return libraryService(locationId).getAlbumsForGenre(genreId);
   }
 
   @GetMapping("/albums/{id}")
-  public AlbumDto getAlbumById(@PathVariable String locationId, @PathVariable Integer id) {
+  public AlbumDto getAlbumById(@PathVariable Integer locationId, @PathVariable Integer id) {
     return libraryService(locationId).getAlbumById(id);
   }
 
   @GetMapping("/artists/{id}")
-  public ArtistDto getArtistById(@PathVariable String locationId, @PathVariable Integer id) {
+  public ArtistDto getArtistById(@PathVariable Integer locationId, @PathVariable Integer id) {
     return libraryService(locationId).getArtistById(id);
   }
 
   @GetMapping("/artistByAlbum/{albumId}")
-  public ArtistDto getArtistByAlbumId(@PathVariable String locationId,
+  public ArtistDto getArtistByAlbumId(@PathVariable Integer locationId,
       @PathVariable Integer albumId) {
     return libraryService(locationId).getArtistByAlbumId(albumId);
   }
 
   @GetMapping("/albums/{id}/coverArt")
-  public ResponseEntity<Resource> getAlbumCoverArt(@PathVariable String locationId,
+  public ResponseEntity<Resource> getAlbumCoverArt(@PathVariable Integer locationId,
       @PathVariable Integer id) throws EntityDoesNotExistException, IOException {
 
     Path coverArtPath = locationService.getCoverArtPath(locationId, id);
@@ -142,7 +142,7 @@ public class LocationScopedSongLibraryController {
   }
 
   @GetMapping("/songs/{albumId}/{songId}")
-  public SongDto getSongById(@PathVariable String locationId, @PathVariable Integer albumId,
+  public SongDto getSongById(@PathVariable Integer locationId, @PathVariable Integer albumId,
       @PathVariable Integer songId) {
     return libraryService(locationId).getSongById(albumId, songId);
   }

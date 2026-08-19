@@ -19,7 +19,7 @@ public class LocationRootEntity extends AbstractPersistentEntity {
 
   public static final String LOCATION_LIST_FILENAME = "JukeANator_Locations.json";
 
-  private TreeMap<String, LocationEntity> locations = new TreeMap<>();
+  private TreeMap<Integer, LocationEntity> locations = new TreeMap<>();
 
   public LocationRootEntity() {
     super(Integer.valueOf(0));
@@ -35,10 +35,10 @@ public class LocationRootEntity extends AbstractPersistentEntity {
   }
 
   public LocationEntity addLocation(LocationEntity location) {
-    return this.locations.put(location.getLocationId(), location);
+    return this.locations.put(location.getPersistentIdentity(), location);
   }
 
-  public LocationEntity getLocationByIdNullIfNotExists(String locationId) {
+  public LocationEntity getLocationByIdNullIfNotExists(Integer locationId) {
     return this.locations.get(locationId);
   }
 }

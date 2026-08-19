@@ -128,7 +128,6 @@ public class AppConfig {
       CoverArtDownloader coverArtDownloader) {
     
     return new SongScanner(
-        songLibraryProperties.getLocationName(),
         discogsClientWrapper,
         musicBrainzClientWrapper,
         jAudioTaggerClient,

@@ -22,9 +22,9 @@ public class LocationServiceRegistry {
   private final SlaveCommandGateway slaveCommandGateway;
   private final LocationService locationService;
 
-  private final Map<String, SongQueueService> songQueueProxies = new ConcurrentHashMap<>();
-  private final Map<String, SongPlayerService> songPlayerProxies = new ConcurrentHashMap<>();
-  private final Map<String, SongLibraryService> songLibraryProxies = new ConcurrentHashMap<>();
+  private final Map<Integer, SongQueueService> songQueueProxies = new ConcurrentHashMap<>();
+  private final Map<Integer, SongPlayerService> songPlayerProxies = new ConcurrentHashMap<>();
+  private final Map<Integer, SongLibraryService> songLibraryProxies = new ConcurrentHashMap<>();
 
   public LocationServiceRegistry(SlaveCommandGateway slaveCommandGateway,
       LocationService locationService) {
@@ -32,17 +32,17 @@ public class LocationServiceRegistry {
     this.locationService = locationService;
   }
 
-  public SongQueueService resolveSongQueueService(String locationId) {
+  public SongQueueService resolveSongQueueService(Integer locationId) {
     return songQueueProxies.computeIfAbsent(locationId,
         id -> new SongQueueServiceLocationProxy(id, slaveCommandGateway));
   }
 
-  public SongPlayerService resolveSongPlayerService(String locationId) {
+  public SongPlayerService resolveSongPlayerService(Integer locationId) {
     return songPlayerProxies.computeIfAbsent(locationId,
         id -> new SongPlayerServiceLocationProxy(id, slaveCommandGateway));
   }
 
-  public SongLibraryService resolveSongLibraryService(String locationId) {
+  public SongLibraryService resolveSongLibraryService(Integer locationId) {
     return songLibraryProxies.computeIfAbsent(locationId,
         id -> new SongLibraryServiceLocationProxy(id, locationService));
   }

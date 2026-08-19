@@ -1,0 +1,119 @@
+# src/main/resources/application.yml
+
+app:
+  ui-enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
+  mode: slave   # standalone | master | slave
+  master-instance-url: https://jukeanator.com/jukeanator-engine   # required if mode=slave, e.g. https://jukeanator.com
+  location-id: 1            # required if mode=slave, assigned at provisioning
+  location-api-key: 3Onc4eEaQqOI-3OKOsnKA8aQsoFZYy9Tt4cg4ERvrkY       # required if mode=slave, issued at provisioning
+  jwt:
+    secret: fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP
+    expiration-ms: 86400000   # 24 hours
+  logging:
+    file-path: logs/jukeanator-service.log
+    max-file-size: 10MB
+  # The song library location ONLY -- where the actual music files live. Not used for app state.
+  root-path-windows: C:\Music # windows
+  root-path-unix: /home/tmyers/Music/Rock_On_Third # linux / macOS
+  # Where the engine reads/writes its own state: song library/queue/users (which include their
+  # credit transaction history), background-music playlists, CD stats, admin/owner password
+  # hashes. Independent of root-path-*,
+  # and OS-agnostic (unlike root-path-*). Defaults to <user.home>/.jukeanator when unset -- override
+  # here to store it elsewhere.
+  # data-dir: ~
+  # data-dir: C:\kiosk\data
+
+logging:
+  level:
+    com.djt.jukeanator_engine: INFO
+
+spring:
+  application:
+    name: JukeANator
+  aop:
+    proxy-target-class: false   # use JDK interface proxies, not CGLIB
+  # MySQL is the only supported local database -- no --spring.profiles.active flag needed. Setting
+  # user.repository-type / location.repository-type to jpa (see below) now always means "JPA against
+  # this MySQL datasource." Override via the DB_* environment variables for anything beyond local
+  # dev. Setup: sudo apt install mysql-server && sudo mysql_secure_installation. Requires the schema
+  # created by src/main/resources/db/migration/mysql/V1__init_user_schema.sql and
+  # V2__init_location_schema.sql (run automatically by Flyway on startup).
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/jukeanator}
+    username: ${DB_USERNAME:jukeanator}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Flyway owns the schema; Hibernate only checks the mapping matches
+  flyway:
+    # Scope migrations to a subfolder matching the live datasource's vendor. {vendor} is
+    # auto-detected from the JDBC connection's metadata (resolves to "mysql" here), not from a
+    # Spring profile -- see db/migration/mysql.
+    locations: classpath:db/migration/{vendor}
+
+song-library:
+  location-name: Rock On Third
+  repository-type: filesystem   # filesystem | postgres
+  requires-metadata: false
+  use-genre: true
+  use-top-folder-for-genre: true
+  discogs:
+    consumer-key: vBSFEvNtGflHQnULBNnL
+    consumer-secret: AOOYhlvSshYkJieLRrdTCUoLcsWACfWW
+  accepted-song-file-extensions:
+    - .mp3
+    - .flac
+    - .wav
+  search-result-size: 100    
+
+song-queue:
+  repository-type: filesystem   # filesystem only
+  reset-queue-at-startup: true
+  minimum-number-songs-to-keep-in-queue: 3 # Only used when background-music.enable-background-music is true
+  minimum-minutes-between-song-plays: 60
+  allow-explicit-songs-at-all-times: false
+  allow-explicit-songs-begin: 21 # In 24 hour/military time (e.g. 21:00 hours is 9:00PM) Only used when allowExplicitSongsAtAllTimes is false
+  allow-explicit-songs-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) Only used when allowExplicitSongsAtAllTimes is false
+
+background-music:
+  enable-background-music: true # assumes playlist file called BackgroundMusic.TXT exists in rootPath
+  enable-smart-background-music-additions: true # will play songs from same artist/album from background music
+  smart-background-music-additions-factor: 3 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
+  smart-background-music-additions-begin: 19 # In 24 hour/military time (e.g. 19:00 hours is 7:00PM) start time for enableSmartBackgroundMusicAdditions
+  smart-background-music-additions-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) end time for enableSmartBackgroundMusicAdditions
+  smart-background-music-min-plays: 5 # candidate songs need at least this many plays to be eligible as a smart addition
+  smart-background-music-favorite-albums-percentage: 50 # target % of the smart-addition pool made up of songs from albums listed in SmartBackgroundMusicAlbumInclusions.TXT
+
+song-player:
+  player-type: winamp   # vlc or detached-vlc (all operating systems) | winamp (windows only)
+  winamp-exe-path: C:\\Program Files (x86)\\Winamp\\winamp.exe
+  player-volume: 100 # 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software amplification)
+  master-volume: 100
+  enable-line-in-on-silence: false # mutually exclusive with enable-background-music
+  line-in-volume: 75  
+
+user:
+  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
+
+location:   # repository/service beans exist regardless of app.mode; see LocationConfig
+  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
+  storage-root: ~   # defaults under app.data-dir/locations when unset
+  command-timeout-ms: 10000   # master-only: how long to wait for a slave to reply to a command
+
+user-interface:
+  always-on-top: false
+  enable-screen-saver: true
+  # HIBERNATE CONFIGURATION  
+  enable-hibernation: true
+  hibernate-begin: 3 # In 24 hour/military time (e.g. 3:00 hours is 3:00AM) Only used when enableHibernation is true
+  hibernate-end: 10 # In 24 hour/military time (e.g. 10:00 hours is 10:00AM) Only used when enableHibernation is true  
+  # CREDIT CONFIGURATION
+  increment-credits-key: a
+  num-credits: 0
+  priority-cost-multiplier: 2
+  credits-per-dollar: 3
+  five-dollar-bonus-credits: 3
+  ten-dollar-bonus-credits: 10
+  # SEARCH CONFIGURATION
+  enable-type-ahead-search: true

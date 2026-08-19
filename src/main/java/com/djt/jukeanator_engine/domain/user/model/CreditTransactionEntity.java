@@ -33,7 +33,7 @@ public class CreditTransactionEntity extends AbstractPersistentEntity {
   private UserEntity user;
 
   @Column(name = "location_id")
-  private String locationId;
+  private Integer locationId;
 
   @Column(nullable = false)
   private int amount; // negative for spend, positive for purchase
@@ -56,7 +56,7 @@ public class CreditTransactionEntity extends AbstractPersistentEntity {
 
   protected CreditTransactionEntity() {} // for JPA
 
-  public CreditTransactionEntity(Integer persistentIdentity, String locationId, int amount,
+  public CreditTransactionEntity(Integer persistentIdentity, Integer locationId, int amount,
       CreditTransactionType type, Instant timestamp, Integer songAlbumId, Integer songId,
       int resultingBalance) {
     super(persistentIdentity);
@@ -82,7 +82,7 @@ public class CreditTransactionEntity extends AbstractPersistentEntity {
     return user != null ? user.getEmailAddress() : null;
   }
 
-  public String getLocationId() {
+  public Integer getLocationId() {
     return locationId;
   }
 

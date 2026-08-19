@@ -55,11 +55,11 @@ public class LocationScopedSongQueueController {
     this.userService = requireNonNull(userService, "userService cannot be null");
   }
 
-  private SongQueueService queueService(String locationId) {
+  private SongQueueService queueService(Integer locationId) {
     return locationServiceRegistry.resolveSongQueueService(locationId);
   }
 
-  private Integer findQueuedPriority(String locationId, int albumId, int songId) {
+  private Integer findQueuedPriority(Integer locationId, int albumId, int songId) {
     return queueService(locationId).getQueuedSongs().stream()
         .filter(entry -> entry.getSong().getAlbumId() == albumId
             && entry.getSong().getSongId() == songId)
@@ -67,31 +67,31 @@ public class LocationScopedSongQueueController {
   }
 
   private void chargeWebUserForQueueAction(Authentication authentication, Integer priority,
-      String locationId) {
+      Integer locationId) {
     if (authentication != null && authentication.getPrincipal() instanceof String email) {
       userService.chargeCreditsForQueueAction(email, priority, locationId);
     }
   }
 
   @GetMapping("/highestPriority")
-  public Integer getHighestPriority(@PathVariable String locationId) {
+  public Integer getHighestPriority(@PathVariable Integer locationId) {
     return queueService(locationId).getHighestPriority();
   }
 
   @GetMapping("/queuedSongs")
-  public List<SongQueueEntryDto> getQueuedSongs(@PathVariable String locationId) {
+  public List<SongQueueEntryDto> getQueuedSongs(@PathVariable Integer locationId) {
     return queueService(locationId).getQueuedSongs();
   }
 
   @GetMapping("/isSongEligibleForQueue")
-  public String isSongEligibleForQueue(@PathVariable String locationId,
+  public String isSongEligibleForQueue(@PathVariable Integer locationId,
       @RequestParam Integer albumId, @RequestParam Integer songId,
       @RequestParam Integer priority) {
     return queueService(locationId).isSongEligibleForQueue(albumId, songId, priority);
   }
 
   @PostMapping("/addSong")
-  public SongQueueEntryDto addSongToQueue(@PathVariable String locationId,
+  public SongQueueEntryDto addSongToQueue(@PathVariable Integer locationId,
       @RequestBody AddSongToQueueRequest addSongToQueueRequest, Authentication authentication) {
 
     if (authentication != null && authentication.getPrincipal() instanceof String email) {
@@ -107,29 +107,29 @@ public class LocationScopedSongQueueController {
   }
 
   @PostMapping("/addAlbum")
-  public List<SongQueueEntryDto> addAlbumToQueue(@PathVariable String locationId,
+  public List<SongQueueEntryDto> addAlbumToQueue(@PathVariable Integer locationId,
       @RequestBody AddAlbumToQueueRequest addAlbumToQueueRequest) {
     return queueService(locationId).addAlbumToQueue(addAlbumToQueueRequest);
   }
 
   @PostMapping("/addMultipleSongs")
-  public List<SongQueueEntryDto> addMultipleSongsToQueue(@PathVariable String locationId,
+  public List<SongQueueEntryDto> addMultipleSongsToQueue(@PathVariable Integer locationId,
       @RequestBody AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
     return queueService(locationId).addMultipleSongsToQueue(addMultipleSongsToQueueRequest);
   }
 
   @PostMapping("/flushQueue")
-  public Integer flushQueue(@PathVariable String locationId) {
+  public Integer flushQueue(@PathVariable Integer locationId) {
     return queueService(locationId).flushQueue();
   }
 
   @PostMapping("/randomizeQueue")
-  public Integer randomizeQueue(@PathVariable String locationId) {
+  public Integer randomizeQueue(@PathVariable Integer locationId) {
     return queueService(locationId).randomizeQueue();
   }
 
   @PostMapping("/moveSongUpInQueue")
-  public Integer moveSongUpInQueue(@PathVariable String locationId,
+  public Integer moveSongUpInQueue(@PathVariable Integer locationId,
       @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication) {
 
     Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.getAlbumId(),
@@ -142,7 +142,7 @@ public class LocationScopedSongQueueController {
   }
 
   @PostMapping("/moveSongDownInQueue")
-  public Integer moveSongDownInQueue(@PathVariable String locationId,
+  public Integer moveSongDownInQueue(@PathVariable Integer locationId,
       @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication) {
 
     Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.getAlbumId(),
@@ -155,7 +155,7 @@ public class LocationScopedSongQueueController {
   }
 
   @PostMapping("/removeSongDownFromQueue")
-  public Integer removeSongDownFromQueue(@PathVariable String locationId,
+  public Integer removeSongDownFromQueue(@PathVariable Integer locationId,
       @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication) {
 
     Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.getAlbumId(),
@@ -168,13 +168,13 @@ public class LocationScopedSongQueueController {
   }
 
   @PostMapping("/saveQueueAsPlaylist")
-  public Integer saveQueueAsPlaylist(@PathVariable String locationId,
+  public Integer saveQueueAsPlaylist(@PathVariable Integer locationId,
       @RequestBody String filename) {
     return queueService(locationId).saveQueueAsPlaylist(filename);
   }
 
   @PostMapping("/loadPlaylistIntoQueue")
-  public Integer loadPlaylistIntoQueue(@PathVariable String locationId,
+  public Integer loadPlaylistIntoQueue(@PathVariable Integer locationId,
       @RequestBody LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest) {
     return queueService(locationId).loadPlaylistIntoQueue(loadPlaylistIntoQueueRequest);
   }

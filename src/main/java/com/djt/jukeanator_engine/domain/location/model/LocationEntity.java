@@ -19,10 +19,6 @@ public class LocationEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
-  // natural identity, UUID generated at provisioning
-  @Column(name = "location_id", nullable = false, unique = true)
-  private String locationId;
-
   @Column(nullable = false)
   private String name;
 
@@ -45,10 +41,9 @@ public class LocationEntity extends AbstractPersistentEntity {
 
   public LocationEntity() {}
 
-  public LocationEntity(Integer persistentIdentity, String locationId, String name,
-      Double latitude, Double longitude, String apiKeyHash) {
+  public LocationEntity(Integer persistentIdentity, String name, Double latitude,
+      Double longitude, String apiKeyHash) {
     super(persistentIdentity);
-    this.locationId = locationId;
     this.name = name;
     this.latitude = latitude;
     this.longitude = longitude;
@@ -57,15 +52,7 @@ public class LocationEntity extends AbstractPersistentEntity {
 
   @Override
   public String getNaturalIdentity() {
-    return locationId;
-  }
-
-  public String getLocationId() {
-    return locationId;
-  }
-
-  public void setLocationId(String locationId) {
-    this.locationId = locationId;
+    return String.valueOf(getPersistentIdentity());
   }
 
   public String getName() {

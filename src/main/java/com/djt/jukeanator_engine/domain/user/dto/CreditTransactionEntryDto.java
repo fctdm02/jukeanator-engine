@@ -15,7 +15,7 @@ public class CreditTransactionEntryDto implements Serializable {
   private static final long serialVersionUID = 1L;
 
   private Integer persistentIdentity;
-  private String locationId;
+  private Integer locationId;
   private int amount;
   private CreditTransactionType type;
   private Instant timestamp;
@@ -25,7 +25,7 @@ public class CreditTransactionEntryDto implements Serializable {
 
   public CreditTransactionEntryDto() {}
 
-  public CreditTransactionEntryDto(Integer persistentIdentity, String locationId, int amount,
+  public CreditTransactionEntryDto(Integer persistentIdentity, Integer locationId, int amount,
       CreditTransactionType type, Instant timestamp, Integer songAlbumId, Integer songId,
       int resultingBalance) {
     this.persistentIdentity = persistentIdentity;
@@ -46,11 +46,11 @@ public class CreditTransactionEntryDto implements Serializable {
     this.persistentIdentity = persistentIdentity;
   }
 
-  public String getLocationId() {
+  public Integer getLocationId() {
     return locationId;
   }
 
-  public void setLocationId(String locationId) {
+  public void setLocationId(Integer locationId) {
     this.locationId = locationId;
   }
 

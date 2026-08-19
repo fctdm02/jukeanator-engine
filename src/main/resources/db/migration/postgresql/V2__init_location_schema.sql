@@ -2,7 +2,6 @@
 -- AbstractPersistentEntity subclass -- see AbstractPersistentEntity.PERSISTENT_IDENTITY_SEQUENCE.
 CREATE TABLE locations (
     persistent_identity     INTEGER PRIMARY KEY,
-    location_id             VARCHAR(255) NOT NULL UNIQUE,
     name                    VARCHAR(255) NOT NULL,
     latitude                DOUBLE PRECISION,
     longitude               DOUBLE PRECISION,

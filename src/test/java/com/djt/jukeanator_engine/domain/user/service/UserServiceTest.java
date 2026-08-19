@@ -530,10 +530,10 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(6, 600), 1, null);
 
-    userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry), "location-42");
+    userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry), Integer.valueOf(42));
 
     CreditTransactionEntity transaction = registeredUser().getTransactions().iterator().next();
-    assertEquals("location-42", transaction.getLocationId());
+    assertEquals(Integer.valueOf(42), transaction.getLocationId());
   }
 
   @Test
@@ -549,24 +549,25 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void chargeCreditsForQueueAction_withLocationId_tagsCreditTransactionWithLocation() {
 
-    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, "location-7");
+    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, Integer.valueOf(7));
 
     CreditTransactionEntity transaction = registeredUser().getTransactions().iterator().next();
-    assertEquals("location-7", transaction.getLocationId());
+    assertEquals(Integer.valueOf(7), transaction.getLocationId());
   }
 
   @Test
   void getCreditLedgerForLocation_returnsOnlyMatchingLocationWithinTimeRange() {
 
-    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, "loc-A");
-    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, "loc-B");
+    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, Integer.valueOf(101));
+    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, Integer.valueOf(102));
 
     Instant from = Instant.now().minusSeconds(60);
     Instant to = Instant.now().plusSeconds(60);
 
-    List<CreditTransactionDto> ledger = userServiceImpl.getCreditLedgerForLocation("loc-A", from, to);
+    List<CreditTransactionDto> ledger =
+        userServiceImpl.getCreditLedgerForLocation(Integer.valueOf(101), from, to);
 
     assertEquals(1, ledger.size());
-    assertEquals("loc-A", ledger.get(0).locationId());
+    assertEquals(Integer.valueOf(101), ledger.get(0).locationId());
   }
 }

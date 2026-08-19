@@ -30,7 +30,6 @@ public final class LocationMapper {
 
     return new LocationDto(
         entity.getPersistentIdentity(),
-        entity.getLocationId(),
         entity.getName(),
         entity.getLatitude(),
         entity.getLongitude(),
@@ -55,7 +54,6 @@ public final class LocationMapper {
 
     LocationEntity location = new LocationEntity(
         dto.getPersistentIdentity(),
-        dto.getLocationId(),
         dto.getName(),
         dto.getLatitude(),
         dto.getLongitude(),

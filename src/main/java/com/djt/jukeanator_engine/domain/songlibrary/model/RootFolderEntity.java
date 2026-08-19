@@ -23,7 +23,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryService
 public class RootFolderEntity extends FolderEntity {
 
   private static final Logger log = LoggerFactory.getLogger(RootFolderEntity.class);
-
+  
   private static final long serialVersionUID = 2L;
 
 
@@ -32,7 +32,7 @@ public class RootFolderEntity extends FolderEntity {
   private static final String CD_STATS_BACKUP = "CDStats_backup.TXT";
   private static final FileSystemHelper fileSystemHelper = new FileSystemHelper();
 
-  private String locationName;
+  private LocationMetaDataFileEntity metadata;
   private Set<ArtistFromSongEntity> artistsFromSongs = new TreeSet<ArtistFromSongEntity>();
 
   private transient Map<Integer, GenreFolderEntity> genresMap;
@@ -45,9 +45,9 @@ public class RootFolderEntity extends FolderEntity {
   // Used to load playlists into the queue
   private transient Map<String, SongFileEntity> songsByPath;
 
-  public RootFolderEntity(String locationName, String rootPath) {
+  public RootFolderEntity(String rootPath) {
     super(null, rootPath);
-    this.locationName = locationName;
+    this.metadata = new LocationMetaDataFileEntity(this);
   }
 
   public void initialize() {
@@ -113,11 +113,17 @@ public class RootFolderEntity extends FolderEntity {
   }
   
   public String getLocationName() {
-    return this.locationName;
+    return getMetadata().getLocationName();
   }
-  
-  public void setLocationName(String locationName) {
-    this.locationName = locationName;
+
+  public LocationMetaDataFileEntity getMetadata() {
+    // Backfills pre-existing serialized (.oos) libraries persisted before this field existed --
+    // Java deserialization never runs a constructor, so an older library file simply leaves
+    // this field null rather than populating it.
+    if (this.metadata == null) {
+      this.metadata = new LocationMetaDataFileEntity(this);
+    }
+    return this.metadata;
   }
 
   public String getRootPath() {

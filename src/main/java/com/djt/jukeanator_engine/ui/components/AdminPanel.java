@@ -825,7 +825,7 @@ public class AdminPanel extends JPanel {
       c.insets = new Insets(6, 6, 6, 6);
       c.anchor = GridBagConstraints.WEST;
 
-      addReadOnlyRow(result, c, 0, "Location ID:", provisioned.locationId());
+      addReadOnlyRow(result, c, 0, "Location ID:", String.valueOf(provisioned.locationId()));
       addReadOnlyRow(result, c, 1, "API Key:", provisioned.apiKey());
 
       JLabel warning = new JLabel("<html><body style='width: 260px;'>Copy this API key now "

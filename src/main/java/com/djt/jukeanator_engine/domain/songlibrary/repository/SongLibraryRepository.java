@@ -9,7 +9,10 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
  */
 public interface SongLibraryRepository extends AggregateRootRepository<RootFolderEntity> {
 
-  String DEFAULT_SONG_LIBRARY_LOCATION_NAME = "JukeANator";
+  // Fixed filename for the filesystem-backed repository -- see
+  // SongLibraryRepositoryFileSystemImpl, which is basePath-scoped (one repository instance per
+  // deployment) so there's no need for the filename to vary by location.
+  String SONG_LIBRARY_FILENAME = "SongLibrary.oos";
   
   /**
    * 
