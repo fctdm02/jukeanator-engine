@@ -12,10 +12,11 @@ public class IdleMonitor {
   private static final long DEFAULT_IDLE_TIMEOUT_MS = 60_000;
 
   /**
-   * How long (ms) to suppress the onActive callback after the screensaver is triggered. This
-   * prevents stale AWT events that are already queued — or the OS-level repaint/focus events
-   * produced when the ScreenSaverWindow becomes visible — from immediately dismissing the
-   * screensaver.
+   * How long (ms) to suppress the onActive callback for passive mouse-motion events (move/enter/
+   * exit) after the screensaver is triggered. This prevents the synthetic MOUSE_ENTERED/
+   * MOUSE_MOVED event that Swing fires when the fullscreen ScreenSaverWindow appears under the
+   * cursor from immediately dismissing it. Deliberate input — a press, click, wheel turn, or key
+   * press — is never suppressed, so a real touch/click dismisses the screensaver with no lag.
    */
   private static final long ACTIVATION_GRACE_PERIOD_MS = 2_000;
 
@@ -38,10 +39,14 @@ public class IdleMonitor {
 
         lastActivity = System.currentTimeMillis();
 
-        // Suppress onActive during the grace period immediately after the
-        // screensaver was activated so that queued / system-generated events
-        // cannot dismiss it before the user sees it.
-        boolean inGracePeriod = lastIdleFiredAt > 0
+        // Only passive motion (no press/click/key behind it) is treated as
+        // possibly a stale/synthetic event; deliberate input dismisses
+        // instantly, with no grace-period lag.
+        int id = ((AWTEvent) e).getID();
+        boolean isPassiveMotion = id == MouseEvent.MOUSE_MOVED || id == MouseEvent.MOUSE_ENTERED
+            || id == MouseEvent.MOUSE_EXITED;
+
+        boolean inGracePeriod = isPassiveMotion && lastIdleFiredAt > 0
             && (System.currentTimeMillis() - lastIdleFiredAt) < ACTIVATION_GRACE_PERIOD_MS;
 
         if (!inGracePeriod) {
