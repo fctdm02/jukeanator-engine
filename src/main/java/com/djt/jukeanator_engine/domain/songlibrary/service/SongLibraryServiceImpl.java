@@ -77,11 +77,10 @@ public class SongLibraryServiceImpl
   private boolean isInitialized;
   private boolean libraryLoadFailedAtStartup;
 
-  public SongLibraryServiceImpl(String locationName, String dataDir, String rootPath, String rootPathWindows,
+  public SongLibraryServiceImpl(String dataDir, String rootPath, String rootPathWindows,
       String rootPathUnix, SongLibraryRepository songLibraryRepository, SongScanner songScanner,
       Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
 
-    requireNonNull(locationName, "locationName cannot be null");
     requireNonNull(dataDir, "dataDir cannot be null");
     requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
@@ -91,7 +90,6 @@ public class SongLibraryServiceImpl
     requireNonNull(searchResultSize, "searchResultSize cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
-    this.locationName = locationName;
     this.dataDir = dataDir;
     this.rootPath = rootPath;
     this.rootPathWindows = rootPathWindows;

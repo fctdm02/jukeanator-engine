@@ -53,7 +53,6 @@ spring:
     locations: classpath:db/migration/{vendor}
 
 song-library:
-  location-name: Rock On Third
   repository-type: filesystem   # filesystem | postgres
   requires-metadata: false
   use-genre: true

@@ -193,7 +193,6 @@ public class AppConfig {
       ApplicationEventPublisher eventPublisher) {
     
     return new SongLibraryServiceImpl(
-        songLibraryProperties.getLocationName(),
         appProperties.getDataDir(),
         appProperties.getEffectiveRootPath(),
         appProperties.getRootPathWindows(),
