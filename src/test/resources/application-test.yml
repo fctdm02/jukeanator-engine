@@ -65,7 +65,7 @@ background-music:
 
 song-player:
   player-type: vlc   # vlc or detached-vlc (all operating systems) | winamp (windows only)
-  winamp-exe-path: C:\\Program Files (x86)\\Winamp\\winamp.exe
+  winamp-exe-path: C:\\kiosk\\Winamp\\winamp.exe
   player-volume: 100 # 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software amplification)
   master-volume: 100
   enable-line-in-on-silence: false # mutually exclusive with enable-background-music
