@@ -148,7 +148,7 @@ public class SongLibraryServiceImpl
       this.songLibraryRoot.initialize();
     }
 
-    log.info("locationName: " + this.locationName);
+    log.info("locationName: " + this.songLibraryRoot.getLocationName());
     log.info("rootPath: " + this.rootPath);
     log.info("rootPathWindows: " + this.rootPathWindows);
     log.info("rootPathUnix: " + this.rootPathUnix);
