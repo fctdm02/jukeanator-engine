@@ -83,7 +83,7 @@ user-interface:
   # HIBERNATE CONFIGURATION
   enable-hibernation: false
   hibernate-begin: 3 # In 24 hour/military time (e.g. 3:00 hours is 3:00AM) Only used when enableHibernation is true
-  hibernate-end: 10 # In 24 hour/military time (e.g. 10:00 hours is 10:00AM) Only used when enableHibernation is true  
+  hibernate-end: 9   # In 24 hour/military time  
   # CREDIT CONFIGURATION
   increment-credits-key: a
   num-credits: 0
