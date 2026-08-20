@@ -56,7 +56,8 @@ public final class SongQueueRepositoryFileSystemImpl extends AbstractRepositoryF
               + " and filePath: " + filePath);
     }
 
-    RootFolderEntity songLibraryRoot = songLibraryService.getSongLibraryRoot();
+    RootFolderEntity songLibraryRoot =
+        songLibraryService.getSongLibraryRoot(songLibraryService.getOwnLocationId());
 
     SongQueueRootEntity root = new SongQueueRootEntity(dto.getRootPath());
     for (SongQueueEntryPersistenceDto entryDto : dto.getEntries()) {

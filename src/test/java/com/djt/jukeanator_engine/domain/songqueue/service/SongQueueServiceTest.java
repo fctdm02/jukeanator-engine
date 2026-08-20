@@ -48,7 +48,7 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
             + "utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
     Integer numAlbums = songLibraryService.scanFileSystemForSongs(scanRequest);
     assertNotNull(numAlbums, "numAlbums should not be null");
-    List<AlbumDto> albums = songLibraryService.getAlbums();
+    List<AlbumDto> albums = songLibraryService.getAlbums(songLibraryService.getOwnLocationId());
     assertNotNull(albums, "albums should not be null");
     assertFalse(albums.isEmpty(), "albums should not be empty");
 
@@ -62,11 +62,13 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
     Integer priority = Integer.valueOf(1);
     AddSongToQueueRequest addSongToQueueRequest =
         new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, albumId, songId, priority);
-    SongQueueEntryDto queueEntry = songQueueService.addSongToQueue(addSongToQueueRequest);
+    SongQueueEntryDto queueEntry = songQueueService.addSongToQueue(
+        songLibraryService.getOwnLocationId(), addSongToQueueRequest);
     assertNotNull(queueEntry, "queueEntry should not be null");
 
     // Get the contents of the song queue
-    List<SongQueueEntryDto> queuedSongs = songQueueService.getQueuedSongs();
+    List<SongQueueEntryDto> queuedSongs =
+        songQueueService.getQueuedSongs(songLibraryService.getOwnLocationId());
     assertNotNull(queuedSongs, "queuedSongs should not be null");
     assertTrue(queuedSongs.size() > 0, "queuedSongs size should be non-zero");
     SongQueueEntryDto queuedSong = queuedSongs.get(0);
@@ -79,7 +81,7 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
         "Song name is incorrect");
 
     // Verify that the song queue is now empty
-    queuedSongs = songQueueService.getQueuedSongs();
+    queuedSongs = songQueueService.getQueuedSongs(songLibraryService.getOwnLocationId());
     assertNotNull(queuedSongs, "queuedSongs should not be null");
     assertTrue(queuedSongs.size() == 0, "queuedSongs size should be zero");
   }

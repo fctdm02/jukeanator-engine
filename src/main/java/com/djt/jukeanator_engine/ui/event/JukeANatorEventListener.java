@@ -45,9 +45,9 @@ public class JukeANatorEventListener {
     if (frame == null) return;
     
     frame.refreshMusicByPopularityResults();
-    frame.setGenres(songLibraryService.getGenres());
+    frame.setGenres(songLibraryService.getGenres(songLibraryService.getOwnLocationId()));
   }
-  
+
   @EventListener
   public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
 
@@ -106,10 +106,12 @@ public class JukeANatorEventListener {
   
   private void initializeUi() {
 
-    frame.setAlbums(songLibraryService.getAlbums(), songLibraryService.getMusicByPopularity());
+    Integer locationId = songLibraryService.getOwnLocationId();
+    frame.setAlbums(songLibraryService.getAlbums(locationId),
+        songLibraryService.getMusicByPopularity(locationId));
     frame.refreshMusicByPopularityResults();
-    frame.setGenres(songLibraryService.getGenres());
-    frame.setNowPlaying(songPlayerService.getNowPlayingSong());
-    frame.setQueue(songQueueService.getQueuedSongs());
+    frame.setGenres(songLibraryService.getGenres(locationId));
+    frame.setNowPlaying(songPlayerService.getNowPlayingSong(locationId));
+    frame.setQueue(songQueueService.getQueuedSongs(locationId));
   }
 }

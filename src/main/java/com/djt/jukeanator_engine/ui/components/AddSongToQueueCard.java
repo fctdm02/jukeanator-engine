@@ -299,15 +299,15 @@ public class AddSongToQueueCard extends JPanel {
     JPanel buttons = new JPanel(new GridLayout(1, 2, 16, 0));
     buttons.setOpaque(false);
 
-    int highestPriority = songQueueService.getHighestPriority();
+    int highestPriority = songQueueService.getHighestPriority(songQueueService.getOwnLocationId());
     int priorityCost = highestPriority * priorityCostMultiplier;
 
     this.normalButton =
         createQueueButton("Play Song", normalPlayCost, ColorTheme.get().accentBlue, e -> {
           if (creditManager.deductCredits(normalPlayCost)) {
 
-            SwingSecurityUtil
-                .runAsync(() -> songQueueService.addSongToQueue(new AddSongToQueueRequest(
+            SwingSecurityUtil.runAsync(() -> songQueueService.addSongToQueue(
+                songQueueService.getOwnLocationId(), new AddSongToQueueRequest(
                     SongQueueService.LOCAL_USERNAME, song.getAlbumId(), song.getSongId(), 1)));
 
             dismiss();
@@ -318,9 +318,10 @@ public class AddSongToQueueCard extends JPanel {
         createQueueButton("Priority Play Song", priorityCost, ColorTheme.get().accentGold, e -> {
           if (creditManager.deductCredits(priorityCost)) {
 
-            SwingSecurityUtil.runAsync(() -> songQueueService
-                .addSongToQueue(new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME,
-                    song.getAlbumId(), song.getSongId(), highestPriority)));
+            SwingSecurityUtil.runAsync(() -> songQueueService.addSongToQueue(
+                songQueueService.getOwnLocationId(),
+                new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, song.getAlbumId(),
+                    song.getSongId(), highestPriority)));
 
             dismiss();
           }
@@ -355,7 +356,7 @@ public class AddSongToQueueCard extends JPanel {
 
     int currentCredits = creditManager.getCredits();
 
-    int highestPriority = songQueueService.getHighestPriority();
+    int highestPriority = songQueueService.getHighestPriority(songQueueService.getOwnLocationId());
     int priorityCost = highestPriority * priorityCostMultiplier;
 
     normalButton.setEnabled(currentCredits >= normalPlayCost);

@@ -50,7 +50,7 @@ spring:
     locations: classpath:db/migration/{vendor}
 
 song-library:
-  repository-type: filesystem   # filesystem | postgres
+  repository-type: jpa   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
   requires-metadata: false
   use-genre: true
   use-top-folder-for-genre: true

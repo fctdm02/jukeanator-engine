@@ -6,6 +6,8 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -46,6 +48,15 @@ public class LibrarySyncService {
   private final AppProperties appProperties;
   private final RestClient restClient;
 
+  // Runs the actual sync (metadata POST + any stale cover-art uploads) off the calling thread, so
+  // a slow/unreachable master never delays the slave's own scan/UI -- see
+  // handleScanFileSystemForSongsEvent.
+  private final ExecutorService syncExecutor = Executors.newSingleThreadExecutor(r -> {
+    Thread t = new Thread(r, "library-sync-thread");
+    t.setDaemon(true);
+    return t;
+  });
+
   public LibrarySyncService(SongLibraryService songLibraryService, AppProperties appProperties) {
 
     this.songLibraryService = songLibraryService;
@@ -56,22 +67,26 @@ public class LibrarySyncService {
   @EventListener
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
 
-    try {
-      syncLibrary();
-    } catch (Throwable t) {
-      // The master being unreachable — or literally anything else going wrong here, down to a
-      // classpath problem — must never break a slave's own scan/UI. This event listener runs
-      // synchronously on the same thread as the scan itself, so an uncaught Throwable here
-      // propagates back out of scanFileSystemForSongs() and fails the scan too. This is exactly
-      // the "slave keeps working fully offline" requirement, so we catch everything.
-      log.warn("Could not sync library to master at " + appProperties.getMasterInstanceUrl(), t);
-    }
+    // Dispatch onto syncExecutor rather than calling syncLibrary() inline: the previous inline
+    // approach already caught every Throwable so a slow/unreachable master couldn't fail the
+    // scan, but it could still delay scanFileSystemForSongs() returning for as long as the HTTP
+    // calls took. Running on a background thread removes that latency entirely.
+    syncExecutor.submit(() -> {
+      try {
+        syncLibrary();
+      } catch (Throwable t) {
+        // Must never let a sync failure propagate anywhere that could affect the slave's own
+        // scan/UI -- see the class javadoc: only metadata and cover art leave the building, and
+        // only on a best-effort basis.
+        log.warn("Could not sync library to master at " + appProperties.getMasterInstanceUrl(), t);
+      }
+    });
   }
 
   private void syncLibrary() {
 
     LibrarySnapshotDto snapshot = buildSnapshot();
-    Integer locationId = songLibraryService.getSongLibraryRoot().getMetadata().getLocationId();
+    Integer locationId = songLibraryService.getOwnLocationId();
 
     LibrarySyncAckDto ack = restClient.post()
         .uri("/api/locations/{locationId}/library-sync/metadata", locationId)
@@ -86,7 +101,7 @@ public class LibrarySyncService {
       return;
     }
 
-    for (AlbumDto album : songLibraryService.getAlbums()) {
+    for (AlbumDto album : songLibraryService.getAlbums(songLibraryService.getOwnLocationId())) {
       if (ack.sourceAlbumIdsNeedingCoverArt().contains(album.getAlbumId())) {
         uploadCoverArt(album);
       }
@@ -96,17 +111,17 @@ public class LibrarySyncService {
   private LibrarySnapshotDto buildSnapshot() {
 
     List<LibrarySnapshotGenreDto> genres = new ArrayList<>();
-    for (GenreDto genre : songLibraryService.getGenres()) {
+    for (GenreDto genre : songLibraryService.getGenres(songLibraryService.getOwnLocationId())) {
       genres.add(new LibrarySnapshotGenreDto(genre.getGenreId(), genre.getGenreName()));
     }
 
     List<LibrarySnapshotArtistDto> artists = new ArrayList<>();
-    for (ArtistDto artist : songLibraryService.getArtists()) {
+    for (ArtistDto artist : songLibraryService.getArtists(songLibraryService.getOwnLocationId())) {
       artists.add(new LibrarySnapshotArtistDto(artist.getArtistId(), artist.getArtistName()));
     }
 
     List<LibrarySnapshotAlbumDto> albums = new ArrayList<>();
-    for (AlbumDto album : songLibraryService.getAlbums()) {
+    for (AlbumDto album : songLibraryService.getAlbums(songLibraryService.getOwnLocationId())) {
 
       List<LibrarySnapshotSongDto> songs = new ArrayList<>();
       for (SongDto song : album.getSongs()) {
@@ -138,7 +153,7 @@ public class LibrarySyncService {
       return;
     }
 
-    Integer locationId = songLibraryService.getSongLibraryRoot().getMetadata().getLocationId();
+    Integer locationId = songLibraryService.getOwnLocationId();
 
     restClient.post()
         .uri("/api/locations/{locationId}/library-sync/cover-art/{sourceAlbumId}",

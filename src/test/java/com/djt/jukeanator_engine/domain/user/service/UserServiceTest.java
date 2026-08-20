@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -303,7 +304,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void getPublicHomePage_returnsHotHereArtistsAndSongsFromSongLibrary() {
 
-    when(songLibraryService.getMusicByPopularity())
+    when(songLibraryService.getMusicByPopularity(any()))
         .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
 
     var homePage = userServiceImpl.getPublicHomePage();
@@ -316,7 +317,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void getHomePage_returnsPlaylistNamesAndSearchHistoryForRegisteredUser() {
 
-    when(songLibraryService.getMusicByPopularity())
+    when(songLibraryService.getMusicByPopularity(any()))
         .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
     registeredUser().addToSearchHistory("beatles", 10);
 
@@ -396,10 +397,10 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     registeredUser().createPlaylist("Road Trip");
     SongFileEntity song = buildSong(1, 100);
 
-    boolean result = userServiceImpl.addSongToPlaylist(REGISTERED_EMAIL, "Road Trip", song);
+    boolean result = userServiceImpl.addSongToPlaylist(REGISTERED_EMAIL, "Road Trip", 9, song);
 
     assertTrue(result);
-    assertEquals(List.of(new SongIdentifier(1, 100)),
+    assertEquals(List.of(new SongIdentifier(9, 1, 100)),
         registeredUser().getPlaylistByName("Road Trip").getSongs());
     verify(userRepository).storeAggregateRoot(userRoot);
   }
@@ -408,10 +409,11 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void removeSongFromPlaylist_removesSongAndPersists() throws Exception {
 
     PlaylistEntity playlist = registeredUser().createPlaylist("Road Trip");
-    playlist.addSong(new SongIdentifier(1, 100));
+    playlist.addSong(new SongIdentifier(9, 1, 100));
     SongFileEntity song = buildSong(1, 100);
 
-    boolean result = userServiceImpl.removeSongFromPlaylist(REGISTERED_EMAIL, "Road Trip", song);
+    boolean result =
+        userServiceImpl.removeSongFromPlaylist(REGISTERED_EMAIL, "Road Trip", 9, song);
 
     assertTrue(result);
     assertTrue(playlist.getSongs().isEmpty());
@@ -435,11 +437,11 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     SongFileEntity song = buildSong(2, 200);
 
-    boolean result = userServiceImpl.addSongToMyFavoritesPlaylist(REGISTERED_EMAIL, song);
+    boolean result = userServiceImpl.addSongToMyFavoritesPlaylist(REGISTERED_EMAIL, 9, song);
 
     assertTrue(result);
     assertTrue(registeredUser().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
-        .getSongs().contains(new SongIdentifier(2, 200)));
+        .getSongs().contains(new SongIdentifier(9, 2, 200)));
     verify(userRepository).storeAggregateRoot(userRoot);
   }
 
@@ -447,14 +449,14 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void removeSongFromMyFavoritesPlaylist_removesSongFromFavoritesAndPersists() throws Exception {
 
     registeredUser().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
-        .addSong(new SongIdentifier(2, 200));
+        .addSong(new SongIdentifier(9, 2, 200));
     SongFileEntity song = buildSong(2, 200);
 
-    boolean result = userServiceImpl.removeSongFromMyFavoritesPlaylist(REGISTERED_EMAIL, song);
+    boolean result = userServiceImpl.removeSongFromMyFavoritesPlaylist(REGISTERED_EMAIL, 9, song);
 
     assertTrue(result);
     assertFalse(registeredUser().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
-        .getSongs().contains(new SongIdentifier(2, 200)));
+        .getSongs().contains(new SongIdentifier(9, 2, 200)));
   }
 
   @Test
@@ -471,9 +473,9 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void getPlaylistSongs_returnsSongsResolvedFromSongLibrary() throws Exception {
 
     registeredUser().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
-        .addSong(new SongIdentifier(3, 300));
+        .addSong(new SongIdentifier(9, 3, 300));
     SongDto songDto = buildSongDto(3, 300);
-    when(songLibraryService.getSongById(3, 300)).thenReturn(songDto);
+    when(songLibraryService.getSongById(any(), eq(3), eq(300))).thenReturn(songDto);
 
     List<SongDto> songs =
         userServiceImpl.getPlaylistSongs(REGISTERED_EMAIL, PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
@@ -485,13 +487,13 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void reorderPlaylistSongs_keepsOnlyExistingSongsInGivenOrderAndPersists() throws Exception {
 
     PlaylistEntity playlist = registeredUser().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
-    SongIdentifier a = new SongIdentifier(1, 1);
-    SongIdentifier b = new SongIdentifier(2, 2);
+    SongIdentifier a = new SongIdentifier(9, 1, 1);
+    SongIdentifier b = new SongIdentifier(9, 2, 2);
     playlist.addSong(a);
     playlist.addSong(b);
 
     userServiceImpl.reorderPlaylistSongs(REGISTERED_EMAIL, PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME,
-        List.of(b, a, new SongIdentifier(9, 9)));
+        List.of(b, a, new SongIdentifier(9, 9, 9)));
 
     assertEquals(List.of(b, a), playlist.getSongs());
     verify(userRepository).storeAggregateRoot(userRoot);
@@ -500,7 +502,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void getFavoriteSongIdentifiers_returnsFavoritesPlaylistSongs() {
 
-    SongIdentifier fav = new SongIdentifier(4, 400);
+    SongIdentifier fav = new SongIdentifier(9, 4, 400);
     registeredUser().getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
         .addSong(fav);
 
@@ -519,7 +521,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry));
 
     UserEntity user = registeredUser();
-    assertTrue(user.getSongPlayHistory().contains(new SongIdentifier(5, 500)));
+    assertTrue(user.getSongPlayHistory().contains(new SongIdentifier(null, 5, 500)));
     assertEquals(4, user.getNumCredits()); // 6 - (priority 1 * 2 credits)
     verify(eventPublisher).publishEvent(any(UserCreditsChangedEvent.class));
     verify(userRepository).storeAggregateRoot(userRoot);

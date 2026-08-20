@@ -15,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.http.MediaType;
 import com.djt.jukeanator_engine.AbstractControllerTest;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -27,8 +28,14 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
 class SongLibraryControllerTest extends AbstractControllerTest {
 
+  private static final Integer LOCATION_ID = 7;
+  private static final String BASE_PATH = "/api/locations/" + LOCATION_ID + "/song-library";
+
   @Mock
   private SongLibraryService songLibraryService;
+
+  @Mock
+  private LocationService locationService;
 
   @InjectMocks
   private SongLibraryController songLibraryController;
@@ -45,61 +52,62 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   @Test
   void getMusicByPopularity_delegatesToService() throws Exception {
     SearchResultDto result = new SearchResultDto(List.of(aSong()), List.of(), List.of());
-    when(songLibraryService.getMusicByPopularity()).thenReturn(result);
+    when(songLibraryService.getMusicByPopularity(LOCATION_ID)).thenReturn(result);
 
-    mockMvc.perform(get("/api/song-library/popular"))
+    mockMvc.perform(get(BASE_PATH + "/popular"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.songs[0].songName", is("Song")));
 
-    verify(songLibraryService).getMusicByPopularity();
+    verify(songLibraryService).getMusicByPopularity(LOCATION_ID);
   }
 
   @Test
   void getMusicBySearch_passesSearchParam() throws Exception {
-    when(songLibraryService.getMusicBySearch("foo", 20)).thenReturn(new SearchResultDto());
+    when(songLibraryService.getMusicBySearch(LOCATION_ID, "foo", 20)).thenReturn(new SearchResultDto());
 
-    mockMvc.perform(get("/api/song-library/search").param("searchFor", "foo"))
+    mockMvc.perform(get(BASE_PATH + "/search").param("searchFor", "foo"))
         .andExpect(status().isOk());
 
-    verify(songLibraryService).getMusicBySearch("foo", 20);
+    verify(songLibraryService).getMusicBySearch(LOCATION_ID, "foo", 20);
   }
 
   @Test
   void getGenres_returnsListFromService() throws Exception {
     GenreDto genre = new GenreDto(1, "Rock", List.of(1, 2), 5);
-    when(songLibraryService.getGenres()).thenReturn(List.of(genre));
+    when(songLibraryService.getGenres(LOCATION_ID)).thenReturn(List.of(genre));
 
-    mockMvc.perform(get("/api/song-library/genres"))
+    mockMvc.perform(get(BASE_PATH + "/genres"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].genreName", is("Rock")));
   }
 
   @Test
   void getGenreMusicByPopularity_passesGenreName() throws Exception {
-    when(songLibraryService.getGenreMusicByPopularity("Rock")).thenReturn(new SearchResultDto());
+    when(songLibraryService.getGenreMusicByPopularity(LOCATION_ID, "Rock"))
+        .thenReturn(new SearchResultDto());
 
-    mockMvc.perform(get("/api/song-library/genres/popular").param("genreName", "Rock"))
+    mockMvc.perform(get(BASE_PATH + "/genres/popular").param("genreName", "Rock"))
         .andExpect(status().isOk());
 
-    verify(songLibraryService).getGenreMusicByPopularity("Rock");
+    verify(songLibraryService).getGenreMusicByPopularity(LOCATION_ID, "Rock");
   }
 
   @Test
   void getGenreMusicByTitle_passesGenreName() throws Exception {
-    when(songLibraryService.getGenreMusicByTitle("Rock")).thenReturn(new SearchResultDto());
+    when(songLibraryService.getGenreMusicByTitle(LOCATION_ID, "Rock")).thenReturn(new SearchResultDto());
 
-    mockMvc.perform(get("/api/song-library/genres/title").param("genreName", "Rock"))
+    mockMvc.perform(get(BASE_PATH + "/genres/title").param("genreName", "Rock"))
         .andExpect(status().isOk());
 
-    verify(songLibraryService).getGenreMusicByTitle("Rock");
+    verify(songLibraryService).getGenreMusicByTitle(LOCATION_ID, "Rock");
   }
 
   @Test
   void getArtists_returnsListFromService() throws Exception {
     ArtistDto artist = new ArtistDto(1, "Artist", "/cover.jpg", 1, 10, 5, List.of());
-    when(songLibraryService.getArtists()).thenReturn(List.of(artist));
+    when(songLibraryService.getArtists(LOCATION_ID)).thenReturn(List.of(artist));
 
-    mockMvc.perform(get("/api/song-library/artists"))
+    mockMvc.perform(get(BASE_PATH + "/artists"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].artistName", is("Artist")));
   }
@@ -107,9 +115,9 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   @Test
   void getArtistByName_passesArtistName() throws Exception {
     ArtistDto artist = new ArtistDto(1, "Artist", "/cover.jpg", 1, 10, 5, List.of());
-    when(songLibraryService.getArtistByName("Artist")).thenReturn(artist);
+    when(songLibraryService.getArtistByName(LOCATION_ID, "Artist")).thenReturn(artist);
 
-    mockMvc.perform(get("/api/song-library/artist").param("artistName", "Artist"))
+    mockMvc.perform(get(BASE_PATH + "/artist").param("artistName", "Artist"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.artistName", is("Artist")));
   }
@@ -118,57 +126,59 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   void getAlbums_returnsListFromService() throws Exception {
     AlbumDto album = new AlbumDto(1, "Genre", 2, "Artist", 3, "Album", false, "Label", "2020",
         "/cover.jpg", false, List.of(aSong()));
-    when(songLibraryService.getAlbums()).thenReturn(List.of(album));
+    when(songLibraryService.getAlbums(LOCATION_ID)).thenReturn(List.of(album));
 
-    mockMvc.perform(get("/api/song-library/albums"))
+    mockMvc.perform(get(BASE_PATH + "/albums"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].albumName", is("Album")));
   }
 
   @Test
   void getAlbumsForGenre_passesGenreId() throws Exception {
-    when(songLibraryService.getAlbumsForGenre(1)).thenReturn(List.of());
+    when(songLibraryService.getAlbumsForGenre(LOCATION_ID, 1)).thenReturn(List.of());
 
-    mockMvc.perform(get("/api/song-library/genres/1/albums"))
+    mockMvc.perform(get(BASE_PATH + "/genres/1/albums"))
         .andExpect(status().isOk());
 
-    verify(songLibraryService).getAlbumsForGenre(1);
+    verify(songLibraryService).getAlbumsForGenre(LOCATION_ID, 1);
   }
 
   @Test
   void getAlbumById_passesId() throws Exception {
     AlbumDto album = new AlbumDto(1, "Genre", 2, "Artist", 3, "Album", false, "Label", "2020",
         "/cover.jpg", false, List.of(aSong()));
-    when(songLibraryService.getAlbumById(3)).thenReturn(album);
+    when(songLibraryService.getAlbumById(LOCATION_ID, 3)).thenReturn(album);
 
-    mockMvc.perform(get("/api/song-library/albums/3"))
+    mockMvc.perform(get(BASE_PATH + "/albums/3"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.albumName", is("Album")));
   }
 
   @Test
   void getAlbumCoverArt_returnsNotFoundWhenAlbumMissing() throws Exception {
-    when(songLibraryService.getAlbumById(99)).thenReturn(null);
+    when(songLibraryService.getOwnLocationId()).thenReturn(LOCATION_ID);
+    when(songLibraryService.getAlbumById(LOCATION_ID, 99)).thenReturn(null);
 
-    mockMvc.perform(get("/api/song-library/albums/99/coverArt"))
+    mockMvc.perform(get(BASE_PATH + "/albums/99/coverArt"))
         .andExpect(status().isNotFound());
   }
 
   @Test
   void getAlbumCoverArt_returnsNotFoundWhenCoverArtPathMissing() throws Exception {
+    when(songLibraryService.getOwnLocationId()).thenReturn(LOCATION_ID);
     AlbumDto album = new AlbumDto(1, "Genre", 2, "Artist", 3, "Album", false, "Label", "2020",
         null, false, List.of());
-    when(songLibraryService.getAlbumById(3)).thenReturn(album);
+    when(songLibraryService.getAlbumById(LOCATION_ID, 3)).thenReturn(album);
 
-    mockMvc.perform(get("/api/song-library/albums/3/coverArt"))
+    mockMvc.perform(get(BASE_PATH + "/albums/3/coverArt"))
         .andExpect(status().isNotFound());
   }
 
   @Test
   void getSongById_passesAlbumAndSongId() throws Exception {
-    when(songLibraryService.getSongById(3, 4)).thenReturn(aSong());
+    when(songLibraryService.getSongById(LOCATION_ID, 3, 4)).thenReturn(aSong());
 
-    mockMvc.perform(get("/api/song-library/songs/3/4"))
+    mockMvc.perform(get(BASE_PATH + "/songs/3/4"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.songName", is("Song")));
   }
@@ -177,7 +187,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   void scanFileSystemForSongsNoPath_delegatesToService() throws Exception {
     when(songLibraryService.scanFileSystemForSongs()).thenReturn(5);
 
-    mockMvc.perform(post("/api/song-library/scanNoPath"))
+    mockMvc.perform(post(BASE_PATH + "/scanNoPath"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$", is(5)));
   }
@@ -187,7 +197,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
     ScanRequest request = new ScanRequest("/music");
     when(songLibraryService.scanFileSystemForSongs(any(ScanRequest.class))).thenReturn(10);
 
-    mockMvc.perform(post("/api/song-library/scan")
+    mockMvc.perform(post(BASE_PATH + "/scan")
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk())
@@ -200,7 +210,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   void resetSongStatistics_delegatesToService() throws Exception {
     when(songLibraryService.resetSongStatistics()).thenReturn(1);
 
-    mockMvc.perform(post("/api/song-library/resetSongStatistics"))
+    mockMvc.perform(post(BASE_PATH + "/resetSongStatistics"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$", is(1)));
   }
@@ -209,7 +219,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   void restoreSongStatistics_passesFilename() throws Exception {
     when(songLibraryService.restoreSongStatistics("backup.oos")).thenReturn(1);
 
-    mockMvc.perform(post("/api/song-library/restoreSongStatistics")
+    mockMvc.perform(post(BASE_PATH + "/restoreSongStatistics")
             .contentType(MediaType.TEXT_PLAIN)
             .content("backup.oos"))
         .andExpect(status().isOk());
@@ -234,7 +244,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
           "hasExplicit": false
         }""";
 
-    mockMvc.perform(post("/api/song-library/albums/3/updateAlbumMetadata")
+    mockMvc.perform(post(BASE_PATH + "/albums/3/updateAlbumMetadata")
             .contentType(MediaType.APPLICATION_JSON)
             .content(requestBody))
         .andExpect(status().isOk());
@@ -249,7 +259,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
     when(songLibraryService.authenticateForAdminPanel(any(AuthenticateForAdminPanelRequest.class)))
         .thenReturn(true);
 
-    mockMvc.perform(post("/api/song-library/authenticateForAdminPanel")
+    mockMvc.perform(post(BASE_PATH + "/authenticateForAdminPanel")
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk())
@@ -261,7 +271,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
     when(songLibraryService.searchInternetForAlbumMetadata("Artist", "Album", 5))
         .thenReturn(List.of(anAlbumMetadataDto()));
 
-    mockMvc.perform(get("/api/song-library/searchInternetForAlbumMetadata")
+    mockMvc.perform(get(BASE_PATH + "/searchInternetForAlbumMetadata")
             .param("artistName", "Artist")
             .param("albumName", "Album")
             .param("limit", "5"))

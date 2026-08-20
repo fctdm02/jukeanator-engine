@@ -477,8 +477,9 @@ public class QueuePanel extends JPanel {
     int idx = selectedIndex;
     SwingSecurityUtil.runAsync(() -> {
       try {
-        songQueueService.moveSongUpInQueue(new ChangeSongQueueRequest(
-            selected.getSong().getAlbumId(), selected.getSong().getSongId()));
+        songQueueService.moveSongUpInQueue(songQueueService.getOwnLocationId(),
+            new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
+                selected.getSong().getSongId()));
       } catch (Exception ex) {
         ex.printStackTrace();
       }
@@ -504,8 +505,9 @@ public class QueuePanel extends JPanel {
     int idx = selectedIndex;
     SwingSecurityUtil.runAsync(() -> {
       try {
-        songQueueService.moveSongDownInQueue(new ChangeSongQueueRequest(
-            selected.getSong().getAlbumId(), selected.getSong().getSongId()));
+        songQueueService.moveSongDownInQueue(songQueueService.getOwnLocationId(),
+            new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
+                selected.getSong().getSongId()));
       } catch (Exception ex) {
         ex.printStackTrace();
       }
@@ -530,8 +532,9 @@ public class QueuePanel extends JPanel {
     int idx = selectedIndex;
     SwingSecurityUtil.runAsync(() -> {
       try {
-        songQueueService.removeSongDownFromQueue(new ChangeSongQueueRequest(
-            selected.getSong().getAlbumId(), selected.getSong().getSongId()));
+        songQueueService.removeSongDownFromQueue(songQueueService.getOwnLocationId(),
+            new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
+                selected.getSong().getSongId()));
       } catch (Exception ex) {
         ex.printStackTrace();
       }

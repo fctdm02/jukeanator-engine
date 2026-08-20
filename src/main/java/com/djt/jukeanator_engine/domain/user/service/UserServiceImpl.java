@@ -174,7 +174,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   @Override
   public HomePageDto getPublicHomePage() {
-    var popular = songLibraryService.getMusicByPopularity();
+    var popular = songLibraryService.getMusicByPopularity(songLibraryService.getOwnLocationId());
     var artists = popular.getArtists().stream().limit(MAX_HOT_HERE).toList();
     var songs = popular.getSongs().stream().limit(MAX_HOT_HERE).toList();
     return new HomePageDto(artists, songs);
@@ -205,7 +205,10 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     for (int i = history.size() - 1; i >= 0 && recentPlays.size() < MAX_RECENT_PLAYS; i--) {
       SongIdentifier id = history.get(i);
       try {
-        SongDto song = songLibraryService.getSongById(id.getAlbumId(), id.getSongId());
+        // TODO(Phase E): once SongIdentifier carries its own locationId, use that instead of
+        // getOwnLocationId() -- a master-served user's history can span multiple locations.
+        SongDto song = songLibraryService.getSongById(songLibraryService.getOwnLocationId(),
+            id.getAlbumId(), id.getSongId());
         if (song != null)
           recentPlays.add(song);
       } catch (Exception e) {
@@ -336,15 +339,15 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public boolean addSongToPlaylist(String emailAddress, String playlistName, SongFileEntity song)
-      throws EntityDoesNotExistException {
+  public boolean addSongToPlaylist(String emailAddress, String playlistName, Integer locationId,
+      SongFileEntity song) throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
-    boolean result = user.addSongToPlaylist(playlistName, song);
+    boolean result = user.addSongToPlaylist(playlistName, locationId, song);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
 
@@ -353,14 +356,14 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   @Override
   public boolean removeSongFromPlaylist(String emailAddress, String playlistName,
-      SongFileEntity song) throws EntityDoesNotExistException {
+      Integer locationId, SongFileEntity song) throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
-    boolean result = user.removeSongFromPlaylist(playlistName, song);
+    boolean result = user.removeSongFromPlaylist(playlistName, locationId, song);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
 
@@ -384,15 +387,16 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public boolean addSongToMyFavoritesPlaylist(String emailAddress, SongFileEntity song)
-      throws EntityDoesNotExistException {
+  public boolean addSongToMyFavoritesPlaylist(String emailAddress, Integer locationId,
+      SongFileEntity song) throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
-    boolean result = user.addSongToPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, song);
+    boolean result =
+        user.addSongToPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, locationId, song);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
 
@@ -400,15 +404,16 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public boolean removeSongFromMyFavoritesPlaylist(String emailAddress, SongFileEntity song)
-      throws EntityDoesNotExistException {
+  public boolean removeSongFromMyFavoritesPlaylist(String emailAddress, Integer locationId,
+      SongFileEntity song) throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
-    boolean result = user.removeSongFromPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, song);
+    boolean result =
+        user.removeSongFromPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, locationId, song);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
 
@@ -445,7 +450,10 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     List<SongDto> result = new ArrayList<>();
     for (SongIdentifier si : playlist.getSongs()) {
       try {
-        SongDto song = songLibraryService.getSongById(si.getAlbumId(), si.getSongId());
+        // TODO(Phase E): once SongIdentifier carries its own locationId, use that instead of
+        // getOwnLocationId() -- a master-served playlist can span multiple locations.
+        SongDto song = songLibraryService.getSongById(songLibraryService.getOwnLocationId(),
+            si.getAlbumId(), si.getSongId());
         if (song != null) {
           result.add(song);
         }
@@ -534,7 +542,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     }
 
     SongDto song = event.queueEntry().getSong();
-    user.addSongToSongPlayHistory(new SongIdentifier(song.getAlbumId(), song.getSongId()));
+    user.addSongToSongPlayHistory(
+        new SongIdentifier(locationId, song.getAlbumId(), song.getSongId()));
 
     // Deduct Web UI credits for non-local (web) users.
     // Cost = priority * WEB_COST_PER_PRIORITY_LEVEL:

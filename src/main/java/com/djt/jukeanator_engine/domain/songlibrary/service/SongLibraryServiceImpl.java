@@ -12,12 +12,16 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
+import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
@@ -63,31 +67,51 @@ public class SongLibraryServiceImpl
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "0123456789" + "',. !@#$%^&*\"()[]/\\\\?:;";
 
   private final ApplicationEventPublisher eventPublisher;
-
   private final String dataDir;
   private final SongLibraryRepository songLibraryRepository;
   private final SongScanner songScanner;
   private final Integer searchResultSize;
+  private final boolean isMaster;
 
-  private RootFolderEntity songLibraryRoot;
+  // This instance's own initial guess at its locationId (app.location-id) -- only needed to boot a
+  // JPA-backed repository, which (unlike the filesystem repository) cannot discover its library by
+  // scanning for a file; see initialize(). Superseded by the authoritative value read back from the
+  // loaded root's own metadata once available.
+  private final Integer configuredLocationId;
+
+  // Every location's loaded RootFolderEntity, keyed by locationId. On standalone/slave this always
+  // has exactly one entry (this instance's own location, == ownRoot below). On master, entries are
+  // populated lazily on demand as locations are browsed (see getOrLoadRoot) -- master never holds
+  // every registered location in memory up front.
+  private final Map<Integer, RootFolderEntity> songLibraryRoots = new HashMap<>();
+
+  // This instance's own location's root, and its resolved locationId -- used by the admin/scan
+  // methods below, which are inherently local to whichever instance owns the physical library and
+  // never take a locationId parameter. null locationId / an empty placeholder root on master, which
+  // owns no location of its own.
+  private RootFolderEntity ownRoot;
+  private Integer ownLocationId;
+
   private boolean isInitialized;
   private boolean libraryLoadFailedAtStartup;
 
-  public SongLibraryServiceImpl(String dataDir, SongLibraryRepository songLibraryRepository,
-      SongScanner songScanner, Integer searchResultSize,
-      ApplicationEventPublisher eventPublisher) {
+  public SongLibraryServiceImpl(AppProperties appProperties,
+      SongLibraryRepository songLibraryRepository, SongScanner songScanner,
+      Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
 
-    requireNonNull(dataDir, "dataDir cannot be null");
+    requireNonNull(appProperties, "appProperties cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
     requireNonNull(songScanner, "songScanner cannot be null");
     requireNonNull(searchResultSize, "searchResultSize cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
-    this.dataDir = dataDir;
+    this.dataDir = appProperties.getDataDir();
     this.songLibraryRepository = songLibraryRepository;
     this.songScanner = songScanner;
     this.searchResultSize = searchResultSize;
     this.eventPublisher = eventPublisher;
+    this.isMaster = appProperties.isMaster();
+    this.configuredLocationId = appProperties.getLocationId();
 
     // Initialize the song library
     initialize();
@@ -100,30 +124,52 @@ public class SongLibraryServiceImpl
 
   public void initialize() {
 
+    if (this.isMaster) {
+
+      // Master is location-agnostic and owns no library of its own -- every location's library is
+      // loaded on demand via getOrLoadRoot(locationId) once it's been synced (see
+      // LocationServiceImpl). ownRoot stays an empty, never-persisted placeholder purely so
+      // admin/scan methods (which are never valid on master) fail with a clear error instead of an
+      // NPE if ever mistakenly invoked here.
+      this.ownRoot = new RootFolderEntity("");
+      this.ownRoot.initialize();
+      this.ownLocationId = null;
+      this.isInitialized = true;
+      this.libraryLoadFailedAtStartup = false;
+      log.info("Master instance -- no own song library; locations are loaded on demand.");
+      return;
+    }
+
     // If we cannot load the song library from disk at startup, then assume a new install and
-    // return an empty songLibraryRoot folder. The application will automatically ask the user to
-    // scan for songs at startup.
+    // return an empty ownRoot folder. The application will automatically ask the user to scan for
+    // songs at startup.
     try {
 
-      Path oosFile = findMostRecentOosFile()
-          .orElseThrow(() -> new EntityDoesNotExistException(
-              "No " + SongLibraryRepository.OOS_FILE_EXTENSION + " song library file found in dataDir: "
-                  + this.dataDir));
+      Path oosFile = findMostRecentOosFile().orElse(null);
 
-      this.songLibraryRoot =
-          this.songLibraryRepository.loadAggregateRoot(deriveLocationNameFromOosFilename(oosFile));
+      RootFolderEntity loaded = (oosFile != null)
+          ? this.songLibraryRepository.loadAggregateRoot(deriveLocationNameFromOosFilename(oosFile))
+          : loadByConfiguredLocationIdOrThrow();
+
+      this.ownRoot = loaded;
+      this.ownLocationId = loaded.getMetadata().getLocationId();
+      this.songLibraryRoots.put(this.ownLocationId, loaded);
       this.libraryLoadFailedAtStartup = false;
 
     } catch (EntityDoesNotExistException ednee) {
 
       log.error("Could not load song library from dataDir: " + this.dataDir
-          + ", using empty song library songLibraryRoot for now, error: " + ednee.getMessage());
+          + ", using empty song library ownRoot for now, error: " + ednee.getMessage());
 
       // No rootPath is known yet -- this placeholder is never persisted, and its metadata (which
       // would require disk I/O against a real rootPath) is never touched. It only exists so that
       // query methods don't NPE before the user completes the initial scan.
-      this.songLibraryRoot = new RootFolderEntity("");
-      this.songLibraryRoot.initialize();
+      this.ownRoot = new RootFolderEntity("");
+      this.ownRoot.initialize();
+      this.ownLocationId = this.configuredLocationId;
+      if (this.ownLocationId != null) {
+        this.songLibraryRoots.put(this.ownLocationId, this.ownRoot);
+      }
       this.libraryLoadFailedAtStartup = true;
     }
 
@@ -133,10 +179,61 @@ public class SongLibraryServiceImpl
       log.info("locationName: <none, awaiting initial scan>");
       log.info("rootPath: <none, awaiting initial scan>");
     } else {
-      log.info("locationName: " + this.songLibraryRoot.getLocationName());
-      log.info("rootPath: " + this.songLibraryRoot.getRootPath());
+      log.info("locationName: " + this.ownRoot.getLocationName());
+      log.info("rootPath: " + this.ownRoot.getRootPath());
     }
     log.info("searchResultSize: " + this.searchResultSize);
+  }
+
+  private RootFolderEntity loadByConfiguredLocationIdOrThrow() throws EntityDoesNotExistException {
+
+    if (this.configuredLocationId == null) {
+      throw new EntityDoesNotExistException(
+          "No " + SongLibraryRepository.OOS_FILE_EXTENSION + " song library file found in dataDir: "
+              + this.dataDir
+              + ", and no app.location-id is configured to load from a non-filesystem repository.");
+    }
+    return this.songLibraryRepository.loadAggregateRoot(this.configuredLocationId.intValue());
+  }
+
+  /**
+   * Resolves the {@link RootFolderEntity} for {@code locationId}, loading it from the repository
+   * and caching it in {@link #songLibraryRoots} on first use if not already resident.
+   */
+  private RootFolderEntity getOrLoadRoot(Integer locationId) {
+
+    // Objects.equals (not a plain non-null check) so this also matches when both are null --
+    // master has ownLocationId == null, and a standalone/slave instance that hasn't completed its
+    // first scan yet also has ownLocationId == null (see initialize()'s failure branch). Both
+    // cases must short-circuit to the in-memory ownRoot placeholder rather than fall through to a
+    // repository load keyed by a locationId that doesn't really exist yet.
+    if (Objects.equals(locationId, this.ownLocationId) && this.ownRoot != null) {
+      return this.ownRoot;
+    }
+
+    RootFolderEntity cached = this.songLibraryRoots.get(locationId);
+    if (cached != null) {
+      return cached;
+    }
+
+    try {
+      RootFolderEntity loaded =
+          this.songLibraryRepository.loadAggregateRoot(locationId == null ? 0 : locationId.intValue());
+      loaded.initialize();
+      this.songLibraryRoots.put(locationId, loaded);
+      return loaded;
+    } catch (EntityDoesNotExistException ednee) {
+      throw new SongLibraryServiceException(
+          "No song library found for locationId: [" + locationId + "]", ednee);
+    }
+  }
+
+  private void requireNotMaster() {
+    if (this.isMaster) {
+      throw new SongLibraryServiceException(
+          "Admin/scan methods are not supported on the master instance -- they are inherently local "
+              + "to the slave that owns the library.");
+    }
   }
 
   /**
@@ -225,9 +322,9 @@ public class SongLibraryServiceImpl
   // Service methods
   // USER ROLE METHODS
   @Override
-  public SearchResultDto getMusicByPopularity() {
+  public SearchResultDto getMusicByPopularity(Integer locationId) {
 
-    return getMusic(null, null, SortOrder.POPULARITY);
+    return getMusic(getOrLoadRoot(locationId), null, null, SortOrder.POPULARITY);
   }
 
   /** Controls how results returned from {@link #getMusic} are ordered. */
@@ -253,12 +350,12 @@ public class SongLibraryServiceImpl
   }
 
   @Override
-  public SearchResultDto getMusicBySearch(String searchFor) {
-    return getMusicBySearch(searchFor, searchResultSize);
+  public SearchResultDto getMusicBySearch(Integer locationId, String searchFor) {
+    return getMusicBySearch(locationId, searchFor, searchResultSize);
   }
 
   @Override
-  public SearchResultDto getMusicBySearch(String searchFor, int limit) {
+  public SearchResultDto getMusicBySearch(Integer locationId, String searchFor, int limit) {
 
     if (!isInitialized) {
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
@@ -270,19 +367,19 @@ public class SongLibraryServiceImpl
 
     String searchForNormalized = stripNonKeyboardCharacters(searchFor.strip().toLowerCase());
 
-    return getMusic(null, searchForNormalized, SortOrder.POPULARITY, limit);
+    return getMusic(getOrLoadRoot(locationId), null, searchForNormalized, SortOrder.POPULARITY, limit);
   }
 
   @Override
-  public SearchResultDto getGenreMusicByPopularity(String genreName) {
+  public SearchResultDto getGenreMusicByPopularity(Integer locationId, String genreName) {
 
-    return getMusic(genreName, null, SortOrder.POPULARITY);
+    return getMusic(getOrLoadRoot(locationId), genreName, null, SortOrder.POPULARITY);
   }
 
   @Override
-  public SearchResultDto getGenreMusicByTitle(String genreName) {
+  public SearchResultDto getGenreMusicByTitle(Integer locationId, String genreName) {
 
-    return getMusic(genreName, null, SortOrder.TITLE);
+    return getMusic(getOrLoadRoot(locationId), genreName, null, SortOrder.TITLE);
   }
 
   /**
@@ -297,11 +394,13 @@ public class SongLibraryServiceImpl
    * <li>{@link SortOrder#TITLE} — ascending alphabetical on {@link LibraryItem#getTitle()}.</li>
    * </ul>
    */
-  private SearchResultDto getMusic(String genreName, String searchFor, SortOrder sortOrder) {
-    return getMusic(genreName, searchFor, sortOrder, searchResultSize);
+  private SearchResultDto getMusic(RootFolderEntity root, String genreName, String searchFor,
+      SortOrder sortOrder) {
+    return getMusic(root, genreName, searchFor, sortOrder, searchResultSize);
   }
 
-  private SearchResultDto getMusic(String genreName, String searchFor, SortOrder sortOrder, int limit) {
+  private SearchResultDto getMusic(RootFolderEntity root, String genreName, String searchFor,
+      SortOrder sortOrder, int limit) {
 
     if (!isInitialized) {
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
@@ -348,13 +447,13 @@ public class SongLibraryServiceImpl
 
     // ── Queries ───────────────────────────────────────────────────────────
 
-    List<SongFileEntity> songs = songLibraryRoot.getSongs().stream().filter(hasPlays)
+    List<SongFileEntity> songs = root.getSongs().stream().filter(hasPlays)
         .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
 
-    List<ArtistFolderEntity> artists = songLibraryRoot.getArtists().stream().filter(hasPlays)
+    List<ArtistFolderEntity> artists = root.getArtists().stream().filter(hasPlays)
         .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
 
-    List<AlbumFolderEntity> albums = songLibraryRoot.getAlbums().stream().filter(hasPlays)
+    List<AlbumFolderEntity> albums = root.getAlbums().stream().filter(hasPlays)
         .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
 
     SearchResultDto dto = new SearchResultDto(SongLibraryMapper.toSongDtoList(songs),
@@ -506,18 +605,18 @@ public class SongLibraryServiceImpl
   }
 
   @Override
-  public List<GenreDto> getGenres() {
+  public List<GenreDto> getGenres(Integer locationId) {
 
     if (!isInitialized) {
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
+    RootFolderEntity root = getOrLoadRoot(locationId);
     List<GenreDto> dtos = new ArrayList<>();
-    for (GenreFolderEntity genre : songLibraryRoot.getGenres()) {
+    for (GenreFolderEntity genre : root.getGenres()) {
 
       int numPlays = 0;
       List<Integer> albumIds = new ArrayList<>();
-      for (AlbumFolderEntity album : songLibraryRoot
-          .getAlbumsForGenre(genre.getPersistentIdentity())) {
+      for (AlbumFolderEntity album : root.getAlbumsForGenre(genre.getPersistentIdentity())) {
 
         albumIds.add(album.getPersistentIdentity());
         numPlays = numPlays + album.getNumPlays().intValue();
@@ -530,25 +629,25 @@ public class SongLibraryServiceImpl
   }
 
   @Override
-  public List<ArtistDto> getArtists() {
+  public List<ArtistDto> getArtists(Integer locationId) {
 
     if (!isInitialized) {
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
-    return SongLibraryMapper.toArtistDtoList(songLibraryRoot.getArtists());
+    return SongLibraryMapper.toArtistDtoList(getOrLoadRoot(locationId).getArtists());
   }
 
   @Override
-  public List<AlbumDto> getAlbums() {
+  public List<AlbumDto> getAlbums(Integer locationId) {
 
     if (!isInitialized) {
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
-    return SongLibraryMapper.toAlbumDtoList(songLibraryRoot.getAlbums());
+    return SongLibraryMapper.toAlbumDtoList(getOrLoadRoot(locationId).getAlbums());
   }
 
   @Override
-  public List<AlbumDto> getAlbumsForGenre(Integer genreId) {
+  public List<AlbumDto> getAlbumsForGenre(Integer locationId, Integer genreId) {
 
     if (!isInitialized) {
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
@@ -558,34 +657,34 @@ public class SongLibraryServiceImpl
       return List.of();
     }
 
-    return SongLibraryMapper.toAlbumDtoList(songLibraryRoot.getAlbumsForGenre(genreId));
+    return SongLibraryMapper.toAlbumDtoList(getOrLoadRoot(locationId).getAlbumsForGenre(genreId));
   }
 
   @Override
-  public ArtistDto getArtistByName(String artistName) {
+  public ArtistDto getArtistByName(Integer locationId, String artistName) {
 
     try {
-      return SongLibraryMapper.toArtistDto(songLibraryRoot.getArtistByName(artistName));
+      return SongLibraryMapper.toArtistDto(getOrLoadRoot(locationId).getArtistByName(artistName));
     } catch (EntityDoesNotExistException ednee) {
       throw new SongLibraryServiceException("Could not find artist by name: " + artistName, ednee);
     }
   }
 
   @Override
-  public ArtistDto getArtistById(Integer artistId) {
+  public ArtistDto getArtistById(Integer locationId, Integer artistId) {
 
     try {
-      return SongLibraryMapper.toArtistDto(songLibraryRoot.getArtistById(artistId));
+      return SongLibraryMapper.toArtistDto(getOrLoadRoot(locationId).getArtistById(artistId));
     } catch (EntityDoesNotExistException ednee) {
       throw new SongLibraryServiceException("Could not find artist by id: " + artistId, ednee);
     }
   }
 
   @Override
-  public ArtistDto getArtistByAlbumId(Integer albumId) {
+  public ArtistDto getArtistByAlbumId(Integer locationId, Integer albumId) {
 
     try {
-      return SongLibraryMapper.toArtistDto(songLibraryRoot.getArtistByAlbumId(albumId));
+      return SongLibraryMapper.toArtistDto(getOrLoadRoot(locationId).getArtistByAlbumId(albumId));
     } catch (EntityDoesNotExistException ednee) {
       throw new SongLibraryServiceException(
           "Could not find artist by album id: " + albumId, ednee);
@@ -593,61 +692,62 @@ public class SongLibraryServiceImpl
   }
 
   @Override
-  public AlbumDto getAlbumById(Integer albumId) {
+  public AlbumDto getAlbumById(Integer locationId, Integer albumId) {
 
     try {
-      return SongLibraryMapper.toAlbumDto(songLibraryRoot.getAlbumById(albumId));
+      return SongLibraryMapper.toAlbumDto(getOrLoadRoot(locationId).getAlbumById(albumId));
     } catch (EntityDoesNotExistException ednee) {
       throw new SongLibraryServiceException("Could not find album by id: " + albumId, ednee);
     }
   }
 
   @Override
-  public SongDto getSongById(Integer albumId, Integer songId) {
+  public SongDto getSongById(Integer locationId, Integer albumId, Integer songId) {
 
     try {
-      return SongLibraryMapper.toSongDto(songLibraryRoot.getSongById(albumId, songId));
+      return SongLibraryMapper.toSongDto(getOrLoadRoot(locationId).getSongById(albumId, songId));
     } catch (EntityDoesNotExistException ednee) {
       throw new SongLibraryServiceException("Could not find song by id: " + albumId, ednee);
     }
   }
 
 
-  // ADMIN ROLE METHODS
+  // ADMIN ROLE METHODS -- always local to this instance's own location; never take a locationId.
   @Override
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 
-    return scanFileSystemForSongs(new ScanRequest(this.songLibraryRoot.getRootPath()));
+    return scanFileSystemForSongs(new ScanRequest(this.ownRoot.getRootPath()));
   }
 
   @Override
   public Integer scanFileSystemForSongs(ScanRequest scanRequest) throws SongScanFailedException {
+
+    requireNotMaster();
 
     String scanPath = scanRequest.getScanPath();
 
     try {
 
       // Scan the file system for songs
-      this.songLibraryRoot.storeSongStatistics(this.dataDir);
+      this.ownRoot.storeSongStatistics(this.dataDir);
 
-      this.songLibraryRoot = songScanner.scanFileSystemForSongs(scanPath);
+      RootFolderEntity scannedRoot = songScanner.scanFileSystemForSongs(scanPath);
 
-      // Restore song num plays, persist, then re-initialize the songLibraryRoot
-      this.songLibraryRoot.restoreSongStatisticsForRootPath(this.dataDir,
-          this.songLibraryRoot.getRootPath());
+      // Restore song num plays, persist, then re-initialize the scanned root
+      scannedRoot.restoreSongStatisticsForRootPath(this.dataDir, scannedRoot.getRootPath());
 
-      this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
-      this.songLibraryRoot.storeSongStatistics(this.dataDir);
-      this.songLibraryRoot.initialize();
+      this.songLibraryRepository.storeAggregateRoot(scannedRoot);
+      scannedRoot.storeSongStatistics(this.dataDir);
+      scannedRoot.initialize();
 
-      // Initialize the song library
+      // Re-derive ownRoot/ownLocationId from persisted state, same discovery path as startup.
       initialize();
 
       // Publish the event
       eventPublisher.publishEvent(
-          new ScanFileSystemForSongsEvent(scanPath, songLibraryRoot.getAlbums().size()));
+          new ScanFileSystemForSongsEvent(scanPath, this.ownRoot.getAlbums().size()));
 
-      return Integer.valueOf(songLibraryRoot.getAlbums().size());
+      return Integer.valueOf(this.ownRoot.getAlbums().size());
     } catch (SongLibraryServiceException sle) {
       throw sle;
     } catch (Exception e) {
@@ -661,13 +761,15 @@ public class SongLibraryServiceImpl
   @Override
   public Integer resetSongStatistics() {
 
+    requireNotMaster();
+
     try {
 
       // Reset all the song statistics
-      this.songLibraryRoot.resetSongStatistics();
+      this.ownRoot.resetSongStatistics();
 
       // Store the song library
-      this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
+      this.songLibraryRepository.storeAggregateRoot(this.ownRoot);
 
       // Initialize the song library
       initialize();
@@ -675,7 +777,7 @@ public class SongLibraryServiceImpl
       // Publish the event
       eventPublisher.publishEvent(new SongStatisticsChangedEvent());
 
-      return Integer.valueOf(songLibraryRoot.getAlbums().size());
+      return Integer.valueOf(this.ownRoot.getAlbums().size());
 
     } catch (Exception e) {
       throw new SongLibraryServiceException("Could not reset song statistics", e);
@@ -685,14 +787,15 @@ public class SongLibraryServiceImpl
   @Override
   public Integer restoreSongStatistics(String filename) {
 
+    requireNotMaster();
+
     try {
 
       // Restore the song statistics
-      this.songLibraryRoot.restoreSongStatisticsForFile(this.songLibraryRoot.getRootPath(),
-          filename);
+      this.ownRoot.restoreSongStatisticsForFile(this.ownRoot.getRootPath(), filename);
 
       // Store the song library
-      this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
+      this.songLibraryRepository.storeAggregateRoot(this.ownRoot);
 
       // Initialize the song library
       initialize();
@@ -700,34 +803,39 @@ public class SongLibraryServiceImpl
       // Publish the event
       eventPublisher.publishEvent(new SongStatisticsChangedEvent());
 
-      return Integer.valueOf(songLibraryRoot.getAlbums().size());
+      return Integer.valueOf(this.ownRoot.getAlbums().size());
 
     } catch (Exception e) {
       throw new SongLibraryServiceException("Could not restore song statistics from: " + filename, e);
     }
   }
-  
+
   @Override
   public Integer storeSongLibraryAndStatistics() {
 
-    try {
-      
-      // Store the song library
-      this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
-      
-      // Store the song statistics
-      this.songLibraryRoot.storeSongStatistics(this.dataDir);
+    requireNotMaster();
 
-      return Integer.valueOf(songLibraryRoot.getAlbums().size());
+    try {
+
+      // Store the song library
+      this.songLibraryRepository.storeAggregateRoot(this.ownRoot);
+
+      // Store the song statistics
+      this.ownRoot.storeSongStatistics(this.dataDir);
+
+      return Integer.valueOf(this.ownRoot.getAlbums().size());
 
     } catch (Exception e) {
-      throw new SongLibraryServiceException("Could not store song library and statistics to: " + this.dataDir, e);
+      throw new SongLibraryServiceException(
+          "Could not store song library and statistics to: " + this.dataDir, e);
     }
   }
 
   @Override
   public List<AlbumMetadataDto> searchInternetForAlbumMetadata(String artistName, String albumName,
       int limit) {
+
+    requireNotMaster();
 
     try {
 
@@ -745,9 +853,11 @@ public class SongLibraryServiceImpl
   @Override
   public AlbumMetadataDto updateAlbumMetadata(Integer albumId, AlbumMetadataDto albumMetadata) {
 
+    requireNotMaster();
+
     try {
 
-      AlbumFolderEntity album = this.songLibraryRoot.getAlbumById(albumId);
+      AlbumFolderEntity album = this.ownRoot.getAlbumById(albumId);
 
       album.getMetaData().writeMetadataToFileSystem(albumMetadata);
 
@@ -761,10 +871,12 @@ public class SongLibraryServiceImpl
   @Override
   public String downloadAlbumCoverArt(DownloadAlbumCoverArtRequest downloadAlbumCoverArtRequest) {
 
+    requireNotMaster();
+
     try {
 
       AlbumFolderEntity album =
-          this.songLibraryRoot.getAlbumById(downloadAlbumCoverArtRequest.getAlbumId());
+          this.ownRoot.getAlbumById(downloadAlbumCoverArtRequest.getAlbumId());
 
       String coverArtPath = album.getCoverArtPath();
 
@@ -782,6 +894,8 @@ public class SongLibraryServiceImpl
   @Override
   public Boolean authenticateForAdminPanel(
       AuthenticateForAdminPanelRequest authenticateForAdminPanelRequest) {
+
+    requireNotMaster();
 
     String username = authenticateForAdminPanelRequest.getUsername();
     String password = authenticateForAdminPanelRequest.getPassword();
@@ -841,8 +955,18 @@ public class SongLibraryServiceImpl
 
   // Repository methods
   @Override
-  public RootFolderEntity getSongLibraryRoot() {
-    return this.songLibraryRoot;
+  public RootFolderEntity getSongLibraryRoot(Integer locationId) {
+    return getOrLoadRoot(locationId);
+  }
+
+  @Override
+  public Integer getOwnLocationId() {
+    return this.ownLocationId;
+  }
+
+  @Override
+  public void reinitializeOwnLocation() {
+    initialize();
   }
 
   @Override
@@ -879,13 +1003,15 @@ public class SongLibraryServiceImpl
     throw new SongLibraryServiceException("Not implemented yet!");
   }
 
-  // Event handlers
+  // Event handlers -- only ever fired for this instance's own local queue activity (a remote
+  // location's mutation happens on the owning slave's own process; that event never crosses to
+  // master), so these always operate on ownRoot.
   @EventListener
   public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
 
     try {
 
-      SongFileEntity song = this.songLibraryRoot.getSongById(
+      SongFileEntity song = this.ownRoot.getSongById(
           event.queueEntry().getSong().getAlbumId(), event.queueEntry().getSong().getSongId());
       song.incrementNumPlays();
 
@@ -907,7 +1033,7 @@ public class SongLibraryServiceImpl
 
       for (SongQueueEntryDto queueEntry : event.queueEntries()) {
 
-        SongFileEntity song = this.songLibraryRoot.getSongById(queueEntry.getSong().getAlbumId(),
+        SongFileEntity song = this.ownRoot.getSongById(queueEntry.getSong().getAlbumId(),
             queueEntry.getSong().getSongId());
         song.incrementNumPlays();
       }

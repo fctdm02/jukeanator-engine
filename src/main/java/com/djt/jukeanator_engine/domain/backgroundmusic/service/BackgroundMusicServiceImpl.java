@@ -272,7 +272,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
   private void createBackgroundMusicFromTopSongs() throws IOException {
 
-    RootFolderEntity songLibraryRoot = this.songLibraryService.getSongLibraryRoot();
+    RootFolderEntity songLibraryRoot =
+        this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
 
     List<SongFileEntity> songs = new ArrayList<>(songLibraryRoot.getSongs());
     songs.sort((s1, s2) -> Integer.compare(s2.getNumPlays() == null ? 0 : s2.getNumPlays(),
@@ -342,7 +343,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       BackgroundMusicSongEntity chosen = songsById.get(chosenId);
 
       try {
-        return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalizedPath(chosen));
+        return this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId())
+            .getSongByPath(normalizedPath(chosen));
       } catch (EntityDoesNotExistException ednee) {
         log.warn(
             "getNextSong: background music song id {} not found in song library, path: {}, "
@@ -488,7 +490,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       String normalizedPath = normalizedPath(chosen);
 
       try {
-        return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalizedPath);
+        return this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId())
+            .getSongByPath(normalizedPath);
       } catch (EntityDoesNotExistException ednee) {
         // Path not found in library — fail gracefully so the caller can fall back.
         log.warn("getNextSmartAdditionSong: could not find song for path: {}", normalizedPath);
@@ -617,7 +620,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
     try {
       String normalized = backgroundMusicHelper.normalizeDriveLetterBackslashes(rawPath);
-      return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalized);
+      return this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId())
+          .getSongByPath(normalized);
     } catch (Exception e) {
       log.debug("resolveSourceSong: could not resolve source song for path {}: {}", rawPath,
           e.getMessage());
@@ -682,7 +686,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       }
 
       // Fetch popularity-ranked results for this genre from the song library.
-      SearchResultDto genreResults = this.songLibraryService.getGenreMusicByPopularity(genreName);
+      SearchResultDto genreResults = this.songLibraryService
+          .getGenreMusicByPopularity(this.songLibraryService.getOwnLocationId(), genreName);
 
       Set<String> excludedPaths = new HashSet<>(reservedPaths);
       excludedPaths.add(coreSongPath);
@@ -819,7 +824,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       }
 
       List<SongFileEntity> eligibleSongs = new ArrayList<>();
-      for (AlbumFolderEntity album : songLibraryService.getSongLibraryRoot().getAllAlbums()) {
+      for (AlbumFolderEntity album : songLibraryService
+          .getSongLibraryRoot(songLibraryService.getOwnLocationId()).getAllAlbums()) {
         if (!isFavoriteAlbum(album)) {
           continue;
         }
@@ -905,7 +911,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private SongFileEntity findSongEntity(Integer albumId, Integer songId) {
 
     try {
-      RootFolderEntity songLibraryRoot = this.songLibraryService.getSongLibraryRoot();
+      RootFolderEntity songLibraryRoot =
+          this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
       return songLibraryRoot.getAlbumById(albumId).getChildSong(songId);
     } catch (Exception e) {
       log.debug("findSongEntity: albumId={}, songId={} not found: {}", albumId, songId,

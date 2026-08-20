@@ -179,7 +179,8 @@ public class ScreenSaverWindow extends JWindow {
       // Always reposition the panel to prevent burn-in.
       // When no song is playing, also pick a fresh random cover art so the
       // screensaver shows variety instead of the same album every 30 seconds.
-      if (this.songPlayerService.getNowPlayingSong() == null) {
+      if (this.songPlayerService.getNowPlayingSong(this.songLibraryService.getOwnLocationId())
+          == null) {
         updateContent();
       }
       moveFloatingPanel();
@@ -218,7 +219,8 @@ public class ScreenSaverWindow extends JWindow {
     touchLabel.setIcon(textImage);
 
     ImageIcon coverArt = null;
-    SongDto currentSong = this.songPlayerService.getNowPlayingSong();
+    SongDto currentSong =
+        this.songPlayerService.getNowPlayingSong(this.songLibraryService.getOwnLocationId());
     if (currentSong != null && currentSong.getCoverArtPath() != null) {
 
       coverArt = imageLoader.loadFilesystemImage(currentSong.getCoverArtPath(), 350, 350);
@@ -226,9 +228,10 @@ public class ScreenSaverWindow extends JWindow {
     } else {
 
       if (numAlbums == 0) {
-        numAlbums = this.songLibraryService.getAlbums().size();
+        numAlbums = this.songLibraryService.getAlbums(this.songLibraryService.getOwnLocationId()).size();
       }
-      AlbumDto album = this.songLibraryService.getAlbumById(new Random().nextInt(this.numAlbums));
+      AlbumDto album = this.songLibraryService.getAlbumById(this.songLibraryService.getOwnLocationId(),
+          new Random().nextInt(this.numAlbums));
       coverArt = imageLoader.loadFilesystemImage(album.getCoverArtPath(), 350, 350);
 
     }

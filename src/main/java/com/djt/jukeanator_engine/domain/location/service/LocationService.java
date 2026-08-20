@@ -69,8 +69,7 @@ public interface LocationService {
 
   /**
    * The most recently synced metadata snapshot for {@code locationId}, or {@code null} if the
-   * location has never synced. Used by {@code SongLibraryServiceLocationProxy} to serve
-   * browse/search reads without a live round-trip to the slave.
+   * location has never synced.
    */
   LibrarySnapshotDto getLibrarySnapshot(Integer locationId);
 

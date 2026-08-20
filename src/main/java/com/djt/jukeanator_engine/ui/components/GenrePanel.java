@@ -417,7 +417,8 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     SearchResultDto results;
     try {
-      results = songLibraryService.getGenreMusicByPopularity(genre.getGenreName());
+      results = songLibraryService.getGenreMusicByPopularity(songLibraryService.getOwnLocationId(),
+          genre.getGenreName());
     } catch (Exception e) {
       results = new SearchResultDto();
     }
@@ -445,7 +446,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     ArtistDto full = null;
     String artistName = artist.getArtistName();
     try {
-      full = songLibraryService.getArtistByName(artistName);
+      full = songLibraryService.getArtistByName(songLibraryService.getOwnLocationId(), artistName);
     } catch (Exception e) {
       e.printStackTrace();
       throw new IllegalStateException("Could not get artist: [" + artistName + "]", e);
@@ -475,7 +476,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
   private AlbumDto fetchFull(AlbumDto album) {
     try {
-      return songLibraryService.getAlbumById(album.getAlbumId());
+      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.getAlbumId());
     } catch (Exception e) {
       return album;
     }

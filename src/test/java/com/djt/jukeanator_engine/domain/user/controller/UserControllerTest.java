@@ -119,16 +119,17 @@ class UserControllerTest extends AbstractControllerTest {
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     SongFileEntity song = new SongFileEntity();
     RootFolderEntity mockRoot = mock(RootFolderEntity.class);
-    when(songLibraryService.getSongLibraryRoot()).thenReturn(mockRoot);
+    when(songLibraryService.getSongLibraryRoot(any())).thenReturn(mockRoot);
     when(mockRoot.getSongById(3, 4)).thenReturn(song);
-    when(userService.addSongToPlaylist("jane@example.com", "Favorites", song)).thenReturn(true);
+    when(userService.addSongToPlaylist("jane@example.com", "Favorites", 9, song))
+        .thenReturn(true);
 
     mockMvc.perform(post("/api/users/playlists/Favorites/songs")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(new SongIdentifier(3, 4))))
+            .content(objectMapper.writeValueAsString(new SongIdentifier(9, 3, 4))))
         .andExpect(status().isNoContent());
 
-    verify(userService).addSongToPlaylist("jane@example.com", "Favorites", song);
+    verify(userService).addSongToPlaylist("jane@example.com", "Favorites", 9, song);
   }
 
   @Test
@@ -137,17 +138,17 @@ class UserControllerTest extends AbstractControllerTest {
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     SongFileEntity song = new SongFileEntity();
     RootFolderEntity mockRoot = mock(RootFolderEntity.class);
-    when(songLibraryService.getSongLibraryRoot()).thenReturn(mockRoot);
+    when(songLibraryService.getSongLibraryRoot(any())).thenReturn(mockRoot);
     when(mockRoot.getSongById(3, 4)).thenReturn(song);
-    when(userService.removeSongFromPlaylist("jane@example.com", "Favorites", song))
+    when(userService.removeSongFromPlaylist("jane@example.com", "Favorites", 9, song))
         .thenReturn(true);
 
     mockMvc.perform(delete("/api/users/playlists/Favorites/songs")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(new SongIdentifier(3, 4))))
+            .content(objectMapper.writeValueAsString(new SongIdentifier(9, 3, 4))))
         .andExpect(status().isNoContent());
 
-    verify(userService).removeSongFromPlaylist("jane@example.com", "Favorites", song);
+    verify(userService).removeSongFromPlaylist("jane@example.com", "Favorites", 9, song);
   }
 
   @Test
@@ -156,16 +157,17 @@ class UserControllerTest extends AbstractControllerTest {
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     SongFileEntity song = new SongFileEntity();
     RootFolderEntity mockRoot = mock(RootFolderEntity.class);
-    when(songLibraryService.getSongLibraryRoot()).thenReturn(mockRoot);
+    when(songLibraryService.getSongLibraryRoot(any())).thenReturn(mockRoot);
     when(mockRoot.getSongById(3, 4)).thenReturn(song);
-    when(userService.addSongToMyFavoritesPlaylist("jane@example.com", song)).thenReturn(true);
+    when(userService.addSongToMyFavoritesPlaylist("jane@example.com", 9, song))
+        .thenReturn(true);
 
     mockMvc.perform(post("/api/users/playlists/favorites/songs")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(new SongIdentifier(3, 4))))
+            .content(objectMapper.writeValueAsString(new SongIdentifier(9, 3, 4))))
         .andExpect(status().isNoContent());
 
-    verify(userService).addSongToMyFavoritesPlaylist("jane@example.com", song);
+    verify(userService).addSongToMyFavoritesPlaylist("jane@example.com", 9, song);
   }
 
   @Test
@@ -174,16 +176,16 @@ class UserControllerTest extends AbstractControllerTest {
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     SongFileEntity song = new SongFileEntity();
     RootFolderEntity mockRoot = mock(RootFolderEntity.class);
-    when(songLibraryService.getSongLibraryRoot()).thenReturn(mockRoot);
+    when(songLibraryService.getSongLibraryRoot(any())).thenReturn(mockRoot);
     when(mockRoot.getSongById(3, 4)).thenReturn(song);
-    when(userService.removeSongFromMyFavoritesPlaylist("jane@example.com", song))
+    when(userService.removeSongFromMyFavoritesPlaylist("jane@example.com", 9, song))
         .thenReturn(true);
 
     mockMvc.perform(delete("/api/users/playlists/favorites/songs")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(new SongIdentifier(3, 4))))
+            .content(objectMapper.writeValueAsString(new SongIdentifier(9, 3, 4))))
         .andExpect(status().isNoContent());
 
-    verify(userService).removeSongFromMyFavoritesPlaylist("jane@example.com", song);
+    verify(userService).removeSongFromMyFavoritesPlaylist("jane@example.com", 9, song);
   }
 }

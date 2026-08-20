@@ -11,46 +11,54 @@ import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
  */
 public interface SongPlayerService {
 
+  // Every method below takes locationId as its first parameter -- standalone/slave instances have
+  // exactly one location (their own) and always execute locally; the master instance forwards to
+  // whichever location owns the request over the existing SlaveCommandGateway/ws-slave channel
+  // (see SongPlayerServiceMasterImpl -- unlike SongQueueServiceImpl, the real, hardware-backed
+  // SongPlayerServiceImpl is never constructed on master at all, since its constructor has real
+  // side effects (spinning up a VLC/Winamp process); the two implementations stay separate
+  // classes, selected by the same NotMasterModeCondition/app.mode=master conditional pattern
+  // already used for repository-type selection elsewhere).
   /**
-   * 
+   *
    * @return
    */
   @PublicServiceMethod
-  SongDto getNowPlayingSong();
+  SongDto getNowPlayingSong(Integer locationId);
 
   /**
-   * 
+   *
    * @return
    */
   @PublicServiceMethod
-  SongPlaybackStatusDto getPlaybackStatus();
+  SongPlaybackStatusDto getPlaybackStatus(Integer locationId);
 
   /**
-   * 
+   *
    */
-  void playNextTrack();
+  void playNextTrack(Integer locationId);
 
   /**
-   * 
+   *
    */
-  void pause();
+  void pause(Integer locationId);
 
   /**
-   * 
+   *
    */
-  void stop();
+  void stop(Integer locationId);
 
   /**
    * Prevents the player from dequeuing and playing any further songs. Any song currently playing is
    * stopped immediately. Has no effect if the queue is already locked.
    */
-  void lockQueue();
+  void lockQueue(Integer locationId);
 
   /**
-   * Releases a previous {@link #lockQueue()} and resumes normal queue processing. Has no effect if
-   * the queue is not currently locked.
+   * Releases a previous {@link #lockQueue(Integer)} and resumes normal queue processing. Has no
+   * effect if the queue is not currently locked.
    */
-  void unlockQueue();
+  void unlockQueue(Integer locationId);
 
   /**
    * 

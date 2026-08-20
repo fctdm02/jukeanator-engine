@@ -9,7 +9,10 @@ import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueu
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
 /**
- * HTTP client implementation of SongPlayerService.
+ * HTTP client implementation of SongPlayerService. Unused today (no callers) -- kept as a
+ * reference for the shape a remote-backed implementation would take. Every path is now under
+ * {@code /api/locations/{locationId}/...}, matching {@code SongPlayerController}'s locationId-scoped
+ * mapping.
  *
  * @author tmyers
  */
@@ -22,48 +25,52 @@ public class SongPlayerServiceHttpClient implements SongPlayerService {
     this.restClient = RestClient.builder().baseUrl(baseUrl).build();
   }
 
-  @Override
-  public SongDto getNowPlayingSong() {
+  private String basePath(Integer locationId) {
+    return "/api/locations/" + locationId + "/song-player";
+  }
 
-    return restClient.get().uri("/api/song-player/nowPlayingSong").retrieve()
+  @Override
+  public SongDto getNowPlayingSong(Integer locationId) {
+
+    return restClient.get().uri(basePath(locationId) + "/nowPlayingSong").retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
-  public SongPlaybackStatusDto getPlaybackStatus() {
+  public SongPlaybackStatusDto getPlaybackStatus(Integer locationId) {
 
-    return restClient.get().uri("/api/song-player/playbackStatus").retrieve()
+    return restClient.get().uri(basePath(locationId) + "/playbackStatus").retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
-  public void playNextTrack() {
+  public void playNextTrack(Integer locationId) {
 
-    restClient.post().uri("/api/song-player/next").retrieve().toBodilessEntity();
+    restClient.post().uri(basePath(locationId) + "/next").retrieve().toBodilessEntity();
   }
 
   @Override
-  public void pause() {
+  public void pause(Integer locationId) {
 
-    restClient.post().uri("/api/song-player/pause").retrieve().toBodilessEntity();
+    restClient.post().uri(basePath(locationId) + "/pause").retrieve().toBodilessEntity();
   }
 
   @Override
-  public void stop() {
+  public void stop(Integer locationId) {
 
-    restClient.post().uri("/api/song-player/stop").retrieve().toBodilessEntity();
+    restClient.post().uri(basePath(locationId) + "/stop").retrieve().toBodilessEntity();
   }
 
   @Override
-  public void lockQueue() {
+  public void lockQueue(Integer locationId) {
 
-    restClient.post().uri("/api/song-player/lockQueue").retrieve().toBodilessEntity();
+    restClient.post().uri(basePath(locationId) + "/lockQueue").retrieve().toBodilessEntity();
   }
 
   @Override
-  public void unlockQueue() {
+  public void unlockQueue(Integer locationId) {
 
-    restClient.post().uri("/api/song-player/unlockQueue").retrieve().toBodilessEntity();
+    restClient.post().uri(basePath(locationId) + "/unlockQueue").retrieve().toBodilessEntity();
   }
 
   @Override

@@ -269,22 +269,22 @@ public class UserEntity extends AbstractPersistentEntity {
     return this.playlists.remove(playlist);
   }
 
-  public boolean addSongToPlaylist(String playlistName, SongFileEntity song)
+  public boolean addSongToPlaylist(String playlistName, Integer locationId, SongFileEntity song)
       throws EntityDoesNotExistException {
 
     PlaylistEntity playlist = getPlaylistByName(playlistName);
-    SongIdentifier songIdentifier =
-        new SongIdentifier(song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity());
+    SongIdentifier songIdentifier = new SongIdentifier(locationId,
+        song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity());
 
     return playlist.addSong(songIdentifier);
   }
 
-  public boolean removeSongFromPlaylist(String playlistName, SongFileEntity song)
-      throws EntityDoesNotExistException {
+  public boolean removeSongFromPlaylist(String playlistName, Integer locationId,
+      SongFileEntity song) throws EntityDoesNotExistException {
 
     PlaylistEntity playlist = getPlaylistByName(playlistName);
-    SongIdentifier songIdentifier =
-        new SongIdentifier(song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity());
+    SongIdentifier songIdentifier = new SongIdentifier(locationId,
+        song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity());
 
     return playlist.removeSong(songIdentifier);
   }

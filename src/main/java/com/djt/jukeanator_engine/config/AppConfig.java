@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.config;
 
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -16,15 +17,17 @@ import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgrou
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgroundMusicRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicService;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicServiceImpl;
+import com.djt.jukeanator_engine.domain.backgroundmusic.service.NoOpBackgroundMusicService;
 import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
+import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
 import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryFileSystemImpl;
-import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryPostgresImpl;
+import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryJpaImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryServiceImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.CoverArtDownloader;
@@ -42,6 +45,7 @@ import com.djt.jukeanator_engine.domain.songplayer.audio.windows.WindowsMasterVo
 import com.djt.jukeanator_engine.domain.songplayer.config.SongPlayerProperties;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerServiceImpl;
+import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerServiceMasterImpl;
 import com.djt.jukeanator_engine.domain.songqueue.config.SongQueueProperties;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryFileSystemImpl;
@@ -111,10 +115,11 @@ public class AppConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "song-library.repository-type", havingValue = "postgres")
-  public SongLibraryRepository songLibraryRepositoryPostgresImpl() {
-    
-    return new SongLibraryRepositoryPostgresImpl();
+  @ConditionalOnProperty(name = "song-library.repository-type", havingValue = "jpa")
+  public SongLibraryRepository songLibraryRepositoryJpaImpl(EntityManagerFactory entityManagerFactory,
+      PlatformTransactionManager transactionManager) {
+
+    return new SongLibraryRepositoryJpaImpl(entityManagerFactory, transactionManager);
   }
 
   // ── Song scanner ──────────────────────────────────────────────────────────
@@ -193,7 +198,7 @@ public class AppConfig {
       ApplicationEventPublisher eventPublisher) {
     
     return new SongLibraryServiceImpl(
-        appProperties.getDataDir(),
+        appProperties,
         repository,
         songScanner,
         songLibraryProperties.getSearchResultSize(),
@@ -218,40 +223,63 @@ public class AppConfig {
         smartBackgroundMusicRepository);
   }
 
+  // Master-only stand-in for BackgroundMusicService, mutually exclusive with the real
+  // NotMasterModeCondition-gated bean above -- exactly one BackgroundMusicService bean always
+  // exists, so songQueueService below has no ambiguity to resolve.
   @Bean
-  @Primary
-  @Conditional(NotMasterModeCondition.class)
+  @ConditionalOnProperty(name = "app.mode", havingValue = "master")
+  public BackgroundMusicService noOpBackgroundMusicService() {
+    return new NoOpBackgroundMusicService();
+  }
+
+  // Unconditional: master now also constructs this bean, so its locationId-aware methods can
+  // branch to forward a request over SlaveCommandGateway (present only on master; absent
+  // elsewhere, hence Optional) instead of the NotMasterModeCondition-gated split this used to be.
+  @Bean
   public SongQueueService songQueueService(
       SongQueueProperties songQueueProperties,
       SongLibraryService songLibraryService,
       BackgroundMusicService backgroundMusicService,
       SongQueueRepository songQueueRepository,
-      ApplicationEventPublisher eventPublisher) {
+      ApplicationEventPublisher eventPublisher,
+      Optional<SlaveCommandGateway> slaveCommandGateway) {
 
     return new SongQueueServiceImpl(
         songQueueProperties,
         songLibraryService,
         backgroundMusicService,
         songQueueRepository,
-        eventPublisher);
+        eventPublisher,
+        slaveCommandGateway);
   }
 
-  @Bean
+  // Real, hardware-backed implementation -- never constructed on master (its constructor spins up
+  // a VLC/Winamp process and a continuously-running watchdog thread, which must never happen on a
+  // headless host with no audio hardware/software installed). Bean name pinned to "songPlayerService"
+  // on both this and the master-only bean below so SongPlayerController's @Qualifier resolves
+  // either one; the mutually-exclusive conditionals guarantee only one is ever actually registered.
+  @Bean(name = "songPlayerService")
   @Primary
   @Conditional(NotMasterModeCondition.class)
-  public SongPlayerService songPlayerService(
+  public SongPlayerService songPlayerServiceImpl(
       SongPlayerProperties songPlayerProperties,
       SongQueueService songQueueService,
       MasterVolumeService masterVolumeService,
-      LineInService lineInService,      
+      LineInService lineInService,
       ApplicationEventPublisher eventPublisher) {
-    
+
     return new SongPlayerServiceImpl(
         songPlayerProperties,
         songQueueService,
         masterVolumeService,
-        lineInService,        
+        lineInService,
         eventPublisher);
+  }
+
+  @Bean(name = "songPlayerService")
+  @ConditionalOnProperty(name = "app.mode", havingValue = "master")
+  public SongPlayerService songPlayerServiceMasterImpl(SlaveCommandGateway slaveCommandGateway) {
+    return new SongPlayerServiceMasterImpl(slaveCommandGateway);
   }
 
   @Bean

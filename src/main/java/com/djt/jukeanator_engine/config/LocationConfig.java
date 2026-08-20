@@ -18,8 +18,8 @@ import com.djt.jukeanator_engine.domain.location.security.StompLocationApiKeyCha
 import com.djt.jukeanator_engine.domain.location.service.ConnectedSlaveRegistry;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.location.service.LocationServiceImpl;
-import com.djt.jukeanator_engine.domain.location.service.LocationServiceRegistry;
 import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
+import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 
 /**
  * Wires the {@code location} domain's beans. {@link LocationRepository} and {@link LocationService}
@@ -59,11 +59,12 @@ public class LocationConfig {
   public LocationService locationService(AppProperties appProperties,
       LocationProperties locationProperties, LocationRepository locationRepository,
       PasswordEncoder passwordEncoder, ApplicationEventPublisher eventPublisher,
-      ObjectMapper objectMapper, ConnectedSlaveRegistry connectedSlaveRegistry) {
+      ObjectMapper objectMapper, ConnectedSlaveRegistry connectedSlaveRegistry,
+      SongLibraryRepository songLibraryRepository) {
 
     return new LocationServiceImpl(locationRepository, passwordEncoder, eventPublisher,
         objectMapper, effectiveStorageRoot(appProperties, locationProperties),
-        connectedSlaveRegistry);
+        connectedSlaveRegistry, songLibraryRepository);
   }
 
   @Bean
@@ -90,14 +91,6 @@ public class LocationConfig {
 
     return new SlaveCommandGateway(messagingTemplate, objectMapper, connectedSlaveRegistry,
         locationProperties.getCommandTimeoutMs());
-  }
-
-  @Bean
-  @ConditionalOnProperty(name = "app.mode", havingValue = "master")
-  public LocationServiceRegistry locationServiceRegistry(SlaveCommandGateway slaveCommandGateway,
-      LocationService locationService) {
-
-    return new LocationServiceRegistry(slaveCommandGateway, locationService);
   }
 
   private static String effectiveStorageRoot(AppProperties appProperties,

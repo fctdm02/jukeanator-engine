@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotAlbumDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotDto;
@@ -29,6 +30,15 @@ import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationStatus;
 import com.djt.jukeanator_engine.domain.location.repository.LocationRepository;
+import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.LocationMetaDataFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
+import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryJpaImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -46,13 +56,14 @@ public class LocationServiceImpl implements LocationService {
   private final ObjectMapper objectMapper;
   private final String storageRoot;
   private final ConnectedSlaveRegistry connectedSlaveRegistry;
+  private final SongLibraryRepository songLibraryRepository;
 
   private LocationRootEntity locationRoot;
 
   public LocationServiceImpl(LocationRepository locationRepository,
       PasswordEncoder passwordEncoder, ApplicationEventPublisher eventPublisher,
       ObjectMapper objectMapper, String storageRoot,
-      ConnectedSlaveRegistry connectedSlaveRegistry) {
+      ConnectedSlaveRegistry connectedSlaveRegistry, SongLibraryRepository songLibraryRepository) {
 
     requireNonNull(locationRepository, "locationRepository cannot be null");
     requireNonNull(passwordEncoder, "passwordEncoder cannot be null");
@@ -60,6 +71,7 @@ public class LocationServiceImpl implements LocationService {
     requireNonNull(objectMapper, "objectMapper cannot be null");
     requireNonNull(storageRoot, "storageRoot cannot be null");
     requireNonNull(connectedSlaveRegistry, "connectedSlaveRegistry cannot be null");
+    requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
 
     this.locationRepository = locationRepository;
     this.passwordEncoder = passwordEncoder;
@@ -67,6 +79,7 @@ public class LocationServiceImpl implements LocationService {
     this.objectMapper = objectMapper;
     this.storageRoot = storageRoot;
     this.connectedSlaveRegistry = connectedSlaveRegistry;
+    this.songLibraryRepository = songLibraryRepository;
 
     initialize();
 
@@ -166,6 +179,12 @@ public class LocationServiceImpl implements LocationService {
 
     Map<Integer, String> previousCoverArtHashes = loadPreviousCoverArtHashes(locationId);
 
+    // The JSON snapshot file remains the source of truth for cover-art-hash diffing (see
+    // loadPreviousCoverArtHashes) regardless of repository-type -- coverArtHash has no analog in
+    // the JPA schema (AlbumMetaDataFileEntity never tracked one), so this file is written
+    // unconditionally. When song-library.repository-type=jpa, the same snapshot additionally
+    // populates the JPA tables, which is what SongLibraryServiceImpl actually serves browse/search
+    // reads from for this location.
     Path libraryFile = locationStorageRoot(locationId).resolve("library.json");
     try {
       Files.createDirectories(libraryFile.getParent());
@@ -173,6 +192,10 @@ public class LocationServiceImpl implements LocationService {
     } catch (IOException ioe) {
       throw new LocationServiceException(
           "Could not write library snapshot for locationId: " + locationId, ioe);
+    }
+
+    if (songLibraryRepository instanceof SongLibraryRepositoryJpaImpl) {
+      persistSnapshotToJpa(locationId, snapshot);
     }
 
     recordHeartbeat(locationId);
@@ -192,6 +215,89 @@ public class LocationServiceImpl implements LocationService {
         .publishEvent(new LocationLibrarySyncedEvent(locationId, snapshot.albums().size()));
 
     return new LibrarySyncAckDto(needingCoverArt);
+  }
+
+  /**
+   * Builds a {@link RootFolderEntity} tree from a synced snapshot -- the same shape {@code
+   * SongScanner} would build from real files -- and stores it via the JPA repository, so {@code
+   * SongLibraryServiceImpl#getOrLoadRoot} transparently picks up this location the next time it's
+   * browsed. Mirrors the field mapping the deleted {@code SongLibraryServiceLocationProxy} used to
+   * do at read time, just performed once at sync time instead of on every request.
+   *
+   * <p>Every {@link AlbumMetaDataFileEntity}/{@link LocationMetaDataFileEntity} built here is
+   * marked loaded via its setter rather than through {@code writeMetadataToFileSystem()} -- see
+   * {@code SongLibraryRepositoryJpaImpl}'s class javadoc for why a synthetically-built root must
+   * never trigger real disk I/O.
+   */
+  private void persistSnapshotToJpa(Integer locationId, LibrarySnapshotDto snapshot) {
+
+    RootFolderEntity root = new RootFolderEntity("synced-location-" + locationId);
+    LocationMetaDataFileEntity metadata = root.getMetadata();
+    metadata.setLocationId(locationId);
+    metadata.setLoaded(true);
+
+    Map<Integer, GenreFolderEntity> genresBySourceId = new HashMap<>();
+    Map<String, ArtistFolderEntity> artistsByGenreAndName = new HashMap<>();
+
+    try {
+      for (LibrarySnapshotAlbumDto albumDto : snapshot.albums()) {
+
+        GenreFolderEntity genre = genresBySourceId.computeIfAbsent(albumDto.sourceGenreId(),
+            id -> {
+              GenreFolderEntity g = new GenreFolderEntity(root,
+                  albumDto.genreName() != null ? albumDto.genreName() : "Unknown");
+              try {
+                root.addChildFolder(g);
+              } catch (EntityAlreadyExistsException e) {
+                throw new LocationServiceException("Duplicate genre folder for locationId: "
+                    + locationId + ", genreName: " + albumDto.genreName(), e);
+              }
+              return g;
+            });
+
+        String artistKey = albumDto.sourceGenreId() + "|" + albumDto.artistName();
+        ArtistFolderEntity artist = artistsByGenreAndName.computeIfAbsent(artistKey, key -> {
+          ArtistFolderEntity a = new ArtistFolderEntity(genre,
+              albumDto.artistName() != null ? albumDto.artistName() : "Unknown");
+          try {
+            genre.addChildFolder(a);
+          } catch (EntityAlreadyExistsException e) {
+            throw new LocationServiceException("Duplicate artist folder for locationId: "
+                + locationId + ", artistName: " + albumDto.artistName(), e);
+          }
+          return a;
+        });
+
+        AlbumFolderEntity album = new AlbumFolderEntity(artist, albumDto.name());
+        album.setPersistentIdentity(albumDto.sourceAlbumId());
+        artist.addChildFolder(album);
+
+        album.createCoverArtEntity();
+        album.createMetadataEntity();
+        AlbumMetaDataFileEntity albumMetadata = album.getMetaData();
+        albumMetadata.setGenre(albumDto.genreName());
+        albumMetadata.setRecordLabel(albumDto.recordLabel());
+        albumMetadata.setReleaseDate(albumDto.releaseDate());
+        albumMetadata.setHasExplicit(Boolean.TRUE.equals(albumDto.hasExplicit()));
+        albumMetadata.setLoaded(true);
+
+        for (var songDto : albumDto.songs()) {
+          SongFileEntity song = new SongFileEntity(album, songDto.title());
+          song.setPersistentIdentity(songDto.sourceSongId());
+          song.setArtistName(albumDto.artistName());
+          song.setSongName(songDto.title());
+          song.setTrackNumber(songDto.trackNumber());
+          song.setNumPlays(songDto.numPlays() != null ? songDto.numPlays() : Integer.valueOf(0));
+          album.addChildSong(song);
+        }
+      }
+    } catch (EntityAlreadyExistsException e) {
+      throw new LocationServiceException(
+          "Could not assemble synced library tree for locationId: " + locationId, e);
+    }
+
+    root.initialize();
+    songLibraryRepository.storeAggregateRoot(root);
   }
 
   @Override

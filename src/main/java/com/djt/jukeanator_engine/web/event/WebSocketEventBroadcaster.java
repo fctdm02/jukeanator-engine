@@ -46,13 +46,16 @@ public class WebSocketEventBroadcaster {
 
   @EventListener
   public void handleSongStatisticsChangedEvent(SongStatisticsChangedEvent event) {
-    messagingTemplate.convertAndSend("/topic/genres", songLibraryService.getGenres());
-    messagingTemplate.convertAndSend("/topic/popularity", songLibraryService.getMusicByPopularity());
+    Integer locationId = songLibraryService.getOwnLocationId();
+    messagingTemplate.convertAndSend("/topic/genres", songLibraryService.getGenres(locationId));
+    messagingTemplate.convertAndSend("/topic/popularity",
+        songLibraryService.getMusicByPopularity(locationId));
   }
 
   @EventListener
   public void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event) {
-    messagingTemplate.convertAndSend("/topic/popularity", songLibraryService.getMusicByPopularity());
+    messagingTemplate.convertAndSend("/topic/popularity",
+        songLibraryService.getMusicByPopularity(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
@@ -64,24 +67,24 @@ public class WebSocketEventBroadcaster {
   public void handlePlaybackStarted(SongPlaybackStartedEvent event) {
     messagingTemplate.convertAndSend("/topic/now-playing",
         new NowPlayingMessage(event.songQueueEntry().getSong()));
-    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus());
+    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
   public void handlePlaybackPaused(SongPlaybackPausedEvent event) {
-    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus());
+    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
   public void handleSongPlaybackStoppedEvent(SongPlaybackStoppedEvent event) {
     messagingTemplate.convertAndSend("/topic/now-playing", new NowPlayingMessage(null));
-    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus());
+    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
   public void handleAllSongsDonePlayingEvent(AllSongsDonePlayingEvent event) {
     messagingTemplate.convertAndSend("/topic/now-playing", new NowPlayingMessage(null));
-    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus());
+    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
@@ -106,10 +109,12 @@ public class WebSocketEventBroadcaster {
 
   @EventListener
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
-    messagingTemplate.convertAndSend("/topic/genres", songLibraryService.getGenres());
-    messagingTemplate.convertAndSend("/topic/popularity", songLibraryService.getMusicByPopularity());
+    Integer locationId = songLibraryService.getOwnLocationId();
+    messagingTemplate.convertAndSend("/topic/genres", songLibraryService.getGenres(locationId));
+    messagingTemplate.convertAndSend("/topic/popularity",
+        songLibraryService.getMusicByPopularity(locationId));
     messagingTemplate.convertAndSend("/topic/now-playing",
-        new NowPlayingMessage(songPlayerService.getNowPlayingSong()));
-    messagingTemplate.convertAndSend("/topic/queue", songQueueService.getQueuedSongs());
+        new NowPlayingMessage(songPlayerService.getNowPlayingSong(locationId)));
+    messagingTemplate.convertAndSend("/topic/queue", songQueueService.getQueuedSongs(locationId));
   }
 }

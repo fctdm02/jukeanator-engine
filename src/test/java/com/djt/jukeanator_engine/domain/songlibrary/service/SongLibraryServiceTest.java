@@ -52,7 +52,7 @@ public class SongLibraryServiceTest extends AbstractServiceIntegrationTest {
 
     // STEP 3: ASSERT
     assertNotNull(numAlbums, "numAlbums should not be null");
-    List<AlbumDto> albums = songLibraryService.getAlbums();
+    List<AlbumDto> albums = songLibraryService.getAlbums(songLibraryService.getOwnLocationId());
     assertNotNull(albums, "albums should not be null");
     assertFalse(albums.isEmpty(), "albums should not be empty");
   }
@@ -68,9 +68,10 @@ public class SongLibraryServiceTest extends AbstractServiceIntegrationTest {
     assertNotNull(numAlbums, "numAlbums should not be null");
 
     // STEP 2: ACT
-    List<GenreDto> genres = songLibraryService.getGenres();
-    List<ArtistDto> artists = songLibraryService.getArtists();
-    List<AlbumDto> albums = songLibraryService.getAlbums();
+    Integer locationId = songLibraryService.getOwnLocationId();
+    List<GenreDto> genres = songLibraryService.getGenres(locationId);
+    List<ArtistDto> artists = songLibraryService.getArtists(locationId);
+    List<AlbumDto> albums = songLibraryService.getAlbums(locationId);
 
     // STEP 3: ASSERT
     assertNotNull(genres, "genres should not be null");
@@ -106,7 +107,7 @@ public class SongLibraryServiceTest extends AbstractServiceIntegrationTest {
     byte[] originalCdStatsBytes =
         Files.exists(cdStatsPath) ? Files.readAllBytes(cdStatsPath) : null;
 
-    RootFolderEntity root = songLibraryService.getSongLibraryRoot();
+    RootFolderEntity root = songLibraryService.getSongLibraryRoot(songLibraryService.getOwnLocationId());
     List<SongFileEntity> songs = new ArrayList<>(root.getSongs());
     assertTrue(songs.size() >= 2, "Fixture should contain at least 2 songs to increment");
 

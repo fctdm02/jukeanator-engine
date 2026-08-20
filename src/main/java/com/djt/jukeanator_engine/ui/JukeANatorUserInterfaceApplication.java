@@ -90,11 +90,12 @@ public class JukeANatorUserInterfaceApplication {
 
     SwingSecurityUtil.runAsync(() -> {
 
-      List<AlbumDto>   albums  = songLibraryService.getAlbums();
-      SearchResultDto  popular = songLibraryService.getMusicByPopularity();
-      var              genres  = songLibraryService.getGenres();
-      var              playing = songPlayerService.getNowPlayingSong();
-      var              queue   = songQueueService.getQueuedSongs();
+      Integer          locationId = songLibraryService.getOwnLocationId();
+      List<AlbumDto>   albums  = songLibraryService.getAlbums(locationId);
+      SearchResultDto  popular = songLibraryService.getMusicByPopularity(locationId);
+      var              genres  = songLibraryService.getGenres(locationId);
+      var              playing = songPlayerService.getNowPlayingSong(locationId);
+      var              queue   = songQueueService.getQueuedSongs(locationId);
 
       SwingUtilities.invokeLater(() -> {
         frame.setAlbums(albums, popular);

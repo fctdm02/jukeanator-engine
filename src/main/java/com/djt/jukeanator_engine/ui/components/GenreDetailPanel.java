@@ -232,8 +232,10 @@ public class GenreDetailPanel extends JPanel {
 
     try {
       SearchResultDto fresh = switch (mode) {
-        case POPULARITY -> songLibraryService.getGenreMusicByPopularity(genre.getGenreName());
-        case TITLE -> songLibraryService.getGenreMusicByTitle(genre.getGenreName());
+        case POPULARITY -> songLibraryService.getGenreMusicByPopularity(
+            songLibraryService.getOwnLocationId(), genre.getGenreName());
+        case TITLE -> songLibraryService.getGenreMusicByTitle(songLibraryService.getOwnLocationId(),
+            genre.getGenreName());
       };
       if (fresh == null)
         fresh = new SearchResultDto();

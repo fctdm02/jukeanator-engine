@@ -32,6 +32,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
@@ -452,7 +453,7 @@ public class JukeANatorFrame extends JFrame {
                 if (hibernationActive) {
                   hibernationActive = false;
                   hibernationWindow.setVisible(false);
-                  songPlayerService.unlockQueue();
+                  songPlayerService.unlockQueue(songLibraryService.getOwnLocationId());
                 }
               }));
 
@@ -548,7 +549,7 @@ public class JukeANatorFrame extends JFrame {
 
       // lockQueue() stops the current song AND prevents the next one from
       // being dequeued — a single call replaces the previous two-step pattern.
-      songPlayerService.lockQueue();
+      songPlayerService.lockQueue(songLibraryService.getOwnLocationId());
 
       hibernationWindow.setVisible(true);
 
@@ -559,7 +560,7 @@ public class JukeANatorFrame extends JFrame {
       hibernationWindow.setVisible(false);
 
       // Re-enable the queue so patrons can queue songs again.
-      songPlayerService.unlockQueue();
+      songPlayerService.unlockQueue(songLibraryService.getOwnLocationId());
     }
   }
 
@@ -1004,9 +1005,11 @@ public class JukeANatorFrame extends JFrame {
 
     // Operator-configured logo override, e.g. dataDir/images/RockOnThirdLogo.jpg
     ImageIcon logoIcon = null;
-    if (songLibraryService != null && songLibraryService.getSongLibraryRoot() != null
-        && songLibraryService.getSongLibraryRoot().getMetadata() != null) {
-      String logoName = songLibraryService.getSongLibraryRoot().getMetadata().getLogoName();
+    RootFolderEntity ownLibraryRoot = songLibraryService != null
+        ? songLibraryService.getSongLibraryRoot(songLibraryService.getOwnLocationId())
+        : null;
+    if (ownLibraryRoot != null && ownLibraryRoot.getMetadata() != null) {
+      String logoName = ownLibraryRoot.getMetadata().getLogoName();
       if (logoName != null && !logoName.isBlank()) {
         logoIcon = imageLoader.loadImageFromDataDir(logoName, topPanelProfile.iconSize(),
             topPanelProfile.iconSize());
@@ -1411,7 +1414,8 @@ public class JukeANatorFrame extends JFrame {
     // ── Eligibility check (normal play = priority 1) ──────────────────────
     // getHighestPriority() returns the next available priority; normal plays
     // always use priority 1, so we pass 1 here as a representative value.
-    String reason = songQueueService.isSongEligibleForQueue(song.getAlbumId(), song.getSongId(), 1);
+    String reason = songQueueService.isSongEligibleForQueue(songQueueService.getOwnLocationId(),
+        song.getAlbumId(), song.getSongId(), 1);
 
     addSongToQueueCard = new AddSongToQueueCard(song, imageLoader, priorityCostMultiplier,
         songQueueService, creditManager, onDismiss);
@@ -1448,7 +1452,8 @@ public class JukeANatorFrame extends JFrame {
     // Fetch the full album (with track listing) for the now-playing song
     AlbumDto full;
     try {
-      full = songLibraryService.getAlbumById(currentNowPlayingSong.getAlbumId());
+      full = songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(),
+          currentNowPlayingSong.getAlbumId());
     } catch (Exception e) {
       return; // cannot show detail without album data
     }

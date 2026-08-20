@@ -153,9 +153,9 @@ public class UserController {
   public ResponseEntity<Void> addSongToPlaylist(@AuthenticationPrincipal String emailAddress,
       @PathVariable String playlistName, @RequestBody SongIdentifier songIdentifier)
       throws EntityDoesNotExistException {
-    SongFileEntity song = songLibraryService.getSongLibraryRoot()
+    SongFileEntity song = songLibraryService.getSongLibraryRoot(songIdentifier.getLocationId())
         .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
-    userService.addSongToPlaylist(emailAddress, playlistName, song);
+    userService.addSongToPlaylist(emailAddress, playlistName, songIdentifier.getLocationId(), song);
     return ResponseEntity.noContent().build();
   }
 
@@ -163,9 +163,10 @@ public class UserController {
   public ResponseEntity<Void> removeSongFromPlaylist(@AuthenticationPrincipal String emailAddress,
       @PathVariable String playlistName, @RequestBody SongIdentifier songIdentifier)
       throws EntityDoesNotExistException {
-    SongFileEntity song = songLibraryService.getSongLibraryRoot()
+    SongFileEntity song = songLibraryService.getSongLibraryRoot(songIdentifier.getLocationId())
         .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
-    userService.removeSongFromPlaylist(emailAddress, playlistName, song);
+    userService.removeSongFromPlaylist(emailAddress, playlistName, songIdentifier.getLocationId(),
+        song);
     return ResponseEntity.noContent().build();
   }
 
@@ -173,9 +174,9 @@ public class UserController {
   public ResponseEntity<Void> addSongToMyFavoritesPlaylist(
       @AuthenticationPrincipal String emailAddress, @RequestBody SongIdentifier songIdentifier)
       throws EntityDoesNotExistException {
-    SongFileEntity song = songLibraryService.getSongLibraryRoot()
+    SongFileEntity song = songLibraryService.getSongLibraryRoot(songIdentifier.getLocationId())
         .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
-    userService.addSongToMyFavoritesPlaylist(emailAddress, song);
+    userService.addSongToMyFavoritesPlaylist(emailAddress, songIdentifier.getLocationId(), song);
     return ResponseEntity.noContent().build();
   }
 
@@ -183,9 +184,10 @@ public class UserController {
   public ResponseEntity<Void> removeSongFromMyFavoritesPlaylist(
       @AuthenticationPrincipal String emailAddress, @RequestBody SongIdentifier songIdentifier)
       throws EntityDoesNotExistException {
-    SongFileEntity song = songLibraryService.getSongLibraryRoot()
+    SongFileEntity song = songLibraryService.getSongLibraryRoot(songIdentifier.getLocationId())
         .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
-    userService.removeSongFromMyFavoritesPlaylist(emailAddress, song);
+    userService.removeSongFromMyFavoritesPlaylist(emailAddress, songIdentifier.getLocationId(),
+        song);
     return ResponseEntity.noContent().build();
   }
 

@@ -53,7 +53,7 @@ public class SongPlayerServiceTest extends AbstractServiceIntegrationTest {
             + "utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
     Integer numAlbums = songLibraryService.scanFileSystemForSongs(scanRequest);
     assertNotNull(numAlbums, "numAlbums should not be null");
-    List<AlbumDto> albums = songLibraryService.getAlbums();
+    List<AlbumDto> albums = songLibraryService.getAlbums(songLibraryService.getOwnLocationId());
     assertNotNull(albums, "albums should not be null");
     assertFalse(albums.isEmpty(), "albums should not be empty");
 
@@ -67,18 +67,22 @@ public class SongPlayerServiceTest extends AbstractServiceIntegrationTest {
     Integer priority = Integer.valueOf(1);
     AddSongToQueueRequest addSongToQueueRequest =
         new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, albumId, songId, priority);
-    SongQueueEntryDto queueEntry = songQueueService.addSongToQueue(addSongToQueueRequest);
+    SongQueueEntryDto queueEntry = songQueueService.addSongToQueue(
+        songLibraryService.getOwnLocationId(), addSongToQueueRequest);
     assertNotNull(queueEntry, "queueEntry should not be null");
 
     // Get the currently playing song
-    SongDto nowPlayingSongDto = songPlayerService.getNowPlayingSong();
+    SongDto nowPlayingSongDto =
+        songPlayerService.getNowPlayingSong(songLibraryService.getOwnLocationId());
     assertNotNull(nowPlayingSongDto, "nowPlayingSongDto should not be null");
 
-    SongPlaybackStatusDto songPlaybackStatusDto = songPlayerService.getPlaybackStatus();
+    SongPlaybackStatusDto songPlaybackStatusDto =
+        songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId());
     assertNotNull(songPlaybackStatusDto, "songPlaybackStatusDto should not be null");
 
     // Verify that the song queue is now empty
-    List<SongQueueEntryDto> queuedSongs = songQueueService.getQueuedSongs();
+    List<SongQueueEntryDto> queuedSongs =
+        songQueueService.getQueuedSongs(songLibraryService.getOwnLocationId());
     assertNotNull(queuedSongs, "queuedSongs should not be null");
     assertTrue(queuedSongs.size() == 0, "queuedSongs size should be zero");
   }

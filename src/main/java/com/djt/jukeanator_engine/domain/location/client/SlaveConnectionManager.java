@@ -169,7 +169,7 @@ public class SlaveConnectionManager {
 
   private Integer currentLocationId() {
     try {
-      return songLibraryService.getSongLibraryRoot().getMetadata().getLocationId();
+      return songLibraryService.getOwnLocationId();
     } catch (Exception e) {
       return null;
     }
@@ -193,24 +193,24 @@ public class SlaveConnectionManager {
   @EventListener
   public void handlePlaybackStarted(SongPlaybackStartedEvent event) {
     sendEvent("now-playing", event.songQueueEntry().getSong());
-    sendEvent("playback-status", songPlayerService.getPlaybackStatus());
+    sendEvent("playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
   public void handlePlaybackPaused(SongPlaybackPausedEvent event) {
-    sendEvent("playback-status", songPlayerService.getPlaybackStatus());
+    sendEvent("playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
   public void handleSongPlaybackStoppedEvent(SongPlaybackStoppedEvent event) {
     sendEvent("now-playing", null);
-    sendEvent("playback-status", songPlayerService.getPlaybackStatus());
+    sendEvent("playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
   public void handleAllSongsDonePlayingEvent(AllSongsDonePlayingEvent event) {
     sendEvent("now-playing", null);
-    sendEvent("playback-status", songPlayerService.getPlaybackStatus());
+    sendEvent("playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   private void sendEvent(String eventType, Object payload) {
@@ -290,13 +290,17 @@ public class SlaveConnectionManager {
 
       Integer confirmedLocationId = (Integer) payload;
       try {
-        LocationMetaDataFileEntity metadata = songLibraryService.getSongLibraryRoot().getMetadata();
+        LocationMetaDataFileEntity metadata = songLibraryService
+            .getSongLibraryRoot(songLibraryService.getOwnLocationId()).getMetadata();
         if (!confirmedLocationId.equals(metadata.getLocationId())) {
           log.info("Master assigned locationId {} (was {} locally) — correcting {}",
               confirmedLocationId, metadata.getLocationId(),
               LocationMetaDataFileEntity.LOCATION_METADATA_FILENAME);
           metadata.setLocationId(confirmedLocationId);
           metadata.writeMetadataToFileSystem();
+          // Re-key SongLibraryServiceImpl's own locationId->root cache under the corrected id --
+          // it was populated under the old (pre-correction) id at startup.
+          songLibraryService.reinitializeOwnLocation();
         }
       } catch (Exception e) {
         log.warn("Could not reconcile confirmed locationId {} with local metadata",
@@ -328,56 +332,63 @@ public class SlaveConnectionManager {
 
   private Object dispatch(String commandType, Object payload) throws Exception {
 
+    Integer ownLocationId = songLibraryService.getOwnLocationId();
+
     switch (commandType) {
       case "getHighestPriority":
-        return songQueueService.getHighestPriority();
+        return songQueueService.getHighestPriority(ownLocationId);
       case "getQueuedSongs":
-        return songQueueService.getQueuedSongs();
+        return songQueueService.getQueuedSongs(ownLocationId);
       case "isSongEligibleForQueue": {
         EligibilityCheckPayload p = convert(payload, EligibilityCheckPayload.class);
-        return songQueueService.isSongEligibleForQueue(p.albumId(), p.songId(), p.priority());
+        return songQueueService.isSongEligibleForQueue(ownLocationId, p.albumId(), p.songId(),
+            p.priority());
       }
       case "addSongToQueue":
-        return songQueueService.addSongToQueue(convert(payload, AddSongToQueueRequest.class));
+        return songQueueService.addSongToQueue(ownLocationId,
+            convert(payload, AddSongToQueueRequest.class));
       case "addAlbumToQueue":
-        return songQueueService.addAlbumToQueue(convert(payload, AddAlbumToQueueRequest.class));
+        return songQueueService.addAlbumToQueue(ownLocationId,
+            convert(payload, AddAlbumToQueueRequest.class));
       case "addMultipleSongsToQueue":
-        return songQueueService
-            .addMultipleSongsToQueue(convert(payload, AddMultipleSongsToQueueRequest.class));
+        return songQueueService.addMultipleSongsToQueue(ownLocationId,
+            convert(payload, AddMultipleSongsToQueueRequest.class));
       case "flushQueue":
-        return songQueueService.flushQueue();
+        return songQueueService.flushQueue(ownLocationId);
       case "randomizeQueue":
-        return songQueueService.randomizeQueue();
+        return songQueueService.randomizeQueue(ownLocationId);
       case "moveSongUpInQueue":
-        return songQueueService.moveSongUpInQueue(convert(payload, ChangeSongQueueRequest.class));
+        return songQueueService.moveSongUpInQueue(ownLocationId,
+            convert(payload, ChangeSongQueueRequest.class));
       case "moveSongDownInQueue":
-        return songQueueService.moveSongDownInQueue(convert(payload, ChangeSongQueueRequest.class));
+        return songQueueService.moveSongDownInQueue(ownLocationId,
+            convert(payload, ChangeSongQueueRequest.class));
       case "removeSongDownFromQueue":
-        return songQueueService
-            .removeSongDownFromQueue(convert(payload, ChangeSongQueueRequest.class));
+        return songQueueService.removeSongDownFromQueue(ownLocationId,
+            convert(payload, ChangeSongQueueRequest.class));
       case "saveQueueAsPlaylist":
-        return songQueueService.saveQueueAsPlaylist(convert(payload, String.class));
+        return songQueueService.saveQueueAsPlaylist(ownLocationId, convert(payload, String.class));
       case "loadPlaylistIntoQueue":
-        return songQueueService
-            .loadPlaylistIntoQueue(convert(payload, LoadPlaylistIntoQueueRequest.class));
+        return songQueueService.loadPlaylistIntoQueue(ownLocationId,
+            convert(payload, LoadPlaylistIntoQueueRequest.class));
       case "getNowPlayingSong":
-        return songPlayerService.getNowPlayingSong();
+        return songPlayerService.getNowPlayingSong(ownLocationId);
       case "getPlaybackStatus":
-        return songPlayerService.getPlaybackStatus();
+        return songPlayerService.getPlaybackStatus(ownLocationId);
       case "playNextTrack":
-        songPlayerService.playNextTrack();
+        songPlayerService.playNextTrack(ownLocationId);
         return null;
       case "pause":
-        songPlayerService.pause();
+        songPlayerService.pause(ownLocationId);
         return null;
       case "stop":
-        songPlayerService.stop();
+        songPlayerService.stop(ownLocationId);
         return null;
       case "lockQueue":
-        songPlayerService.lockQueue();
+        songPlayerService.lockQueue(ownLocationId);
         return null;
       case "unlockQueue":
-        songPlayerService.unlockQueue();
+        songPlayerService.unlockQueue(ownLocationId);
         return null;
       default:
         throw new IllegalArgumentException("Unknown commandType: " + commandType);

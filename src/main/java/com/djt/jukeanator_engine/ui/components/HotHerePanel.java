@@ -144,7 +144,8 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   public void refreshMusicByPopularityResults() {
 
     try {
-      this.resultsByPopularity = songLibraryService.getMusicByPopularity();
+      this.resultsByPopularity =
+          songLibraryService.getMusicByPopularity(songLibraryService.getOwnLocationId());
     } catch (Exception e) {
       throw new RuntimeException("Could not get music by popularity, error: " + e.getMessage(), e);
     }
@@ -455,7 +456,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     ArtistDto full = null;
     String artistName = artist.getArtistName();
     try {
-      full = songLibraryService.getArtistByName(artistName);
+      full = songLibraryService.getArtistByName(songLibraryService.getOwnLocationId(), artistName);
     } catch (Exception e) {
       e.printStackTrace();
       throw new IllegalStateException("Could not get artist: [" + artistName + "]", e);
@@ -473,7 +474,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // ─────────────────────────────────────────────────────────────────────────
   private AlbumDto fetchFull(AlbumDto album) {
     try {
-      return songLibraryService.getAlbumById(album.getAlbumId());
+      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.getAlbumId());
     } catch (Exception e) {
       return album;
     }

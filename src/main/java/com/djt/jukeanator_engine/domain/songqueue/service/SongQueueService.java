@@ -44,96 +44,103 @@ public interface SongQueueService {
   @PublicServiceMethod
   boolean isBackgroundMusicEnabled();  
 
+  // Every method below takes locationId as its first parameter -- standalone/slave instances have
+  // exactly one location (their own) and always execute locally; the master instance forwards to
+  // whichever location owns the request over the existing SlaveCommandGateway/ws-slave channel.
+  // See SongQueueServiceImpl#isOwnLocation.
   /**
-   * 
+   *
    * @return a priority value that is one higher than the highest priority that is currently in the
    *         queue. For example, if the largest priority value of a song that is currently in the
    *         queue is 2, then return 3 If there are no songs in the queue, then return 2 (a random
    *         song will be always be priority 0 and a normal cost user selected song will always be
    *         priority 1).
    */
-  Integer getHighestPriority();
+  Integer getHighestPriority(Integer locationId);
 
   /**
-   * 
+   *
    * @return
    */
-  List<SongQueueEntryDto> getQueuedSongs();
+  List<SongQueueEntryDto> getQueuedSongs(Integer locationId);
 
   /**
-   * 
+   *
    * @param albumId
    * @param songId
    * @param priority
    * @return The reason why the song was not eligible
    */
-  String isSongEligibleForQueue(Integer albumId, Integer songId, Integer priority);
-  
+  String isSongEligibleForQueue(Integer locationId, Integer albumId, Integer songId,
+      Integer priority);
+
   /**
    * @param addSongToQueueRequest
    * @return
    */
-  SongQueueEntryDto addSongToQueue(AddSongToQueueRequest addSongToQueueRequest);
-  
+  SongQueueEntryDto addSongToQueue(Integer locationId, AddSongToQueueRequest addSongToQueueRequest);
+
   /**
-   * 
+   *
    * @param addAlbumToQueueRequest
    * @return
    */
-  List<SongQueueEntryDto> addAlbumToQueue(AddAlbumToQueueRequest addAlbumToQueueRequest);
+  List<SongQueueEntryDto> addAlbumToQueue(Integer locationId,
+      AddAlbumToQueueRequest addAlbumToQueueRequest);
 
   /**
-   * 
+   *
    * @param addMultipleSongsToQueueRequest
    * @return
    */
-  List<SongQueueEntryDto> addMultipleSongsToQueue(
+  List<SongQueueEntryDto> addMultipleSongsToQueue(Integer locationId,
       AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest);
 
   /**
    * @return
    */
-  Integer flushQueue();
+  Integer flushQueue(Integer locationId);
 
   /**
    * @return
    */
-  Integer randomizeQueue();
+  Integer randomizeQueue(Integer locationId);
 
   /**
-   * 
+   *
    * @param changeSongQueueRequest
    * @return
    */
-  Integer moveSongUpInQueue(ChangeSongQueueRequest changeSongQueueRequest);
+  Integer moveSongUpInQueue(Integer locationId, ChangeSongQueueRequest changeSongQueueRequest);
 
   /**
-   * 
+   *
    * @param changeSongQueueRequest
    * @return
    */
-  Integer moveSongDownInQueue(ChangeSongQueueRequest changeSongQueueRequest);
+  Integer moveSongDownInQueue(Integer locationId, ChangeSongQueueRequest changeSongQueueRequest);
 
   /**
-   * 
+   *
    * @param changeSongQueueRequest
    * @return
    */
-  Integer removeSongDownFromQueue(ChangeSongQueueRequest changeSongQueueRequest);
+  Integer removeSongDownFromQueue(Integer locationId, ChangeSongQueueRequest changeSongQueueRequest);
 
   /**
-   * 
+   *
    * @param filename
    * @return
    */
-  Integer saveQueueAsPlaylist(String filename);
+  Integer saveQueueAsPlaylist(Integer locationId, String filename);
 
   /**
    *
    * @param loadPlaylistIntoQueueRequest
    * @return
    */
-  Integer loadPlaylistIntoQueue(LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest);
+  Integer loadPlaylistIntoQueue(Integer locationId,
+      LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest);
 
   /**
    * Persists the current song queue to disk.
@@ -143,9 +150,20 @@ public interface SongQueueService {
   Integer storeSongQueue();
 
   /**
-   * 
+   *
    * @param event
    */
   @PublicServiceMethod
   void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event);
+
+  /**
+   * The locationId of the one location this instance itself owns, or {@code null} on the master
+   * instance. Convenience for callers (e.g. Swing UI panels) that hold a {@code SongQueueService}
+   * reference but not a {@code SongLibraryService} one -- delegates to {@code
+   * SongLibraryService#getOwnLocationId()} under the hood.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   */
+  @PublicServiceMethod
+  Integer getOwnLocationId();
 }

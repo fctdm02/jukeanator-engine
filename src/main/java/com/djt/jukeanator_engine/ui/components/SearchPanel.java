@@ -342,7 +342,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
       return;
 
     try {
-      lastResult = songLibraryService.getMusicBySearch(query);
+      lastResult = songLibraryService.getMusicBySearch(songLibraryService.getOwnLocationId(), query);
       artistsOffset = 0;
       albumsOffset = 0;
       songsOffset = 0;
@@ -458,7 +458,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
     ArtistDto full = null;
     String artistName = artist.getArtistName();
     try {
-      full = songLibraryService.getArtistByName(artistName);
+      full = songLibraryService.getArtistByName(songLibraryService.getOwnLocationId(), artistName);
     } catch (Exception e) {
       e.printStackTrace();
       throw new IllegalStateException("Could not get artist: [" + artistName + "]", e);
@@ -473,7 +473,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
   private AlbumDto fetchFull(AlbumDto album) {
     try {
-      return songLibraryService.getAlbumById(album.getAlbumId());
+      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.getAlbumId());
     } catch (Exception e) {
       return album;
     }

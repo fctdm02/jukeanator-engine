@@ -158,7 +158,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   }
 
   @Override
-  public SongDto getNowPlayingSong() {
+  public SongDto getNowPlayingSong(Integer locationId) {
 
     SongQueueEntryDto current = this.nowPlayingSong;
     if (current != null) {
@@ -169,7 +169,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   }
 
   @Override
-  public SongPlaybackStatusDto getPlaybackStatus() {
+  public SongPlaybackStatusDto getPlaybackStatus(Integer locationId) {
 
     Long elapsedSeconds = 0L;
     Long totalSeconds = 0L;
@@ -185,7 +185,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   }
 
   @Override
-  public void playNextTrack() {
+  public void playNextTrack(Integer locationId) {
 
     songPlayerStatus = player.getStatus();
     if (songPlayerStatus != SongPlayerStatus.STOPPED) {
@@ -199,7 +199,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   }
 
   @Override
-  public void pause() {
+  public void pause(Integer locationId) {
 
     songPlayerStatus = player.getStatus();
     if (songPlayerStatus == SongPlayerStatus.PLAYING
@@ -212,7 +212,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   }
 
   @Override
-  public void stop() {
+  public void stop(Integer locationId) {
 
     songPlayerStatus = player.getStatus();
     if (songPlayerStatus == SongPlayerStatus.PLAYING
@@ -227,7 +227,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   }
 
   @Override
-  public void lockQueue() {
+  public void lockQueue(Integer locationId) {
 
     queueLocked = true;
     log.info("Queue locked — no further songs will be dequeued until unlocked");
@@ -251,7 +251,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   }
 
   @Override
-  public void unlockQueue() {
+  public void unlockQueue(Integer locationId) {
 
     queueLocked = false;
     log.info("Queue unlocked — resuming normal queue processing");

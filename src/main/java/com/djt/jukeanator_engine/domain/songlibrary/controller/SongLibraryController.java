@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -34,89 +36,103 @@ import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedExce
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
 /**
+ * Every browse endpoint is scoped by {@code locationId} -- on a standalone/slave instance this is
+ * always its own one location; on master it can be any previously-synced location. Admin/scan
+ * endpoints stay unscoped (no {@code locationId}), since they're inherently local to whichever
+ * instance owns the physical library and are rejected outright on master (see
+ * {@code SongLibraryServiceImpl#requireNotMaster()}).
+ *
  * @author tmyers
  */
 @RestController
-@RequestMapping("/api/song-library")
+@RequestMapping("/api/locations/{locationId}/song-library")
 public class SongLibraryController {
 
   private final SongLibraryService songLibraryService;
+  private final LocationService locationService;
 
-  public SongLibraryController(
-      @Qualifier("songLibraryService") SongLibraryService songLibraryService) {
+  public SongLibraryController(@Qualifier("songLibraryService") SongLibraryService songLibraryService,
+      LocationService locationService) {
 
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
+    requireNonNull(locationService, "locationService cannot be null");
     this.songLibraryService = songLibraryService;
+    this.locationService = locationService;
   }
 
   // USER ROLE METHODS
 
   @GetMapping("/popular")
-  public SearchResultDto getMusicByPopularity() {
-    return songLibraryService.getMusicByPopularity();
+  public SearchResultDto getMusicByPopularity(@PathVariable Integer locationId) {
+    return songLibraryService.getMusicByPopularity(locationId);
   }
 
   @GetMapping("/search")
-  public SearchResultDto getMusicBySearch(@RequestParam String searchFor,
-      @RequestParam(defaultValue = "20") int limit) {
-    return songLibraryService.getMusicBySearch(searchFor, limit);
+  public SearchResultDto getMusicBySearch(@PathVariable Integer locationId,
+      @RequestParam String searchFor, @RequestParam(defaultValue = "20") int limit) {
+    return songLibraryService.getMusicBySearch(locationId, searchFor, limit);
   }
 
   @GetMapping("/genres")
-  public List<GenreDto> getGenres() {
-    return songLibraryService.getGenres();
+  public List<GenreDto> getGenres(@PathVariable Integer locationId) {
+    return songLibraryService.getGenres(locationId);
   }
 
   @GetMapping("/genres/popular")
-  public SearchResultDto getGenreMusicByPopularity(@RequestParam String genreName) {
-    return songLibraryService.getGenreMusicByPopularity(genreName);
+  public SearchResultDto getGenreMusicByPopularity(@PathVariable Integer locationId,
+      @RequestParam String genreName) {
+    return songLibraryService.getGenreMusicByPopularity(locationId, genreName);
   }
 
   @GetMapping("/genres/title")
-  public SearchResultDto getGenreMusicByTitle(@RequestParam String genreName) {
-    return songLibraryService.getGenreMusicByTitle(genreName);
+  public SearchResultDto getGenreMusicByTitle(@PathVariable Integer locationId,
+      @RequestParam String genreName) {
+    return songLibraryService.getGenreMusicByTitle(locationId, genreName);
   }
 
   @GetMapping("/artists")
-  public List<ArtistDto> getArtists() {
-    return songLibraryService.getArtists();
+  public List<ArtistDto> getArtists(@PathVariable Integer locationId) {
+    return songLibraryService.getArtists(locationId);
   }
 
   @GetMapping("/artist")
-  public ArtistDto getArtistByName(@RequestParam String artistName) {
-    return songLibraryService.getArtistByName(artistName);
+  public ArtistDto getArtistByName(@PathVariable Integer locationId,
+      @RequestParam String artistName) {
+    return songLibraryService.getArtistByName(locationId, artistName);
   }
 
   @GetMapping("/albums")
-  public List<AlbumDto> getAlbums() {
-    return songLibraryService.getAlbums();
+  public List<AlbumDto> getAlbums(@PathVariable Integer locationId) {
+    return songLibraryService.getAlbums(locationId);
   }
 
   @GetMapping("/genres/{genreId}/albums")
-  public List<AlbumDto> getAlbumsForGenre(@PathVariable Integer genreId) {
-    return songLibraryService.getAlbumsForGenre(genreId);
+  public List<AlbumDto> getAlbumsForGenre(@PathVariable Integer locationId,
+      @PathVariable Integer genreId) {
+    return songLibraryService.getAlbumsForGenre(locationId, genreId);
   }
 
   @GetMapping("/albums/{id}")
-  public AlbumDto getAlbumById(@PathVariable Integer id) {
-    return songLibraryService.getAlbumById(id);
+  public AlbumDto getAlbumById(@PathVariable Integer locationId, @PathVariable Integer id) {
+    return songLibraryService.getAlbumById(locationId, id);
   }
 
   @GetMapping("/artists/{id}")
-  public ArtistDto getArtistById(@PathVariable Integer id) {
-    return songLibraryService.getArtistById(id);
+  public ArtistDto getArtistById(@PathVariable Integer locationId, @PathVariable Integer id) {
+    return songLibraryService.getArtistById(locationId, id);
   }
 
   @GetMapping("/artistByAlbum/{albumId}")
-  public ArtistDto getArtistByAlbumId(@PathVariable Integer albumId) {
-    return songLibraryService.getArtistByAlbumId(albumId);
+  public ArtistDto getArtistByAlbumId(@PathVariable Integer locationId,
+      @PathVariable Integer albumId) {
+    return songLibraryService.getArtistByAlbumId(locationId, albumId);
   }
 
   @GetMapping("/artists/{id}/coverArt")
-  public ResponseEntity<Resource> getArtistCoverArt(@PathVariable Integer id)
-      throws EntityDoesNotExistException, IOException {
+  public ResponseEntity<Resource> getArtistCoverArt(@PathVariable Integer locationId,
+      @PathVariable Integer id) throws EntityDoesNotExistException, IOException {
 
-    ArtistDto artist = songLibraryService.getArtistById(id);
+    ArtistDto artist = songLibraryService.getArtistById(locationId, id);
     if (artist.getCoverArtPath() == null) {
       throw new EntityDoesNotExistException("No cover art path set for artist: " + id);
     }
@@ -127,33 +143,45 @@ public class SongLibraryController {
           "Cover art file does not exist for artist: " + id + " at path: " + coverArtPath);
     }
 
-    String probed = Files.probeContentType(coverArtPath);
-    MediaType contentType =
-        probed != null ? MediaType.parseMediaType(probed) : MediaType.APPLICATION_OCTET_STREAM;
-
-    return ResponseEntity.ok()
-        .contentType(contentType)
-        .cacheControl(CacheControl.maxAge(Duration.ofDays(1)))
-        .body(new FileSystemResource(coverArtPath));
+    return serveCoverArtFile(coverArtPath);
   }
 
   @GetMapping("/albums/{id}/coverArt")
-  public ResponseEntity<Resource> getAlbumCoverArt(@PathVariable Integer id)
-      throws EntityDoesNotExistException, IOException {
+  public ResponseEntity<Resource> getAlbumCoverArt(@PathVariable Integer locationId,
+      @PathVariable Integer id) throws EntityDoesNotExistException, IOException {
 
-    AlbumDto album = songLibraryService.getAlbumById(id);
-    if (album == null) {
-      throw new EntityDoesNotExistException("No album found for id: " + id);
-    }
-    if (album.getCoverArtPath() == null) {
-      throw new EntityDoesNotExistException("No cover art path set for album: " + id);
+    boolean isOwnLocation = Objects.equals(locationId, songLibraryService.getOwnLocationId());
+
+    Path coverArtPath;
+    if (isOwnLocation) {
+
+      AlbumDto album = songLibraryService.getAlbumById(locationId, id);
+      if (album == null || album.getCoverArtPath() == null) {
+        throw new EntityDoesNotExistException("No cover art path set for album: " + id);
+      }
+      coverArtPath = Paths.get(album.getCoverArtPath());
+
+    } else {
+
+      // A remote (synced) location's cover art never lives at the path any locally-loaded
+      // AlbumFolderEntity would compute -- it's served from master's own per-location storage
+      // root, populated by LocationService as slaves sync.
+      coverArtPath = locationService.getCoverArtPath(locationId, id);
+      if (coverArtPath == null) {
+        throw new EntityDoesNotExistException(
+            "No synced cover art for album: " + id + " at locationId: " + locationId);
+      }
     }
 
-    Path coverArtPath = Paths.get(album.getCoverArtPath());
     if (!Files.isRegularFile(coverArtPath)) {
       throw new EntityDoesNotExistException(
           "Cover art file does not exist for album: " + id + " at path: " + coverArtPath);
     }
+
+    return serveCoverArtFile(coverArtPath);
+  }
+
+  private ResponseEntity<Resource> serveCoverArtFile(Path coverArtPath) throws IOException {
 
     String probed = Files.probeContentType(coverArtPath);
     MediaType contentType =
@@ -166,11 +194,17 @@ public class SongLibraryController {
   }
 
   @GetMapping("/songs/{albumId}/{songId}")
-  public SongDto getSongById(@PathVariable Integer albumId, @PathVariable Integer songId) {
-    return songLibraryService.getSongById(albumId, songId);
+  public SongDto getSongById(@PathVariable Integer locationId, @PathVariable Integer albumId,
+      @PathVariable Integer songId) {
+    return songLibraryService.getSongById(locationId, albumId, songId);
   }
 
-  // ADMIN ROLE METHODS
+  // ADMIN ROLE METHODS -- always local to this instance's own location, no locationId path
+  // variable would make sense; @RequestMapping's {locationId} is simply ignored/unused here (a
+  // caller must still pass its own locationId in the path for URL consistency with the rest of
+  // this controller, but it's not otherwise used since admin/scan is only ever valid on the one
+  // instance that owns the library).
+
   @PostMapping("/scanNoPath")
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 
@@ -201,7 +235,7 @@ public class SongLibraryController {
 
     return songLibraryService.storeSongLibraryAndStatistics();
   }
-  
+
   @GetMapping("/searchInternetForAlbumMetadata")
   public List<AlbumMetadataDto> searchInternetForAlbumMetadata(@RequestParam String artistName,
       @RequestParam String albumName, int limit) {

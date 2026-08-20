@@ -147,19 +147,19 @@ public interface UserService {
    * @return
    * @throws EntityDoesNotExistException
    */
-  boolean addSongToPlaylist(String emailAddress, String playlistName, SongFileEntity song)
-      throws EntityDoesNotExistException;
+  boolean addSongToPlaylist(String emailAddress, String playlistName, Integer locationId,
+      SongFileEntity song) throws EntityDoesNotExistException;
 
   /**
-   * 
+   *
    * @param emailAddress
    * @param playlistName
    * @param song
    * @return
    * @throws EntityDoesNotExistException
    */
-  boolean removeSongFromPlaylist(String emailAddress, String playlistName, SongFileEntity song)
-      throws EntityDoesNotExistException;
+  boolean removeSongFromPlaylist(String emailAddress, String playlistName, Integer locationId,
+      SongFileEntity song) throws EntityDoesNotExistException;
 
   /**
    *
@@ -178,18 +178,18 @@ public interface UserService {
    * @return
    * @throws EntityDoesNotExistException
    */
-  boolean addSongToMyFavoritesPlaylist(String emailAddress, SongFileEntity song)
-      throws EntityDoesNotExistException;
+  boolean addSongToMyFavoritesPlaylist(String emailAddress, Integer locationId,
+      SongFileEntity song) throws EntityDoesNotExistException;
 
   /**
-   * 
+   *
    * @param emailAddress
    * @param song
    * @return
    * @throws EntityDoesNotExistException
    */
-  boolean removeSongFromMyFavoritesPlaylist(String emailAddress, SongFileEntity song)
-      throws EntityDoesNotExistException;
+  boolean removeSongFromMyFavoritesPlaylist(String emailAddress, Integer locationId,
+      SongFileEntity song) throws EntityDoesNotExistException;
 
   List<PlaylistSummaryDto> getPlaylists(String emailAddress);
 

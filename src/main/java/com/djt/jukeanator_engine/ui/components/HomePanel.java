@@ -504,7 +504,7 @@ public class HomePanel extends JPanel implements TabNavigator {
    */
   private AlbumDto fetchFull(AlbumDto album) {
     try {
-      return songLibraryService.getAlbumById(album.getAlbumId());
+      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.getAlbumId());
     } catch (Exception e) {
       return album;
     }

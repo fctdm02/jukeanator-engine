@@ -84,6 +84,20 @@ public class LocationMetaDataFileEntity extends AbstractFileEntity implements Se
     this.isGeoFenced = isGeoFenced;
   }
 
+  public boolean isLoaded() {
+    return isLoaded;
+  }
+
+  /**
+   * Lets a non-filesystem-backed caller (e.g. {@code SongLibraryRepositoryJpaImpl}, reconstructing
+   * this object from database rows) mark it already-populated, so {@link #ensureLoaded()} never
+   * attempts a filesystem read/write for a root that has no real directory on disk. Mirrors the
+   * equivalent method already on {@link AlbumMetaDataFileEntity}.
+   */
+  public void setLoaded(boolean isLoaded) {
+    this.isLoaded = isLoaded;
+  }
+
   private void ensureLoaded() {
     if (!isLoaded) {
       readMetadataFromFileSystem();

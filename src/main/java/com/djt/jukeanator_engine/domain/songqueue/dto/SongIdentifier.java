@@ -10,7 +10,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @Embeddable
 public class SongIdentifier implements Serializable {
 
-  private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = 2L;
+
+  @Column(name = "location_id")
+  private Integer locationId;
 
   @Column(name = "album_id")
   private Integer albumId;
@@ -22,10 +25,15 @@ public class SongIdentifier implements Serializable {
 
   /** See {@link AddSongToQueueRequest} for why this needs an explicit {@code @JsonCreator}. */
   @JsonCreator
-  public SongIdentifier(@JsonProperty("albumId") Integer albumId,
-      @JsonProperty("songId") Integer songId) {
+  public SongIdentifier(@JsonProperty("locationId") Integer locationId,
+      @JsonProperty("albumId") Integer albumId, @JsonProperty("songId") Integer songId) {
+    this.locationId = locationId;
     this.albumId = albumId;
     this.songId = songId;
+  }
+
+  public Integer getLocationId() {
+    return locationId;
   }
 
   public Integer getAlbumId() {
@@ -38,7 +46,7 @@ public class SongIdentifier implements Serializable {
 
   @Override
   public int hashCode() {
-    return Objects.hash(albumId, songId);
+    return Objects.hash(locationId, albumId, songId);
   }
 
   @Override
@@ -50,11 +58,13 @@ public class SongIdentifier implements Serializable {
     if (getClass() != obj.getClass())
       return false;
     SongIdentifier other = (SongIdentifier) obj;
-    return Objects.equals(albumId, other.albumId) && Objects.equals(songId, other.songId);
+    return Objects.equals(locationId, other.locationId) && Objects.equals(albumId, other.albumId)
+        && Objects.equals(songId, other.songId);
   }
 
   @Override
   public String toString() {
-    return "SongIdentifier [albumId=" + albumId + ", songId=" + songId + "]";
+    return "SongIdentifier [locationId=" + locationId + ", albumId=" + albumId + ", songId="
+        + songId + "]";
   }
 }

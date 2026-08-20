@@ -20,8 +20,11 @@ import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueu
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 
 /**
- * HTTP client implementation of SongLibraryService.
- * 
+ * HTTP client implementation of SongLibraryService. Unused today (no callers) -- kept as a
+ * reference for the shape a remote-backed implementation would take, same role as {@code
+ * SongQueueServiceHttpClient}. Every path is now under {@code /api/locations/{locationId}/...},
+ * matching {@code SongLibraryController}'s locationId-scoped mapping.
+ *
  * @author tmyers
  */
 public class SongLibraryServiceHttpClient implements SongLibraryService {
@@ -32,104 +35,114 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
     this.restClient = RestClient.builder().baseUrl(baseUrl).build();
   }
 
+  private String basePath(Integer locationId) {
+    return "/api/locations/" + locationId + "/song-library";
+  }
+
   // USER ROLE METHODS
   @Override
-  public SearchResultDto getMusicByPopularity() {
+  public SearchResultDto getMusicByPopularity(Integer locationId) {
 
-    return restClient.get().uri("/api/song-library/popular").retrieve().body(SearchResultDto.class);
+    return restClient.get().uri(basePath(locationId) + "/popular").retrieve()
+        .body(SearchResultDto.class);
   }
 
   @Override
-  public SearchResultDto getMusicBySearch(String searchFor) {
-    return getMusicBySearch(searchFor, 20);
+  public SearchResultDto getMusicBySearch(Integer locationId, String searchFor) {
+    return getMusicBySearch(locationId, searchFor, 20);
   }
 
   @Override
-  public SearchResultDto getMusicBySearch(String searchFor, int limit) {
+  public SearchResultDto getMusicBySearch(Integer locationId, String searchFor, int limit) {
 
-    return restClient.get().uri(uriBuilder -> uriBuilder.path("/api/song-library/search")
+    return restClient.get().uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/search")
         .queryParam("searchFor", searchFor).queryParam("limit", limit).build()).retrieve()
         .body(SearchResultDto.class);
   }
 
   @Override
-  public List<GenreDto> getGenres() {
+  public List<GenreDto> getGenres(Integer locationId) {
 
-    return restClient.get().uri("/api/song-library/genres").retrieve()
+    return restClient.get().uri(basePath(locationId) + "/genres").retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
-  public SearchResultDto getGenreMusicByPopularity(String genreName) {
+  public SearchResultDto getGenreMusicByPopularity(Integer locationId, String genreName) {
 
-    return restClient.get().uri(uriBuilder -> uriBuilder.path("/api/song-library/genres/popular")
-        .queryParam("genreName", genreName).build()).retrieve().body(SearchResultDto.class);
+    return restClient.get()
+        .uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/genres/popular")
+            .queryParam("genreName", genreName).build())
+        .retrieve().body(SearchResultDto.class);
   }
 
   @Override
-  public SearchResultDto getGenreMusicByTitle(String genreName) {
+  public SearchResultDto getGenreMusicByTitle(Integer locationId, String genreName) {
 
-    return restClient.get().uri(uriBuilder -> uriBuilder.path("/api/song-library/genres/title")
-        .queryParam("genreName", genreName).build()).retrieve().body(SearchResultDto.class);
+    return restClient.get()
+        .uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/genres/title")
+            .queryParam("genreName", genreName).build())
+        .retrieve().body(SearchResultDto.class);
   }
 
   @Override
-  public List<ArtistDto> getArtists() {
+  public List<ArtistDto> getArtists(Integer locationId) {
 
-    return restClient.get().uri("/api/song-library/artists").retrieve()
+    return restClient.get().uri(basePath(locationId) + "/artists").retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
-  public List<AlbumDto> getAlbums() {
+  public List<AlbumDto> getAlbums(Integer locationId) {
 
-    return restClient.get().uri("/api/song-library/albums").retrieve()
+    return restClient.get().uri(basePath(locationId) + "/albums").retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
-  public List<AlbumDto> getAlbumsForGenre(Integer genreId) {
+  public List<AlbumDto> getAlbumsForGenre(Integer locationId, Integer genreId) {
 
-    return restClient.get().uri("/api/song-library/genres/" + genreId + "/albums").retrieve()
+    return restClient.get().uri(basePath(locationId) + "/genres/" + genreId + "/albums").retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
-  public ArtistDto getArtistByName(String artistName) {
+  public ArtistDto getArtistByName(Integer locationId, String artistName) {
 
-    return restClient.get().uri(uriBuilder -> uriBuilder.path("/api/song-library/artist")
+    return restClient.get().uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/artist")
         .queryParam("artistName", artistName).build()).retrieve().body(ArtistDto.class);
   }
 
   @Override
-  public ArtistDto getArtistById(Integer artistId) {
+  public ArtistDto getArtistById(Integer locationId, Integer artistId) {
 
-    return restClient.get().uri("/api/song-library/artists/" + artistId).retrieve()
+    return restClient.get().uri(basePath(locationId) + "/artists/" + artistId).retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
-  public ArtistDto getArtistByAlbumId(Integer albumId) {
+  public ArtistDto getArtistByAlbumId(Integer locationId, Integer albumId) {
 
-    return restClient.get().uri("/api/song-library/artistByAlbum/" + albumId).retrieve()
+    return restClient.get().uri(basePath(locationId) + "/artistByAlbum/" + albumId).retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
-  public AlbumDto getAlbumById(Integer albumId) {
+  public AlbumDto getAlbumById(Integer locationId, Integer albumId) {
 
-    return restClient.get().uri("/api/song-library/albums/" + albumId).retrieve()
+    return restClient.get().uri(basePath(locationId) + "/albums/" + albumId).retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
-  public SongDto getSongById(Integer albumId, Integer songId) {
+  public SongDto getSongById(Integer locationId, Integer albumId, Integer songId) {
 
-    return restClient.get().uri("/api/song-library/songs/" + albumId + "/" + songId).retrieve()
-        .body(new ParameterizedTypeReference<>() {});
+    return restClient.get().uri(basePath(locationId) + "/songs/" + albumId + "/" + songId)
+        .retrieve().body(new ParameterizedTypeReference<>() {});
   }
 
-  // ADMIN ROLE METHODS
+  // ADMIN ROLE METHODS -- always local to whichever instance owns the library; this client only
+  // ever targets its own instance for these, so locationId isn't threaded through them.
   @Override
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 
@@ -156,14 +169,14 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
     return restClient.post().uri("/api/song-library/restoreSongStatistics").body(filename)
         .retrieve().body(Integer.class);
   }
-  
+
   @Override
   public Integer storeSongLibraryAndStatistics() {
-    
+
     return restClient.post().uri("/api/song-library/storeSongLibraryAndStatistics")
         .retrieve().body(Integer.class);
   }
- 
+
   @Override
   public List<AlbumMetadataDto> searchInternetForAlbumMetadata(@RequestParam String artistName,
       @RequestParam String albumName, @RequestParam int limit) {
@@ -205,7 +218,17 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
   }
 
   @Override
-  public RootFolderEntity getSongLibraryRoot() {
+  public RootFolderEntity getSongLibraryRoot(Integer locationId) {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public Integer getOwnLocationId() {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public void reinitializeOwnLocation() {
     throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 

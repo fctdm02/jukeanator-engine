@@ -13,8 +13,11 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 
 /**
- * HTTP client implementation of SongQueueService.
- * 
+ * HTTP client implementation of SongQueueService. Unused today (no callers) -- kept as a
+ * reference for the shape a remote-backed implementation would take. Every path is now under
+ * {@code /api/locations/{locationId}/...}, matching {@code SongQueueController}'s locationId-scoped
+ * mapping.
+ *
  * @author tmyers
  */
 public class SongQueueServiceHttpClient implements SongQueueService {
@@ -25,9 +28,13 @@ public class SongQueueServiceHttpClient implements SongQueueService {
     this.restClient = RestClient.builder().baseUrl(baseUrl).build();
   }
 
+  private String basePath(Integer locationId) {
+    return "/api/locations/" + locationId + "/song-queue";
+  }
+
   /**
    * NOTE: System method, not to be invoked on behalf of a user
-   * 
+   *
    * @return
    */
   @Override
@@ -38,7 +45,7 @@ public class SongQueueServiceHttpClient implements SongQueueService {
 
   /**
    * NOTE: System method, not to be invoked on behalf of a user
-   * 
+   *
    * @return
    */
   @Override
@@ -49,7 +56,7 @@ public class SongQueueServiceHttpClient implements SongQueueService {
 
   /**
    * NOTE: System method, not to be invoked on behalf of a user
-   * 
+   *
    * @return
    */
   @Override
@@ -59,95 +66,105 @@ public class SongQueueServiceHttpClient implements SongQueueService {
   }
 
   @Override
-  public Integer getHighestPriority() {
+  public Integer getHighestPriority(Integer locationId) {
 
-    return restClient.post().uri("/api/song-queue/highestPriority").retrieve().body(Integer.class);
+    return restClient.post().uri(basePath(locationId) + "/highestPriority").retrieve()
+        .body(Integer.class);
   }
 
   @Override
-  public List<SongQueueEntryDto> getQueuedSongs() {
+  public List<SongQueueEntryDto> getQueuedSongs(Integer locationId) {
 
-    return restClient.get().uri("/api/song-queue/queuedSongs").retrieve()
+    return restClient.get().uri(basePath(locationId) + "/queuedSongs").retrieve()
         .body(new ParameterizedTypeReference<>() {});
   }
 
   @Override
-  public String isSongEligibleForQueue(Integer albumId, Integer songId, Integer priority) {
+  public String isSongEligibleForQueue(Integer locationId, Integer albumId, Integer songId,
+      Integer priority) {
 
     return restClient.get()
-        .uri(uriBuilder -> uriBuilder.path("/api/song-queue/isSongEligibleForQueue")
+        .uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/isSongEligibleForQueue")
             .queryParam("albumId", albumId).queryParam("songId", songId)
             .queryParam("priority", priority).build())
         .retrieve().body(String.class);
   }
 
   @Override
-  public SongQueueEntryDto addSongToQueue(AddSongToQueueRequest addSongToQueueRequest) {
+  public SongQueueEntryDto addSongToQueue(Integer locationId,
+      AddSongToQueueRequest addSongToQueueRequest) {
 
-    return restClient.post().uri("/api/song-queue/addSong").body(addSongToQueueRequest).retrieve()
-        .body(SongQueueEntryDto.class);
+    return restClient.post().uri(basePath(locationId) + "/addSong").body(addSongToQueueRequest)
+        .retrieve().body(SongQueueEntryDto.class);
   }
 
   @Override
-  public List<SongQueueEntryDto> addAlbumToQueue(AddAlbumToQueueRequest addAlbumToQueueRequest) {
+  public List<SongQueueEntryDto> addAlbumToQueue(Integer locationId,
+      AddAlbumToQueueRequest addAlbumToQueueRequest) {
 
-    return restClient.post().uri("/api/song-queue/addAlbum").body(addAlbumToQueueRequest).retrieve()
-        .body(new ParameterizedTypeReference<List<SongQueueEntryDto>>() {});
+    return restClient.post().uri(basePath(locationId) + "/addAlbum").body(addAlbumToQueueRequest)
+        .retrieve().body(new ParameterizedTypeReference<List<SongQueueEntryDto>>() {});
   }
 
   @Override
-  public List<SongQueueEntryDto> addMultipleSongsToQueue(
+  public List<SongQueueEntryDto> addMultipleSongsToQueue(Integer locationId,
       AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
 
-    return restClient.post().uri("/api/song-queue/addMultipleSongs")
+    return restClient.post().uri(basePath(locationId) + "/addMultipleSongs")
         .body(addMultipleSongsToQueueRequest).retrieve()
         .body(new ParameterizedTypeReference<List<SongQueueEntryDto>>() {});
   }
 
   @Override
-  public Integer flushQueue() {
+  public Integer flushQueue(Integer locationId) {
 
-    return restClient.post().uri("/api/song-queue/flushQueue").retrieve().body(Integer.class);
-  }
-
-  @Override
-  public Integer randomizeQueue() {
-
-    return restClient.post().uri("/api/song-queue/randomizeQueue").retrieve().body(Integer.class);
-  }
-
-  @Override
-  public Integer moveSongUpInQueue(ChangeSongQueueRequest changeSongQueueRequest) {
-
-    return restClient.post().uri("/api/song-queue/moveSongUpInQueue").body(changeSongQueueRequest)
-        .retrieve().body(Integer.class);
-  }
-
-  @Override
-  public Integer moveSongDownInQueue(ChangeSongQueueRequest changeSongQueueRequest) {
-
-    return restClient.post().uri("/api/song-queue/moveSongDownInQueue").body(changeSongQueueRequest)
-        .retrieve().body(Integer.class);
-  }
-
-  @Override
-  public Integer removeSongDownFromQueue(ChangeSongQueueRequest changeSongQueueRequest) {
-
-    return restClient.post().uri("/api/song-queue/removeSongDownFromQueue")
-        .body(changeSongQueueRequest).retrieve().body(Integer.class);
-  }
-
-  @Override
-  public Integer saveQueueAsPlaylist(String filename) {
-
-    return restClient.post().uri("/api/song-queue/saveQueueAsPlaylist").body(filename).retrieve()
+    return restClient.post().uri(basePath(locationId) + "/flushQueue").retrieve()
         .body(Integer.class);
   }
 
   @Override
-  public Integer loadPlaylistIntoQueue(LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest) {
+  public Integer randomizeQueue(Integer locationId) {
 
-    return restClient.post().uri("/api/song-queue/loadPlaylistIntoQueue")
+    return restClient.post().uri(basePath(locationId) + "/randomizeQueue").retrieve()
+        .body(Integer.class);
+  }
+
+  @Override
+  public Integer moveSongUpInQueue(Integer locationId,
+      ChangeSongQueueRequest changeSongQueueRequest) {
+
+    return restClient.post().uri(basePath(locationId) + "/moveSongUpInQueue")
+        .body(changeSongQueueRequest).retrieve().body(Integer.class);
+  }
+
+  @Override
+  public Integer moveSongDownInQueue(Integer locationId,
+      ChangeSongQueueRequest changeSongQueueRequest) {
+
+    return restClient.post().uri(basePath(locationId) + "/moveSongDownInQueue")
+        .body(changeSongQueueRequest).retrieve().body(Integer.class);
+  }
+
+  @Override
+  public Integer removeSongDownFromQueue(Integer locationId,
+      ChangeSongQueueRequest changeSongQueueRequest) {
+
+    return restClient.post().uri(basePath(locationId) + "/removeSongDownFromQueue")
+        .body(changeSongQueueRequest).retrieve().body(Integer.class);
+  }
+
+  @Override
+  public Integer saveQueueAsPlaylist(Integer locationId, String filename) {
+
+    return restClient.post().uri(basePath(locationId) + "/saveQueueAsPlaylist").body(filename)
+        .retrieve().body(Integer.class);
+  }
+
+  @Override
+  public Integer loadPlaylistIntoQueue(Integer locationId,
+      LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest) {
+
+    return restClient.post().uri(basePath(locationId) + "/loadPlaylistIntoQueue")
         .body(loadPlaylistIntoQueueRequest).retrieve().body(Integer.class);
   }
 
@@ -165,5 +182,10 @@ public class SongQueueServiceHttpClient implements SongQueueService {
   public Integer storeSongQueue() {
     throw new UnsupportedOperationException(
         "System method, not to be invoked on behalf of a user!");
+  }
+
+  @Override
+  public Integer getOwnLocationId() {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 }

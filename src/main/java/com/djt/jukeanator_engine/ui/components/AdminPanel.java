@@ -155,7 +155,7 @@ public class AdminPanel extends JPanel {
     add(buildOverlayHost(contentPanel), BorderLayout.CENTER);
 
     loadAlbumList();
-    setQueue(songQueueService.getQueuedSongs());
+    setQueue(songQueueService.getQueuedSongs(songQueueService.getOwnLocationId()));
 
     requestFocusInWindow();
   }
@@ -408,15 +408,15 @@ public class AdminPanel extends JPanel {
     SwingSecurityUtil.runAsync(() -> {
       try {
         // 1. Fetch full album entity context in the background
-        AlbumDto full = songLibraryService.getAlbumById(albumId);
+        AlbumDto full = songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), albumId);
 
         // 2. Submit to the queue engine (Fires events, updates data models)
-        songQueueService.addAlbumToQueue(
+        songQueueService.addAlbumToQueue(songQueueService.getOwnLocationId(),
             new AddAlbumToQueueRequest(SongQueueService.LOCAL_USERNAME, full.getAlbumId(), 1));
 
         // 3. Explicitly request the fresh queue list from the service layer
         // WHILE STILL on the background thread.
-        var freshQueue = songQueueService.getQueuedSongs();
+        var freshQueue = songQueueService.getQueuedSongs(songQueueService.getOwnLocationId());
 
         // 4. Safely push the isolated DTO snapshot to the Swing EDT
         SwingUtilities.invokeLater(() -> refreshQueueList(freshQueue));
@@ -906,7 +906,7 @@ public class AdminPanel extends JPanel {
   private void doPlayNextTrack() {
 
     try {
-      songPlayerService.playNextTrack();
+      songPlayerService.playNextTrack(songLibraryService.getOwnLocationId());
     } catch (Exception ex) {
       ex.printStackTrace();
     }
@@ -915,7 +915,7 @@ public class AdminPanel extends JPanel {
   private void doPause() {
 
     try {
-      songPlayerService.pause();
+      songPlayerService.pause(songLibraryService.getOwnLocationId());
     } catch (Exception ex) {
       ex.printStackTrace();
     }
@@ -932,10 +932,11 @@ public class AdminPanel extends JPanel {
     try {
       int idx = queueList.getSelectedIndex();
       for (int i = 0; i < idx; i++) {
-        songQueueService.moveSongUpInQueue(new ChangeSongQueueRequest(
-            selected.getSong().getAlbumId(), selected.getSong().getSongId()));
+        songQueueService.moveSongUpInQueue(songQueueService.getOwnLocationId(),
+            new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
+                selected.getSong().getSongId()));
       }
-      songPlayerService.playNextTrack();
+      songPlayerService.playNextTrack(songLibraryService.getOwnLocationId());
     } catch (Exception ex) {
       ex.printStackTrace();
     }
@@ -950,8 +951,9 @@ public class AdminPanel extends JPanel {
     if (idx <= 0)
       return;
     try {
-      songQueueService.moveSongUpInQueue(new ChangeSongQueueRequest(
-          selected.getSong().getAlbumId(), selected.getSong().getSongId(), idx));
+      songQueueService.moveSongUpInQueue(songQueueService.getOwnLocationId(),
+          new ChangeSongQueueRequest(selected.getSong().getAlbumId(), selected.getSong().getSongId(),
+              idx));
       SongQueueEntryDto above = queueListModel.get(idx - 1);
       queueListModel.set(idx - 1, selected);
       queueListModel.set(idx, above);
@@ -970,8 +972,9 @@ public class AdminPanel extends JPanel {
     if (idx >= queueListModel.getSize() - 1)
       return;
     try {
-      songQueueService.moveSongDownInQueue(new ChangeSongQueueRequest(
-          selected.getSong().getAlbumId(), selected.getSong().getSongId(), idx));
+      songQueueService.moveSongDownInQueue(songQueueService.getOwnLocationId(),
+          new ChangeSongQueueRequest(selected.getSong().getAlbumId(), selected.getSong().getSongId(),
+              idx));
       SongQueueEntryDto below = queueListModel.get(idx + 1);
       queueListModel.set(idx + 1, selected);
       queueListModel.set(idx, below);
@@ -990,8 +993,9 @@ public class AdminPanel extends JPanel {
       return;
     }
     try {
-      songQueueService.removeSongDownFromQueue(new ChangeSongQueueRequest(
-          selected.getSong().getAlbumId(), selected.getSong().getSongId()));
+      songQueueService.removeSongDownFromQueue(songQueueService.getOwnLocationId(),
+          new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
+              selected.getSong().getSongId()));
     } catch (Exception ex) {
       ex.printStackTrace();
     }
@@ -1002,7 +1006,7 @@ public class AdminPanel extends JPanel {
     showOverlayConfirm("Clear Queue", "Clear the entire song queue?", ColorTheme.get().accentRed,
         () -> SwingSecurityUtil.runAsync(() -> {
           try {
-            songQueueService.flushQueue();
+            songQueueService.flushQueue(songQueueService.getOwnLocationId());
           } catch (Exception ex) {
             ex.printStackTrace();
           }
@@ -1014,7 +1018,7 @@ public class AdminPanel extends JPanel {
     showOverlayConfirm("Shuffle Queue", "Shuffle the entire song queue?",
         ColorTheme.get().accentViolet, () -> SwingSecurityUtil.runAsync(() -> {
           try {
-            songQueueService.randomizeQueue();
+            songQueueService.randomizeQueue(songQueueService.getOwnLocationId());
           } catch (Exception ex) {
             ex.printStackTrace();
           }
@@ -1045,7 +1049,8 @@ public class AdminPanel extends JPanel {
 
         LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest =
             new LoadPlaylistIntoQueueRequest(SongQueueService.LOCAL_USERNAME, filename);
-        this.songQueueService.loadPlaylistIntoQueue(loadPlaylistIntoQueueRequest);
+        this.songQueueService.loadPlaylistIntoQueue(songQueueService.getOwnLocationId(),
+            loadPlaylistIntoQueueRequest);
 
         SwingUtilities.invokeLater(() -> showOverlayMessage("Playlist Loaded", "Loaded " + filename,
             ColorTheme.get().accentGreen));
@@ -1070,7 +1075,7 @@ public class AdminPanel extends JPanel {
     String filename = chooser.getSelectedFile().getAbsolutePath();
     SwingSecurityUtil.runAsync(() -> {
       try {
-        this.songQueueService.saveQueueAsPlaylist(filename);
+        this.songQueueService.saveQueueAsPlaylist(songQueueService.getOwnLocationId(), filename);
 
         SwingUtilities.invokeLater(() -> showOverlayMessage("Playlist Saved", "Saved " + filename,
             ColorTheme.get().accentGreen));
@@ -1091,7 +1096,7 @@ public class AdminPanel extends JPanel {
    */
   private void loadAlbumList() {
     try {
-      List<AlbumDto> albums = songLibraryService.getAlbums();
+      List<AlbumDto> albums = songLibraryService.getAlbums(songLibraryService.getOwnLocationId());
       albumListModel.clear();
       albumsWithInvalidMetadata.clear();
       if (albums != null) {
@@ -1155,7 +1160,7 @@ public class AdminPanel extends JPanel {
 
   public void setQueue(List<SongQueueEntryDto> queue) {
 
-    refreshQueueList(songQueueService.getQueuedSongs());
+    refreshQueueList(songQueueService.getQueuedSongs(songQueueService.getOwnLocationId()));
   }
 
   private void refreshQueueList(List<SongQueueEntryDto> queue) {

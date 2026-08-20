@@ -35,6 +35,7 @@ import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationStatus;
 import com.djt.jukeanator_engine.domain.location.repository.LocationRepository;
+import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 
 /**
  * Covers every method declared on {@link LocationService}, run against
@@ -56,6 +57,7 @@ public class LocationServiceTest {
   private PasswordEncoder passwordEncoder;
   private ApplicationEventPublisher eventPublisher;
   private ConnectedSlaveRegistry connectedSlaveRegistry;
+  private SongLibraryRepository songLibraryRepository;
   private LocationRootEntity locationRoot;
   private LocationServiceImpl locationServiceImpl;
 
@@ -66,6 +68,10 @@ public class LocationServiceTest {
     passwordEncoder = mock(PasswordEncoder.class);
     eventPublisher = mock(ApplicationEventPublisher.class);
     connectedSlaveRegistry = new ConnectedSlaveRegistry();
+    // A plain mock (not a SongLibraryRepositoryJpaImpl instance), so
+    // receiveLibraryMetadataSync's persistSnapshotToJpa branch never fires here -- these tests
+    // cover the filesystem-repository-type sync path only.
+    songLibraryRepository = mock(SongLibraryRepository.class);
 
     locationRoot = new LocationRootEntity();
     LocationEntity registered = new LocationEntity(REGISTERED_LOCATION_ID,
@@ -77,7 +83,8 @@ public class LocationServiceTest {
     when(locationRepository.nextPersistentIdentity()).thenReturn(null);
 
     locationServiceImpl = new LocationServiceImpl(locationRepository, passwordEncoder,
-        eventPublisher, ObjectMappers.create(), storageRoot.toString(), connectedSlaveRegistry);
+        eventPublisher, ObjectMappers.create(), storageRoot.toString(), connectedSlaveRegistry,
+        songLibraryRepository);
   }
 
   private LocationEntity registeredLocation() {

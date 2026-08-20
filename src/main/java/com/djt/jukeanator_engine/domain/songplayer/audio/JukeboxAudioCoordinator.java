@@ -55,7 +55,8 @@ public class JukeboxAudioCoordinator {
     if (lineInService.isLineInOnSilenceEnabled()) {
 
       boolean shouldMonitor =
-          songPlayerService.getPlaybackStatus().status().equals(SongPlayerStatus.STOPPED)
+          songPlayerService.getPlaybackStatus(songQueueService.getOwnLocationId()).status()
+              .equals(SongPlayerStatus.STOPPED)
               && songQueueService.isQueueEmpty() && !songQueueService.isBackgroundMusicEnabled();
 
       if (shouldMonitor && !lineInService.isMonitoring()) {

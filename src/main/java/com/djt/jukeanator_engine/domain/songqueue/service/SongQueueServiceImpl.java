@@ -7,6 +7,8 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -16,6 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.djt.jukeanator_engine.domain.backgroundmusic.exception.BackgroundMusicServiceException;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicService;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
@@ -47,6 +50,7 @@ import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
 import com.djt.jukeanator_engine.domain.songqueue.service.utils.PlaylistManager;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 /**
  * @author tmyers
@@ -60,6 +64,10 @@ public class SongQueueServiceImpl
   private final SongLibraryService songLibraryService;
   private final BackgroundMusicService backgroundMusicService;
   private final SongQueueRepository songQueueRepository;
+
+  // Present only on master (see LocationConfig) -- absent everywhere else, since standalone/slave
+  // never needs to forward anything (isOwnLocation is always true there).
+  private final Optional<SlaveCommandGateway> slaveCommandGateway;
 
   // Whether or not to start with an empty song queue
   private final boolean resetQueueAtStartup;
@@ -86,18 +94,21 @@ public class SongQueueServiceImpl
 
   public SongQueueServiceImpl(SongQueueProperties songQueueProperties,
       SongLibraryService songLibraryService, BackgroundMusicService backgroundMusicService,
-      SongQueueRepository songQueueRepository, ApplicationEventPublisher eventPublisher) {
+      SongQueueRepository songQueueRepository, ApplicationEventPublisher eventPublisher,
+      Optional<SlaveCommandGateway> slaveCommandGateway) {
 
     requireNonNull(songQueueProperties, "songQueueProperties cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
     requireNonNull(backgroundMusicService, "backgroundMusicService cannot be null");
     requireNonNull(songQueueRepository, "songQueueRepository cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
+    requireNonNull(slaveCommandGateway, "slaveCommandGateway cannot be null (use Optional.empty())");
 
     this.songLibraryService = songLibraryService;
     this.backgroundMusicService = backgroundMusicService;
     this.songQueueRepository = songQueueRepository;
     this.eventPublisher = eventPublisher;
+    this.slaveCommandGateway = slaveCommandGateway;
 
     this.resetQueueAtStartup = songQueueProperties.isResetQueueAtStartup();
     this.minimumNumberSongsToKeepInQueue = songQueueProperties.getMinimumNumberSongsToKeepInQueue();
@@ -110,6 +121,21 @@ public class SongQueueServiceImpl
     this.allowExplicitSongsEnd = songQueueProperties.getAllowExplicitSongsEnd();
 
     initialize();
+  }
+
+  /**
+   * True when {@code locationId} is this instance's own location -- always true on
+   * standalone/slave (which have exactly one), and true on master only for a location it does not
+   * actually own (never, since master owns none), so this is always false there.
+   */
+  private boolean isOwnLocation(Integer locationId) {
+    return Objects.equals(locationId, songLibraryService.getOwnLocationId());
+  }
+
+  private SlaveCommandGateway requireGateway(Integer locationId) {
+    return slaveCommandGateway.orElseThrow(() -> new SongQueueServiceException(
+        "Cannot forward a song-queue request for locationId: [" + locationId
+            + "] -- no SlaveCommandGateway is available (this instance is not running in master mode)."));
   }
 
   private synchronized void initialize() {
@@ -134,7 +160,7 @@ public class SongQueueServiceImpl
 
   private void initializeInternal() {
 
-    this.songLibraryRoot = this.songLibraryService.getSongLibraryRoot();
+    this.songLibraryRoot = this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
 
     if (resetQueueAtStartup) {
 
@@ -259,7 +285,8 @@ public class SongQueueServiceImpl
       Integer coreAlbumId = coreSong.getAlbum().getPersistentIdentity();
       Integer coreSongId = coreSong.getPersistentIdentity();
 
-      String coreIneligibility = isSongEligibleForQueue(coreAlbumId, coreSongId, 0);
+      String coreIneligibility =
+          isSongEligibleForQueue(songLibraryService.getOwnLocationId(), coreAlbumId, coreSongId, 0);
       if (coreIneligibility == null) {
         addSongToQueue("BG_MUSIC", coreAlbumId, coreSongId, 0);
       } else {
@@ -292,7 +319,8 @@ public class SongQueueServiceImpl
         Integer smartAlbumId = smartSong.getAlbum().getPersistentIdentity();
         Integer smartSongId = smartSong.getPersistentIdentity();
 
-        String smartIneligibility = isSongEligibleForQueue(smartAlbumId, smartSongId, 0);
+        String smartIneligibility = isSongEligibleForQueue(songLibraryService.getOwnLocationId(),
+            smartAlbumId, smartSongId, 0);
         if (smartIneligibility == null) {
           addSongToQueue("SMART_BG_MUSIC", smartAlbumId, smartSongId, 0);
         } else {
@@ -310,7 +338,11 @@ public class SongQueueServiceImpl
   }
 
   @Override
-  public Integer getHighestPriority() {
+  public Integer getHighestPriority(Integer locationId) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "getHighestPriority", null,
+          Integer.class);
+    }
     List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
     if (songs.isEmpty()) {
       return Integer.valueOf(2);
@@ -319,12 +351,21 @@ public class SongQueueServiceImpl
   }
 
   @Override
-  public List<SongQueueEntryDto> getQueuedSongs() {
+  public List<SongQueueEntryDto> getQueuedSongs(Integer locationId) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "getQueuedSongs", null,
+          new TypeReference<List<SongQueueEntryDto>>() {});
+    }
     return SongQueueMapper.toDto(songQueueRoot.getSongs());
   }
 
   @Override
-  public String isSongEligibleForQueue(Integer albumId, Integer songId, Integer priority) {
+  public String isSongEligibleForQueue(Integer locationId, Integer albumId, Integer songId,
+      Integer priority) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "isSongEligibleForQueue",
+          new EligibilityCheckPayload(albumId, songId, priority), String.class);
+    }
 
     try {
 
@@ -483,20 +524,30 @@ public class SongQueueServiceImpl
   }
 
   @Override
-  public SongQueueEntryDto addSongToQueue(AddSongToQueueRequest addSongToQueueRequest) {
+  public SongQueueEntryDto addSongToQueue(Integer locationId,
+      AddSongToQueueRequest addSongToQueueRequest) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "addSongToQueue",
+          addSongToQueueRequest, SongQueueEntryDto.class);
+    }
 
     SongQueueEntryDto queueEntryDto =
         addSongToQueue(addSongToQueueRequest.getUsername(), addSongToQueueRequest.getAlbumId(),
             addSongToQueueRequest.getSongId(), addSongToQueueRequest.getPriority());
 
     eventPublisher.publishEvent(new SongAddedToQueueEvent(queueEntryDto));
-    eventPublisher.publishEvent(new SongQueueChangedEvent(getQueuedSongs()));
+    eventPublisher.publishEvent(new SongQueueChangedEvent(getQueuedSongs(locationId)));
 
     return queueEntryDto;
   }
 
   @Override
-  public List<SongQueueEntryDto> addAlbumToQueue(AddAlbumToQueueRequest addAlbumToQueueRequest) {
+  public List<SongQueueEntryDto> addAlbumToQueue(Integer locationId,
+      AddAlbumToQueueRequest addAlbumToQueueRequest) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "addAlbumToQueue",
+          addAlbumToQueueRequest, new TypeReference<List<SongQueueEntryDto>>() {});
+    }
     if (addAlbumToQueueRequest == null) {
       return List.of();
     }
@@ -510,7 +561,8 @@ public class SongQueueServiceImpl
       AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
       if (album != null) {
         for (SongFileEntity song : album.getChildSongs()) {
-          songIdentifiers.add(new SongIdentifier(albumId, song.getPersistentIdentity()));
+          songIdentifiers.add(
+              new SongIdentifier(locationId, albumId, song.getPersistentIdentity()));
         }
       }
     } catch (EntityDoesNotExistException e) {
@@ -518,13 +570,17 @@ public class SongQueueServiceImpl
           + ", albumId: " + albumId + ", priority: " + priority);
     }
 
-    return addMultipleSongsToQueue(
+    return addMultipleSongsToQueue(locationId,
         new AddMultipleSongsToQueueRequest(username, songIdentifiers, priority));
   }
 
   @Override
-  public List<SongQueueEntryDto> addMultipleSongsToQueue(
+  public List<SongQueueEntryDto> addMultipleSongsToQueue(Integer locationId,
       AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "addMultipleSongsToQueue",
+          addMultipleSongsToQueueRequest, new TypeReference<List<SongQueueEntryDto>>() {});
+    }
 
     if (addMultipleSongsToQueueRequest == null
         || addMultipleSongsToQueueRequest.getSongIdentifiers().isEmpty()) {
@@ -540,13 +596,16 @@ public class SongQueueServiceImpl
     }
 
     eventPublisher.publishEvent(new MultipleSongsAddedToQueueEvent(queueEntries));
-    eventPublisher.publishEvent(new SongQueueChangedEvent(getQueuedSongs()));
+    eventPublisher.publishEvent(new SongQueueChangedEvent(getQueuedSongs(locationId)));
 
     return queueEntries;
   }
 
   @Override
-  public synchronized Integer flushQueue() {
+  public synchronized Integer flushQueue(Integer locationId) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "flushQueue", null, Integer.class);
+    }
     Integer numSongsFlushed = songQueueRoot.flushQueue();
     songQueueRepository.storeAggregateRoot(songQueueRoot);
 
@@ -561,7 +620,11 @@ public class SongQueueServiceImpl
   }
 
   @Override
-  public Integer randomizeQueue() {
+  public Integer randomizeQueue(Integer locationId) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "randomizeQueue", null,
+          Integer.class);
+    }
     Integer numSongsRandomized = songQueueRoot.randomizeQueue();
     songQueueRepository.storeAggregateRoot(songQueueRoot);
     eventPublisher
@@ -570,7 +633,12 @@ public class SongQueueServiceImpl
   }
 
   @Override
-  public Integer moveSongUpInQueue(ChangeSongQueueRequest changeSongQueueRequest) {
+  public Integer moveSongUpInQueue(Integer locationId,
+      ChangeSongQueueRequest changeSongQueueRequest) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "moveSongUpInQueue",
+          changeSongQueueRequest, Integer.class);
+    }
     int albumId = changeSongQueueRequest.getAlbumId();
     int songId = changeSongQueueRequest.getSongId();
 
@@ -605,7 +673,12 @@ public class SongQueueServiceImpl
   }
 
   @Override
-  public Integer moveSongDownInQueue(ChangeSongQueueRequest changeSongQueueRequest) {
+  public Integer moveSongDownInQueue(Integer locationId,
+      ChangeSongQueueRequest changeSongQueueRequest) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "moveSongDownInQueue",
+          changeSongQueueRequest, Integer.class);
+    }
     int albumId = changeSongQueueRequest.getAlbumId();
     int songId = changeSongQueueRequest.getSongId();
 
@@ -640,8 +713,12 @@ public class SongQueueServiceImpl
   }
 
   @Override
-  public synchronized Integer removeSongDownFromQueue(
+  public synchronized Integer removeSongDownFromQueue(Integer locationId,
       ChangeSongQueueRequest changeSongQueueRequest) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "removeSongDownFromQueue",
+          changeSongQueueRequest, Integer.class);
+    }
     int albumId = changeSongQueueRequest.getAlbumId();
     int songId = changeSongQueueRequest.getSongId();
 
@@ -679,7 +756,11 @@ public class SongQueueServiceImpl
   }
 
   @Override
-  public Integer saveQueueAsPlaylist(String filename) {
+  public Integer saveQueueAsPlaylist(Integer locationId, String filename) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "saveQueueAsPlaylist", filename,
+          Integer.class);
+    }
     try {
       List<String> songPathnames = new ArrayList<>();
       for (SongQueueEntryEntity queueEntry : this.songQueueRoot.getSongs()) {
@@ -695,7 +776,12 @@ public class SongQueueServiceImpl
   }
 
   @Override
-  public Integer loadPlaylistIntoQueue(LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest) {
+  public Integer loadPlaylistIntoQueue(Integer locationId,
+      LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "loadPlaylistIntoQueue",
+          loadPlaylistIntoQueueRequest, Integer.class);
+    }
     String username = loadPlaylistIntoQueueRequest.getUsername();
     String filename = loadPlaylistIntoQueueRequest.getFilename();
 
@@ -705,14 +791,14 @@ public class SongQueueServiceImpl
 
       for (String songPathname : PlaylistManager.loadPlayList(new File(filename))) {
         SongFileEntity song = this.songLibraryRoot.getSongByPath(songPathname);
-        songIdentifiers.add(new SongIdentifier(song.getAlbum().getPersistentIdentity(),
+        songIdentifiers.add(new SongIdentifier(locationId, song.getAlbum().getPersistentIdentity(),
             song.getPersistentIdentity()));
       }
 
       AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest =
           new AddMultipleSongsToQueueRequest(username, songIdentifiers, priority);
 
-      addMultipleSongsToQueue(addMultipleSongsToQueueRequest);
+      addMultipleSongsToQueue(locationId, addMultipleSongsToQueueRequest);
       return Integer.valueOf(songIdentifiers.size());
     } catch (Exception e) {
       throw new SongQueueServiceException(
@@ -747,6 +833,13 @@ public class SongQueueServiceImpl
     throw new SongQueueServiceException("Could not add song to queue, albumId: " + albumId
         + ", songId: " + songId + ", priority: " + priority);
   }
+
+  @Override
+  public Integer getOwnLocationId() {
+    return songLibraryService.getOwnLocationId();
+  }
+
+  private record EligibilityCheckPayload(Integer albumId, Integer songId, Integer priority) {}
 
   @Override
   public SongQueueRootEntity loadAggregateRoot(String naturalIdentity)
@@ -786,6 +879,6 @@ public class SongQueueServiceImpl
 
     // SongLibraryServiceImpl has already re-initialized RootFolderEntity in response
     // to this same event; grab the new shared instance rather than loading from disk again.
-    this.songLibraryRoot = this.songLibraryService.getSongLibraryRoot();
+    this.songLibraryRoot = this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
   }
 }
