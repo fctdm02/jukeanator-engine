@@ -6,9 +6,9 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Properties bound to the {@code song-queue:} YAML prefix.
  *
- * <p>Note: the filesystem root path previously held here has been moved to
- * {@code app.root-path} / {@code app.root-path-windows} and is resolved via
- * {@link com.djt.jukeanator_engine.config.AppProperties#getEffectiveRootPath()}.
+ * <p>Note: the filesystem root path previously held here is gone entirely -- the song queue's
+ * aggregate root is now discovered directly from {@code app.data-dir} by natural identity
+ * {@code SongQueueRootEntity#SONG_QUEUE_FILENAME}.
  */
 @Validated
 @ConfigurationProperties(prefix = "song-queue")

@@ -12,14 +12,11 @@ app:
   logging:
     file-path: logs/jukeanator-service.log
     max-file-size: 5MB
-  # The song library location ONLY -- where the actual music files live. Not used for app state.
-  root-path-windows: C:\Music # windows
-  root-path-unix: /home/tmyers/Music/Rock_On_Third # linux / macOS
   # Where the engine reads/writes its own state: song library/queue/users (which include their
   # credit transaction history), background-music playlists, CD stats, admin/owner password
-  # hashes. Independent of root-path-*,
-  # and OS-agnostic (unlike root-path-*). Defaults to <user.home>/.jukeanator when unset -- override
-  # here to store it elsewhere.
+  # hashes. Defaults to <user.home>/.jukeanator when unset -- override here to store it
+  # elsewhere. The song library's own music-folder location is discovered from whatever's
+  # already stored here, or (on first run) via the JFC/Swing "scan for songs" prompt.
   # data-dir: ~
   # data-dir: C:\kiosk\data
 

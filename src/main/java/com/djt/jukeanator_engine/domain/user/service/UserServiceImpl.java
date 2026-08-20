@@ -69,7 +69,6 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   private static final int MAX_RECENT_PLAYS = 10;
 
-  private String rootPath;
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
@@ -79,18 +78,16 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   private UserRootEntity userRoot;
 
-  public UserServiceImpl(String rootPath, UserRepository userRepository,
-      PasswordEncoder passwordEncoder, JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
+  public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder,
+      JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
       SongLibraryService songLibraryService, boolean slaveMode) {
 
-    requireNonNull(rootPath, "rootPath cannot be null");
     requireNonNull(userRepository, "userRepository cannot be null");
     requireNonNull(passwordEncoder, "passwordEncoder cannot be null");
     requireNonNull(jwtUtil, "jwtUtil cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
 
-    this.rootPath = rootPath;
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtUtil = jwtUtil;
@@ -651,10 +648,10 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private void initialize() {
 
     try {
-      this.userRoot = this.userRepository.loadAggregateRoot(rootPath);
+      this.userRoot = this.userRepository.loadAggregateRoot(UserRootEntity.USER_LIST_FILENAME);
     } catch (EntityDoesNotExistException ednee) {
-      log.error("Could not load user root from: " + rootPath
-          + ", using empty user root for now, error: " + ednee.getMessage());
+      log.error("Could not load user root from dataDir, using empty user root for now, error: "
+          + ednee.getMessage());
       this.userRoot = new UserRootEntity();
     }
   }

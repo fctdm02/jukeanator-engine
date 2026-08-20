@@ -8,8 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
-import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
-import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 
 /**
  * Top-level application properties bound to the {@code app:} YAML prefix.
@@ -20,12 +18,10 @@ public class AppProperties {
 
   private boolean uiEnabled = false; // if true, a JFC UI is launched, otherwise, headless backend
 
-  private String rootPathWindows;
-  private String rootPathUnix; // Both Linux and MacOSX
-
-  // Where the engine reads/writes its own state (song library, song queue, users, credit ledger,
-  // background-music playlists, CD stats, admin/owner password hashes) -- independent of
-  // rootPath-*, which is strictly the song library location.
+  // Where the engine reads/writes its own state: song library, song queue, users, credit ledger,
+  // background-music playlists, CD stats, admin/owner password hashes. Every aggregate root is
+  // discovered directly from this directory (see e.g. SongLibraryServiceImpl.initialize()) --
+  // there is no separate app-level "root path" config to keep in sync with it.
   private String dataDir = System.getProperty("user.home") + File.separator + ".jukeanator";
 
   // standalone: today's single-tenant behavior (default). master: headless, location-agnostic,
@@ -89,30 +85,6 @@ public class AppProperties {
 
   public void setLocationApiKey(String locationApiKey) {
     this.locationApiKey = locationApiKey;
-  }
-
-  public String getEffectiveRootPath() {
-
-    if (OperatingSystemDetector.getOperatingSystem() == OSType.WINDOWS) {
-      return rootPathWindows;
-    }
-    return rootPathUnix;
-  }
-
-  public String getRootPathWindows() {
-    return rootPathWindows;
-  }
-
-  public String getRootPathUnix() {
-    return rootPathUnix;
-  }
-
-  public void setRootPathUnix(String rootPathUnix) {
-    this.rootPathUnix = rootPathUnix;
-  }
-  
-  public void setRootPathWindows(String rootPathWindows) {
-    this.rootPathWindows = rootPathWindows;
   }
 
   public String getDataDir() {

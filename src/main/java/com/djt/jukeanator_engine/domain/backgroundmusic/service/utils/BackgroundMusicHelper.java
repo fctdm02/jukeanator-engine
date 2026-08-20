@@ -4,15 +4,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.common.utils.FileSystemHelper;
-import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
-import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 
 /**
- * Reads/writes the canonical {@code BackgroundMusic.TXT} playlist file and normalizes song paths
- * between OS-specific formats. All played/not-played rotation state now lives in
- * {@code BackgroundMusicSongEntity}/{@code SmartBackgroundMusicSongEntity} records persisted via
- * {@code BackgroundMusicRepository}/{@code SmartBackgroundMusicRepository} — this helper no longer
- * tracks any of that state itself.
+ * Reads/writes the canonical {@code BackgroundMusic.TXT} playlist file. All played/not-played
+ * rotation state now lives in {@code BackgroundMusicSongEntity}/{@code SmartBackgroundMusicSongEntity}
+ * records persisted via {@code BackgroundMusicRepository}/{@code SmartBackgroundMusicRepository} —
+ * this helper no longer tracks any of that state itself.
  */
 public class BackgroundMusicHelper extends FileSystemHelper {
 
@@ -79,33 +76,10 @@ public class BackgroundMusicHelper extends FileSystemHelper {
   }
 
   /**
-   * Translates a song path read from a file into the format required by the OS currently running
-   * the application.
+   * Collapses a double backslash after a drive letter (e.g. "R:\\Rock_On_Third" instead of
+   * "R:\Rock_On_Third") that can occur when a Windows path is round-tripped through config/YAML.
    */
-  public String normalizePathForCurrentOS(String songPathName, String rootPathWindows,
-      String rootPathUnix) {
-
-    // Normalize rootPathWindows in case the config value was loaded with a double backslash
-    // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
-    String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
-    OSType osType = OperatingSystemDetector.getOperatingSystem();
-
-    boolean switchToUnixFormat = false;
-    boolean switchToWindowsFormat = false;
-
-    if (osType == OSType.WINDOWS && !songPathName.contains(normalizedRootPathWindows)) {
-      switchToWindowsFormat = true;
-    } else if ((osType == OSType.LINUX || osType == OSType.MACOS)
-        && !songPathName.contains(rootPathUnix)) {
-      switchToUnixFormat = true;
-    }
-
-    if (switchToUnixFormat) {
-      return songPathName.replace(normalizedRootPathWindows, rootPathUnix).replace("\\", "/");
-    } else if (switchToWindowsFormat) {
-      return songPathName.replace(rootPathUnix, normalizedRootPathWindows).replace("/", "\\");
-    }
-
+  public String normalizeDriveLetterBackslashes(String songPathName) {
     return songPathName.replace(":\\\\", ":\\");
   }
 }

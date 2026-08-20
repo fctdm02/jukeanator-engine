@@ -96,8 +96,8 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     when(userRepository.loadAggregateRoot(anyString())).thenReturn(userRoot);
 
-    userServiceImpl = new UserServiceImpl("test-root", userRepository, passwordEncoder, jwtUtil,
-        eventPublisher, songLibraryService, false);
+    userServiceImpl = new UserServiceImpl(userRepository, passwordEncoder, jwtUtil, eventPublisher,
+        songLibraryService, false);
   }
 
   private UserEntity registeredUser() {

@@ -51,8 +51,6 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private final SmartBackgroundMusicRepository smartBackgroundMusicRepository;
   private final BackgroundMusicHelper backgroundMusicHelper = new BackgroundMusicHelper();
 
-  private final String rootPathWindows;
-  private final String rootPathUnix;
   private final String dataDir;
 
   private boolean enableBackgroundMusic;
@@ -89,22 +87,18 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   // played yet. ─────────────────────────────────────────────────────────────
   private Set<String> currentlyQueuedPaths = new HashSet<>();
 
-  public BackgroundMusicServiceImpl(String dataDir, String rootPathWindows,
-      String rootPathUnix, BackgroundMusicProperties backgroundMusicProperties,
+  public BackgroundMusicServiceImpl(String dataDir,
+      BackgroundMusicProperties backgroundMusicProperties,
       SongLibraryService songLibraryService, BackgroundMusicRepository backgroundMusicRepository,
       SmartBackgroundMusicRepository smartBackgroundMusicRepository) {
 
     requireNonNull(dataDir, "dataDir cannot be null");
-    requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
-    requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
     requireNonNull(backgroundMusicProperties, "backgroundMusicProperties cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
     requireNonNull(backgroundMusicRepository, "backgroundMusicRepository cannot be null");
     requireNonNull(smartBackgroundMusicRepository, "smartBackgroundMusicRepository cannot be null");
 
     this.dataDir = dataDir;
-    this.rootPathWindows = rootPathWindows;
-    this.rootPathUnix = rootPathUnix;
     this.songLibraryService = songLibraryService;
     this.backgroundMusicRepository = backgroundMusicRepository;
     this.smartBackgroundMusicRepository = smartBackgroundMusicRepository;
@@ -264,8 +258,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   }
 
   private String normalizedPath(BackgroundMusicSongEntity song) {
-    return backgroundMusicHelper.normalizePathForCurrentOS(song.getSongFilePath(),
-        this.rootPathWindows, this.rootPathUnix);
+    return backgroundMusicHelper.normalizeDriveLetterBackslashes(song.getSongFilePath());
   }
 
   private void rebuildNotPlayedCache() {
@@ -614,8 +607,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   }
 
   /**
-   * Resolves a raw {@code BackgroundMusic.TXT} path into a {@link SongFileEntity}, normalizing it
-   * for the current OS first.
+   * Resolves a raw {@code BackgroundMusic.TXT} path into a {@link SongFileEntity}, normalizing
+   * drive-letter backslashes first.
    *
    * @return the resolved entity, or {@code null} if it could not be found (e.g. the file was
    *         moved/deleted since being added to the playlist)
@@ -623,8 +616,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private SongFileEntity resolveSourceSong(String rawPath) {
 
     try {
-      String normalized =
-          backgroundMusicHelper.normalizePathForCurrentOS(rawPath, rootPathWindows, rootPathUnix);
+      String normalized = backgroundMusicHelper.normalizeDriveLetterBackslashes(rawPath);
       return this.songLibraryService.getSongLibraryRoot().getSongByPath(normalized);
     } catch (Exception e) {
       log.debug("resolveSourceSong: could not resolve source song for path {}: {}", rawPath,

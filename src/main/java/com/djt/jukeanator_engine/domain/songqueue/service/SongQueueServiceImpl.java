@@ -74,9 +74,6 @@ public class SongQueueServiceImpl
   private final int allowExplicitSongsBegin;
   private final int allowExplicitSongsEnd;
 
-  private String rootPath;
-  private String rootPathWindows;
-  private String rootPathUnix;
   private RootFolderEntity songLibraryRoot;
   private SongQueueRootEntity songQueueRoot;
 
@@ -87,23 +84,16 @@ public class SongQueueServiceImpl
   /** Reference to the track that is currently playing on the output system */
   private SongFileEntity currentlyPlayingSong;
 
-  public SongQueueServiceImpl(String rootPath, String rootPathWindows, String rootPathUnix,
-      SongQueueProperties songQueueProperties, SongLibraryService songLibraryService,
-      BackgroundMusicService backgroundMusicService, SongQueueRepository songQueueRepository,
-      ApplicationEventPublisher eventPublisher) {
+  public SongQueueServiceImpl(SongQueueProperties songQueueProperties,
+      SongLibraryService songLibraryService, BackgroundMusicService backgroundMusicService,
+      SongQueueRepository songQueueRepository, ApplicationEventPublisher eventPublisher) {
 
-    requireNonNull(rootPath, "rootPath cannot be null");
-    requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
-    requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
     requireNonNull(songQueueProperties, "songQueueProperties cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
     requireNonNull(backgroundMusicService, "backgroundMusicService cannot be null");
     requireNonNull(songQueueRepository, "songQueueRepository cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
-    this.rootPath = rootPath;
-    this.rootPathWindows = rootPathWindows;
-    this.rootPathUnix = rootPathUnix;
     this.songLibraryService = songLibraryService;
     this.backgroundMusicService = backgroundMusicService;
     this.songQueueRepository = songQueueRepository;
@@ -158,29 +148,14 @@ public class SongQueueServiceImpl
 
       } catch (EntityDoesNotExistException ednee) {
 
-        log.error("Could not load song queue from: " + rootPath
-            + ", using empty song library root for now, error: " + ednee.getMessage());
+        log.error("Could not load song queue from dataDir, using empty song library root for now, "
+            + "error: " + ednee.getMessage());
 
         this.songQueueRoot = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
       }
     }
 
-    if (!this.rootPath.equals(this.songLibraryRoot.getRootPath())) {
-
-      this.songLibraryRoot.setRootPath(this.rootPath);
-      this.songLibraryRoot.initialize();
-    }
-
-    if (!this.rootPath.equals(this.songQueueRoot.getRootPath())) {
-
-      this.songQueueRoot.setRootPath(this.rootPath);
-      this.songQueueRoot.resetQueuedAtTime();
-    }
-
     log.info("resetQueueAtStartup: " + this.resetQueueAtStartup);
-    log.info("rootPath: " + this.rootPath);
-    log.info("rootPathWindows: " + this.rootPathWindows);
-    log.info("rootPathUnix: " + this.rootPathUnix);
     log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
     log.info("songQueueRoot: " + this.songQueueRoot.getRootPath());
     log.info("minimumNumberSongsToKeepInQueue: " + this.minimumNumberSongsToKeepInQueue);
@@ -808,8 +783,6 @@ public class SongQueueServiceImpl
         scanPath={}
         albumCount={}
         """, event.scanPath(), event.albumCount());
-
-    this.rootPath = event.scanPath();
 
     // SongLibraryServiceImpl has already re-initialized RootFolderEntity in response
     // to this same event; grab the new shared instance rather than loading from disk again.

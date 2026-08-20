@@ -16,8 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.utils.FileSystemHelper;
-import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
-import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 
 public class RootFolderEntity extends FolderEntity {
@@ -47,7 +45,13 @@ public class RootFolderEntity extends FolderEntity {
 
   public RootFolderEntity(String rootPath) {
     super(null, rootPath);
-    this.metadata = new LocationMetaDataFileEntity(this);
+    // Only eagerly persist metadata defaults when constructed with a real rootPath. A blank
+    // rootPath means this is a placeholder root built with no known music folder yet (e.g. before
+    // the user has completed their first library scan) -- getMetadata() still lazily creates it
+    // on demand if ever needed, matching the pre-existing deserialization backfill behavior below.
+    if (rootPath != null && !rootPath.isBlank()) {
+      this.metadata = new LocationMetaDataFileEntity(this);
+    }
   }
 
   public void initialize() {
@@ -357,36 +361,26 @@ public class RootFolderEntity extends FolderEntity {
   }
 
   // CD STATS RELATED
-  public int restoreSongStatisticsForRootPath(String dataDir, String rootPath,
-      String rootPathWindows, String rootPathUnix) {
+  public int restoreSongStatisticsForRootPath(String dataDir, String rootPath) {
 
     String cdStatsPathName = dataDir + File.separator + RootFolderEntity.CD_STATS;
 
     int numRestored = 0;
     if (fileSystemHelper.exists(cdStatsPathName)) {
-      numRestored =
-          restoreSongStatisticsForFile(rootPath, rootPathWindows, rootPathUnix, cdStatsPathName);
+      numRestored = restoreSongStatisticsForFile(rootPath, cdStatsPathName);
     } else {
       System.err.println("CD stats file does not exist: " + cdStatsPathName);
     }
 
     if (numRestored == 0) {
 
-      numRestored = restoreSongStatisticsForFile(rootPath, rootPathWindows, rootPathUnix,
+      numRestored = restoreSongStatisticsForFile(rootPath,
           dataDir + File.separator + RootFolderEntity.CD_STATS_BACKUP);
     }
     return numRestored;
   }
 
-  public int restoreSongStatisticsForFile(String rootPath, String rootPathWindows,
-      String rootPathUnix, String filename) {
-
-    // Normalize rootPathWindows in case the config value was loaded with a double backslash
-    // after the drive letter (e.g. "R:\\Rock_On_Third" instead of "R:\Rock_On_Third").
-    // CDStats.TXT always stores single-backslash Windows paths, so we must match that form.
-    String normalizedRootPathWindows = rootPathWindows.replace(":\\\\", ":\\");
-
-    OSType osType = OperatingSystemDetector.getOperatingSystem();
+  public int restoreSongStatisticsForFile(String rootPath, String filename) {
 
     if (!fileSystemHelper.exists(filename)) {
       System.err.println("CD stats file does not exist: " + filename);
@@ -421,23 +415,6 @@ public class RootFolderEntity extends FolderEntity {
         }
 
         try {
-
-          // See if we need to fix up song pathnames that we read in.
-          boolean switchToUnixFormat = false;
-          boolean switchToWindowsFormat = false;
-          if (osType == OSType.WINDOWS && !line.contains(normalizedRootPathWindows)) {
-            switchToWindowsFormat = true;
-          } else if ((osType == OSType.LINUX || osType == OSType.MACOS)
-              && !line.contains(rootPathUnix)) {
-            switchToUnixFormat = true;
-          }
-
-          if (switchToUnixFormat) {
-            line = line.replace(normalizedRootPathWindows, rootPathUnix).replace("\\", "/");
-          } else if (switchToWindowsFormat) {
-            line = line.replace(":\\", ":\\\\").replace(rootPathUnix, normalizedRootPathWindows)
-                .replace("/", "\\");
-          }
 
           int rootPathIndex = line.indexOf(rootPath);
           if (rootPathIndex < 0) {

@@ -194,9 +194,6 @@ public class AppConfig {
     
     return new SongLibraryServiceImpl(
         appProperties.getDataDir(),
-        appProperties.getEffectiveRootPath(),
-        appProperties.getRootPathWindows(),
-        appProperties.getRootPathUnix(),
         repository,
         songScanner,
         songLibraryProperties.getSearchResultSize(),
@@ -215,8 +212,6 @@ public class AppConfig {
 
     return new BackgroundMusicServiceImpl(
         appProperties.getDataDir(),
-        appProperties.getRootPathWindows(),
-        appProperties.getRootPathUnix(),
         backgroundMusicProperties,
         songLibraryService,
         backgroundMusicRepository,
@@ -227,7 +222,6 @@ public class AppConfig {
   @Primary
   @Conditional(NotMasterModeCondition.class)
   public SongQueueService songQueueService(
-      AppProperties appProperties,
       SongQueueProperties songQueueProperties,
       SongLibraryService songLibraryService,
       BackgroundMusicService backgroundMusicService,
@@ -235,9 +229,6 @@ public class AppConfig {
       ApplicationEventPublisher eventPublisher) {
 
     return new SongQueueServiceImpl(
-        appProperties.getEffectiveRootPath(),
-        appProperties.getRootPathWindows(),
-        appProperties.getRootPathUnix(),
         songQueueProperties,
         songLibraryService,
         backgroundMusicService,
@@ -274,7 +265,6 @@ public class AppConfig {
       SongLibraryService songLibraryService) {
 
     return new UserServiceImpl(
-        appProperties.getEffectiveRootPath(),
         userRepository,
         passwordEncoder,
         jwtUtil,

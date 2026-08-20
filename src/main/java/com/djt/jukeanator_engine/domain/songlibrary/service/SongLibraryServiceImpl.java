@@ -3,6 +3,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 import static java.util.Objects.requireNonNull;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,8 +25,6 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
-import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
-import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -64,10 +64,6 @@ public class SongLibraryServiceImpl
 
   private final ApplicationEventPublisher eventPublisher;
 
-  private String locationName;
-  private String rootPath;
-  private String rootPathWindows;
-  private String rootPathUnix;
   private final String dataDir;
   private final SongLibraryRepository songLibraryRepository;
   private final SongScanner songScanner;
@@ -77,23 +73,17 @@ public class SongLibraryServiceImpl
   private boolean isInitialized;
   private boolean libraryLoadFailedAtStartup;
 
-  public SongLibraryServiceImpl(String dataDir, String rootPath, String rootPathWindows,
-      String rootPathUnix, SongLibraryRepository songLibraryRepository, SongScanner songScanner,
-      Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
+  public SongLibraryServiceImpl(String dataDir, SongLibraryRepository songLibraryRepository,
+      SongScanner songScanner, Integer searchResultSize,
+      ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(dataDir, "dataDir cannot be null");
-    requireNonNull(rootPath, "rootPath cannot be null");
-    requireNonNull(rootPathWindows, "rootPathWindows cannot be null");
-    requireNonNull(rootPathUnix, "rootPathUnix cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
     requireNonNull(songScanner, "songScanner cannot be null");
     requireNonNull(searchResultSize, "searchResultSize cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
     this.dataDir = dataDir;
-    this.rootPath = rootPath;
-    this.rootPathWindows = rootPathWindows;
-    this.rootPathUnix = rootPathUnix;
     this.songLibraryRepository = songLibraryRepository;
     this.songScanner = songScanner;
     this.searchResultSize = searchResultSize;
@@ -110,50 +100,91 @@ public class SongLibraryServiceImpl
 
   public void initialize() {
 
-    // The persisted .oos filename tracks the location's live display name (see
-    // LocationMetaDataFileEntity / docs/multi-tenant-mode.md Item 2), which lives under rootPath
-    // independent of the .oos file itself -- so we can resolve the current name via a cheap
-    // "peek" RootFolderEntity (it only reads/creates locationMetadata.txt, it doesn't scan songs)
-    // before deciding which .oos file to load.
-    RootFolderEntity locationPeek = new RootFolderEntity(this.rootPath);
-    this.locationName = locationPeek.getMetadata().getLocationName();
-
-    // If we cannot load the song library from disk at startup, then assume a new install and return
-    // an
-    // empty songLibraryRoot folder. The application will automatically ask the user to scan for
-    // songs at
-    // startup.
+    // If we cannot load the song library from disk at startup, then assume a new install and
+    // return an empty songLibraryRoot folder. The application will automatically ask the user to
+    // scan for songs at startup.
     try {
 
-      this.songLibraryRoot = this.songLibraryRepository.loadAggregateRoot(this.locationName);
+      Path oosFile = findMostRecentOosFile()
+          .orElseThrow(() -> new EntityDoesNotExistException(
+              "No " + SongLibraryRepository.OOS_FILE_EXTENSION + " song library file found in dataDir: "
+                  + this.dataDir));
+
+      this.songLibraryRoot =
+          this.songLibraryRepository.loadAggregateRoot(deriveLocationNameFromOosFilename(oosFile));
       this.libraryLoadFailedAtStartup = false;
 
     } catch (EntityDoesNotExistException ednee) {
 
-      log.error("Could not load song library from: " + rootPath
+      log.error("Could not load song library from dataDir: " + this.dataDir
           + ", using empty song library songLibraryRoot for now, error: " + ednee.getMessage());
 
-      this.songLibraryRoot = locationPeek;
+      // No rootPath is known yet -- this placeholder is never persisted, and its metadata (which
+      // would require disk I/O against a real rootPath) is never touched. It only exists so that
+      // query methods don't NPE before the user completes the initial scan.
+      this.songLibraryRoot = new RootFolderEntity("");
       this.songLibraryRoot.initialize();
       this.libraryLoadFailedAtStartup = true;
-
-      this.songLibraryRepository.storeAggregateRoot(songLibraryRoot);
     }
 
     this.isInitialized = true;
 
-    if (!this.rootPath.equals(this.songLibraryRoot.getRootPath())) {
+    if (this.libraryLoadFailedAtStartup) {
+      log.info("locationName: <none, awaiting initial scan>");
+      log.info("rootPath: <none, awaiting initial scan>");
+    } else {
+      log.info("locationName: " + this.songLibraryRoot.getLocationName());
+      log.info("rootPath: " + this.songLibraryRoot.getRootPath());
+    }
+    log.info("searchResultSize: " + this.searchResultSize);
+  }
 
-      this.songLibraryRoot.setRootPath(this.rootPath);
-      this.songLibraryRoot.initialize();
+  /**
+   * Lists the {@code .oos} files directly under {@link #dataDir} and returns the most recently
+   * modified one, if any. Under normal slave/standalone operation there should be at most one.
+   */
+  private Optional<Path> findMostRecentOosFile() {
+
+    List<Path> oosFiles = new ArrayList<>();
+
+    try (DirectoryStream<Path> stream = Files.newDirectoryStream(Path.of(this.dataDir),
+        "*" + SongLibraryRepository.OOS_FILE_EXTENSION)) {
+
+      for (Path candidate : stream) {
+        if (Files.isRegularFile(candidate)) {
+          oosFiles.add(candidate);
+        }
+      }
+
+    } catch (IOException e) {
+      return Optional.empty();
     }
 
-    log.info("locationName: " + this.songLibraryRoot.getLocationName());
-    log.info("rootPath: " + this.rootPath);
-    log.info("rootPathWindows: " + this.rootPathWindows);
-    log.info("rootPathUnix: " + this.rootPathUnix);
-    log.info("searchResultSize: " + this.searchResultSize);
-    log.info("songLibraryRoot: " + this.songLibraryRoot.getRootPath());
+    return oosFiles.stream().max(Comparator.comparing(this::lastModifiedTimeOrEpoch));
+  }
+
+  private FileTime lastModifiedTimeOrEpoch(Path path) {
+    try {
+      return Files.getLastModifiedTime(path);
+    } catch (IOException e) {
+      return FileTime.fromMillis(0L);
+    }
+  }
+
+  /**
+   * Derives a location name from a persisted {@code .oos} filename by stripping the extension and
+   * replacing underscores with spaces -- the inverse of
+   * {@code SongLibraryRepositoryFileSystemImpl.sanitizeLocationNameForFilename}, which replaces
+   * spaces (and other filesystem-unsafe characters) with underscores when writing. E.g.
+   * {@code Rock_On_Third.oos} -> {@code "Rock On Third"}.
+   */
+  private String deriveLocationNameFromOosFilename(Path oosFile) {
+
+    String filename = oosFile.getFileName().toString();
+    String stem = filename.substring(0,
+        filename.length() - SongLibraryRepository.OOS_FILE_EXTENSION.length());
+
+    return stem.replace('_', ' ');
   }
 
   // TODO: No need to restore stats if JPA repository
@@ -586,30 +617,24 @@ public class SongLibraryServiceImpl
   @Override
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 
-    return scanFileSystemForSongs(new ScanRequest(this.rootPath));
+    return scanFileSystemForSongs(new ScanRequest(this.songLibraryRoot.getRootPath()));
   }
 
   @Override
   public Integer scanFileSystemForSongs(ScanRequest scanRequest) throws SongScanFailedException {
 
+    String scanPath = scanRequest.getScanPath();
+
     try {
 
       // Scan the file system for songs
-      this.rootPath = scanRequest.getScanPath();
       this.songLibraryRoot.storeSongStatistics(this.dataDir);
 
-      OSType osType = OperatingSystemDetector.getOperatingSystem();
-      if (osType == OSType.WINDOWS) {
-        this.rootPathWindows = this.rootPath;
-      } else {
-        this.rootPathUnix = this.rootPath;
-      }
-
-      this.songLibraryRoot = songScanner.scanFileSystemForSongs(this.rootPath);
+      this.songLibraryRoot = songScanner.scanFileSystemForSongs(scanPath);
 
       // Restore song num plays, persist, then re-initialize the songLibraryRoot
-      this.songLibraryRoot.restoreSongStatisticsForRootPath(this.dataDir, this.rootPath,
-          this.rootPathWindows, this.rootPathUnix);
+      this.songLibraryRoot.restoreSongStatisticsForRootPath(this.dataDir,
+          this.songLibraryRoot.getRootPath());
 
       this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
       this.songLibraryRoot.storeSongStatistics(this.dataDir);
@@ -620,14 +645,14 @@ public class SongLibraryServiceImpl
 
       // Publish the event
       eventPublisher.publishEvent(
-          new ScanFileSystemForSongsEvent(rootPath, songLibraryRoot.getAlbums().size()));
+          new ScanFileSystemForSongsEvent(scanPath, songLibraryRoot.getAlbums().size()));
 
       return Integer.valueOf(songLibraryRoot.getAlbums().size());
     } catch (SongLibraryServiceException sle) {
       throw sle;
     } catch (Exception e) {
       throw new SongScanFailedException(
-          "Could not scan file system for songs in: " + rootPath
+          "Could not scan file system for songs in: " + scanPath
               + " with acceptedSongFileExtensions: " + songScanner.getAcceptedSongFileExtensions(),
           e);
     }
@@ -663,8 +688,8 @@ public class SongLibraryServiceImpl
     try {
 
       // Restore the song statistics
-      this.songLibraryRoot.restoreSongStatisticsForFile(this.rootPath, this.rootPathWindows,
-          this.rootPathUnix, filename);
+      this.songLibraryRoot.restoreSongStatisticsForFile(this.songLibraryRoot.getRootPath(),
+          filename);
 
       // Store the song library
       this.songLibraryRepository.storeAggregateRoot(this.songLibraryRoot);
