@@ -211,4 +211,24 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
     return basePath + File.separator + sanitizeLocationNameForFilename(locationName)
         + SongLibraryRepository.OOS_FILE_EXTENSION;
   }
+  
+  @Override
+  public Integer updateNumPlaysForSong(
+      RootFolderEntity root, 
+      Integer locationId, 
+      Integer albumId,
+      Integer songId, 
+      Integer numPlays) throws EntityDoesNotExistException {
+
+    persistenceExecutor.submit(() -> {
+
+      try {
+        storeAggregateRoot(root);
+      } catch (Exception e) {
+        throw new SongLibraryServiceException("Could not asynchronously persist song library", e);
+      }
+    });
+    
+    return numPlays;    
+  }  
 }

@@ -1011,15 +1011,27 @@ public class SongLibraryServiceImpl
 
     try {
 
+      // Update the number of song plays and store to the repository
+      Integer locationId = this.ownLocationId;
+      Integer albumId = event.queueEntry().getSong().getAlbumId();
+      Integer songId = event.queueEntry().getSong().getSongId();
+      
       SongFileEntity song = this.ownRoot.getSongById(
-          event.queueEntry().getSong().getAlbumId(), event.queueEntry().getSong().getSongId());
-      song.incrementNumPlays();
+          event.queueEntry().getSong().getAlbumId(), 
+          event.queueEntry().getSong().getSongId());
+
+      Integer numPlays = song.incrementNumPlays();
+
+      this.songLibraryRepository.updateNumPlaysForSong(
+          ownRoot, 
+          locationId, 
+          albumId,
+          songId, 
+          numPlays);
 
       // Publish the event
       eventPublisher.publishEvent(new SongStatisticsChangedEvent());
-
-      this.songLibraryRepository.storeSongLibraryAsync();
-
+      
     } catch (EntityDoesNotExistException ednee) {
       throw new SongLibraryServiceException("Could not increment num plays for: " + event.queueEntry(),
           ednee);
@@ -1033,15 +1045,27 @@ public class SongLibraryServiceImpl
 
       for (SongQueueEntryDto queueEntry : event.queueEntries()) {
 
-        SongFileEntity song = this.ownRoot.getSongById(queueEntry.getSong().getAlbumId(),
+        // Update the number of song plays and store to the repository
+        Integer locationId = this.ownLocationId;
+        Integer albumId = queueEntry.getSong().getAlbumId();
+        Integer songId = queueEntry.getSong().getSongId();
+        
+        SongFileEntity song = this.ownRoot.getSongById(
+            queueEntry.getSong().getAlbumId(), 
             queueEntry.getSong().getSongId());
-        song.incrementNumPlays();
+
+        Integer numPlays = song.incrementNumPlays();
+
+        this.songLibraryRepository.updateNumPlaysForSong(
+            ownRoot, 
+            locationId, 
+            albumId,
+            songId, 
+            numPlays);
       }
 
       // Publish the event
       eventPublisher.publishEvent(new SongStatisticsChangedEvent());
-
-      this.songLibraryRepository.storeSongLibraryAsync();
 
     } catch (EntityDoesNotExistException ednee) {
       throw new SongLibraryServiceException("Could not increment num plays for: " + event.queueEntries(),

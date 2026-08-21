@@ -31,4 +31,21 @@ public interface SongLibraryRepository extends AggregateRootRepository<RootFolde
    * @throws EntityDoesNotExistException
    */
   void storeSongLibraryAsync() throws EntityDoesNotExistException;
+
+  /**
+   * 
+   * @param root
+   * @param locationId
+   * @param albumId
+   * @param songId
+   * @param numPlays
+   * @return
+   * @throws EntityDoesNotExistException
+   */
+  Integer updateNumPlaysForSong(
+      RootFolderEntity root, 
+      Integer locationId, 
+      Integer albumId,
+      Integer songId, 
+      Integer numPlays) throws EntityDoesNotExistException;
 }

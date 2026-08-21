@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -141,5 +142,64 @@ public class SongLibraryRepositoryFileSystemImplTest {
     root.getMetadata().setLocationName(locationName);
     root.initialize();
     return root;
+  }
+
+  // ── updateNumPlaysForSong ────────────────────────────────────────────────
+
+  /**
+   * Unlike {@code SongLibraryRepositoryJpaImpl} (see its dedicated targeted-UPDATE tests), this
+   * filesystem impl has no per-row store to target: the whole {@code .oos} file is always
+   * rewritten wholesale, and locationId/albumId/songId are only used by the caller (see {@code
+   * SongLibraryServiceImpl}) to mutate the in-memory {@link SongFileEntity} before calling this
+   * method -- they're never consulted here. So besides the numPlays argument passing straight
+   * through as the return value, the only other observable effect is that a {@code
+   * storeAggregateRoot} gets scheduled (mirroring {@code storeSongLibraryAsync}) rather than
+   * thrown from.
+   */
+  @Test
+  void updateNumPlaysForSong_returnsNumPlaysUnchanged_andSchedulesAPersist(@TempDir Path basePath,
+      @TempDir Path rootPath) throws Exception {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+    RootFolderEntity root = newRoot(rootPath, "Rock On Third");
+
+    Integer result = repository.updateNumPlaysForSong(root, 1, 2, 3, 99);
+
+    assertEquals(99, result);
+
+    // The persist above runs on a background executor -- wait for it to actually finish writing
+    // (and release its file handle) before the test method returns, otherwise @TempDir's own
+    // cleanup can race that write and fail to delete the .oos file out from under it.
+    Path oosFile = basePath.resolve("Rock_On_Third.oos");
+    awaitFileHandleReleased(oosFile);
+    assertTrue(Files.exists(oosFile), "Async persist should have written the .oos file");
+  }
+
+  /**
+   * Polls until {@code path} can be opened for writing, proving whatever background writer
+   * created it has closed its own handle. Needed because {@code updateNumPlaysForSong}/{@code
+   * storeSongLibraryAsync} persist on a fire-and-forget background executor with no
+   * completion signal to await directly.
+   */
+  private void awaitFileHandleReleased(Path path) throws IOException, InterruptedException {
+
+    long deadline = System.currentTimeMillis() + 5_000;
+    IOException lastFailure = null;
+
+    while (System.currentTimeMillis() < deadline) {
+
+      if (Files.exists(path)) {
+        try (java.nio.channels.FileChannel channel =
+            java.nio.channels.FileChannel.open(path, java.nio.file.StandardOpenOption.WRITE)) {
+          return;
+        } catch (IOException e) {
+          lastFailure = e;
+        }
+      }
+      Thread.sleep(50);
+    }
+
+    throw new AssertionError("Timed out waiting for " + path + " to be released", lastFailure);
   }
 }

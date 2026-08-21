@@ -362,4 +362,39 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
       entityManager.persist(metadataRow);
     }
   }
+  
+  @Override
+  public Integer updateNumPlaysForSong(
+      RootFolderEntity root,
+      Integer locationId,
+      Integer albumId,
+      Integer songId,
+      Integer numPlays) throws EntityDoesNotExistException {
+
+    requireNonNull(locationId, "locationId cannot be null");
+    requireNonNull(albumId, "albumId cannot be null");
+    requireNonNull(songId, "songId cannot be null");
+    requireNonNull(numPlays, "numPlays cannot be null");
+
+    int rowsUpdated = transactionTemplate.execute(status -> entityManager
+        .createQuery("update SongLibraryFileJpaEntity f set f.numPlays = :numPlays "
+            + "where f.locationId = :locationId and f.fileType = :fileType and f.sourceId = :songId "
+            + "and f.parentFolderId = (select fo.persistentIdentity from SongLibraryFolderJpaEntity fo "
+            + "where fo.locationId = :locationId and fo.folderType = :folderType and fo.sourceId = :albumId)")
+        .setParameter("numPlays", numPlays)
+        .setParameter("locationId", locationId)
+        .setParameter("fileType", SongLibraryFileJpaEntity.FileType.SONG)
+        .setParameter("songId", songId)
+        .setParameter("folderType", SongLibraryFolderJpaEntity.FolderType.ALBUM)
+        .setParameter("albumId", albumId)
+        .executeUpdate());
+
+    if (rowsUpdated == 0) {
+      throw new EntityDoesNotExistException("No song found for locationId: [" + locationId
+          + "], albumId: [" + albumId + "], songId: [" + songId + "].");
+    }
+
+    this.root = root;
+    return numPlays;
+  }
 }
