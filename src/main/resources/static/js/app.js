@@ -4,6 +4,7 @@
     token: localStorage.getItem('jwt'),
     role: localStorage.getItem('role'),
     emailAddress: localStorage.getItem('emailAddress'),
+    locationId: null,      // this instance's own location; fetched once at boot (see init below)
     pendingScreen: null,   // { screen, params } to navigate to after login
     navStack: [],          // { screen, params } entries for back navigation
     currentMainTab: 'music',
@@ -59,8 +60,16 @@
   }
 
   // ── API helper ──────────────────────────────────────────────────────────
+  // song-library/song-player/song-queue endpoints are scoped by locationId
+  // server-side (/api/locations/{locationId}/...); rewrite bare calls to those
+  // three so every caller can keep writing the short, unscoped path.
+  function locationScopedPath(path) {
+    const m = /^\/api\/(song-library|song-player|song-queue)(\/.*|$)/.exec(path);
+    return m ? `/api/locations/${state.locationId}/${m[1]}${m[2]}` : path;
+  }
+
   async function api(path, options = {}) {
-    const res = await fetch(path, {
+    const res = await fetch(locationScopedPath(path), {
       ...options,
       headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(options.headers || {}) },
     });
@@ -320,7 +329,7 @@
 
   function songThumbHtml(s) {
     const art = s.albumId != null
-      ? `<img src="/api/song-library/albums/${s.albumId}/coverArt" alt=""
+      ? `<img src="/api/locations/${state.locationId}/song-library/albums/${s.albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'rp-thumb-placeholder\\'>&#127925;</div>'">`
       : `<div class="rp-thumb-placeholder">&#127925;</div>`;
     return `<div class="rp-thumb-card">
@@ -332,7 +341,7 @@
 
   function artistThumbHtml(a) {
     const art = (a.albums && a.albums.length && a.albums[0].albumId != null)
-      ? `<img src="/api/song-library/albums/${a.albums[0].albumId}/coverArt" alt=""
+      ? `<img src="/api/locations/${state.locationId}/song-library/albums/${a.albums[0].albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'rp-thumb-placeholder\\'>&#127911;</div>'">`
       : `<div class="rp-thumb-placeholder">&#127911;</div>`;
     return `<div class="rp-thumb-card">
@@ -405,7 +414,7 @@
 
   function songListRowHtml(s) {
     const art = s.albumId != null
-      ? `<img class="result-thumb" src="/api/song-library/albums/${s.albumId}/coverArt" alt=""
+      ? `<img class="result-thumb" src="/api/locations/${state.locationId}/song-library/albums/${s.albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#127925;</div>'">`
       : `<div class="result-thumb-placeholder">&#127925;</div>`;
     return `<div class="result-row">
@@ -419,7 +428,7 @@
 
   function artistListRowHtml(a) {
     const art = (a.albums && a.albums.length && a.albums[0].albumId != null)
-      ? `<img class="result-thumb" src="/api/song-library/albums/${a.albums[0].albumId}/coverArt" alt=""
+      ? `<img class="result-thumb" src="/api/locations/${state.locationId}/song-library/albums/${a.albums[0].albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#127911;</div>'">`
       : `<div class="result-thumb-placeholder">&#127911;</div>`;
     return `<div class="result-row">
@@ -469,7 +478,7 @@
     } else {
       const crawlText = `${escHtml(song.artistName || '')}${song.albumName ? ' &middot; ' + escHtml(song.albumName) : ''}`;
       widget.innerHTML = `
-        <img src="/api/song-library/albums/${song.albumId}/coverArt" alt="${escHtml(song.albumName || '')}"
+        <img src="/api/locations/${state.locationId}/song-library/albums/${song.albumId}/coverArt" alt="${escHtml(song.albumName || '')}"
              onerror="this.remove()">
         <div class="now-playing-text">
           <div class="song-name">${escHtml(song.songName || '')}</div>
@@ -1062,7 +1071,7 @@
 
   function coverArtHtml(albumId, fallbackEmoji) {
     if (albumId != null) {
-      return `<img class="result-thumb" src="/api/song-library/albums/${albumId}/coverArt"
+      return `<img class="result-thumb" src="/api/locations/${state.locationId}/song-library/albums/${albumId}/coverArt"
                alt="" onerror="this.outerHTML=\`<div class='result-thumb-placeholder'>${fallbackEmoji}</div>\`">`;
     }
     return `<div class="result-thumb-placeholder">${fallbackEmoji}</div>`;
@@ -1070,7 +1079,7 @@
 
   function artistResultRow(a) {
     const thumb = a.artistId != null
-      ? `<img class="result-thumb" src="/api/song-library/artists/${a.artistId}/coverArt"
+      ? `<img class="result-thumb" src="/api/locations/${state.locationId}/song-library/artists/${a.artistId}/coverArt"
                alt="" onerror="this.outerHTML=\`<div class='result-thumb-placeholder'>&#127911;</div>\`">`
       : `<div class="result-thumb-placeholder">&#127911;</div>`;
     return `<div class="result-row artist-result-row" data-artist-id="${a.artistId ?? ''}">
@@ -1348,7 +1357,7 @@
     const songs = [...(album.songs || [])].sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
     const year = (album.releaseDate || '').slice(0, 4);
     const coverHtml = album.albumId != null
-      ? `<img class="album-detail-cover" src="/api/song-library/albums/${album.albumId}/coverArt"
+      ? `<img class="album-detail-cover" src="/api/locations/${state.locationId}/song-library/albums/${album.albumId}/coverArt"
               alt="" onerror="this.outerHTML=\`<div class='album-detail-cover album-detail-cover-placeholder'>&#128191;</div>\`">`
       : `<div class="album-detail-cover album-detail-cover-placeholder">&#128191;</div>`;
 
@@ -1412,7 +1421,7 @@
         </div>`;
       }
       const art = nowPlaying.albumId != null
-        ? `<img class="queue-now-playing-thumb" src="/api/song-library/albums/${nowPlaying.albumId}/coverArt"
+        ? `<img class="queue-now-playing-thumb" src="/api/locations/${state.locationId}/song-library/albums/${nowPlaying.albumId}/coverArt"
                 alt="" onerror="this.remove()">`
         : '';
       return `<div class="queue-now-playing-row">
@@ -1575,7 +1584,7 @@
     const crawlText = `${albumName} · ${artist}`;
 
     const thumbHtml = song.albumId != null
-      ? `<img class="song-popup-thumb" src="/api/song-library/albums/${song.albumId}/coverArt"
+      ? `<img class="song-popup-thumb" src="/api/locations/${state.locationId}/song-library/albums/${song.albumId}/coverArt"
               alt="" onerror="this.outerHTML='<div class=\\'song-popup-thumb song-popup-thumb-placeholder\\'>&#127925;</div>'">`
       : `<div class="song-popup-thumb song-popup-thumb-placeholder">&#127925;</div>`;
 
@@ -1725,7 +1734,7 @@
       return `<div class="${cls}"><img src="/images/MyFavorites_Playlist.png" alt="" style="width:100%;height:100%;object-fit:contain;"></div>`;
     }
     if (p.firstSongAlbumId != null) {
-      return `<div class="${cls}"><img src="/api/song-library/albums/${p.firstSongAlbumId}/coverArt" alt=""
+      return `<div class="${cls}"><img src="/api/locations/${state.locationId}/song-library/albums/${p.firstSongAlbumId}/coverArt" alt=""
         onerror="this.src='/images/Generic_Playlist.png'" style="width:100%;height:100%;object-fit:cover;"></div>`;
     }
     return `<div class="${cls}"><img src="/images/Generic_Playlist.png" alt="" style="width:100%;height:100%;object-fit:contain;"></div>`;
@@ -1807,7 +1816,7 @@
       }
       return songList.map((s, i) => `
         <div class="playlist-song-row" data-index="${i}">
-          <img class="result-thumb" src="/api/song-library/albums/${s.albumId}/coverArt" alt=""
+          <img class="result-thumb" src="/api/locations/${state.locationId}/song-library/albums/${s.albumId}/coverArt" alt=""
                onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#127925;</div>'">
           <div class="result-info">
             <div class="result-title">${escHtml(s.songName || '')}</div>
@@ -2067,6 +2076,13 @@
   }
 
   // ── Init ────────────────────────────────────────────────────────────────
-  renderMain('music');
-  connectWebSocket();
+  (async () => {
+    try {
+      state.locationId = await api('/api/users/own-location-id');
+    } catch {
+      state.locationId = null;
+    }
+    renderMain('music');
+    connectWebSocket();
+  })();
 })();

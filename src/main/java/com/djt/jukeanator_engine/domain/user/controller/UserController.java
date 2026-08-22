@@ -65,6 +65,17 @@ public class UserController {
     return ResponseEntity.ok(userService.getPublicHomePage());
   }
 
+  /**
+   * The location this instance itself serves (standalone/slave). The web UI has no other way to
+   * learn its own {@code locationId}, which every {@code /api/locations/{locationId}/...}
+   * endpoint (song-library, song-player, song-queue) requires.
+   */
+  @GetMapping("/own-location-id")
+  public ResponseEntity<Integer> getOwnLocationId() {
+
+    return ResponseEntity.ok(songLibraryService.getOwnLocationId());
+  }
+
   /** Returns home-page content and search history for the currently authenticated user. */
   @GetMapping("/home")
   public ResponseEntity<UserHomePageDto> getHomePage(@AuthenticationPrincipal String emailAddress) {
