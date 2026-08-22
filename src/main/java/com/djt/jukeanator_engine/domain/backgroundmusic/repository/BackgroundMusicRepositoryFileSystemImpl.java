@@ -49,4 +49,20 @@ public final class BackgroundMusicRepositoryFileSystemImpl extends AbstractRepos
 
     writeJsonList(filePath, BackgroundMusicMapper.toDtoList(songs));
   }
+
+  @Override
+  public void updatePlayStats(List<BackgroundMusicSongEntity> allSongs,
+      BackgroundMusicSongEntity song) {
+
+    // JSON has no notion of a partial write -- song is already mutated in-place within allSongs,
+    // so persisting the whole list picks up its change along with everything else.
+    storeAll(allSongs);
+  }
+
+  @Override
+  public void resetAllPlayedTimestamps(List<BackgroundMusicSongEntity> allSongs) {
+
+    // Same rationale as updatePlayStats: allSongs is already reset in-memory by the caller.
+    storeAll(allSongs);
+  }
 }

@@ -57,4 +57,20 @@ public final class SmartBackgroundMusicRepositoryFileSystemImpl
   public boolean exists() {
     return Files.exists(Path.of(filePath));
   }
+
+  @Override
+  public void updatePlayStats(List<SmartBackgroundMusicSongEntity> smartPool,
+      SmartBackgroundMusicSongEntity song) {
+
+    // JSON has no notion of a partial write -- song is already mutated in-place within
+    // smartPool, so persisting the whole list picks up its change along with everything else.
+    storeAll(smartPool);
+  }
+
+  @Override
+  public void resetAllPlayedTimestamps(List<SmartBackgroundMusicSongEntity> smartPool) {
+
+    // Same rationale as updatePlayStats: smartPool is already reset in-memory by the caller.
+    storeAll(smartPool);
+  }
 }

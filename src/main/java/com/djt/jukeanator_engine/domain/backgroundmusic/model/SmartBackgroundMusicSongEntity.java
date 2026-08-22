@@ -2,6 +2,11 @@ package com.djt.jukeanator_engine.domain.backgroundmusic.model;
 
 import static java.util.Objects.requireNonNull;
 import java.time.Instant;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
 
 /**
  * A {@link BackgroundMusicSongEntity} that was dynamically selected as a "smart addition" —
@@ -15,17 +20,29 @@ import java.time.Instant;
  * {@link SmartAdditionReason#SONG_FROM_FAVORITE_ALBUM} entries — favorite-album songs are
  * included by virtue of their album, not because some other song seeded the pick.
  *
+ * <p>
+ * Own complete table ({@code smart_background_music_songs}) under {@link BackgroundMusicSongEntity}'s
+ * {@code TABLE_PER_CLASS} inheritance -- see that class's javadoc.
+ *
  * @author tmyers
  */
+@Entity
+@Table(name = "smart_background_music_songs")
 public class SmartBackgroundMusicSongEntity extends BackgroundMusicSongEntity {
 
   private static final long serialVersionUID = 1L;
 
+  @Column(name = "source_song")
   private String sourceSong; // natural identity (path) of the song that seeded this pick
+
+  @Column(name = "source_song_num_plays")
   private Integer sourceSongNumPlays; // sourceSong's play count as of when this pick was made
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "reason", nullable = false)
   private SmartAdditionReason reason;
 
-  public SmartBackgroundMusicSongEntity() {}
+  protected SmartBackgroundMusicSongEntity() {} // for JPA
 
   public SmartBackgroundMusicSongEntity(Integer persistentIdentity, String songFilePath,
       String sourceSong, Integer sourceSongNumPlays, SmartAdditionReason reason) {

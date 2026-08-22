@@ -386,7 +386,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       for (BackgroundMusicSongEntity song : allSongs) {
         song.setTimeLastPlayed(null);
       }
-      backgroundMusicRepository.storeAll(allSongs);
+      backgroundMusicRepository.resetAllPlayedTimestamps(allSongs);
       rebuildNotPlayedCache();
 
       if (enableSmartBackgroundMusicAdditions) {
@@ -470,7 +470,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         for (SmartBackgroundMusicSongEntity song : smartPool) {
           song.setTimeLastPlayed(null);
         }
-        smartBackgroundMusicRepository.storeAll(smartPool);
+        smartBackgroundMusicRepository.resetAllPlayedTimestamps(smartPool);
         rebuildSmartCaches();
       }
 
@@ -971,7 +971,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         BackgroundMusicSongEntity song = songsById.get(backgroundId);
         song.markPlayed(Instant.now());
         notPlayedIds.remove(backgroundId);
-        backgroundMusicRepository.storeAll(allSongs);
+        backgroundMusicRepository.updatePlayStats(allSongs, song);
       }
 
       Integer smartId = smartNormalizedPathToId.get(playedPath);
@@ -979,7 +979,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         SmartBackgroundMusicSongEntity song = smartSongsById.get(smartId);
         song.markPlayed(Instant.now());
         smartNotPlayedIds.remove(smartId);
-        smartBackgroundMusicRepository.storeAll(smartPool);
+        smartBackgroundMusicRepository.updatePlayStats(smartPool, song);
       }
 
     } catch (Exception e) {

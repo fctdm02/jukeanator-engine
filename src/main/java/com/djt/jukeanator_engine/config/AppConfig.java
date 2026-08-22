@@ -13,8 +13,10 @@ import org.springframework.transaction.PlatformTransactionManager;
 import com.djt.jukeanator_engine.domain.backgroundmusic.config.BackgroundMusicProperties;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepository;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepositoryFileSystemImpl;
+import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepositoryJpaImpl;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgroundMusicRepository;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgroundMusicRepositoryFileSystemImpl;
+import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgroundMusicRepositoryJpaImpl;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicService;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicServiceImpl;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.NoOpBackgroundMusicService;
@@ -185,16 +187,37 @@ public class AppConfig {
   // ── Background music repositories ───────────────────────────────────────
 
   @Bean
-  public BackgroundMusicRepository backgroundMusicRepository(AppProperties appProperties) {
+  @ConditionalOnProperty(name = "background-music.repository-type", havingValue = "filesystem",
+      matchIfMissing = true)
+  public BackgroundMusicRepository backgroundMusicRepositoryFileSystemImpl(
+      AppProperties appProperties) {
 
     return new BackgroundMusicRepositoryFileSystemImpl(appProperties.getDataDir());
   }
 
   @Bean
-  public SmartBackgroundMusicRepository smartBackgroundMusicRepository(
+  @ConditionalOnProperty(name = "background-music.repository-type", havingValue = "jpa")
+  public BackgroundMusicRepository backgroundMusicRepositoryJpaImpl(
+      EntityManagerFactory entityManagerFactory, PlatformTransactionManager transactionManager) {
+
+    return new BackgroundMusicRepositoryJpaImpl(entityManagerFactory, transactionManager);
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = "background-music.repository-type", havingValue = "filesystem",
+      matchIfMissing = true)
+  public SmartBackgroundMusicRepository smartBackgroundMusicRepositoryFileSystemImpl(
       AppProperties appProperties) {
 
     return new SmartBackgroundMusicRepositoryFileSystemImpl(appProperties.getDataDir());
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = "background-music.repository-type", havingValue = "jpa")
+  public SmartBackgroundMusicRepository smartBackgroundMusicRepositoryJpaImpl(
+      EntityManagerFactory entityManagerFactory, PlatformTransactionManager transactionManager) {
+
+    return new SmartBackgroundMusicRepositoryJpaImpl(entityManagerFactory, transactionManager);
   }
 
   // ── Services ──────────────────────────────────────────────────────────────
