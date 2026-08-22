@@ -1,7 +1,0 @@
-# src/main/resources/application-mysql.yml
-#
-# RETIRED -- no longer needed. MySQL is now the unconditional default in application.yml (spring
-# .datasource.*, spring.jpa.hibernate.ddl-auto, user/location repository-type: jpa), so nothing
-# activates this profile anymore. It's kept as an empty placeholder only because this tooling can't
-# delete files on your machine -- safe to delete this file yourself (git rm
-# src/main/resources/application-mysql.yml).

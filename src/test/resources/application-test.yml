@@ -2,6 +2,7 @@
 
 app:
   ui-enabled: false   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
+  repository-type: filesystem   # filesystem | jpa; governs song-library, song-queue, background-music, user, and location alike
   jwt:
     secret: fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP
     expiration-ms: 3600000
@@ -29,7 +30,6 @@ spring:
     locations: classpath:db/migration/{vendor}
 
 song-library:
-  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* in application.yml)
   requires-metadata: false
   use-genre: true
   use-top-folder-for-genre: true
@@ -43,7 +43,6 @@ song-library:
   search-result-size: 100  
 
 song-queue:
-  repository-type: filesystem   # filesystem only
   reset-queue-at-startup: true
   minimum-number-songs-to-keep-in-queue: 3 # Only used when background-music.enable-background-music is true
   minimum-minutes-between-song-plays: 60
@@ -68,12 +67,6 @@ song-player:
   enable-line-in-on-silence: false # mutually exclusive with enable-background-music
   line-in-volume: 75  
   
-user:
-  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* in application.yml)
-
-location:   # repository/service beans exist regardless of app.mode; see LocationConfig
-  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* in application.yml)
-
 user-interface:
   always-on-top: false
   enable-screen-saver: false

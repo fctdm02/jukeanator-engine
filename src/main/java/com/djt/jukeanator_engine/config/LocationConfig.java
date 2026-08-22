@@ -34,7 +34,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryReposi
 public class LocationConfig {
 
   @Bean
-  @ConditionalOnProperty(name = "location.repository-type", havingValue = "filesystem",
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
   public LocationRepository locationRepositoryFileSystemImpl(AppProperties appProperties,
       LocationProperties locationProperties) {
@@ -43,7 +43,7 @@ public class LocationConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "location.repository-type", havingValue = "jpa")
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "jpa")
   public LocationRepository locationRepositoryJpaImpl(EntityManagerFactory entityManagerFactory,
       PlatformTransactionManager transactionManager) {
 

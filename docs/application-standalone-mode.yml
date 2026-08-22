@@ -2,6 +2,7 @@
 
 app:
   ui-enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
+  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* below); governs song-library, song-queue, background-music, user, and location alike
   mode: standalone   # standalone | master | slave
   master-instance-url: ~   # required if mode=slave, e.g. https://jukeanator.com
   location-id: ~            # required if mode=slave, assigned at provisioning
@@ -30,8 +31,8 @@ spring:
   aop:
     proxy-target-class: false   # use JDK interface proxies, not CGLIB
   # MySQL is the only supported local database -- no --spring.profiles.active flag needed. Setting
-  # user.repository-type / location.repository-type to jpa (see below) now always means "JPA against
-  # this MySQL datasource." Override via the DB_* environment variables for anything beyond local
+  # app.repository-type to jpa (see above) now always means "JPA against this MySQL datasource."
+  # Override via the DB_* environment variables for anything beyond local
   # dev. Setup: sudo apt install mysql-server && sudo mysql_secure_installation. Requires the schema
   # created by src/main/resources/db/migration/mysql/V1__init_user_schema.sql and
   # V2__init_location_schema.sql (run automatically by Flyway on startup).
@@ -50,7 +51,6 @@ spring:
     locations: classpath:db/migration/{vendor}
 
 song-library:
-  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
   requires-metadata: false
   use-genre: true
   use-top-folder-for-genre: true
@@ -64,7 +64,6 @@ song-library:
   search-result-size: 100    
 
 song-queue:
-  repository-type: filesystem   # filesystem only
   reset-queue-at-startup: true
   minimum-number-songs-to-keep-in-queue: 3 # Only used when background-music.enable-background-music is true
   minimum-minutes-between-song-plays: 60
@@ -73,7 +72,6 @@ song-queue:
   allow-explicit-songs-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) Only used when allowExplicitSongsAtAllTimes is false
 
 background-music:
-  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
   enable-background-music: true # assumes playlist file called BackgroundMusic.TXT exists in rootPath
   enable-smart-background-music-additions: true # will play songs from same artist/album from background music
   smart-background-music-additions-factor: 3 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
@@ -90,11 +88,7 @@ song-player:
   enable-line-in-on-silence: false # mutually exclusive with enable-background-music
   line-in-volume: 75  
 
-user:
-  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
-
 location:   # repository/service beans exist regardless of app.mode; see LocationConfig
-  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* above)
   storage-root: ~   # defaults under app.data-dir/locations when unset
   command-timeout-ms: 10000   # master-only: how long to wait for a slave to reply to a command
 

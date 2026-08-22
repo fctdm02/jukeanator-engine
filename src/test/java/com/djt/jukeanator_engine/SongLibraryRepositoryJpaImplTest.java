@@ -41,14 +41,12 @@ import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryReposi
  * Testcontainer (see {@link MySqlTestcontainersConfiguration}), the same combination already
  * proven out by {@link MySqlMasterModeJukeanatorEngineApplicationTests}.
  *
- * <p>{@code location.repository-type=jpa} is set purely to satisfy {@code
- * JpaRepositoryRequiredCondition} -- it only looks at {@code user}/{@code location}
- * repository-type, not {@code song-library}'s -- so the JPA datasource/Hibernate/Flyway stack
- * actually comes up. It's also put to direct use here: {@code song_library_folders.location_id}
- * and {@code song_library_files.location_id} are both {@code NOT NULL} foreign keys into {@code
- * locations} (see {@code db/migration/mysql/V3__init_song_library_schema.sql}), so every fixture
- * root below is built under a real, freshly registered {@link LocationRepository} row rather than
- * an arbitrary int.
+ * <p>{@code app.repository-type=jpa} is set so the JPA datasource/Hibernate/Flyway stack actually
+ * comes up (see {@code JpaDataSourceAutoConfigurationImport}). It's also put to direct use here:
+ * {@code song_library_folders.location_id} and {@code song_library_files.location_id} are both
+ * {@code NOT NULL} foreign keys into {@code locations} (see {@code
+ * db/migration/mysql/V3__init_song_library_schema.sql}), so every fixture root below is built
+ * under a real, freshly registered {@link LocationRepository} row rather than an arbitrary int.
  *
  * <p>This class lives in the root package (alongside {@link MySqlTestcontainersConfiguration}
  * and its siblings) rather than under {@code domain.songlibrary.repository}, because that
@@ -59,8 +57,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryReposi
 @Import(MySqlTestcontainersConfiguration.class)
 @SpringBootTest
 @ActiveProfiles({ "test", "mysql" })
-@TestPropertySource(
-    properties = { "song-library.repository-type=jpa", "location.repository-type=jpa" })
+@TestPropertySource(properties = { "app.repository-type=jpa" })
 class SongLibraryRepositoryJpaImplTest {
 
   private static final Integer GENRE_ID = 1;

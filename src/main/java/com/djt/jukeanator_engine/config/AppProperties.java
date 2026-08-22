@@ -24,6 +24,12 @@ public class AppProperties {
   // there is no separate app-level "root path" config to keep in sync with it.
   private String dataDir = System.getProperty("user.home") + File.separator + ".jukeanator";
 
+  // Shared by every domain's repository bean selection (song-library, song-queue,
+  // background-music, user, location) -- see the @ConditionalOnProperty pairs in AppConfig and
+  // LocationConfig. "filesystem": JSON files under dataDir. "jpa": Hibernate against the MySQL
+  // datasource configured under spring.datasource.*.
+  private String repositoryType = "filesystem";
+
   // standalone: today's single-tenant behavior (default). master: headless, location-agnostic,
   // hosts the location registry and proxies to slaves. slave: a physical location that syncs its
   // library to the master and accepts remote commands over a persistent connection.
@@ -93,6 +99,14 @@ public class AppProperties {
 
   public void setDataDir(String dataDir) {
     this.dataDir = dataDir;
+  }
+
+  public String getRepositoryType() {
+    return repositoryType;
+  }
+
+  public void setRepositoryType(String repositoryType) {
+    this.repositoryType = repositoryType;
   }
 
   @PostConstruct

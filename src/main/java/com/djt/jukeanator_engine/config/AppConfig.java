@@ -110,7 +110,7 @@ public class AppConfig {
   // ── Song library repository ───────────────────────────────────────────────
 
   @Bean
-  @ConditionalOnProperty(name = "song-library.repository-type", havingValue = "filesystem",
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
   public SongLibraryRepository songLibraryRepositoryFileSystemImpl(AppProperties appProperties) {
 
@@ -118,7 +118,7 @@ public class AppConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "song-library.repository-type", havingValue = "jpa")
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "jpa")
   public SongLibraryRepository songLibraryRepositoryJpaImpl(EntityManagerFactory entityManagerFactory,
       PlatformTransactionManager transactionManager) {
 
@@ -149,7 +149,7 @@ public class AppConfig {
   // ── Song queue repository ─────────────────────────────────────────────────
 
   @Bean
-  @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "filesystem",
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
   public SongQueueRepository songQueueRepositoryFileSystemImpl(AppProperties appProperties,
       SongLibraryService songLibraryService) {
@@ -158,7 +158,7 @@ public class AppConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "jpa")
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "jpa")
   public SongQueueRepository songQueueRepositoryJpaImpl(EntityManagerFactory entityManagerFactory,
       PlatformTransactionManager transactionManager, SongLibraryService songLibraryService) {
 
@@ -169,7 +169,7 @@ public class AppConfig {
   // ── User repository ───────────────────────────────────────────────────────
 
   @Bean
-  @ConditionalOnProperty(name = "user.repository-type", havingValue = "filesystem",
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
   public UserRepository userRepositoryFileSystemImpl(AppProperties appProperties) {
 
@@ -177,7 +177,7 @@ public class AppConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "user.repository-type", havingValue = "jpa")
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "jpa")
   public UserRepository userRepositoryJpaImpl(EntityManagerFactory entityManagerFactory,
       PlatformTransactionManager transactionManager) {
 
@@ -187,7 +187,7 @@ public class AppConfig {
   // ── Background music repositories ───────────────────────────────────────
 
   @Bean
-  @ConditionalOnProperty(name = "background-music.repository-type", havingValue = "filesystem",
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
   public BackgroundMusicRepository backgroundMusicRepositoryFileSystemImpl(
       AppProperties appProperties) {
@@ -196,7 +196,7 @@ public class AppConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "background-music.repository-type", havingValue = "jpa")
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "jpa")
   public BackgroundMusicRepository backgroundMusicRepositoryJpaImpl(
       EntityManagerFactory entityManagerFactory, PlatformTransactionManager transactionManager) {
 
@@ -204,7 +204,7 @@ public class AppConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "background-music.repository-type", havingValue = "filesystem",
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
   public SmartBackgroundMusicRepository smartBackgroundMusicRepositoryFileSystemImpl(
       AppProperties appProperties) {
@@ -213,7 +213,7 @@ public class AppConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "background-music.repository-type", havingValue = "jpa")
+  @ConditionalOnProperty(name = "app.repository-type", havingValue = "jpa")
   public SmartBackgroundMusicRepository smartBackgroundMusicRepositoryJpaImpl(
       EntityManagerFactory entityManagerFactory, PlatformTransactionManager transactionManager) {
 

@@ -14,8 +14,6 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "song-queue")
 public class SongQueueProperties {
 
-  private String repositoryType; // "filesystem" or "postgres"
-  
   private boolean resetQueueAtStartup = true; // Whether or not to start with an empty song queue
 
   // Minimum number of songs to keep queued; only relevant when background music is enabled (see
@@ -28,14 +26,6 @@ public class SongQueueProperties {
   private boolean allowExplicitSongsAtAllTimes = false;
   private int allowExplicitSongsBegin = 21; // # In 24 hour/military time (e.g. 21:00 hours is (9:00PM))
   private int allowExplicitSongsEnd = 5; // # In 24 hour/military time (e.g. 5:00 hours is (5:00AM))
-
-  public String getRepositoryType() {
-    return repositoryType;
-  }
-
-  public void setRepositoryType(String repositoryType) {
-    this.repositoryType = repositoryType;
-  }
 
   public boolean isResetQueueAtStartup() {
     return resetQueueAtStartup;

@@ -55,20 +55,19 @@ import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository
  * context) against a mocked {@link SongLibraryService}, letting each test pin down exactly which
  * locationId and library fixture it's exercising without needing a real filesystem scan.
  *
- * <p>{@code location.repository-type=jpa} is set purely so {@code song_queue_entries.location_id}'s
+ * <p>{@code app.repository-type=jpa} is set so {@code song_queue_entries.location_id}'s
  * {@code NOT NULL} foreign key into {@code locations} (see {@code
  * db/migration/mysql/V5__init_song_queue_schema.sql}) has a real row to point at, exactly as
- * {@code SongLibraryRepositoryJpaImplTest} does for the song-library tables' same FK.
- * {@code song-queue.repository-type=jpa} is set to additionally satisfy {@code
- * JpaRepositoryRequiredCondition} via the branch this refactor added for it.
+ * {@code SongLibraryRepositoryJpaImplTest} does for the song-library tables' same FK; it also
+ * satisfies {@code JpaDataSourceAutoConfigurationImport} so the JPA datasource/Hibernate/Flyway
+ * stack actually comes up.
  *
  * @author tmyers
  */
 @Import(MySqlTestcontainersConfiguration.class)
 @SpringBootTest
 @ActiveProfiles({ "test", "mysql" })
-@TestPropertySource(
-    properties = { "song-queue.repository-type=jpa", "location.repository-type=jpa" })
+@TestPropertySource(properties = { "app.repository-type=jpa" })
 class SongQueueRepositoryJpaImplTest {
 
   private static final Integer ALBUM_ONE_ID = 501;

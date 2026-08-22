@@ -16,7 +16,6 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "song-library")
 public class SongLibraryProperties {
 
-  private String repositoryType; // "filesystem" or "postgres"
   private boolean requiresMetadata;
   private boolean useGenre;
   private boolean useTopFolderForGenre;
@@ -47,14 +46,6 @@ public class SongLibraryProperties {
     }
   }
   
-  public String getRepositoryType() {
-    return repositoryType;
-  }
-
-  public void setRepositoryType(String repositoryType) {
-    this.repositoryType = repositoryType;
-  }
-
   public boolean isRequiresMetadata() {
     return requiresMetadata;
   }

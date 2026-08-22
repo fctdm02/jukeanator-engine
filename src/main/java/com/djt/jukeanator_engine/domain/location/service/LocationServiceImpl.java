@@ -182,7 +182,7 @@ public class LocationServiceImpl implements LocationService {
     // The JSON snapshot file remains the source of truth for cover-art-hash diffing (see
     // loadPreviousCoverArtHashes) regardless of repository-type -- coverArtHash has no analog in
     // the JPA schema (AlbumMetaDataFileEntity never tracked one), so this file is written
-    // unconditionally. When song-library.repository-type=jpa, the same snapshot additionally
+    // unconditionally. When app.repository-type=jpa, the same snapshot additionally
     // populates the JPA tables, which is what SongLibraryServiceImpl actually serves browse/search
     // reads from for this location.
     Path libraryFile = locationStorageRoot(locationId).resolve("library.json");
