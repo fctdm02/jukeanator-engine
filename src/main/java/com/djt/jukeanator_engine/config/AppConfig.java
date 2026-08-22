@@ -49,6 +49,7 @@ import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerServiceMast
 import com.djt.jukeanator_engine.domain.songqueue.config.SongQueueProperties;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryFileSystemImpl;
+import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryJpaImpl;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
@@ -152,6 +153,15 @@ public class AppConfig {
       SongLibraryService songLibraryService) {
 
     return new SongQueueRepositoryFileSystemImpl(appProperties.getDataDir(), songLibraryService);
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = "song-queue.repository-type", havingValue = "jpa")
+  public SongQueueRepository songQueueRepositoryJpaImpl(EntityManagerFactory entityManagerFactory,
+      PlatformTransactionManager transactionManager, SongLibraryService songLibraryService) {
+
+    return new SongQueueRepositoryJpaImpl(entityManagerFactory, transactionManager,
+        songLibraryService);
   }
 
   // ── User repository ───────────────────────────────────────────────────────
