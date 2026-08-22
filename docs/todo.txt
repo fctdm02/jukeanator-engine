@@ -494,3 +494,6 @@ If you want, I can turn this into an OpenAPI spec next so the mobile app could c
 rest of this monorepo already uses.
 
  
+ 
+ 
+ Refactor SongQueueRepository to have a JPA implementation.  Use the same pattern as is done in UserService with UserRepositoryJpaImpl.  Do the same thing with SongQueueRootEntity as is done with UserRootEntity in that there is no table for the root entity.  Ask any questions before proceeding.
