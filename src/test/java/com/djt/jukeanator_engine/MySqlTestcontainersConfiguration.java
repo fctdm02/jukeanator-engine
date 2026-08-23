@@ -8,10 +8,12 @@ import org.testcontainers.mysql.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * MySQL counterpart to {@link TestcontainersConfiguration}. Import this instead when a test
- * needs to run against the {@code mysql} profile (see {@code application-mysql.yml}) rather than
- * the default Postgres container -- the two are never imported together, since Spring Boot only
- * supports one JDBC {@code @ServiceConnection} per test context.
+ * MySQL Testcontainers configuration used by the {@code mysql}-profile test variants in this
+ * package. Functionally equivalent to {@link TestcontainersConfiguration} -- both provision a
+ * disposable MySQL container via {@code @ServiceConnection} -- but kept as a separate class so
+ * the {@code mysql}-profile test classes can import it explicitly, independent of the default
+ * test configuration; the two are never imported together, since Spring Boot only supports one
+ * JDBC {@code @ServiceConnection} per test context.
  */
 @TestConfiguration(proxyBeanMethods = false)
 class MySqlTestcontainersConfiguration {

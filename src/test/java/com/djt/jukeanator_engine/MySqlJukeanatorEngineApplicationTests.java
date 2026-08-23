@@ -9,16 +9,16 @@ import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.DockerClientFactory;
 
 /**
- * MySQL counterpart to {@link JukeanatorEngineApplicationTests}. Activates the {@code mysql}
- * profile (JPA user repository, {@code db/migration/mysql} Flyway scripts) against a disposable
- * {@link MySqlTestcontainersConfiguration#mysqlContainer() MySQLContainer} instead of the default
- * Postgres one, proving the schema and datasource wiring both work against a real MySQL instance.
+ * Runs the {@code contextLoads} smoke test with the {@code mysql} profile explicitly activated
+ * (JPA user repository, {@code db/migration/mysql} Flyway scripts) against a disposable
+ * {@link MySqlTestcontainersConfiguration#mysqlContainer() MySQLContainer}, proving the schema and
+ * datasource wiring both work against a real MySQL instance. Now that {@link
+ * JukeanatorEngineApplicationTests} also provisions MySQL by default (via
+ * {@link TestcontainersConfiguration}), this class is functionally equivalent to it; kept as a
+ * separate class pending a future consolidation pass.
  *
- * <p>Unlike {@link JukeanatorEngineApplicationTests}, the {@code mysql} profile hardcodes a real
- * {@code jdbc:mysql://} URL (see {@code application-mysql.yml}) rather than falling back to an
- * embedded database, so there's nothing for Spring to fall back to if Docker isn't available.
- * {@link #requiresDocker()} skips the whole class in that case instead of failing on a connection
- * attempt to a MySQL instance that was never started.
+ * <p>There is no embedded-database fallback here, so {@link #requiresDocker()} skips the whole
+ * class instead of failing on a connection attempt to a MySQL instance that was never started.
  */
 @Import(MySqlTestcontainersConfiguration.class)
 @SpringBootTest

@@ -15,8 +15,8 @@ import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
 
 /**
  * JPA/Hibernate-backed implementation of {@link LocationRepository}. Server/database-type
- * agnostic, exactly like {@code UserRepositoryJpaImpl}: the vendor (Postgres, MySQL, ...) is
- * selected entirely via {@code spring.datasource.url}/{@code driver-class-name}.
+ * agnostic, exactly like {@code UserRepositoryJpaImpl}: the vendor is selected entirely via
+ * {@code spring.datasource.url}/{@code driver-class-name} (MySQL is the only supported vendor).
  *
  * <p>{@link LocationRootEntity} is <strong>not</strong> JPA-mapped -- there is no {@code
  * location_root} table. It exists purely as an in-memory aggregate, exactly like {@link

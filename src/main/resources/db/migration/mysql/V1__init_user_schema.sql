@@ -1,5 +1,5 @@
--- Portable id generation, MySQL side: real MySQL has no native CREATE SEQUENCE (that's a
--- Postgres/Oracle/MariaDB feature), so Hibernate's GenerationType.SEQUENCE falls back to emulating
+-- Portable id generation, MySQL side: real MySQL has no native CREATE SEQUENCE (a feature some
+-- other databases support), so Hibernate's GenerationType.SEQUENCE falls back to emulating
 -- one with a backing table -- a single row whose `next_val` column is read-then-incremented on
 -- every id allocation. The shape below (table named after the sequence, one BIGINT `next_val`
 -- column) is Hibernate's internal org.hibernate.id.enhanced.TableStructure convention; it has not

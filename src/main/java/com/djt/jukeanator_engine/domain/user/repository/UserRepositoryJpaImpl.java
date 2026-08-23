@@ -15,11 +15,11 @@ import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 
 /**
  * JPA/Hibernate-backed implementation of {@link UserRepository}. Unlike a hand-written JDBC/SQL
- * implementation, this class is server/database-type agnostic: the actual vendor (Postgres,
- * MySQL, ...) is selected entirely via {@code spring.datasource.url}/{@code driver-class-name},
- * and Hibernate translates the JPQL/criteria queries and id-generation strategy below into
- * whatever dialect that vendor needs -- including emulating {@code GenerationType.SEQUENCE} with
- * a backing table on databases (like MySQL) that don't support native sequences. See
+ * implementation, this class is server/database-type agnostic: the actual vendor is selected
+ * entirely via {@code spring.datasource.url}/{@code driver-class-name} (MySQL is the only
+ * supported vendor), and Hibernate translates the JPQL/criteria queries and id-generation
+ * strategy below into whatever dialect that vendor needs -- including emulating {@code
+ * GenerationType.SEQUENCE} with a backing table, since MySQL doesn't support native sequences. See
  * {@link com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity} for where that
  * id-generation strategy is declared.
  *

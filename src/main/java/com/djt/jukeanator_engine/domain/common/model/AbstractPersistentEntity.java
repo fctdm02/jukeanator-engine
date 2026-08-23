@@ -17,12 +17,12 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
  * the file-system-backed aggregates) -- it only takes effect for JPA-backed entities such as
  * {@link com.djt.jukeanator_engine.domain.user.model.UserRootEntity}. Using
  * {@code GenerationType.SEQUENCE} rather than vendor-specific DDL keeps id generation portable:
- * Hibernate emits a real {@code CREATE SEQUENCE} on databases that support it (Postgres) and
- * transparently emulates one with a backing table on databases that don't (MySQL), so no
- * per-vendor branching is needed in application code. The generator name/sequence name are
- * pinned explicitly (rather than left to Hibernate's implicit per-entity naming) so every entity
- * in this hierarchy shares one predictable, hand-writable sequence -- see the Flyway migrations
- * under {@code db/migration/postgresql} and {@code db/migration/mysql}.
+ * Hibernate emits a real {@code CREATE SEQUENCE} on databases that support it, and transparently
+ * emulates one with a backing table on databases that don't -- including MySQL, the only vendor
+ * this project targets -- so no per-vendor branching is needed in application code. The generator
+ * name/sequence name are pinned explicitly (rather than left to Hibernate's implicit per-entity
+ * naming) so every entity in this hierarchy shares one predictable, hand-writable sequence -- see
+ * the Flyway migrations under {@code db/migration/mysql}.
  */
 @MappedSuperclass
 public abstract class AbstractPersistentEntity extends AbstractEntity {

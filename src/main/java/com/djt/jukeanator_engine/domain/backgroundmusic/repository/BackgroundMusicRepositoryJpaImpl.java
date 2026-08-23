@@ -14,8 +14,8 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 
 /**
  * JPA/Hibernate-backed implementation of {@link BackgroundMusicRepository}. Server/database-type
- * agnostic, exactly like {@code UserRepositoryJpaImpl}: the vendor (Postgres, MySQL, ...) is
- * selected entirely via {@code spring.datasource.url}/{@code driver-class-name}.
+ * agnostic, exactly like {@code UserRepositoryJpaImpl}: the vendor is selected entirely via
+ * {@code spring.datasource.url}/{@code driver-class-name} (MySQL is the only supported vendor).
  *
  * <p>Unlike {@code UserRepository}, {@link BackgroundMusicRepository} has no root aggregate --
  * it already deals directly in {@code List<BackgroundMusicSongEntity>}, so {@link #loadAll()}/

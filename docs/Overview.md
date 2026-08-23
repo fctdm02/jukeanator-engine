@@ -8,9 +8,9 @@ This is a **Spring Boot 4.0.4 / Java 21** application, packaged as a WAR, that s
 
 ### Architecture: 4 Core Domains
 
-**`songlibrary`** — Manages the music catalog. Scans the filesystem for songs (via `SongScanner`), reads/writes ID3 tags with JAudioTagger, pulls album metadata from **Discogs** and **MusicBrainz**, and stores everything in either PostgreSQL or a flat filesystem. Elasticsearch is wired in for search.
+**`songlibrary`** — Manages the music catalog. Scans the filesystem for songs (via `SongScanner`), reads/writes ID3 tags with JAudioTagger, pulls album metadata from **Discogs** and **MusicBrainz**, and stores everything in either a JPA-backed MySQL store or a flat filesystem. Elasticsearch is wired in for search.
 
-**`songqueue`** — The play queue. Handles adding individual songs, albums, or whole playlists to the queue. Backed by both a filesystem and Postgres implementation, with a `PlaylistManager` utility.
+**`songqueue`** — The play queue. Handles adding individual songs, albums, or whole playlists to the queue. Backed by both a filesystem and JPA implementation, with a `PlaylistManager` utility.
 
 **`songplayer`** — The actual audio playback engine. Has implementations for **VLC** (`vlcj`), **Winamp**, and even a video VLC player. Cross-platform volume control: separate implementations for Windows (via JNA/CoreAudio bridge + a PowerShell script), Mac, and Linux. Also handles line-in audio monitoring.
 
@@ -27,9 +27,9 @@ A fairly complete Swing frontend: genre panels with artwork, album grids, search
 - **JNA 5.17.0** — Windows native audio control  
 - **JAudioTagger 3.0.1** — MP3/FLAC tag reading  
 - **Discogs Java Client 1.1.3** — Album metadata  
-- **Flyway** — DB migrations (supports PostgreSQL and Derby)
-- **H2 + Derby + PostgreSQL** — three DB options
-- **Testcontainers** — integration tests with real PostgreSQL
+- **Flyway** — DB migrations (supports MySQL and Derby)
+- **H2 + Derby + MySQL** — three DB options
+- **Testcontainers** — integration tests with real MySQL
 
 ### Also of Note
 There are several standalone utility scripts at the repo root (`BPMFilter.java`, `Mp3Normalize.java`, `Mp3Pruner.java`, etc.) — these look like one-off MP3 library management tools living outside the main package structure.
@@ -80,12 +80,12 @@ The object model is **thoughtful and coherent** — clearly designed by someone 
 
 ### The Bigger Question
 
-The model is designed around the filesystem structure as the source of truth, which works beautifully while everything stays in sync. But you have two repository implementations — filesystem and Postgres — and the model's natural identity *is* a file path. That means:
+The model is designed around the filesystem structure as the source of truth, which works beautifully while everything stays in sync. But you have two repository implementations — filesystem and JPA — and the model's natural identity *is* a file path. That means:
 
 - If you move a file, its identity changes and it becomes a different entity
-- The Postgres implementation essentially has to re-derive the tree structure from stored paths
+- The JPA implementation essentially has to re-derive the tree structure from stored paths
 
-It'd be worth thinking about whether the domain model should eventually decouple from the filesystem path as identity, particularly if you want the Postgres side to become the primary source of truth over time. Right now the path *is* the identity, which is great for the filesystem implementation but a bit awkward for a proper relational schema.
+It'd be worth thinking about whether the domain model should eventually decouple from the filesystem path as identity, particularly if you want the JPA/MySQL side to become the primary source of truth over time. Right now the path *is* the identity, which is great for the filesystem implementation but a bit awkward for a proper relational schema.
 
 ---
 

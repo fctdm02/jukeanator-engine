@@ -12,7 +12,7 @@
 
 `jukeanator-engine` already has a substantial master/slave multi-tenant system built and verified (212 tests passing, documented in `docs/multi-tenant-mode.md`). But it took a "snapshot + proxy" shape: master serves song-library browse reads from a synced **JSON snapshot** on disk via a dedicated `SongLibraryServiceLocationProxy`/`SongQueueServiceLocationProxy`/`SongPlayerServiceLocationProxy` class family and parallel `LocationScoped*Controller`s, deliberately kept separate from the standalone/slave code path so standalone risk stayed at zero.
 
-The goal now is a real pivot: give `SongLibraryRepository` a JPA/MySQL implementation (replacing the stub `SongLibraryRepositoryPostgresImpl`) where **one master database table set holds every location's songs**, tenant-separated by `locationId` — and use that to collapse the proxy/scoped-controller duplication entirely. Every relevant service method and controller takes `locationId` directly instead of having two parallel implementations. Standalone mode becomes "multi-tenant with exactly one location," not a structurally different code path. This is an accepted breaking change — existing persisted playlists/song-identifiers are obsolete and will be reset; there is no production master deployment yet, so schema and data are clean-slate.
+The goal now is a real pivot: give `SongLibraryRepository` a JPA/MySQL implementation (replacing the old single-vendor stub repository implementation) where **one master database table set holds every location's songs**, tenant-separated by `locationId` — and use that to collapse the proxy/scoped-controller duplication entirely. Every relevant service method and controller takes `locationId` directly instead of having two parallel implementations. Standalone mode becomes "multi-tenant with exactly one location," not a structurally different code path. This is an accepted breaking change — existing persisted playlists/song-identifiers are obsolete and will be reset; there is no production master deployment yet, so schema and data are clean-slate.
 
 ## Decisions already confirmed (do not re-litigate during implementation)
 
@@ -40,9 +40,9 @@ IDs in both tables are **scan-local** (`SongScanner`'s per-slave sequential ints
 ### Phase A — JPA entities, repository, Flyway migrations (Item 1)
 - Add JPA annotations (`@Entity`, `@Inheritance(SINGLE_TABLE)`, `@DiscriminatorColumn`/`@DiscriminatorValue`) to the folder and file entity hierarchies in `domain/songlibrary/model/`.
 - New `domain/songlibrary/repository/SongLibraryRepositoryJpaImpl.java`, mirroring `UserRepositoryJpaImpl.java`'s shape (`EntityManagerFactory`/`PlatformTransactionManager`). `loadAggregateRoot(int locationId)` queries both tables `WHERE location_id = ?` and reassembles the tree, then calls `root.initialize()` — same contract as the filesystem loader. `storeAggregateRoot(root)`: delete-then-bulk-insert all rows for that `location_id` in one transaction (simpler and correct here since the tree is always fully materialized before a store, unlike `UserRepositoryJpaImpl`'s diff/orphan-delete approach).
-- **Delete** `SongLibraryRepositoryPostgresImpl.java`. Rename the `song-library.repository-type` value `postgres` → `jpa` throughout `AppConfig.java` and all `application*.yml`/`docs/application-*-mode.yml` files.
+- **Delete** the old single-vendor stub repository implementation file. Rename the `song-library.repository-type` value to `jpa` throughout `AppConfig.java` and all `application*.yml`/`docs/application-*-mode.yml` files.
 - `SongLibraryRepositoryFileSystemImpl.loadAggregateRoot(int)` (currently throws unsupported) gets a real implementation: move the existing "find the one `.oos` file under `basePath`" logic (today living in `SongLibraryServiceImpl.findMostRecentOosFile()`) down into the repository, ignoring the passed int (filesystem mode is always single-location). This is what lets the unified service call `loadAggregateRoot(locationId)` uniformly regardless of repository type.
-- New migrations: `src/main/resources/db/migration/{postgresql,mysql}/V3__init_song_library_schema.sql` (both dialects, following `V2__init_location_schema.sql`'s existing Postgres/MySQL delta pattern).
+- New migration: `src/main/resources/db/migration/mysql/V3__init_song_library_schema.sql`, following `V2__init_location_schema.sql`'s existing pattern.
 
 ### Phase B — `SongLibraryServiceImpl`/`SongLibraryController` unification (Items 2–4, part of 6)
 - `SongLibraryService` interface: every "USER ROLE" method gains `Integer locationId` as the first parameter (the 13 methods Item 4 lists, plus `getSongLibraryRoot(Integer locationId)`). Admin/scan/stats methods (`scanFileSystemForSongs`, `resetSongStatistics`, etc.) stay locationId-less — scanning is inherently local to whichever instance owns the physical files.
@@ -77,8 +77,8 @@ Same mechanical pattern as Phase C, smaller surface (`getNowPlayingSong`, `getPl
 - The master-id-handoff handshake (`StompLocationApiKeyChannelInterceptor`, `LocationEventStompController`, `SlaveConnectionManager`) is already fully built — nothing new needed there.
 
 ## Config changes
-- `AppConfig.java`: rename `songLibraryRepositoryPostgresImpl` bean → `songLibraryRepositoryJpaImpl`, `@ConditionalOnProperty(havingValue="jpa")`, constructed like `userRepositoryJpaImpl`. Drop `@Conditional(NotMasterModeCondition.class)` from the `songQueueService`/`songPlayerService` bean definitions; add master-only no-op stand-in beans (`NoOpBackgroundMusicService` and the player equivalent).
-- `application.yml` / environment-specific yml / `docs/application-*-mode.yml`: `song-library.repository-type: postgres` → `jpa` wherever present.
+- `AppConfig.java`: rename the old single-vendor stub bean → `songLibraryRepositoryJpaImpl`, `@ConditionalOnProperty(havingValue="jpa")`, constructed like `userRepositoryJpaImpl`. Drop `@Conditional(NotMasterModeCondition.class)` from the `songQueueService`/`songPlayerService` bean definitions; add master-only no-op stand-in beans (`NoOpBackgroundMusicService` and the player equivalent).
+- `application.yml` / environment-specific yml / `docs/application-*-mode.yml`: `song-library.repository-type` value renamed to `jpa` wherever present.
 - `LocationConfig.java`: remove the `LocationServiceRegistry` bean method.
 
 ## Risk callouts

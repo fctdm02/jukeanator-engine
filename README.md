@@ -39,7 +39,7 @@ For further reference, please consider the following sections:
 * [Create an OCI image](https://docs.spring.io/spring-boot/4.0.4/maven-plugin/build-image.html)
 * [GraalVM Native Image Support](https://docs.spring.io/spring-boot/4.0.4/reference/packaging/native-image/introducing-graalvm-native-images.html)
 * [Spring Boot Testcontainers support](https://docs.spring.io/spring-boot/4.0.4/reference/testing/testcontainers.html#testing.testcontainers)
-* [Testcontainers Postgres Module Reference Guide](https://java.testcontainers.org/modules/databases/postgres/)
+* [Testcontainers MySQL Module Reference Guide](https://java.testcontainers.org/modules/databases/mysql/)
 * [Spring Web](https://docs.spring.io/spring-boot/4.0.4/reference/web/servlet.html)
 * [HTTP Client](https://docs.spring.io/spring-boot/4.0.4/reference/io/rest-client.html#io.rest-client.restclient)
 * [JDBC API](https://docs.spring.io/spring-boot/4.0.4/reference/data/sql.html)
@@ -121,13 +121,13 @@ This project uses [Testcontainers at development time](https://docs.spring.io/sp
 
 Testcontainers has been configured to use the following Docker images:
 
-* [`postgres:latest`](https://hub.docker.com/_/postgres)
+* [`mysql:latest`](https://hub.docker.com/_/mysql)
 
 Please review the tags of the used images and set them to the same as you're running in production.
 
 #### Docker setup for tests (Windows, Linux, macOS)
 
-`mvn clean package` runs integration tests that use Testcontainers + PostgreSQL. Docker must be installed and the daemon must be reachable.
+`mvn clean package` runs integration tests that use Testcontainers + MySQL -- the same DBMS the hosting provider runs in production. Docker must be installed and the daemon must be reachable.
 
 - **Windows**: install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and ensure it is running.
 - **macOS**: install Docker Desktop, [Colima](https://github.com/abiosoft/colima), or [Rancher Desktop](https://rancherdesktop.io/).
@@ -137,7 +137,7 @@ Quick verification:
 
 ```
 docker version
-docker run --rm postgres:latest --version
+docker run --rm mysql:latest --version
 ```
 
 If you are using Colima on macOS, export Docker host before running Maven:
@@ -151,7 +151,7 @@ Windows PowerShell equivalent:
 
 ```
 docker version
-docker run --rm postgres:latest --version
+docker run --rm mysql:latest --version
 .\mvnw.cmd clean package
 ```
 

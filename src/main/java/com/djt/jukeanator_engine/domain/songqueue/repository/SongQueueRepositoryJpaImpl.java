@@ -19,8 +19,8 @@ import jakarta.persistence.EntityManagerFactory;
 
 /**
  * JPA/Hibernate-backed implementation of {@link SongQueueRepository}. Server/database-type
- * agnostic, exactly like {@code UserRepositoryJpaImpl}: the vendor (Postgres, MySQL, ...) is
- * selected entirely via {@code spring.datasource.url}/{@code driver-class-name}.
+ * agnostic, exactly like {@code UserRepositoryJpaImpl}: the vendor is selected entirely via
+ * {@code spring.datasource.url}/{@code driver-class-name} (MySQL is the only supported vendor).
  *
  * <p>{@link SongQueueRootEntity} is <strong>not</strong> JPA-mapped -- there is no {@code
  * song_queue_root} table. It exists purely as an in-memory aggregate, exactly like {@link
