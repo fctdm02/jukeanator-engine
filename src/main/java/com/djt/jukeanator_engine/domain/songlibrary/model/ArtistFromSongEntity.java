@@ -179,10 +179,4 @@ public final class ArtistFromSongEntity extends ArtistFolderEntity {
     }
     return releaseDate;
   }
-
-  @Override
-  public String getNaturalIdentity() {
-
-    return getName();
-  }
 }

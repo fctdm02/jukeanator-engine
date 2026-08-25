@@ -47,8 +47,8 @@ public abstract class AbstractLibraryEntity extends AbstractPersistentEntity {
     StringBuilder sb = new StringBuilder();
     if (this.parentFolder != null) {
       sb.append(this.parentFolder.getNaturalIdentity());
-    }
-    sb.append(File.separatorChar);
+      sb.append(File.separatorChar);
+    }    
     sb.append(this.name);
     return sb.toString();
   }

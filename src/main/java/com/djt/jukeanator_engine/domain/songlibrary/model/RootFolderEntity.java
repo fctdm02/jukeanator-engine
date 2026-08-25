@@ -215,11 +215,6 @@ public class RootFolderEntity extends FolderEntity {
     throw new IllegalStateException("getParentFolder() cannot be called on the Root");
   }
 
-  @Override
-  public String getNaturalIdentity() {
-    return getName();
-  }
-
   public Collection<GenreFolderEntity> getGenres() {
     return genresMap.values();
   }

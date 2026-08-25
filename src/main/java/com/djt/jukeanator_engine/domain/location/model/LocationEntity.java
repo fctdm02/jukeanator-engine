@@ -52,7 +52,7 @@ public class LocationEntity extends AbstractPersistentEntity {
 
   @Override
   public String getNaturalIdentity() {
-    return String.valueOf(getPersistentIdentity());
+    return name;
   }
 
   public String getName() {
