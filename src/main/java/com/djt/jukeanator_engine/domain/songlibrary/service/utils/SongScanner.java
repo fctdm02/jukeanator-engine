@@ -35,6 +35,12 @@ public final class SongScanner {
   private MusicBrainzClientWrapper musicBrainzClientWrapper;
   private JAudioTaggerClient jAudioTaggerClient;
   private CoverArtDownloader coverArtDownloader;
+  
+  private int folderIndex = 0;
+  private int genreIndex = 0;
+  private int artistIndex = 0;
+  private int albumIndex = 0;
+  private int songIndex = 0;
 
   public SongScanner(DiscogsClientWrapper discogsClientWrapper,
       MusicBrainzClientWrapper musicBrainzClientWrapper, JAudioTaggerClient jAudioTaggerClient,
@@ -64,7 +70,12 @@ public final class SongScanner {
 
   public RootFolderEntity scanFileSystemForSongs(String rootPath) throws IOException {
 
-    // FIX: Clean up invisible whitespace trailing paths to prevent Linux mounting discrepancies
+    folderIndex = 0;
+    genreIndex = 0;
+    artistIndex = 0;
+    albumIndex = 0;
+    songIndex = 0;
+    
     if (rootPath != null) {
       rootPath = rootPath.strip();
     }
@@ -122,12 +133,11 @@ public final class SongScanner {
 
     // See if any album needs to have cover art, record label, release
     // date or explicit lyrics metadata retrieved from Discogs
-    int genreIndex = 0;
-    int artistIndex = 0;
     for (int i = 0; i < albums.size(); i++) {
 
-      AlbumFolderEntity album = albums.get(i);
-      album.setPersistentIdentity(i);
+      albumIndex = i;
+      AlbumFolderEntity album = albums.get(albumIndex);
+      album.setPersistentIdentity(albumIndex);
 
       GenreFolderEntity genre = album.getParentGenre();
       if (genre != null && genre.getPersistentIdentity() == null) {
@@ -149,11 +159,12 @@ public final class SongScanner {
       List<SongFileEntity> songList = album.getChildSongs();
       for (int j = 0; j < songList.size(); j++) {
 
-        SongFileEntity song = songList.get(j);
+        songIndex = j;
+        SongFileEntity song = songList.get(songIndex);
 
         String songPathname = song.getNaturalIdentity();
         String songFilename = song.getName();
-        song.setPersistentIdentity(j);
+        song.setPersistentIdentity(songIndex);
 
         String songArtistName = SongFileEntity.extractArtistName(songFilename);
         if (songArtistName != null && !songArtistName.trim().isBlank()) {
@@ -298,6 +309,7 @@ public final class SongScanner {
             }
 
             FolderEntity childFolder = new FolderEntity(parentFolder, child.getName());
+            childFolder.setPersistentIdentity(folderIndex++);
             parentFolder.addChildFolder(childFolder);
             process(childFolder);
 
@@ -320,7 +332,6 @@ public final class SongScanner {
     }
   }
 
-  // FIX: Using lastIndexOf('.') isolates ".mp3" from multi-dotted names like "Y.M.C.A..mp3"
   private String getFileExtension(File file) {
     if (file == null) {
       return "";
@@ -334,8 +345,6 @@ public final class SongScanner {
     return extension;
   }
 
-  // FIX: Targets actual Unicode system control blocks while preserving international character sets
-  // safely
   private String stripNonPrintableCharacters(String input) {
     if (input == null) {
       return "";

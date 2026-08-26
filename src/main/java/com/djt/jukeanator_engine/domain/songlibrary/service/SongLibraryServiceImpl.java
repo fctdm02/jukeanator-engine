@@ -744,8 +744,10 @@ public class SongLibraryServiceImpl
       initialize();
 
       // Publish the event
-      eventPublisher.publishEvent(
-          new ScanFileSystemForSongsEvent(scanPath, this.ownRoot.getAlbums().size()));
+      eventPublisher.publishEvent(new ScanFileSystemForSongsEvent(
+          scanPath, 
+          this.ownRoot.getAlbums().size(),
+          this.ownRoot.getSongs().size()));
 
       return Integer.valueOf(this.ownRoot.getAlbums().size());
     } catch (SongLibraryServiceException sle) {

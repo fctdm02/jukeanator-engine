@@ -875,7 +875,8 @@ public class SongQueueServiceImpl
         Received ScanFileSystemForSongsEvent:
         scanPath={}
         albumCount={}
-        """, event.scanPath(), event.albumCount());
+        songCount={}
+        """, event.scanPath(), event.albumCount(), event.songCount());
 
     // SongLibraryServiceImpl has already re-initialized RootFolderEntity in response
     // to this same event; grab the new shared instance rather than loading from disk again.
