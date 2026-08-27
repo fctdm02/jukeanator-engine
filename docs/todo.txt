@@ -1,3 +1,246 @@
+TASK NAME
+=========
+Location/SongLibrary object model and JPA mapping refactor
+
+
+OVERVIEW
+========
+1: The key conceptual change here is that when it comes to standalone/slave mode, a song library will always
+   have a "parent" location and a location will always have a "child" song library.
+
+2: For standalone/slave mode, RootFolderEntity and LocationEntity will have a 1-to-1 association via transient attribute linkage:
+   a. LocationService to be injected into SongLibraryService
+   b. SongLibraryService gets default LocationEntity
+   c. SongLibraryService sets location on song library root
+   d. SongLibraryService sets song library on location
+
+2: As is currently implemented, SongLibraryServiceImpl has these two attributes:
+  private RootFolderEntity ownRoot;
+  private Integer ownLocationId;
+
+  that will be changed to:
+  private LocationEntity ownLocation;
+  private RootFolderEntity ownRoot;
+
+  When the application is started for the first time in standalone/slave mode, default LocationEntity
+  and SongLibraryRootEntity instances should be created and associated to one another as parent/child.
+
+3: LocationMetadataFileEntity will go away, as this information will be stored with LocationEntity.
+  
+
+
+
+
+ 
+
+
+X: In Domain Driven Design parlance, the "aggregate root" f
+
+
+FUTURE STATE OBJECT INHERITANCE HIERARCHY
+=========================================
+Object Classes
+
+1:AbstractEntity extends Object
+
+2:AbstractPersistentEntity extends AbstractEntity
+  Integer persistentIdentity
+  Integer version = 1;
+
+3:LocationEntity extends AbstractPersistentEntity
+  private String name;
+  private String locationName = "Rock On Third";
+  private String logoName = "RockOnThirdLogo.jpg";
+  private Double latitude = 42.4883;
+  private Double longitude = -83.143;
+  private boolean isGeoFenced = true;
+  private String apiKeyHash;
+  private LocationStatus status = LocationStatus.PENDING;
+  private Instant lastSeenAt;
+  private Instant libraryLastSyncedAt;
+  private transient RootFolderEntity locationSongLibraryRoot;
+
+4:AbstractLibraryEntity extends AbstractPersistentEntity
+  private FolderEntity parentFolder;
+  private String name;
+ 
+5:FolderEntity extends AbstractLibraryEntity
+  private Set<FolderEntity> childFolders = new TreeSet<FolderEntity>();
+
+6:GenreFolderEntity extends FolderEntity
+
+7:ArtistFolderEntity extends FolderEntity
+
+8:ArtistFromSongEntity extends ArtistFolderEntity
+  private final Set<AlbumFolderEntity> childAlbums = new TreeSet<AlbumFolderEntity>();
+
+9:AlbumFolderEntity extends FolderEntity
+  private AlbumCoverArtFileEntity coverArt;
+  private AlbumMetaDataFileEntity metaData;
+  private Set<SongFileEntity> childSongs = new TreeSet<SongFileEntity>();
+ 
+10:RootFolderEntity extends FolderEntity
+  private transient LocationEntity parentLocation;
+  private Set<ArtistFromSongEntity> artistsFromSongs = new TreeSet<ArtistFromSongEntity>();
+
+11:AbstractFileEntity extends AbstractLibraryEntity
+
+12:AlbumCoverArtFileEntity extends AbstractFileEntity
+
+13:AlbumMetaDataFileEntity extends AbstractFileEntity
+  private String genre = "";
+  private String coverArtUrl = "";
+  private String recordLabel = "";
+  private String releaseDate = "";
+  private boolean hasExplicit = false;
+
+14:SongFileEntity extends AbstractFileEntity
+  private Integer numPlays = Integer.valueOf(0);
+  private String artistName;
+  private String songName;
+  private Integer trackNumber;
+
+
+
+
+FUTURE STATE OBJECT TO RELATIONAL MAPPING STRATEGY
+==================================================
+NOTES: 
+a. The "persistentIdentity" class attribute should always map to an "id" JPA/table column name
+b. For the Song Library inheritance hierarchy, the persistent identity set during the song scan
+   will be unique and should be saved as-is to the song_library table.  That is, there will be no
+   need for this "sourceId" property in SongLibraryFolderJpaEntity and SongLibraryFileJpaEntity
+   (In addition location metadata will no longer exist and cover art/album metadata will not be mapped).
+c. The unique constraint for a table should always match getNaturalIdentity() for class
+d. AlbumMetaDataFileEntity does not need to be mapped to the database, as all the attributes of this
+   class are contained in the ALBUM_METADATA COLUMNS that would be stored directly with the album 
+   row. This class can be re-hyrdated by instantiating the class and setting these properties.
+e. AlbumCoverArtFileEntity does not need to be mapped to the database, as the only meaningful attribute
+   of this class is a hardcoded value for "name", which is always going to be "cover.jpg".  The full path
+   of this cover art image file can be derived by using the full path of the associated album. This
+   class can be re-hydrated by instanting the class and passing in the album as a parent and the constant
+   that is used for "cover.jpg".
+
+
+Table Definitions:
+==================
+1: 
+table name:
+    location
+maps classes: 
+    AbstractEntity, 
+    AbstractPersistentEntity, 
+    LocationEntity
+columms:
+    id                      INT PRIMARY KEY,
+    version                 INT,
+    name                    VARCHAR(255) NOT NULL,
+    latitude                DOUBLE,
+    longitude               DOUBLE,
+    api_key_hash            VARCHAR(255) NOT NULL,
+    status                  VARCHAR(255) NOT NULL,
+    last_seen_at            TIMESTAMP NULL,
+    library_last_synced_at  TIMESTAMP NULL,
+    logo_name               VARCHAR(255),
+    is_geo_fenced           BOOLEAN,
+primary key constraint:
+    id
+foreign key constraints:
+    NONE DEFINED    
+unique constraint:
+    name
+
+
+2: 
+table name:
+    song_library
+maps classes: 
+    AbstractEntity, 
+    AbstractPersistentEntity, 
+    AbstractLibraryEntity, 
+    FolderEntity, 
+    GenreFolderEntity, 
+    ArtistFolderEntity, 
+    ArtistFromSongEntity, 
+    AlbumFolderEntity, 
+    RootFolderEntity,
+    AbstractFileEntity, 
+    SongFileEntity
+columms:
+    -- COMMON COLUMNS
+    id                      INT PRIMARY KEY,
+    version                 INT,
+    name                    VARCHAR(255) NOT NULL,
+    parent_location_id      INT NOT NULL,
+    parent_folder_id        INT NOT NULL,
+
+    -- CLASS DISCRIMINATOR COLUMN 
+    -- COLUMN VALUE -> CONCRETE CLASS
+    -- ===========================================
+    -- ROOT                -> RootFolderEntity
+    -- FOLDER              -> FolderEntity
+    -- GENRE               -> GenreFolderEntity
+    -- ARTIST              -> ArtistFolderEntity
+    -- SONG_ARTIST         -> ArtistFromSongEntity
+    -- ALBUM               -> AlbumFolderEntity
+    -- SONG                -> SongFileEntity
+    class_discriminator    VARCHAR(20) NOT NULL,   
+
+    -- SONG COLUMNS
+    song_artist_name        VARCHAR(500),
+    song_name               VARCHAR(500),
+    song_track_number       INT,
+    song_num_plays          INT,
+
+    -- ALBUM_METADATA COLUMNS
+    album_genre             VARCHAR(255),
+    album_cover_art_url     VARCHAR(1000),
+    album_record_label      VARCHAR(255),
+    album_release_date      VARCHAR(20),
+    album_has_explicit      BOOLEAN
+primary key constraint:
+    id
+foreign key constraints:
+    parent_location_id references location(id)
+    parent_folder_id references song_library_folder(id)
+unique constraint:
+    parent_location_id,parent_folder_id,name
+index:
+    parent_location_id,name
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Describe the needed REST API to support this mobile app, in terms of a Java 21 Spring Boot controller, as well as any DTOs
 
 3 minutes ago
