@@ -19,7 +19,7 @@ app:
   # elsewhere. The song library's own music-folder location is discovered from whatever's
   # already stored here, or (on first run) via the JFC/Swing "scan for songs" prompt.
   # data-dir: ~
-  # data-dir: C:\kiosk\data
+    data-dir: C:\kiosk\data
 
 logging:
   level:
@@ -82,7 +82,7 @@ background-music:
 
 song-player:
   player-type: winamp   # vlc or detached-vlc (all operating systems) | winamp (windows only)
-  winamp-exe-path: C:\\kiosk\\Winamp\\winamp.exe
+  winamp-exe-path: C:\\Program Files (x86)\\Winamp\\winamp.exe
   player-volume: 100 # 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software amplification)
   master-volume: 100
   enable-line-in-on-silence: false # mutually exclusive with enable-background-music
@@ -94,9 +94,9 @@ location:   # repository/service beans exist regardless of app.mode; see Locatio
 
 user-interface:
   always-on-top: false
-  enable-screen-saver: false
+  enable-screen-saver: true
   # HIBERNATE CONFIGURATION  
-  enable-hibernation: false
+  enable-hibernation: true
   hibernate-begin: 3 # In 24 hour/military time (e.g. 3:00 hours is 3:00AM) Only used when enableHibernation is true
   hibernate-end: 9   # In 24 hour/military time  
   # CREDIT CONFIGURATION

@@ -7,8 +7,22 @@ The following was discovered as part of building this project:
 ```
 mvn clean package -DskipTests
 ./mvnw clean package -DskipTests
-java -jar --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 jukeanator-engine-0.0.1-SNAPSHOT.war
+java --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar jukeanator-engine-0.0.1-SNAPSHOT.war
 ```
+
+Note: JVM options (`-D...`, `--enable-native-access=...`, etc.) must come *before* `-jar <file>`; anything after the jar filename is passed to the application instead.
+
+## Externalized config (e.g. kiosk deployments)
+
+By default the app seeds a `config/application.yml` (and sibling `data/`) next to the WAR on first run and reads overrides from there. To point it at a config directory somewhere else instead, pass `--app.config-dir` as a program argument (after the jar filename):
+
+```
+java --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar jukeanator-engine-0.0.1-SNAPSHOT.war --app.config-dir=C:\kiosk\config
+```
+
+Note the argument order: JVM options (`-D...`, `--enable-native-access=...`, etc.) come *before* `-jar <file>`; everything after the jar filename is passed to the application instead -- putting `--app.config-dir` before `-jar` makes the JVM launcher itself reject it as an unrecognized option.
+
+On first run this seeds `C:\kiosk\config\application.yml` (with `app.data-dir` pre-wired to a sibling `C:\kiosk\data`) if it doesn't already exist, then loads overrides from it -- same seeding behavior as the WAR-relative default, just rooted at the given directory instead.
 
 # How to start Docker
 ```

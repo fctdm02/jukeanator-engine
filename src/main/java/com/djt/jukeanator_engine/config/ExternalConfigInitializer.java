@@ -25,6 +25,12 @@ import org.springframework.core.io.ClassPathResource;
  * or pre-existing) so the caller can point Spring's config loader at it explicitly -- Spring's own
  * default {@code ./config/} lookup is relative to the process's working directory, which won't
  * match this WAR-relative directory unless the app happens to be launched from inside it.
+ *
+ * <p>
+ * A caller (e.g. a kiosk deployment launched with {@code --app.config-dir=C:\kiosk\config}) can
+ * override the WAR-relative default entirely via {@link #seedExternalConfigIfAbsent(Class, Path)}
+ * -- the seeded {@code data/} directory then sits alongside the given config directory rather than
+ * alongside the WAR.
  */
 public final class ExternalConfigInitializer {
 
@@ -42,10 +48,26 @@ public final class ExternalConfigInitializer {
   }
 
   public static Path seedExternalConfigIfAbsent(Class<?> applicationClass) {
+    return seedExternalConfigIfAbsent(applicationClass, null);
+  }
 
-    Path warDir = new ApplicationHome(applicationClass).getDir().toPath();
-    Path configDir = warDir.resolve(CONFIG_DIR_NAME);
-    Path dataDir = warDir.resolve(DATA_DIR_NAME);
+  /**
+   * @param configDirOverride explicit config directory to use instead of the WAR-relative default
+   *        (e.g. from a {@code --app.config-dir} program argument), or {@code null} to fall back
+   *        to the default {@code <war-dir>/config}
+   */
+  public static Path seedExternalConfigIfAbsent(Class<?> applicationClass, Path configDirOverride) {
+
+    Path configDir;
+    Path dataDir;
+    if (configDirOverride != null) {
+      configDir = configDirOverride;
+      dataDir = configDir.resolveSibling(DATA_DIR_NAME);
+    } else {
+      Path warDir = new ApplicationHome(applicationClass).getDir().toPath();
+      configDir = warDir.resolve(CONFIG_DIR_NAME);
+      dataDir = warDir.resolve(DATA_DIR_NAME);
+    }
     Path configFile = configDir.resolve(CONFIG_FILE_NAME);
 
     if (Files.exists(configFile)) {

@@ -107,7 +107,17 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
       loaded.initialize();
       return loaded;
 
-    } catch (ClassNotFoundException | IOException e) {
+      // RuntimeException (not just ClassNotFoundException/IOException) is caught here too: a .oos
+      // file written before a RootFolderEntity/FolderEntity shape change can still deserialize
+      // successfully -- Java serialization tolerates field additions/removals as long as
+      // serialVersionUID matches -- but leave a new/changed field at its default (null) value,
+      // which then NPEs deep inside initialize() while walking the object graph. Without this,
+      // that NPE would propagate all the way up through Spring bean creation and crash startup
+      // instead of falling back to the empty-placeholder-root/prompt-for-scan flow this exception
+      // type triggers in SongLibraryServiceImpl.initialize().
+    } catch (ClassNotFoundException | IOException | RuntimeException e) {
+      log.warn("Could not load song library from {} (locationName: {}) -- treating as absent so "
+          + "the user is prompted to re-scan.", filePath, locationName, e);
       throw new EntityDoesNotExistException("Could not read song library from disk with locationName: "
           + locationName
           + " and filePath: "
