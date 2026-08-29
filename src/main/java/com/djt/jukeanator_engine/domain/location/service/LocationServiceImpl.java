@@ -23,6 +23,7 @@ import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
+import com.djt.jukeanator_engine.domain.location.dto.UpdateLocationInfoRequest;
 import com.djt.jukeanator_engine.domain.location.event.LocationLibrarySyncedEvent;
 import com.djt.jukeanator_engine.domain.location.event.LocationRegisteredEvent;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
@@ -34,7 +35,6 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.LocationMetaDataFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
@@ -224,17 +224,17 @@ public class LocationServiceImpl implements LocationService {
    * browsed. Mirrors the field mapping the deleted {@code SongLibraryServiceLocationProxy} used to
    * do at read time, just performed once at sync time instead of on every request.
    *
-   * <p>Every {@link AlbumMetaDataFileEntity}/{@link LocationMetaDataFileEntity} built here is
-   * marked loaded via its setter rather than through {@code writeMetadataToFileSystem()} -- see
-   * {@code SongLibraryRepositoryJpaImpl}'s class javadoc for why a synthetically-built root must
-   * never trigger real disk I/O.
+   * <p>Every {@link AlbumMetaDataFileEntity} built here is marked loaded via its setter rather
+   * than through {@code writeMetadataToFileSystem()} -- see {@code SongLibraryRepositoryJpaImpl}'s
+   * class javadoc for why a synthetically-built root must never trigger real disk I/O.
    */
   private void persistSnapshotToJpa(Integer locationId, LibrarySnapshotDto snapshot) {
 
     RootFolderEntity root = new RootFolderEntity("synced-location-" + locationId);
-    LocationMetaDataFileEntity metadata = root.getMetadata();
-    metadata.setLocationId(locationId);
-    metadata.setLoaded(true);
+    root.setParentLocation(this.locationRoot.getLocationByIdNullIfNotExists(locationId));
+    // Mirrors SongScanner's own convention: id is unique per (single-scan) location, and root is
+    // always the first id a real scan assigns -- see SongScanner.scanFileSystemForSongs().
+    root.setId(1);
 
     Map<Integer, GenreFolderEntity> genresBySourceId = new HashMap<>();
     Map<String, ArtistFolderEntity> artistsByGenreAndName = new HashMap<>();
@@ -246,6 +246,10 @@ public class LocationServiceImpl implements LocationService {
             id -> {
               GenreFolderEntity g = new GenreFolderEntity(root,
                   albumDto.genreName() != null ? albumDto.genreName() : "Unknown");
+              // The slave's own sourceGenreId -- thanks to SongScanner's single shared per-scan
+              // counter, this lives in the same non-colliding id space as sourceArtistId/
+              // sourceAlbumId/sourceSongId below, so no separate id-minting is needed here.
+              g.setId(albumDto.sourceGenreId());
               try {
                 root.addChildFolder(g);
               } catch (EntityAlreadyExistsException e) {
@@ -259,6 +263,7 @@ public class LocationServiceImpl implements LocationService {
         ArtistFolderEntity artist = artistsByGenreAndName.computeIfAbsent(artistKey, key -> {
           ArtistFolderEntity a = new ArtistFolderEntity(genre,
               albumDto.artistName() != null ? albumDto.artistName() : "Unknown");
+          a.setId(albumDto.sourceArtistId());
           try {
             genre.addChildFolder(a);
           } catch (EntityAlreadyExistsException e) {
@@ -269,7 +274,7 @@ public class LocationServiceImpl implements LocationService {
         });
 
         AlbumFolderEntity album = new AlbumFolderEntity(artist, albumDto.name());
-        album.setPersistentIdentity(albumDto.sourceAlbumId());
+        album.setId(albumDto.sourceAlbumId());
         artist.addChildFolder(album);
 
         album.createCoverArtEntity();
@@ -283,7 +288,7 @@ public class LocationServiceImpl implements LocationService {
 
         for (var songDto : albumDto.songs()) {
           SongFileEntity song = new SongFileEntity(album, songDto.title());
-          song.setPersistentIdentity(songDto.sourceSongId());
+          song.setId(songDto.sourceSongId());
           song.setArtistName(albumDto.artistName());
           song.setSongName(songDto.title());
           song.setTrackNumber(songDto.trackNumber());
@@ -340,6 +345,75 @@ public class LocationServiceImpl implements LocationService {
     Path coverArtFile = locationStorageRoot(locationId).resolve("cover-art")
         .resolve(sourceAlbumId + ".jpg");
     return Files.exists(coverArtFile) ? coverArtFile : null;
+  }
+
+  @Override
+  public LocationEntity getOrCreateOwnLocation(Integer preferredPersistentIdentity) {
+
+    if (!this.locationRoot.getLocations().isEmpty()) {
+      return this.locationRoot.getLocations().iterator().next();
+    }
+
+    Integer persistentIdentity = preferredPersistentIdentity;
+    if (persistentIdentity == null) {
+      persistentIdentity = this.locationRepository.nextPersistentIdentity();
+      if (persistentIdentity == null) {
+        persistentIdentity = Integer.valueOf(this.locationRoot.getLocations().size() + 1);
+      }
+    }
+
+    LocationEntity location = new LocationEntity();
+    location.setPersistentIdentity(persistentIdentity);
+    // Nothing ever authenticates into a standalone/slave instance's own local LocationRepository
+    // (that check only happens on master, against master's own copy) -- this hash is a throwaway,
+    // distinct from app.location-api-key, which is the real secret used for outbound auth to master.
+    location.setApiKeyHash(passwordEncoder.encode(generateApiKey()));
+
+    this.locationRoot.addLocation(location);
+    this.locationRepository.storeAggregateRoot(this.locationRoot);
+
+    return location;
+  }
+
+  @Override
+  public void reconcileOwnLocationId(Integer confirmedLocationId) {
+
+    requireNonNull(confirmedLocationId, "confirmedLocationId cannot be null");
+
+    if (this.locationRoot.getLocations().isEmpty()) {
+      return;
+    }
+
+    LocationEntity location = this.locationRoot.getLocations().iterator().next();
+    Integer currentLocationId = location.getPersistentIdentity();
+    if (confirmedLocationId.equals(currentLocationId)) {
+      return;
+    }
+
+    // persistentIdentity is this entity's actual DB/JSON key, so re-keying it also requires
+    // re-keying LocationRootEntity's own id-keyed map -- storeAggregateRoot's delete/merge diff
+    // then correctly deletes the old row and inserts the new one on the next call below.
+    this.locationRoot.removeLocation(currentLocationId);
+    location.setPersistentIdentity(confirmedLocationId);
+    this.locationRoot.addLocation(location);
+    this.locationRepository.storeAggregateRoot(this.locationRoot);
+  }
+
+  @Override
+  public LocationEntity updateOwnLocationInfo(UpdateLocationInfoRequest request) {
+
+    requireNonNull(request, "request cannot be null");
+
+    LocationEntity location = getOrCreateOwnLocation(null);
+    location.setName(request.name());
+    location.setLatitude(request.latitude());
+    location.setLongitude(request.longitude());
+    location.setLogoName(request.logoName());
+    location.setGeoFenced(request.isGeoFenced());
+
+    this.locationRepository.storeAggregateRoot(this.locationRoot);
+
+    return location;
   }
 
   private void requireValidLocation(Integer locationId, String apiKey) {

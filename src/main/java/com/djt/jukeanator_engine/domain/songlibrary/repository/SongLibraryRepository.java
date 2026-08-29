@@ -10,7 +10,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 public interface SongLibraryRepository extends AggregateRootRepository<RootFolderEntity> {
 
   // The persisted filename is derived from the location's live display name (see
-  // LocationMetaDataFileEntity), sanitized and suffixed with this extension -- not fixed.
+  // RootFolderEntity#getLocationName), sanitized and suffixed with this extension -- not fixed.
   // SongLibraryRepositoryFileSystemImpl reconciles this at load time: if the expected-named file
   // isn't found, it looks for whatever other .oos file exists under basePath and renames it to
   // match, rather than silently starting a second file. See docs/multi-tenant-mode.md, Item 2,

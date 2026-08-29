@@ -6,6 +6,7 @@ The following was discovered as part of building this project:
 # Building/Running the Application
 ```
 mvn clean package -DskipTests
+./mvnw clean package -DskipTests
 java -jar --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 jukeanator-engine-0.0.1-SNAPSHOT.war
 ```
 
@@ -27,6 +28,15 @@ GRANT ALL PRIVILEGES ON jukeanator.* TO 'jukeanator'@'%';
 GRANT ALL PRIVILEGES ON jukeanator.* TO 'jukeanator'@'localhost';
 
 FLUSH PRIVILEGES;
+```
+
+# Live Integration Tests
+Use the following:
+
+```
+sudo mysql -e "CREATE DATABASE IF NOT EXISTS jukeanator_test; 
+GRANT ALL PRIVILEGES ON jukeanator_test.* TO 'jukeanator'@'localhost'; 
+FLUSH PRIVILEGES;"
 ```
 
 # Getting Started

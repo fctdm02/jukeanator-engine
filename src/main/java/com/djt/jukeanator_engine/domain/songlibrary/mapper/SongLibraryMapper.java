@@ -22,7 +22,7 @@ public final class SongLibraryMapper {
   public static GenreDto toGenreDto(GenreFolderEntity genreEntity, List<Integer> albumIds,
       Integer numPlays) {
 
-    return new GenreDto(genreEntity.getPersistentIdentity(), genreEntity.getName(), albumIds,
+    return new GenreDto(genreEntity.getId(), genreEntity.getName(), albumIds,
         numPlays);
   }
 
@@ -44,7 +44,7 @@ public final class SongLibraryMapper {
             .reversed())
         .toList();
 
-    return new ArtistDto(artistEntity.getPersistentIdentity(), artistEntity.getName(),
+    return new ArtistDto(artistEntity.getId(), artistEntity.getName(),
         artistEntity.getCoverArtPath(), artistEntity.getAlbumCount(), artistEntity.getSongCount(),
         artistEntity.getNumPlays(), SongLibraryMapper.toAlbumDtoList(artistEntity, albums));
   }
@@ -80,9 +80,9 @@ public final class SongLibraryMapper {
 
   public static AlbumDto toAlbumDto(ArtistFolderEntity artist, AlbumFolderEntity albumEntity) {
 
-    return new AlbumDto(albumEntity.getParentGenre().getPersistentIdentity(),
-        albumEntity.getParentGenre().getName(), artist.getPersistentIdentity(), artist.getName(),
-        albumEntity.getPersistentIdentity(), albumEntity.getName(), albumEntity.hasExplicit(),
+    return new AlbumDto(albumEntity.getParentGenre().getId(),
+        albumEntity.getParentGenre().getName(), artist.getId(), artist.getName(),
+        albumEntity.getId(), albumEntity.getName(), albumEntity.hasExplicit(),
         albumEntity.getRecordLabel(), albumEntity.getReleaseDate().toString(),
         albumEntity.getCoverArtPath(), albumEntity.isCompilation(),
         SongLibraryMapper.toSongDtoList(artist, albumEntity, albumEntity.getChildSongs()));
@@ -126,10 +126,10 @@ public final class SongLibraryMapper {
     // RootFolderEntity.initialize() builds artistsMap keyed by name, adding ArtistFromSongEntity
     // instances first. When a regular ArtistFolderEntity shares a name with an ArtistFromSongEntity
     // (which happens whenever artist names appear in song filenames), the two have different
-    // persistentIdentity values and the ArtistFolderEntity ends up absent from artistsMap. Using
+    // id values and the ArtistFolderEntity ends up absent from artistsMap. Using
     // the ArtistFromSongEntity's ID here keeps the artistId in the DTO consistent with what
     // getArtistById can actually resolve.
-    Integer artistId = artist.getPersistentIdentity();
+    Integer artistId = artist.getId();
     // Use the song's embedded artist name for lookup if present; otherwise fall back to the folder
     // artist's name. This ensures we get the ID that artistsMap actually holds — which may be the
     // ArtistFromSongEntity's ID rather than the ArtistFolderEntity's ID when both share a name.
@@ -138,13 +138,13 @@ public final class SongLibraryMapper {
     ArtistFromSongEntity artistFromSong =
         album.getRootFolder().getArtistFromSong(lookupName);
     if (artistFromSong != null) {
-      artistId = artistFromSong.getPersistentIdentity();
+      artistId = artistFromSong.getId();
     }
 
-    return new SongDto(album.getParentGenre().getPersistentIdentity(),
+    return new SongDto(album.getParentGenre().getId(),
         album.getParentGenre().getName(), artistId,
-        songEntity.getArtistName(), album.getPersistentIdentity(), album.getName(),
-        album.getCoverArtPath(), songEntity.getPersistentIdentity(), songEntity.getSongName(),
+        songEntity.getArtistName(), album.getId(), album.getName(),
+        album.getCoverArtPath(), songEntity.getId(), songEntity.getSongName(),
         songEntity.getTrackNumber(), songEntity.getNumPlays());
   }
 }

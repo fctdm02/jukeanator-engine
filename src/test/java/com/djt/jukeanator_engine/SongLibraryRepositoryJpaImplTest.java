@@ -2,26 +2,20 @@ package com.djt.jukeanator_engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import javax.sql.DataSource;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.testcontainers.DockerClientFactory;
 import jakarta.persistence.EntityManagerFactory;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
@@ -37,42 +31,42 @@ import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryReposi
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryJpaImpl;
 
 /**
- * Integration tests for {@link SongLibraryRepositoryJpaImpl}, run against a real MySQL
- * Testcontainer (see {@link MySqlTestcontainersConfiguration}), the same combination already
- * proven out by {@link MySqlMasterModeJukeanatorEngineApplicationTests}.
+ * Integration tests for {@link SongLibraryRepositoryJpaImpl}, run against a live local MySQL
+ * instance (see {@code application.yml}'s {@code spring.datasource.*} defaults), the same
+ * combination already proven out by {@link MySqlMasterModeJukeanatorEngineApplicationTests}.
  *
  * <p>{@code app.repository-type=jpa} is set so the JPA datasource/Hibernate/Flyway stack actually
  * comes up (see {@code JpaDataSourceAutoConfigurationImport}). It's also put to direct use here:
- * {@code song_library_folders.location_id} and {@code song_library_files.location_id} are both
- * {@code NOT NULL} foreign keys into {@code locations} (see {@code
- * db/migration/mysql/V3__init_song_library_schema.sql}), so every fixture root below is built
- * under a real, freshly registered {@link LocationRepository} row rather than an arbitrary int.
+ * {@code song_library.parent_location_id} is a {@code NOT NULL} foreign key into {@code location}
+ * (see {@code db/migration/mysql/V8__consolidate_song_library_folders_and_files.sql}), so every
+ * fixture root below is built under a real, freshly registered {@link LocationRepository} row
+ * rather than an arbitrary int.
  *
  * <p>This class lives in the root package (alongside {@link MySqlTestcontainersConfiguration}
  * and its siblings) rather than under {@code domain.songlibrary.repository}, because that
  * Testcontainers config is package-private.
  *
+ * <p>Requires a real MySQL server with a {@code jukeanator_test} database the {@code jukeanator}
+ * user can access -- see {@code src/test/resources/application-mysql.yml}. Deliberately a
+ * separate database from {@code application.yml}'s own {@code jukeanator}, which is reserved for
+ * manual QA against a master instance running locally. No Docker/Testcontainers dependency.
+ *
  * @author tmyers
  */
-@Import(MySqlTestcontainersConfiguration.class)
 @SpringBootTest
 @ActiveProfiles({ "test", "mysql" })
 @TestPropertySource(properties = { "app.repository-type=jpa" })
 class SongLibraryRepositoryJpaImplTest {
 
-  private static final Integer GENRE_ID = 1;
+  // GENRE_ID starts at 2, not 1 -- id 1 is reserved for the root itself (see buildTwoAlbumRoot's
+  // root.setId(1)), matching SongScanner's own "root is always the first id" convention.
+  private static final Integer GENRE_ID = 2;
   private static final Integer ARTIST_ID = 101;
   private static final Integer ALBUM_ONE_ID = 501;
   private static final Integer ALBUM_TWO_ID = 502;
   private static final Integer SONG_A_ID = 9001; // under album one
   private static final Integer SONG_B_ID = 9002; // under album one
   private static final Integer SONG_C_ID = 9003; // under album two
-
-  @BeforeAll
-  static void requiresDocker() {
-    Assumptions.assumeTrue(DockerClientFactory.instance().isDockerAvailable(),
-        "Docker is required to run this test");
-  }
 
   @Autowired
   private SongLibraryRepository songLibraryRepository;
@@ -92,15 +86,15 @@ class SongLibraryRepositoryJpaImplTest {
   // ── updateNumPlaysForSong ────────────────────────────────────────────────
 
   @Test
-  void updateNumPlaysForSong_updatesOnlyTheTargetSongRow_leavingEverySurrogateKeyUntouched()
+  void updateNumPlaysForSong_updatesOnlyTheTargetSongRow_leavingEveryOtherRowsIdUntouched()
       throws Exception {
 
     Integer locationId = registerLocation("Rock On Third");
     RootFolderEntity root = buildTwoAlbumRoot(locationId);
     songLibraryRepository.storeAggregateRoot(root);
 
-    Set<Integer> folderIdsBefore = folderPersistentIdentities(locationId);
-    Set<Integer> fileIdsBefore = filePersistentIdentities(locationId);
+    Set<Integer> folderIdsBefore = folderIds(locationId);
+    Set<Integer> songRowIdsBefore = songRowIds(locationId);
 
     Integer result =
         songLibraryRepository.updateNumPlaysForSong(root, locationId, ALBUM_ONE_ID, SONG_A_ID, 42);
@@ -112,13 +106,13 @@ class SongLibraryRepositoryJpaImplTest {
     assertEquals(Integer.valueOf(1), numPlaysOf(locationId, SONG_C_ID),
         "Song in a different album should be untouched");
 
-    // The whole point of a targeted UPDATE over storeAggregateRoot's delete+reinsert is that no
-    // row's surrogate key churns: every persistent_identity present before must still be present,
-    // completely unchanged, after.
-    assertEquals(folderIdsBefore, folderPersistentIdentities(locationId),
-        "Folder rows' surrogate keys should be completely unaffected by a song numPlays update");
-    assertEquals(fileIdsBefore, filePersistentIdentities(locationId),
-        "File rows' surrogate keys should be completely unaffected by a song numPlays update");
+    // id is application-assigned (SongScanner), not Hibernate-generated, so it never churns
+    // regardless of write path -- this just confirms the targeted UPDATE only touches the one
+    // song row's num_plays column, not its id or any other row.
+    assertEquals(folderIdsBefore, folderIds(locationId),
+        "Folder rows' ids should be completely unaffected by a song numPlays update");
+    assertEquals(songRowIdsBefore, songRowIds(locationId),
+        "Song rows' ids should be completely unaffected by a song numPlays update");
   }
 
   @Test
@@ -198,42 +192,37 @@ class SongLibraryRepositoryJpaImplTest {
     freshRepository.storeSongLibraryAsync();
   }
 
-  // ── validating the targeted-UPDATE strategy against a whole-root store ─────────────────────
+  // ── id stability across write paths ─────────────────────────────────────
 
   @Test
-  void storeAggregateRoot_churnsEverySurrogateKey_unlikeTargetedUpdateNumPlaysForSong()
+  void storeAggregateRoot_preservesEveryIdOnReStore_sinceIdIsApplicationAssignedNotGenerated()
       throws Exception {
 
-    Integer locationId = registerLocation("Churn Comparison Loc");
+    Integer locationId = registerLocation("Re-store Id Stability Loc");
     RootFolderEntity root = buildTwoAlbumRoot(locationId);
     songLibraryRepository.storeAggregateRoot(root);
 
-    Set<Integer> folderIdsAfterFirstStore = folderPersistentIdentities(locationId);
-    Set<Integer> fileIdsAfterFirstStore = filePersistentIdentities(locationId);
+    Set<Integer> folderIdsAfterFirstStore = folderIds(locationId);
+    Set<Integer> songRowIdsAfterFirstStore = songRowIds(locationId);
 
-    // This is what the old code path did for every single numPlays bump: delete every row for the
-    // location and reinsert the whole tree. Simulate that here to make the contrast concrete.
+    // Unlike the old split-table schema (id an auto-generated GenerationType.SEQUENCE surrogate,
+    // distinct from the domain object's own scan-local sourceId), id is now assigned once by
+    // SongScanner and carried directly on the domain objects -- a full delete+reinsert of the
+    // exact same tree re-persists the exact same ids, not fresh ones.
     songLibraryRepository.storeAggregateRoot(root);
 
-    Set<Integer> folderIdsAfterSecondStore = folderPersistentIdentities(locationId);
-    Set<Integer> fileIdsAfterSecondStore = filePersistentIdentities(locationId);
+    assertEquals(folderIdsAfterFirstStore, folderIds(locationId),
+        "id is application-assigned now, not Hibernate-generated -- a full re-store must not "
+            + "change any folder row's id");
+    assertEquals(songRowIdsAfterFirstStore, songRowIds(locationId),
+        "id is application-assigned now, not Hibernate-generated -- a full re-store must not "
+            + "change any song row's id");
 
-    assertEquals(folderIdsAfterFirstStore.size(), folderIdsAfterSecondStore.size());
-    assertEquals(fileIdsAfterFirstStore.size(), fileIdsAfterSecondStore.size());
-    assertTrue(Collections.disjoint(folderIdsAfterFirstStore, folderIdsAfterSecondStore),
-        "storeAggregateRoot deletes and reinserts every folder row, so every surrogate key "
-            + "should be brand new -- churn a full re-store would inflict for a single song's "
-            + "numPlays bump");
-    assertTrue(Collections.disjoint(fileIdsAfterFirstStore, fileIdsAfterSecondStore),
-        "storeAggregateRoot deletes and reinserts every file row, so every surrogate key should "
-            + "be brand new -- churn a full re-store would inflict for a single song's numPlays "
-            + "bump");
-
-    // Contrast: a numPlays bump via the targeted UPDATE leaves every key exactly as it was.
-    Set<Integer> fileIdsBeforeTargetedUpdate = filePersistentIdentities(locationId);
+    // updateNumPlaysForSong remains preferable to a full re-store -- not for id stability (both
+    // now preserve ids identically) but because it's a single targeted UPDATE rather than
+    // deleting and reinserting the entire tree on every song play.
     songLibraryRepository.updateNumPlaysForSong(root, locationId, ALBUM_ONE_ID, SONG_A_ID, 100);
-    assertEquals(fileIdsBeforeTargetedUpdate, filePersistentIdentities(locationId),
-        "Unlike storeAggregateRoot, updateNumPlaysForSong must not reassign any surrogate key");
+    assertEquals(songRowIdsAfterFirstStore, songRowIds(locationId));
   }
 
   // ── fixtures ─────────────────────────────────────────────────────────────
@@ -242,8 +231,13 @@ class SongLibraryRepositoryJpaImplTest {
 
     LocationRootEntity locationRoot = locationRepository.loadAggregateRoot(0);
     Integer locationId = locationRepository.nextPersistentIdentity();
-    locationRoot.addLocation(
-        new LocationEntity(locationId, name, null, null, "test-api-key-hash-" + locationId));
+    // Suffixed with the (guaranteed-unique) locationId: against a live, persistent MySQL instance
+    // (unlike an ephemeral Testcontainer, this database survives across separate test classes and
+    // runs), a plain fixture name can collide with either another test class's own fixture (see
+    // SongQueueRepositoryJpaImplTest's identical "Tenant A"/"Tenant B" names) or with the default
+    // location SongLibraryServiceImpl's own bootstrap creates automatically on every context load.
+    locationRoot.addLocation(new LocationEntity(locationId, name + " " + locationId, null, null,
+        "test-api-key-hash-" + locationId));
     locationRepository.storeAggregateRoot(locationRoot);
     return locationId;
   }
@@ -252,29 +246,31 @@ class SongLibraryRepositoryJpaImplTest {
       throws EntityAlreadyExistsException {
 
     RootFolderEntity root = new RootFolderEntity("/fixture/" + locationId);
-    root.getMetadata().setLocationId(locationId);
-    root.getMetadata().setLocationName("Location " + locationId);
-    // Avoids a real filesystem read/write against a rootPath that doesn't exist on this machine --
-    // see SongLibraryRepositoryJpaImpl's class javadoc "Caller contract for a synthetically-built
-    // root".
-    root.getMetadata().setLoaded(true);
+    root.setId(1);
+    try {
+      LocationRootEntity locationRoot = locationRepository.loadAggregateRoot(0);
+      root.setParentLocation(locationRoot.getLocationByIdNullIfNotExists(locationId));
+    } catch (EntityDoesNotExistException ednee) {
+      throw new IllegalStateException("registerLocation() must be called before buildTwoAlbumRoot()",
+          ednee);
+    }
 
     GenreFolderEntity genre = new GenreFolderEntity(root, "Rock");
-    genre.setPersistentIdentity(GENRE_ID);
+    genre.setId(GENRE_ID);
     root.addChildFolder(genre);
 
     ArtistFolderEntity artist = new ArtistFolderEntity(genre, "Artist One");
-    artist.setPersistentIdentity(ARTIST_ID);
+    artist.setId(ARTIST_ID);
     genre.addChildFolder(artist);
 
     AlbumFolderEntity albumOne = new AlbumFolderEntity(artist, "Album One");
-    albumOne.setPersistentIdentity(ALBUM_ONE_ID);
+    albumOne.setId(ALBUM_ONE_ID);
     artist.addChildFolder(albumOne);
     albumOne.addChildSong(newSong(albumOne, "01 - Song A.mp3", SONG_A_ID, 1, 3));
     albumOne.addChildSong(newSong(albumOne, "02 - Song B.mp3", SONG_B_ID, 2, 5));
 
     AlbumFolderEntity albumTwo = new AlbumFolderEntity(artist, "Album Two");
-    albumTwo.setPersistentIdentity(ALBUM_TWO_ID);
+    albumTwo.setId(ALBUM_TWO_ID);
     artist.addChildFolder(albumTwo);
     albumTwo.addChildSong(newSong(albumTwo, "01 - Song C.mp3", SONG_C_ID, 1, 1));
 
@@ -286,7 +282,7 @@ class SongLibraryRepositoryJpaImplTest {
       int trackNumber, int numPlays) {
 
     SongFileEntity song = new SongFileEntity(album, filename);
-    song.setPersistentIdentity(songId);
+    song.setId(songId);
     song.setArtistName("Artist One");
     song.setSongName(filename);
     song.setTrackNumber(trackNumber);
@@ -297,20 +293,21 @@ class SongLibraryRepositoryJpaImplTest {
   // ── raw-JDBC row introspection -- bypasses the repository's own EntityManager/1st-level cache,
   // so it reflects exactly what's on disk ────────────────────────────────────────────────────
 
-  private Set<Integer> folderPersistentIdentities(Integer locationId) throws SQLException {
-    return persistentIdentities("song_library_folders", locationId);
+  private Set<Integer> folderIds(Integer locationId) throws SQLException {
+    return songLibraryIds(locationId, "class_discriminator <> 'SONG'");
   }
 
-  private Set<Integer> filePersistentIdentities(Integer locationId) throws SQLException {
-    return persistentIdentities("song_library_files", locationId);
+  private Set<Integer> songRowIds(Integer locationId) throws SQLException {
+    return songLibraryIds(locationId, "class_discriminator = 'SONG'");
   }
 
-  private Set<Integer> persistentIdentities(String table, Integer locationId) throws SQLException {
+  private Set<Integer> songLibraryIds(Integer locationId, String discriminatorFilter)
+      throws SQLException {
 
     Set<Integer> ids = new HashSet<>();
     try (Connection connection = dataSource.getConnection();
-        PreparedStatement statement = connection
-            .prepareStatement("select persistent_identity from " + table + " where location_id = ?")) {
+        PreparedStatement statement = connection.prepareStatement(
+            "select id from song_library where parent_location_id = ? and " + discriminatorFilter)) {
 
       statement.setInt(1, locationId);
       try (ResultSet resultSet = statement.executeQuery()) {
@@ -322,15 +319,15 @@ class SongLibraryRepositoryJpaImplTest {
     return ids;
   }
 
-  private Integer numPlaysOf(Integer locationId, Integer songSourceId) throws SQLException {
+  private Integer numPlaysOf(Integer locationId, Integer songId) throws SQLException {
 
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(
-            "select num_plays from song_library_files where location_id = ? "
-                + "and file_type = 'SONG' and source_id = ?")) {
+            "select song_num_plays from song_library where parent_location_id = ? "
+                + "and class_discriminator = 'SONG' and id = ?")) {
 
       statement.setInt(1, locationId);
-      statement.setInt(2, songSourceId);
+      statement.setInt(2, songId);
       try (ResultSet resultSet = statement.executeQuery()) {
         resultSet.next();
         int value = resultSet.getInt(1);

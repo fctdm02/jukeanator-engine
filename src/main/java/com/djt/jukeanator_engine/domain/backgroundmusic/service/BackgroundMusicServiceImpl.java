@@ -667,7 +667,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       }
 
       String artistName = coreSong.getArtistName();
-      Integer albumId = coreSong.getAlbum().getPersistentIdentity();
+      Integer albumId = coreSong.getAlbum().getId();
       String coreSongPath = coreSong.getNaturalIdentity();
 
       // Determine how many same-artist/album vs genre slots this factor calls for.
@@ -701,7 +701,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
           boolean sameArtist = artistName.equalsIgnoreCase(s.getArtistName());
           boolean sameAlbum = albumId.equals(s.getAlbumId());
           // Exclude the core song itself; prefer same album, fall back to same artist.
-          boolean isCoreSong = coreSong.getPersistentIdentity().equals(s.getSongId())
+          boolean isCoreSong = coreSong.getId().equals(s.getSongId())
               && albumId.equals(s.getAlbumId());
           if (!isCoreSong && (sameArtist || sameAlbum) && isEligibleByPlayCount(s)) {
             sameArtistSongs.add(s);

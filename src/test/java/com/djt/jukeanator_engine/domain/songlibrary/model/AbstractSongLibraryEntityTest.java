@@ -123,7 +123,7 @@ public abstract class AbstractSongLibraryEntityTest {
     song.setArtistName(artistName);
     song.setSongName(songName);
     song.setTrackNumber(trackNumber);
-    song.setPersistentIdentity(songId);
+    song.setId(songId);
     album.addChildSong(song);
     return song;
   }
@@ -135,16 +135,16 @@ public abstract class AbstractSongLibraryEntityTest {
 
     for (int i = 0; i < albums.size(); i++) {
       AlbumFolderEntity album = albums.get(i);
-      album.setPersistentIdentity(i);
+      album.setId(i);
 
       GenreFolderEntity genre = album.getParentGenre();
-      if (genre != null && genre.getPersistentIdentity() == null) {
-        genre.setPersistentIdentity(genreIndex++);
+      if (genre != null && genre.getId() == null) {
+        genre.setId(genreIndex++);
       }
 
       ArtistFolderEntity artist = album.getParentArtist();
-      if (artist != null && artist.getPersistentIdentity() == null) {
-        artist.setPersistentIdentity(artistIndex++);
+      if (artist != null && artist.getId() == null) {
+        artist.setId(artistIndex++);
       }
     }
   }

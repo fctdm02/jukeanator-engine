@@ -35,7 +35,6 @@ public abstract class AbstractPersistentEntity extends AbstractEntity {
   @SequenceGenerator(name = PERSISTENT_IDENTITY_SEQUENCE,
       sequenceName = PERSISTENT_IDENTITY_SEQUENCE, allocationSize = 1)
   private Integer persistentIdentity;
-  private Integer version = 1;
 
   public AbstractPersistentEntity() {}
 
@@ -51,15 +50,6 @@ public abstract class AbstractPersistentEntity extends AbstractEntity {
   // Used by the JDBC implementations to know when to INSERT vs UPDATE
   public void setPersistentIdentity(Integer persistentIdentity) {
     this.persistentIdentity = persistentIdentity;
-  }
-
-  public Integer getVersion() {
-    return version;
-  }
-
-  // Use by the JBDC implementations upon mutation
-  public void setVersion(Integer version) {
-    this.version = version;
   }
 
   public String getClassAndPersistentIdentity() {

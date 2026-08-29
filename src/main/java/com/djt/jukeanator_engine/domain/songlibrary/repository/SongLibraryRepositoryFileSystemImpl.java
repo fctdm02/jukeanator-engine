@@ -184,7 +184,15 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
   @Override
   public RootFolderEntity loadAggregateRoot(int persistentIdentity) throws EntityDoesNotExistException {
 
-    throw new SongLibraryServiceException("This method is unsupported for the file system implementation");
+    // The filesystem repository has no id-keyed storage -- its only real lookup is by name (see
+    // the String overload, which finds the one .oos file under basePath). Throwing
+    // EntityDoesNotExistException (not SongLibraryServiceException) here matters:
+    // SongLibraryServiceImpl.initialize() falls back to this overload for a fresh install with no
+    // .oos file yet, and specifically catches EntityDoesNotExistException to fall back to an empty
+    // placeholder root prompting the user to scan -- the same contract this method's own throws
+    // clause already promised.
+    throw new EntityDoesNotExistException(
+        "SongLibraryRepositoryFileSystemImpl has no id-keyed storage; load by name instead.");
   }
 
   @Override

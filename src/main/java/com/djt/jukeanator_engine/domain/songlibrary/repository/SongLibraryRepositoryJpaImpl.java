@@ -18,18 +18,17 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntit
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.FolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
-import com.djt.jukeanator_engine.domain.songlibrary.model.LocationMetaDataFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 
 /**
- * JPA/Hibernate-backed implementation of {@link SongLibraryRepository}. One database (and one
- * pair of tables, {@code song_library_folders}/{@code song_library_files}) holds every location's
- * catalog, tenant-separated by {@code location_id} -- see {@link SongLibraryFolderJpaEntity}/
- * {@link SongLibraryFileJpaEntity} for the flat row shape and why they're separate types from the
- * domain object graph.
+ * JPA/Hibernate-backed implementation of {@link SongLibraryRepository}. One table ({@code
+ * song_library}) holds every location's catalog -- folders and songs together, tenant-separated
+ * by {@code location_id} and discriminated by {@code class_discriminator} -- see {@link
+ * SongLibraryJpaEntity} for the flat row shape and why it's a standalone type rather than a JPA
+ * annotation retrofit of the domain model itself.
  *
  * <p>{@code loadAggregateRoot(locationId)} reassembles a full, ordinary {@link RootFolderEntity}
  * tree from the flat rows (calling the domain model's own constructors/{@code addChildFolder}/
@@ -40,13 +39,20 @@ import jakarta.persistence.EntityManagerFactory;
  * is always fully materialized already, unlike {@code UserRepositoryJpaImpl}'s diff/orphan-delete
  * approach for a root that's mutated incrementally over its lifetime.
  *
+ * <p><b>id is application-assigned, not Hibernate-generated</b>: {@code SongScanner}'s single
+ * shared per-scan counter assigns every folder/file a unique id across the whole location (see
+ * {@code AbstractLibraryEntity#getId}) -- root, genres, artists, albums, and songs must all
+ * already have a non-null id before {@link #storeAggregateRoot} is called, since {@code id} is
+ * part of this table's primary key.
+ *
  * <p><b>Caller contract for a synthetically-built root</b> (e.g. a master populating this from a
- * synced {@code LibrarySnapshotDto} rather than a real filesystem scan): every
- * {@link AlbumMetaDataFileEntity}/{@link LocationMetaDataFileEntity} on the tree must have {@code
- * setLoaded(true)} called after its fields are populated, before calling
- * {@link #storeAggregateRoot}. Otherwise the first read of a metadata field triggers a real
- * filesystem read/write against a path that doesn't exist on that machine -- see the {@code
- * ensureLoaded()} methods on those two classes.
+ * synced {@code LibrarySnapshotDto} rather than a real filesystem scan): every {@link
+ * AlbumMetaDataFileEntity} on the tree must have {@code setLoaded(true)} called after its fields
+ * are populated, before calling {@link #storeAggregateRoot}. Otherwise the first read of a
+ * metadata field triggers a real filesystem read/write against a path that doesn't exist on that
+ * machine -- see {@code ensureLoaded()} on that class. The tree's {@code parentLocation} must also
+ * already be set (see {@link RootFolderEntity#setParentLocation}) before calling {@link
+ * #storeAggregateRoot}, since this repository sources {@code location_id} from it.
  *
  * <p><b>Known limitation</b>: compilation-album artists that only exist as a song-embedded artist
  * name (no real {@code ArtistFolderEntity} folder on disk -- see {@code ArtistFromSongEntity}) are
@@ -91,24 +97,18 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
   @Override
   public RootFolderEntity loadAggregateRoot(int locationId) throws EntityDoesNotExistException {
 
-    List<SongLibraryFolderJpaEntity> folderRows = transactionTemplate.execute(status -> entityManager
-        .createQuery("from SongLibraryFolderJpaEntity where locationId = :locationId",
-            SongLibraryFolderJpaEntity.class)
+    List<SongLibraryJpaEntity> rows = transactionTemplate.execute(status -> entityManager
+        .createQuery("from SongLibraryJpaEntity where locationId = :locationId",
+            SongLibraryJpaEntity.class)
         .setParameter("locationId", locationId)
         .getResultList());
 
-    if (folderRows == null || folderRows.isEmpty()) {
+    if (rows == null || rows.isEmpty()) {
       throw new EntityDoesNotExistException(
           "No song library found for locationId: [" + locationId + "].");
     }
 
-    List<SongLibraryFileJpaEntity> fileRows = transactionTemplate.execute(status -> entityManager
-        .createQuery("from SongLibraryFileJpaEntity where locationId = :locationId",
-            SongLibraryFileJpaEntity.class)
-        .setParameter("locationId", locationId)
-        .getResultList());
-
-    RootFolderEntity assembled = assembleRoot(locationId, folderRows, fileRows);
+    RootFolderEntity assembled = assembleRoot(locationId, rows);
     this.root = assembled;
     return assembled;
   }
@@ -117,35 +117,22 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
   public void storeAggregateRoot(RootFolderEntity root) {
 
     requireNonNull(root, "root cannot be null");
-    Integer locationId = root.getMetadata().getLocationId();
-    requireNonNull(locationId,
-        "root.getMetadata().getLocationId() cannot be null when storing via SongLibraryRepositoryJpaImpl");
+    requireNonNull(root.getParentLocation(),
+        "root.getParentLocation() cannot be null when storing via SongLibraryRepositoryJpaImpl");
+    requireNonNull(root.getId(),
+        "root.getId() cannot be null when storing via SongLibraryRepositoryJpaImpl");
+    Integer locationId = root.getParentLocation().getPersistentIdentity();
 
     transactionTemplate.executeWithoutResult(status -> {
 
-      entityManager.createQuery("delete from SongLibraryFileJpaEntity where locationId = :locationId")
-          .setParameter("locationId", locationId)
-          .executeUpdate();
-      entityManager.createQuery("delete from SongLibraryFolderJpaEntity where locationId = :locationId")
+      entityManager.createQuery("delete from SongLibraryJpaEntity where locationId = :locationId")
           .setParameter("locationId", locationId)
           .executeUpdate();
 
-      SongLibraryFolderJpaEntity rootRow = new SongLibraryFolderJpaEntity(locationId,
-          SongLibraryFolderJpaEntity.FolderType.ROOT, null, null, root.getRootPath());
-      entityManager.persist(rootRow);
+      entityManager.persist(new SongLibraryJpaEntity(locationId, root.getId(), root.getRootPath(),
+          null, SongLibraryJpaEntity.LibraryItemType.ROOT));
 
-      insertFolderRowsRecursively(root, locationId, rootRow.getPersistentIdentity());
-
-      LocationMetaDataFileEntity metadata = root.getMetadata();
-      SongLibraryFileJpaEntity metadataRow = new SongLibraryFileJpaEntity(locationId,
-          rootRow.getPersistentIdentity(), SongLibraryFileJpaEntity.FileType.LOCATION_METADATA, null,
-          LocationMetaDataFileEntity.LOCATION_METADATA_FILENAME);
-      metadataRow.setLocationName(metadata.getLocationName());
-      metadataRow.setLogoName(metadata.getLogoName());
-      metadataRow.setLatitude(metadata.getLatitude());
-      metadataRow.setLongitude(metadata.getLongitude());
-      metadataRow.setIsGeoFenced(metadata.isGeoFenced());
-      entityManager.persist(metadataRow);
+      insertFolderRowsRecursively(root, locationId, root.getId());
     });
 
     this.root = root;
@@ -170,73 +157,72 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
 
   // ── load-side assembly ──────────────────────────────────────────────────
 
-  private RootFolderEntity assembleRoot(Integer locationId,
-      List<SongLibraryFolderJpaEntity> folderRows, List<SongLibraryFileJpaEntity> fileRows) {
+  private RootFolderEntity assembleRoot(Integer locationId, List<SongLibraryJpaEntity> rows) {
 
-    SongLibraryFolderJpaEntity rootRow = folderRows.stream()
-        .filter(r -> r.getFolderType() == SongLibraryFolderJpaEntity.FolderType.ROOT)
+    SongLibraryJpaEntity rootRow = rows.stream()
+        .filter(r -> r.getClassDiscriminator() == SongLibraryJpaEntity.LibraryItemType.ROOT)
         .findFirst()
         .orElseThrow(() -> new SongLibraryServiceException(
-            "No ROOT folder row found for locationId: [" + locationId + "]."));
+            "No ROOT row found for locationId: [" + locationId + "]."));
 
     RootFolderEntity root = new RootFolderEntity(rootRow.getName());
+    root.setId(rootRow.getId());
 
-    Map<Integer, FolderEntity> builtFoldersByRowId = new HashMap<>();
-    builtFoldersByRowId.put(rootRow.getPersistentIdentity(), root);
+    Map<Integer, FolderEntity> builtFoldersById = new HashMap<>();
+    builtFoldersById.put(rootRow.getId(), root);
 
-    Map<Integer, List<SongLibraryFolderJpaEntity>> childRowsByParentRowId = new HashMap<>();
-    for (SongLibraryFolderJpaEntity row : folderRows) {
-      if (row.getParentFolderId() != null) {
-        childRowsByParentRowId.computeIfAbsent(row.getParentFolderId(), k -> new ArrayList<>())
+    Map<Integer, List<SongLibraryJpaEntity>> childRowsByParentId = new HashMap<>();
+    List<SongLibraryJpaEntity> songRows = new ArrayList<>();
+    for (SongLibraryJpaEntity row : rows) {
+      if (row.getClassDiscriminator() == SongLibraryJpaEntity.LibraryItemType.ROOT) {
+        continue;
+      }
+      if (row.getClassDiscriminator() == SongLibraryJpaEntity.LibraryItemType.SONG) {
+        songRows.add(row);
+      } else if (row.getParentFolderId() != null) {
+        childRowsByParentId.computeIfAbsent(row.getParentFolderId(), k -> new ArrayList<>())
             .add(row);
       }
     }
 
-    buildChildFolders(root, rootRow.getPersistentIdentity(), childRowsByParentRowId,
-        builtFoldersByRowId);
+    buildChildFolders(root, rootRow.getId(), childRowsByParentId, builtFoldersById);
 
-    for (SongLibraryFileJpaEntity fileRow : fileRows) {
-      attachFile(fileRow, builtFoldersByRowId);
+    for (SongLibraryJpaEntity songRow : songRows) {
+      attachSong(songRow, builtFoldersById);
     }
 
     root.initialize();
     return root;
   }
 
-  private void buildChildFolders(FolderEntity parent, Integer parentRowId,
-      Map<Integer, List<SongLibraryFolderJpaEntity>> childRowsByParentRowId,
-      Map<Integer, FolderEntity> builtFoldersByRowId) {
+  private void buildChildFolders(FolderEntity parent, Integer parentId,
+      Map<Integer, List<SongLibraryJpaEntity>> childRowsByParentId,
+      Map<Integer, FolderEntity> builtFoldersById) {
 
-    List<SongLibraryFolderJpaEntity> childRows = childRowsByParentRowId.get(parentRowId);
+    List<SongLibraryJpaEntity> childRows = childRowsByParentId.get(parentId);
     if (childRows == null) {
       return;
     }
 
     try {
-      for (SongLibraryFolderJpaEntity row : childRows) {
+      for (SongLibraryJpaEntity row : childRows) {
 
-        FolderEntity built = switch (row.getFolderType()) {
+        FolderEntity built = switch (row.getClassDiscriminator()) {
           case GENRE -> new GenreFolderEntity(parent, row.getName());
           case ARTIST -> new ArtistFolderEntity(parent, row.getName());
-          case ALBUM -> new AlbumFolderEntity(parent, row.getName());
-          case ROOT -> throw new SongLibraryServiceException(
-              "Unexpected nested ROOT folder row with id: [" + row.getPersistentIdentity() + "].");
+          case ALBUM -> buildAlbumFromRow(parent, row);
+          case FOLDER -> new FolderEntity(parent, row.getName());
+          case ROOT, SONG_ARTIST, SONG -> throw new SongLibraryServiceException(
+              "Unexpected " + row.getClassDiscriminator() + " row with id: [" + row.getId() + "].");
         };
-        // The row's own persistentIdentity is a surrogate database key used only for
-        // parent_folder_id linkage during assembly -- the domain object's public id is the
-        // scan-local sourceId column, which is what getAlbumById/getGenreById/etc. are keyed by.
-        built.setPersistentIdentity(row.getSourceId());
-
-        if (built instanceof AlbumFolderEntity albumFolder) {
-          albumFolder.createCoverArtEntity();
-          albumFolder.createMetadataEntity();
-        }
+        built.setId(row.getId());
 
         parent.addChildFolder(built);
-        builtFoldersByRowId.put(row.getPersistentIdentity(), built);
+        builtFoldersById.put(row.getId(), built);
 
-        buildChildFolders(built, row.getPersistentIdentity(), childRowsByParentRowId,
-            builtFoldersByRowId);
+        if (!(built instanceof AlbumFolderEntity)) {
+          buildChildFolders(built, row.getId(), childRowsByParentId, builtFoldersById);
+        }
       }
     } catch (EntityAlreadyExistsException e) {
       throw new SongLibraryServiceException("Could not assemble song library tree for locationId: ["
@@ -245,124 +231,110 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
     }
   }
 
-  private void attachFile(SongLibraryFileJpaEntity fileRow,
-      Map<Integer, FolderEntity> builtFoldersByRowId) {
+  /**
+   * Rehydrates the album's metadata/cover-art from this row's own columns -- see {@link
+   * SongLibraryJpaEntity}'s class javadoc for why these no longer live in a separate child row.
+   */
+  private AlbumFolderEntity buildAlbumFromRow(FolderEntity parent, SongLibraryJpaEntity row) {
 
-    FolderEntity parent = builtFoldersByRowId.get(fileRow.getParentFolderId());
-    if (parent == null) {
+    AlbumFolderEntity album = new AlbumFolderEntity(parent, row.getName());
+    album.createCoverArtEntity();
+    album.createMetadataEntity();
+
+    AlbumMetaDataFileEntity metaData = album.getMetaData();
+    metaData.setGenre(row.getAlbumGenre());
+    metaData.setCoverArtUrl(row.getAlbumCoverArtUrl());
+    metaData.setRecordLabel(row.getAlbumRecordLabel());
+    metaData.setReleaseDate(row.getAlbumReleaseDate());
+    metaData.setHasExplicit(Boolean.TRUE.equals(row.getAlbumHasExplicit()));
+    // Individual setters only -- writeMetadataToFileSystem() performs real disk I/O against a
+    // path that doesn't exist for a JPA-hydrated root (see class javadoc's caller contract).
+    metaData.setLoaded(true);
+
+    return album;
+  }
+
+  private void attachSong(SongLibraryJpaEntity songRow, Map<Integer, FolderEntity> builtFoldersById) {
+
+    FolderEntity parent = builtFoldersById.get(songRow.getParentFolderId());
+    if (!(parent instanceof AlbumFolderEntity album)) {
       throw new SongLibraryServiceException(
-          "File row references unknown parent folder row id: [" + fileRow.getParentFolderId() + "].");
+          "Song row references unknown/non-album parent folder id: [" + songRow.getParentFolderId()
+              + "].");
     }
 
-    switch (fileRow.getFileType()) {
-
-      case SONG -> {
-        AlbumFolderEntity album = (AlbumFolderEntity) parent;
-        SongFileEntity song = new SongFileEntity(album, fileRow.getName());
-        song.setPersistentIdentity(fileRow.getSourceId());
-        song.setArtistName(fileRow.getArtistName());
-        song.setSongName(fileRow.getSongName());
-        song.setTrackNumber(fileRow.getTrackNumber());
-        song.setNumPlays(fileRow.getNumPlays() != null ? fileRow.getNumPlays() : Integer.valueOf(0));
-        try {
-          album.addChildSong(song);
-        } catch (EntityAlreadyExistsException e) {
-          throw new SongLibraryServiceException("Could not attach song to album: " + album.getName(),
-              e);
-        }
-      }
-
-      case ALBUM_METADATA -> {
-        AlbumFolderEntity album = (AlbumFolderEntity) parent;
-        AlbumMetaDataFileEntity metaData = album.getMetaData();
-        // Individual setters only -- writeMetadataToFileSystem() performs real disk I/O against a
-        // path that doesn't exist for a JPA-hydrated root (see class javadoc's caller contract).
-        metaData.setGenre(fileRow.getGenre());
-        metaData.setCoverArtUrl(fileRow.getCoverArtUrl());
-        metaData.setRecordLabel(fileRow.getRecordLabel());
-        metaData.setReleaseDate(fileRow.getReleaseDate());
-        metaData.setHasExplicit(Boolean.TRUE.equals(fileRow.getHasExplicit()));
-        metaData.setLoaded(true);
-      }
-
-      case LOCATION_METADATA -> {
-        RootFolderEntity rootFolder = (RootFolderEntity) parent;
-        LocationMetaDataFileEntity metadata = rootFolder.getMetadata();
-        metadata.setLocationId(fileRow.getLocationId());
-        metadata.setLocationName(fileRow.getLocationName());
-        metadata.setLogoName(fileRow.getLogoName());
-        metadata.setLatitude(fileRow.getLatitude());
-        metadata.setLongitude(fileRow.getLongitude());
-        metadata.setGeoFenced(Boolean.TRUE.equals(fileRow.getIsGeoFenced()));
-        metadata.setLoaded(true);
-      }
-
-      case ALBUM_COVER_ART -> {
-        // AlbumFolderEntity.createCoverArtEntity() already synthesized a fresh
-        // AlbumCoverArtFileEntity when the album folder was built above -- there is no real file
-        // on master's disk to reference (cover art bytes are served separately by
-        // LocationService), so there is nothing further to attach.
-      }
+    SongFileEntity song = new SongFileEntity(album, songRow.getName());
+    song.setId(songRow.getId());
+    song.setArtistName(songRow.getSongArtistName());
+    song.setSongName(songRow.getSongName());
+    song.setTrackNumber(songRow.getSongTrackNumber());
+    song.setNumPlays(songRow.getSongNumPlays() != null ? songRow.getSongNumPlays() : Integer.valueOf(0));
+    try {
+      album.addChildSong(song);
+    } catch (EntityAlreadyExistsException e) {
+      throw new SongLibraryServiceException("Could not attach song to album: " + album.getName(), e);
     }
   }
 
   // ── store-side decomposition ────────────────────────────────────────────
 
-  private void insertFolderRowsRecursively(FolderEntity parent, Integer locationId,
-      Integer parentRowId) {
+  private void insertFolderRowsRecursively(FolderEntity parent, Integer locationId, Integer parentId) {
 
     for (FolderEntity child : parent.getChildFolders()) {
 
-      SongLibraryFolderJpaEntity.FolderType folderType;
-      if (child instanceof AlbumFolderEntity) {
-        folderType = SongLibraryFolderJpaEntity.FolderType.ALBUM;
-      } else if (child instanceof ArtistFolderEntity) {
-        folderType = SongLibraryFolderJpaEntity.FolderType.ARTIST;
+      if (child instanceof AlbumFolderEntity albumFolder) {
+        entityManager.persist(buildAlbumRow(albumFolder, locationId, parentId));
+        insertSongRows(albumFolder, locationId);
+        continue;
+      }
+
+      SongLibraryJpaEntity.LibraryItemType discriminator;
+      if (child instanceof ArtistFolderEntity) {
+        discriminator = SongLibraryJpaEntity.LibraryItemType.ARTIST;
       } else if (child instanceof GenreFolderEntity) {
-        folderType = SongLibraryFolderJpaEntity.FolderType.GENRE;
+        discriminator = SongLibraryJpaEntity.LibraryItemType.GENRE;
       } else {
         throw new SongLibraryServiceException(
             "Unexpected folder type while storing song library: " + child.getClass().getSimpleName());
       }
 
-      SongLibraryFolderJpaEntity row = new SongLibraryFolderJpaEntity(locationId, folderType,
-          parentRowId, child.getPersistentIdentity(), child.getName());
-      entityManager.persist(row);
-
-      if (child instanceof AlbumFolderEntity albumFolder) {
-        insertAlbumFileRows(albumFolder, locationId, row.getPersistentIdentity());
-      } else {
-        insertFolderRowsRecursively(child, locationId, row.getPersistentIdentity());
-      }
+      entityManager.persist(
+          new SongLibraryJpaEntity(locationId, child.getId(), child.getName(), parentId, discriminator));
+      insertFolderRowsRecursively(child, locationId, child.getId());
     }
   }
 
-  private void insertAlbumFileRows(AlbumFolderEntity album, Integer locationId, Integer albumRowId) {
+  private SongLibraryJpaEntity buildAlbumRow(AlbumFolderEntity album, Integer locationId,
+      Integer parentId) {
 
-    for (SongFileEntity song : album.getChildSongs()) {
-
-      SongLibraryFileJpaEntity row = new SongLibraryFileJpaEntity(locationId, albumRowId,
-          SongLibraryFileJpaEntity.FileType.SONG, song.getPersistentIdentity(), song.getName());
-      row.setArtistName(song.getArtistName());
-      row.setSongName(song.getSongName());
-      row.setTrackNumber(song.getTrackNumber());
-      row.setNumPlays(song.getNumPlays());
-      entityManager.persist(row);
-    }
+    SongLibraryJpaEntity row = new SongLibraryJpaEntity(locationId, album.getId(), album.getName(),
+        parentId, SongLibraryJpaEntity.LibraryItemType.ALBUM);
 
     AlbumMetaDataFileEntity metaData = album.getMetaData();
     if (metaData != null) {
-      SongLibraryFileJpaEntity metadataRow = new SongLibraryFileJpaEntity(locationId, albumRowId,
-          SongLibraryFileJpaEntity.FileType.ALBUM_METADATA, null, AlbumFolderEntity.METADATA_FILENAME);
-      metadataRow.setGenre(metaData.getGenre());
-      metadataRow.setCoverArtUrl(metaData.getCoverArtUrl());
-      metadataRow.setRecordLabel(metaData.getRecordLabel());
-      metadataRow.setReleaseDate(metaData.getReleaseDate());
-      metadataRow.setHasExplicit(metaData.hasExplicit());
-      entityManager.persist(metadataRow);
+      row.setAlbumGenre(metaData.getGenre());
+      row.setAlbumCoverArtUrl(metaData.getCoverArtUrl());
+      row.setAlbumRecordLabel(metaData.getRecordLabel());
+      row.setAlbumReleaseDate(metaData.getReleaseDate());
+      row.setAlbumHasExplicit(metaData.hasExplicit());
+    }
+    return row;
+  }
+
+  private void insertSongRows(AlbumFolderEntity album, Integer locationId) {
+
+    for (SongFileEntity song : album.getChildSongs()) {
+
+      SongLibraryJpaEntity row = new SongLibraryJpaEntity(locationId, song.getId(), song.getName(),
+          album.getId(), SongLibraryJpaEntity.LibraryItemType.SONG);
+      row.setSongArtistName(song.getArtistName());
+      row.setSongName(song.getSongName());
+      row.setSongTrackNumber(song.getTrackNumber());
+      row.setSongNumPlays(song.getNumPlays());
+      entityManager.persist(row);
     }
   }
-  
+
   @Override
   public Integer updateNumPlaysForSong(
       RootFolderEntity root,
@@ -376,16 +348,18 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
     requireNonNull(songId, "songId cannot be null");
     requireNonNull(numPlays, "numPlays cannot be null");
 
+    // id alone would already resolve the exact row (it's unique per location across every
+    // discriminator), but matching parentFolderId too preserves the caller-facing guarantee that
+    // a mismatched albumId/songId pair is rejected rather than silently updating the wrong album's
+    // song.
     int rowsUpdated = transactionTemplate.execute(status -> entityManager
-        .createQuery("update SongLibraryFileJpaEntity f set f.numPlays = :numPlays "
-            + "where f.locationId = :locationId and f.fileType = :fileType and f.sourceId = :songId "
-            + "and f.parentFolderId = (select fo.persistentIdentity from SongLibraryFolderJpaEntity fo "
-            + "where fo.locationId = :locationId and fo.folderType = :folderType and fo.sourceId = :albumId)")
+        .createQuery("update SongLibraryJpaEntity e set e.songNumPlays = :numPlays "
+            + "where e.locationId = :locationId and e.id = :songId "
+            + "and e.classDiscriminator = :songType and e.parentFolderId = :albumId")
         .setParameter("numPlays", numPlays)
         .setParameter("locationId", locationId)
-        .setParameter("fileType", SongLibraryFileJpaEntity.FileType.SONG)
         .setParameter("songId", songId)
-        .setParameter("folderType", SongLibraryFolderJpaEntity.FolderType.ALBUM)
+        .setParameter("songType", SongLibraryJpaEntity.LibraryItemType.SONG)
         .setParameter("albumId", albumId)
         .executeUpdate());
 

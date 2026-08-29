@@ -38,6 +38,10 @@ public class LocationRootEntity extends AbstractPersistentEntity {
     return this.locations.put(location.getPersistentIdentity(), location);
   }
 
+  public LocationEntity removeLocation(Integer locationId) {
+    return this.locations.remove(locationId);
+  }
+
   public LocationEntity getLocationByIdNullIfNotExists(Integer locationId) {
     return this.locations.get(locationId);
   }

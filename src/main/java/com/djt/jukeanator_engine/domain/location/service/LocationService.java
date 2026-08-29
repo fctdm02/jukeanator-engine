@@ -7,7 +7,9 @@ import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
+import com.djt.jukeanator_engine.domain.location.dto.UpdateLocationInfoRequest;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 
 /**
  * Provisions locations and receives their library syncs. {@link #registerLocation} and
@@ -75,4 +77,42 @@ public interface LocationService {
 
   /** Filesystem path to a previously-synced album's cover art, or {@code null} if not present. */
   java.nio.file.Path getCoverArtPath(Integer locationId, Integer sourceAlbumId);
+
+  /**
+   * Returns this standalone/slave instance's own location, creating a default one ("Rock On
+   * Third") the first time this is called if none exists yet -- idempotent thereafter. Not
+   * meaningful on master, which owns no location of its own.
+   *
+   * <p>{@code preferredPersistentIdentity} is only consulted the first time a location is
+   * created: slave mode must pass its {@code app.location-id} (the id master already assigned via
+   * {@link #registerLocation}, so the slave's local record and master's agree); standalone mode
+   * (no master to agree with) passes {@code null} to auto-generate one the same way {@link
+   * #registerLocation} does.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   */
+  @PublicServiceMethod
+  LocationEntity getOrCreateOwnLocation(Integer preferredPersistentIdentity);
+
+  /**
+   * Re-keys this standalone/slave instance's own location to {@code confirmedLocationId}, if it
+   * doesn't already match -- needed when master resolves this slave's identity by API key alone
+   * during the {@code /ws-slave} handshake (see {@code StompLocationApiKeyChannelInterceptor}) and
+   * the id it confirms differs from this slave's own local guess (e.g. an admin hand-assigned a
+   * different id than {@code app.location-id} when provisioning it on master). A no-op if the ids
+   * already match. Called by {@code SlaveConnectionManager}, which must also call {@code
+   * SongLibraryService.reinitializeOwnLocation()} afterward so its own locationId-keyed cache
+   * doesn't go stale under the pre-correction id.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   */
+  @PublicServiceMethod
+  void reconcileOwnLocationId(Integer confirmedLocationId);
+
+  /**
+   * Updates this standalone/slave instance's own location's operator-editable info (name,
+   * coordinates, logo, geofencing) and persists the change. Backs the Swing admin panel's "Edit
+   * Location Info" dialog. Not meaningful on master, which owns no location of its own.
+   */
+  LocationEntity updateOwnLocationInfo(UpdateLocationInfoRequest request);
 }

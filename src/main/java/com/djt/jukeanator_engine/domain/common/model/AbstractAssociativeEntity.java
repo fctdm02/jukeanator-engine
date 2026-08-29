@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
+import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.model.validation.ValidationMessage;
 
 public abstract class AbstractAssociativeEntity extends AbstractEntity {
@@ -61,7 +62,7 @@ public abstract class AbstractAssociativeEntity extends AbstractEntity {
     this.needsPersisting = needsPersisting;
   }
 
-  public abstract Map<String, Integer> getParentIdentities();
+  public abstract Map<String, Integer> getPersistentIdentity();
 
   protected <T> boolean addChild(Set<T> set, T t, AbstractEntity parent)
       throws EntityAlreadyExistsException {
@@ -73,9 +74,18 @@ public abstract class AbstractAssociativeEntity extends AbstractEntity {
     return set.add(t);
   }
 
+  protected <T> boolean removeChild(Set<T> set, T t) throws EntityDoesNotExistException {
+
+    if (!set.contains(t)) {
+      throw new EntityDoesNotExistException(
+          this.getClassAndNaturalIdentity() + " does not have child: [" + t + "].");
+    }
+    return set.remove(t);
+  }
+
   public int hashCode() {
 
-    return getParentIdentities().hashCode();
+    return getPersistentIdentity().hashCode();
   }
 
   public boolean equals(Object that) {
@@ -92,19 +102,14 @@ public abstract class AbstractAssociativeEntity extends AbstractEntity {
       return false;
     }
 
-    return this.getParentIdentities()
-        .equals(((AbstractAssociativeEntity) that).getParentIdentities());
-  }
-
-  public String getNaturalIdentity() {
-
-    return getParentIdentities().toString();
+    return this.getPersistentIdentity()
+        .equals(((AbstractAssociativeEntity) that).getPersistentIdentity());
   }
 
   @Override
   public void validate(List<ValidationMessage> validationMessages) {
 
-    Map<String, Integer> parentIdentities = getParentIdentities();
+    Map<String, Integer> parentIdentities = getPersistentIdentity();
     if (parentIdentities == null || parentIdentities.size() < 2) {
 
       // TODO: TDM

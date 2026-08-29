@@ -274,7 +274,7 @@ public class UserEntity extends AbstractPersistentEntity {
 
     PlaylistEntity playlist = getPlaylistByName(playlistName);
     SongIdentifier songIdentifier = new SongIdentifier(locationId,
-        song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity());
+        song.getAlbum().getId(), song.getId());
 
     return playlist.addSong(songIdentifier);
   }
@@ -284,7 +284,7 @@ public class UserEntity extends AbstractPersistentEntity {
 
     PlaylistEntity playlist = getPlaylistByName(playlistName);
     SongIdentifier songIdentifier = new SongIdentifier(locationId,
-        song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity());
+        song.getAlbum().getId(), song.getId());
 
     return playlist.removeSong(songIdentifier);
   }

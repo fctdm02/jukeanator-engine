@@ -60,16 +60,16 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
         Comparator.nullsLast(Integer::compareTo))).toList();
   }
 
-  public SongFileEntity getChildSong(Integer persistentIdentity)
+  public SongFileEntity getChildSong(Integer id)
       throws EntityDoesNotExistException {
 
     for (SongFileEntity childSong : childSongs) {
-      if (childSong.getPersistentIdentity().equals(persistentIdentity)) {
+      if (childSong.getId().equals(id)) {
         return childSong;
       }
     }
-    throw new EntityDoesNotExistException("Child Song with persistentIdentity: ["
-        + persistentIdentity + "] not found in [" + this.getNaturalIdentity() + "].");
+    throw new EntityDoesNotExistException(
+        "Child Song with id: [" + id + "] not found in [" + this.getNaturalIdentity() + "].");
   }
 
   public SongFileEntity getChildSongByName(String name) throws EntityDoesNotExistException {
@@ -95,7 +95,7 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
       }
     }
     ArtistFolderEntity dummyArtist = new ArtistFolderEntity(parentFolder, "Compilations");
-    dummyArtist.setPersistentIdentity(999999);
+    dummyArtist.setId(999999);
     return dummyArtist;
   }
 

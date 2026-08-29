@@ -2,10 +2,10 @@ package com.djt.jukeanator_engine.domain.songlibrary.model;
 
 import java.time.Year;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 public final class ArtistFromSongEntity extends ArtistFolderEntity {
@@ -139,7 +139,10 @@ public final class ArtistFromSongEntity extends ArtistFolderEntity {
 
     if (genre == null) {
 
-      Map<GenreFolderEntity, Integer> genreMap = new HashMap<>();
+      // TreeMap (natural-identity ordering), not HashMap -- equals()/hashCode() now depend on
+      // getPersistentIdentity(), which walks up to parentLocation, and this can run before that's
+      // wired (e.g. during a scan, well before SongLibraryServiceImpl gets control back).
+      Map<GenreFolderEntity, Integer> genreMap = new TreeMap<>();
 
       for (AlbumFolderEntity album : childAlbums) {
 

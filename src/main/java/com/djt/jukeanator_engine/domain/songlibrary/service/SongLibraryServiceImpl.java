@@ -29,6 +29,8 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -69,14 +71,15 @@ public class SongLibraryServiceImpl
   private final ApplicationEventPublisher eventPublisher;
   private final String dataDir;
   private final SongLibraryRepository songLibraryRepository;
+  private final LocationService locationService;
   private final SongScanner songScanner;
   private final Integer searchResultSize;
   private final boolean isMaster;
 
-  // This instance's own initial guess at its locationId (app.location-id) -- only needed to boot a
-  // JPA-backed repository, which (unlike the filesystem repository) cannot discover its library by
-  // scanning for a file; see initialize(). Superseded by the authoritative value read back from the
-  // loaded root's own metadata once available.
+  // This instance's own initial guess at its locationId (app.location-id) -- passed to
+  // LocationService.getOrCreateOwnLocation() the first time this instance ever boots, so a slave's
+  // local LocationEntity is created with the same id master already assigned it. Standalone mode
+  // leaves this null, letting LocationService auto-generate one instead.
   private final Integer configuredLocationId;
 
   // Every location's loaded RootFolderEntity, keyed by locationId. On standalone/slave this always
@@ -85,28 +88,30 @@ public class SongLibraryServiceImpl
   // every registered location in memory up front.
   private final Map<Integer, RootFolderEntity> songLibraryRoots = new HashMap<>();
 
-  // This instance's own location's root, and its resolved locationId -- used by the admin/scan
-  // methods below, which are inherently local to whichever instance owns the physical library and
-  // never take a locationId parameter. null locationId / an empty placeholder root on master, which
-  // owns no location of its own.
+  // This instance's own location and its root -- used by the admin/scan methods below, which are
+  // inherently local to whichever instance owns the physical library and never take a locationId
+  // parameter. Both stay null / an empty placeholder root on master, which owns no location of its
+  // own.
+  private LocationEntity ownLocation;
   private RootFolderEntity ownRoot;
-  private Integer ownLocationId;
 
   private boolean isInitialized;
   private boolean libraryLoadFailedAtStartup;
 
   public SongLibraryServiceImpl(AppProperties appProperties,
-      SongLibraryRepository songLibraryRepository, SongScanner songScanner,
-      Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
+      SongLibraryRepository songLibraryRepository, LocationService locationService,
+      SongScanner songScanner, Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(appProperties, "appProperties cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
+    requireNonNull(locationService, "locationService cannot be null");
     requireNonNull(songScanner, "songScanner cannot be null");
     requireNonNull(searchResultSize, "searchResultSize cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
     this.dataDir = appProperties.getDataDir();
     this.songLibraryRepository = songLibraryRepository;
+    this.locationService = locationService;
     this.songScanner = songScanner;
     this.searchResultSize = searchResultSize;
     this.eventPublisher = eventPublisher;
@@ -133,12 +138,14 @@ public class SongLibraryServiceImpl
       // NPE if ever mistakenly invoked here.
       this.ownRoot = new RootFolderEntity("");
       this.ownRoot.initialize();
-      this.ownLocationId = null;
+      this.ownLocation = null;
       this.isInitialized = true;
       this.libraryLoadFailedAtStartup = false;
       log.info("Master instance -- no own song library; locations are loaded on demand.");
       return;
     }
+
+    this.ownLocation = this.locationService.getOrCreateOwnLocation(this.configuredLocationId);
 
     // If we cannot load the song library from disk at startup, then assume a new install and
     // return an empty ownRoot folder. The application will automatically ask the user to scan for
@@ -149,11 +156,9 @@ public class SongLibraryServiceImpl
 
       RootFolderEntity loaded = (oosFile != null)
           ? this.songLibraryRepository.loadAggregateRoot(deriveLocationNameFromOosFilename(oosFile))
-          : loadByConfiguredLocationIdOrThrow();
+          : this.songLibraryRepository.loadAggregateRoot(this.ownLocation.getPersistentIdentity());
 
       this.ownRoot = loaded;
-      this.ownLocationId = loaded.getMetadata().getLocationId();
-      this.songLibraryRoots.put(this.ownLocationId, loaded);
       this.libraryLoadFailedAtStartup = false;
 
     } catch (EntityDoesNotExistException ednee) {
@@ -161,17 +166,17 @@ public class SongLibraryServiceImpl
       log.error("Could not load song library from dataDir: " + this.dataDir
           + ", using empty song library ownRoot for now, error: " + ednee.getMessage());
 
-      // No rootPath is known yet -- this placeholder is never persisted, and its metadata (which
-      // would require disk I/O against a real rootPath) is never touched. It only exists so that
-      // query methods don't NPE before the user completes the initial scan.
+      // No rootPath is known yet -- this placeholder is never persisted, and its parentLocation
+      // (which would require disk I/O against a real rootPath if it were the old metadata object)
+      // is still wired below so query methods don't NPE before the user completes the initial scan.
       this.ownRoot = new RootFolderEntity("");
       this.ownRoot.initialize();
-      this.ownLocationId = this.configuredLocationId;
-      if (this.ownLocationId != null) {
-        this.songLibraryRoots.put(this.ownLocationId, this.ownRoot);
-      }
       this.libraryLoadFailedAtStartup = true;
     }
+
+    this.ownRoot.setParentLocation(this.ownLocation);
+    this.ownLocation.setLocationSongLibraryRoot(this.ownRoot);
+    this.songLibraryRoots.put(this.ownLocation.getPersistentIdentity(), this.ownRoot);
 
     this.isInitialized = true;
 
@@ -185,29 +190,19 @@ public class SongLibraryServiceImpl
     log.info("searchResultSize: " + this.searchResultSize);
   }
 
-  private RootFolderEntity loadByConfiguredLocationIdOrThrow() throws EntityDoesNotExistException {
-
-    if (this.configuredLocationId == null) {
-      throw new EntityDoesNotExistException(
-          "No " + SongLibraryRepository.OOS_FILE_EXTENSION + " song library file found in dataDir: "
-              + this.dataDir
-              + ", and no app.location-id is configured to load from a non-filesystem repository.");
-    }
-    return this.songLibraryRepository.loadAggregateRoot(this.configuredLocationId.intValue());
-  }
-
   /**
    * Resolves the {@link RootFolderEntity} for {@code locationId}, loading it from the repository
    * and caching it in {@link #songLibraryRoots} on first use if not already resident.
    */
   private RootFolderEntity getOrLoadRoot(Integer locationId) {
 
-    // Objects.equals (not a plain non-null check) so this also matches when both are null --
-    // master has ownLocationId == null, and a standalone/slave instance that hasn't completed its
-    // first scan yet also has ownLocationId == null (see initialize()'s failure branch). Both
-    // cases must short-circuit to the in-memory ownRoot placeholder rather than fall through to a
-    // repository load keyed by a locationId that doesn't really exist yet.
-    if (Objects.equals(locationId, this.ownLocationId) && this.ownRoot != null) {
+    // Objects.equals (not a plain non-null check) so this also matches when both are null -- only
+    // master has ownLocation == null now (see initialize()'s LocationService-backed bootstrap,
+    // which guarantees standalone/slave always resolves a real ownLocation, even before its first
+    // scan completes). Master's null case must still short-circuit to the in-memory ownRoot
+    // placeholder rather than fall through to a repository load keyed by a locationId that isn't
+    // real.
+    if (Objects.equals(locationId, getOwnLocationId()) && this.ownRoot != null) {
       return this.ownRoot;
     }
 
@@ -616,9 +611,9 @@ public class SongLibraryServiceImpl
 
       int numPlays = 0;
       List<Integer> albumIds = new ArrayList<>();
-      for (AlbumFolderEntity album : root.getAlbumsForGenre(genre.getPersistentIdentity())) {
+      for (AlbumFolderEntity album : root.getAlbumsForGenre(genre.getId())) {
 
-        albumIds.add(album.getPersistentIdentity());
+        albumIds.add(album.getId());
         numPlays = numPlays + album.getNumPlays().intValue();
       }
       Collections.sort(albumIds);
@@ -732,6 +727,9 @@ public class SongLibraryServiceImpl
       this.ownRoot.storeSongStatistics(this.dataDir);
 
       RootFolderEntity scannedRoot = songScanner.scanFileSystemForSongs(scanPath);
+      // SongScanner has no notion of LocationEntity -- wire it here so SongLibraryRepositoryJpaImpl
+      // (which sources location_id from this) can persist the freshly-scanned tree.
+      scannedRoot.setParentLocation(this.ownLocation);
 
       // Restore song num plays, persist, then re-initialize the scanned root
       scannedRoot.restoreSongStatisticsForRootPath(this.dataDir, scannedRoot.getRootPath());
@@ -740,7 +738,7 @@ public class SongLibraryServiceImpl
       scannedRoot.storeSongStatistics(this.dataDir);
       scannedRoot.initialize();
 
-      // Re-derive ownRoot/ownLocationId from persisted state, same discovery path as startup.
+      // Re-derive ownRoot/ownLocation from persisted state, same discovery path as startup.
       initialize();
 
       // Publish the event
@@ -963,7 +961,7 @@ public class SongLibraryServiceImpl
 
   @Override
   public Integer getOwnLocationId() {
-    return this.ownLocationId;
+    return this.ownLocation != null ? this.ownLocation.getPersistentIdentity() : null;
   }
 
   @Override
@@ -1014,7 +1012,7 @@ public class SongLibraryServiceImpl
     try {
 
       // Update the number of song plays and store to the repository
-      Integer locationId = this.ownLocationId;
+      Integer locationId = getOwnLocationId();
       Integer albumId = event.queueEntry().getSong().getAlbumId();
       Integer songId = event.queueEntry().getSong().getSongId();
       
@@ -1048,7 +1046,7 @@ public class SongLibraryServiceImpl
       for (SongQueueEntryDto queueEntry : event.queueEntries()) {
 
         // Update the number of song plays and store to the repository
-        Integer locationId = this.ownLocationId;
+        Integer locationId = getOwnLocationId();
         Integer albumId = queueEntry.getSong().getAlbumId();
         Integer songId = queueEntry.getSong().getSongId();
         

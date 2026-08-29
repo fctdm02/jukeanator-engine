@@ -91,8 +91,22 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
         }
       }
 
+      // persistentIdentity is minted up front by nextPersistentIdentity() (see its own javadoc --
+      // needed before the entity exists so registerLocation() can return the id immediately),
+      // bypassing this @GeneratedValue(SEQUENCE) entity's own generator. Both merge() and
+      // persist() refuse that: merge() assumes a pre-set id means "update an existing row" (a
+      // no-op update on a row that was never persisted surfaces as a concurrent-modification
+      // conflict, not an insert), and persist() rejects a @GeneratedValue entity that already has
+      // an id outright ("detached entity passed to persist"). Only merge() rows already confirmed
+      // present (per persistedIds, queried above); INSERT anything new natively, the same
+      // workaround nextPersistentIdentity() already uses for allocating the id itself.
+      Set<Integer> persistedIdSet = new HashSet<>(persistedIds);
       for (LocationEntity location : root.getLocations()) {
-        entityManager.merge(location);
+        if (persistedIdSet.contains(location.getPersistentIdentity())) {
+          entityManager.merge(location);
+        } else {
+          insertNewLocation(location);
+        }
       }
     });
   }
@@ -113,6 +127,27 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
           .createNativeQuery("select next_val from persistent_identity_seq").getSingleResult();
       return Integer.valueOf(nextVal.intValue() - 1);
     });
+  }
+
+  private void insertNewLocation(LocationEntity location) {
+
+    entityManager.createNativeQuery("insert into location "
+        + "(id, version, name, latitude, longitude, api_key_hash, status, last_seen_at, "
+        + "library_last_synced_at, logo_name, is_geo_fenced) "
+        + "values (:id, :version, :name, :latitude, :longitude, :apiKeyHash, :status, "
+        + ":lastSeenAt, :libraryLastSyncedAt, :logoName, :isGeoFenced)")
+        .setParameter("id", location.getPersistentIdentity())
+        .setParameter("version", location.getVersion())
+        .setParameter("name", location.getName())
+        .setParameter("latitude", location.getLatitude())
+        .setParameter("longitude", location.getLongitude())
+        .setParameter("apiKeyHash", location.getApiKeyHash())
+        .setParameter("status", location.getStatus().name())
+        .setParameter("lastSeenAt", location.getLastSeenAt())
+        .setParameter("libraryLastSyncedAt", location.getLibraryLastSyncedAt())
+        .setParameter("logoName", location.getLogoName())
+        .setParameter("isGeoFenced", location.isGeoFenced())
+        .executeUpdate();
   }
 
   private LocationRootEntity loadOrCreateRoot() {

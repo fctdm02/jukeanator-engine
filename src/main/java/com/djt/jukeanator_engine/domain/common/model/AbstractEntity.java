@@ -18,6 +18,8 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
 
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.Transient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +34,7 @@ import com.djt.jukeanator_engine.domain.common.model.validation.ValidationMessag
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 
+@MappedSuperclass
 public abstract class AbstractEntity implements Comparable<AbstractEntity>, Serializable {
   private static final long serialVersionUID = 1L;
   
@@ -216,8 +219,14 @@ public abstract class AbstractEntity implements Comparable<AbstractEntity>, Seri
   
   public static final Set<String> EMPTY_MODIFIED_ATTRIBUTES = new HashSet<>();
   
+  // @Transient: bookkeeping only, never persisted -- @MappedSuperclass on this class exists solely
+  // to make `version` below mappable by AbstractPersistentEntity/AbstractAssociativeEntity
+  // subclasses, and these two fields must not incidentally start being mapped as a side effect.
+  @Transient
   private boolean isDeleted = false;
+  @Transient
   private Set<String> modifiedAttributeNames = null; // This is instantiated when needed
+  private Integer version = 1;
   
   public AbstractEntity() {
     super();
@@ -268,6 +277,15 @@ public abstract class AbstractEntity implements Comparable<AbstractEntity>, Seri
 
   public void setNotModified() {
     modifiedAttributeNames = null;
+  }
+  
+  public Integer getVersion() {
+	return version;
+  }
+
+  // Use by the JBDC implementations upon mutation
+  public void setVersion(Integer version) {
+	 this.version = version;
   }
   
   /**
@@ -395,17 +413,17 @@ public abstract class AbstractEntity implements Comparable<AbstractEntity>, Seri
   public <T extends AbstractAssociativeEntity> T getChild(
       Class<T> childClass,
       Set<T> set,
-      Map<String, Integer> parentIdentities,
+      Map<String, Integer> persistentIdentity,
       AbstractPersistentEntity parent) throws EntityDoesNotExistException {
 
     return set
         .stream()
-        .filter(associativeEntity -> associativeEntity.getParentIdentities().equals(parentIdentities))
+        .filter(associativeEntity -> associativeEntity.getPersistentIdentity().equals(persistentIdentity))
         .findAny()
         .orElseThrow(() -> new EntityDoesNotExistException(
             childClass.getSimpleName()
             + " with compound id: [" 
-            + parentIdentities 
+            + persistentIdentity 
             + "] not found in: ["
             + parent.getClassAndPersistentIdentity()
             + "] with collection: "

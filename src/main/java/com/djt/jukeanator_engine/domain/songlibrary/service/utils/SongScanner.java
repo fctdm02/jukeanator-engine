@@ -36,11 +36,10 @@ public final class SongScanner {
   private JAudioTaggerClient jAudioTaggerClient;
   private CoverArtDownloader coverArtDownloader;
   
-  private int folderIndex = 0;
-  private int genreIndex = 0;
-  private int artistIndex = 0;
-  private int albumIndex = 0;
-  private int songIndex = 0;
+  // Single counter shared across every folder/file type for one scan, so ids are unique for the
+  // whole location (not just within a type) -- see AbstractLibraryEntity.getPersistentIdentity(),
+  // whose composite key relies on this. 1-based; reset at the top of each scan.
+  private int nextId = 1;
 
   public SongScanner(DiscogsClientWrapper discogsClientWrapper,
       MusicBrainzClientWrapper musicBrainzClientWrapper, JAudioTaggerClient jAudioTaggerClient,
@@ -70,12 +69,8 @@ public final class SongScanner {
 
   public RootFolderEntity scanFileSystemForSongs(String rootPath) throws IOException {
 
-    folderIndex = 0;
-    genreIndex = 0;
-    artistIndex = 0;
-    albumIndex = 0;
-    songIndex = 0;
-    
+    nextId = 1;
+
     if (rootPath != null) {
       rootPath = rootPath.strip();
     }
@@ -84,6 +79,7 @@ public final class SongScanner {
     String rootName = file.getAbsolutePath();
 
     rootFolder = new RootFolderEntity(rootName);
+    rootFolder.setId(nextId++);
 
     process(rootFolder);
 
@@ -135,18 +131,17 @@ public final class SongScanner {
     // date or explicit lyrics metadata retrieved from Discogs
     for (int i = 0; i < albums.size(); i++) {
 
-      albumIndex = i;
-      AlbumFolderEntity album = albums.get(albumIndex);
-      album.setPersistentIdentity(albumIndex);
+      AlbumFolderEntity album = albums.get(i);
+      album.setId(nextId++);
 
       GenreFolderEntity genre = album.getParentGenre();
-      if (genre != null && genre.getPersistentIdentity() == null) {
-        genre.setPersistentIdentity(genreIndex++);
+      if (genre != null && genre.getId() == null) {
+        genre.setId(nextId++);
       }
 
       ArtistFolderEntity artist = album.getParentArtist();
-      if (artist != null && artist.getPersistentIdentity() == null) {
-        artist.setPersistentIdentity(artistIndex++);
+      if (artist != null && artist.getId() == null) {
+        artist.setId(nextId++);
       }
 
       String albumPath = album.getNaturalIdentity();
@@ -159,12 +154,11 @@ public final class SongScanner {
       List<SongFileEntity> songList = album.getChildSongs();
       for (int j = 0; j < songList.size(); j++) {
 
-        songIndex = j;
-        SongFileEntity song = songList.get(songIndex);
+        SongFileEntity song = songList.get(j);
 
         String songPathname = song.getNaturalIdentity();
         String songFilename = song.getName();
-        song.setPersistentIdentity(songIndex);
+        song.setId(nextId++);
 
         String songArtistName = SongFileEntity.extractArtistName(songFilename);
         if (songArtistName != null && !songArtistName.trim().isBlank()) {
@@ -174,7 +168,7 @@ public final class SongScanner {
         ArtistFromSongEntity artistFromSong = rootFolder.getArtistFromSong(songArtistName);
         if (artistFromSong == null) {
           artistFromSong = new ArtistFromSongEntity(rootFolder, songArtistName);
-          artistFromSong.setPersistentIdentity(artistIndex++);
+          artistFromSong.setId(nextId++);
           artistFromSong.addAlbum(album);
           rootFolder.addArtistFromSong(artistFromSong);
         } else {
@@ -309,7 +303,7 @@ public final class SongScanner {
             }
 
             FolderEntity childFolder = new FolderEntity(parentFolder, child.getName());
-            childFolder.setPersistentIdentity(folderIndex++);
+            childFolder.setId(nextId++);
             parentFolder.addChildFolder(childFolder);
             process(childFolder);
 

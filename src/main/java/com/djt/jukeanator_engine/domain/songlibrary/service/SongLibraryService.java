@@ -229,7 +229,7 @@ public interface SongLibraryService {
    * {@link #getOwnLocationId()}/{@link #getSongLibraryRoot(Integer)} reflect the current state of
    * whatever is persisted on disk/in the repository. Used by {@code SlaveConnectionManager} after
    * correcting a mismatched {@code locationId} post-handshake (see {@code
-   * LocationMetaDataFileEntity#setLocationId}), so the in-memory cache doesn't go stale under the
+   * LocationService#reconcileOwnLocationId}), so the in-memory cache doesn't go stale under the
    * id it was keyed by before the correction.
    *
    * NOTE: System method, not to be invoked on behalf of a user.

@@ -109,7 +109,7 @@ public final class SongQueueRepositoryJpaImpl implements SongQueueRepository {
         SongFileEntity song = entry.getSong();
 
         SongIdentifier songIdentifier = new SongIdentifier(locationId,
-            song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity());
+            song.getAlbum().getId(), song.getId());
 
         entityManager.persist(new SongQueueEntryJpaEntity(songIdentifier, entry.getUsername(),
             entry.getPriority(), entry.getQueuedAtTime(), Integer.valueOf(i)));

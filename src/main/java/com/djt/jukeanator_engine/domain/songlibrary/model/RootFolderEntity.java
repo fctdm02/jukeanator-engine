@@ -6,16 +6,18 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.utils.FileSystemHelper;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 
 public class RootFolderEntity extends FolderEntity {
@@ -30,7 +32,10 @@ public class RootFolderEntity extends FolderEntity {
   private static final String CD_STATS_BACKUP = "CDStats_backup.TXT";
   private static final FileSystemHelper fileSystemHelper = new FileSystemHelper();
 
-  private LocationMetaDataFileEntity metadata;
+  // Not persisted by either repository -- reconstructed uniformly by SongLibraryServiceImpl right
+  // after any repository load, regardless of backend (filesystem or JPA). See LocationEntity's
+  // symmetric transient locationSongLibraryRoot field.
+  private transient LocationEntity parentLocation;
   private Set<ArtistFromSongEntity> artistsFromSongs = new TreeSet<ArtistFromSongEntity>();
 
   private transient Map<Integer, GenreFolderEntity> genresMap;
@@ -45,13 +50,6 @@ public class RootFolderEntity extends FolderEntity {
 
   public RootFolderEntity(String rootPath) {
     super(null, rootPath);
-    // Only eagerly persist metadata defaults when constructed with a real rootPath. A blank
-    // rootPath means this is a placeholder root built with no known music folder yet (e.g. before
-    // the user has completed their first library scan) -- getMetadata() still lazily creates it
-    // on demand if ever needed, matching the pre-existing deserialization backfill behavior below.
-    if (rootPath != null && !rootPath.isBlank()) {
-      this.metadata = new LocationMetaDataFileEntity(this);
-    }
   }
 
   public void initialize() {
@@ -75,14 +73,18 @@ public class RootFolderEntity extends FolderEntity {
     for (AlbumFolderEntity album : allAlbums) {
 
       GenreFolderEntity genre = album.getParentGenre();
-      Integer genreId = genre.getPersistentIdentity();
+      Integer genreId = genre.getId();
       if (!this.genresMap.containsKey(genreId)) {
         this.genresMap.put(genreId, genre);
       }
 
       Set<AlbumFolderEntity> genreAlbums = null;
       if (!this.albumsByGenreMap.containsKey(genre)) {
-        genreAlbums = new HashSet<>();
+        // TreeSet (natural-identity ordering), not HashSet -- equals()/hashCode() now depend on
+        // getPersistentIdentity(), which walks up to parentLocation, and that isn't wired yet at
+        // this point (initialize() runs as part of/immediately after a repository load, before
+        // SongLibraryServiceImpl gets a chance to set it -- see RootFolderEntity's field javadoc).
+        genreAlbums = new TreeSet<>();
         genreAlbums.add(album);
         this.albumsByGenreMap.put(genre, genreAlbums);
       } else {
@@ -105,29 +107,39 @@ public class RootFolderEntity extends FolderEntity {
         }
       }
 
-      Integer albumId = album.getPersistentIdentity();
+      Integer albumId = album.getId();
       if (!this.albumsMap.containsKey(albumId)) {
         this.albumsMap.put(albumId, album);
       }
 
       for (SongFileEntity song : album.getChildSongs()) {
-        this.songsMap.put(buildSongKey(albumId, song.getPersistentIdentity()), song);
+        this.songsMap.put(buildSongKey(albumId, song.getId()), song);
       }
     }
   }
   
   public String getLocationName() {
-    return getMetadata().getLocationName();
+    return getParentLocation().getName();
   }
 
-  public LocationMetaDataFileEntity getMetadata() {
-    // Backfills pre-existing serialized (.oos) libraries persisted before this field existed --
-    // Java deserialization never runs a constructor, so an older library file simply leaves
-    // this field null rather than populating it.
-    if (this.metadata == null) {
-      this.metadata = new LocationMetaDataFileEntity(this);
-    }
-    return this.metadata;
+  public LocationEntity getParentLocation() {
+    return this.parentLocation;
+  }
+
+  public void setParentLocation(LocationEntity parentLocation) {
+    this.parentLocation = parentLocation;
+  }
+
+  // Root has no parentFolder (see getParentFolder() below), so it seeds the composite key from
+  // parentLocation instead -- LocationEntity keeps a plain scalar persistentIdentity (it isn't
+  // itself an AbstractAssociativeEntity), so it's wrapped into a single-entry map here.
+  @Override
+  public Map<String, Integer> getPersistentIdentity() {
+
+    Map<String, Integer> persistentIdentity = new HashMap<>();
+    persistentIdentity.put("location_id", getParentLocation().getPersistentIdentity());
+    persistentIdentity.put("id", getId());
+    return persistentIdentity;
   }
 
   public String getRootPath() {
@@ -284,7 +296,7 @@ public class RootFolderEntity extends FolderEntity {
 
   public ArtistFolderEntity getArtistById(Integer artistId) throws EntityDoesNotExistException {
     for (ArtistFolderEntity artist : artistsMap.values()) {
-      if (artistId.equals(artist.getPersistentIdentity())) {
+      if (artistId.equals(artist.getId())) {
         return artist;
       }
     }

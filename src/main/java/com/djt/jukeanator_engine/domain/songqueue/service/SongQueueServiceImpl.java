@@ -282,8 +282,8 @@ public class SongQueueServiceImpl
         break;
       }
 
-      Integer coreAlbumId = coreSong.getAlbum().getPersistentIdentity();
-      Integer coreSongId = coreSong.getPersistentIdentity();
+      Integer coreAlbumId = coreSong.getAlbum().getId();
+      Integer coreSongId = coreSong.getId();
 
       String coreIneligibility =
           isSongEligibleForQueue(songLibraryService.getOwnLocationId(), coreAlbumId, coreSongId, 0);
@@ -316,8 +316,8 @@ public class SongQueueServiceImpl
           break;
         }
 
-        Integer smartAlbumId = smartSong.getAlbum().getPersistentIdentity();
-        Integer smartSongId = smartSong.getPersistentIdentity();
+        Integer smartAlbumId = smartSong.getAlbum().getId();
+        Integer smartSongId = smartSong.getId();
 
         String smartIneligibility = isSongEligibleForQueue(songLibraryService.getOwnLocationId(),
             smartAlbumId, smartSongId, 0);
@@ -562,7 +562,7 @@ public class SongQueueServiceImpl
       if (album != null) {
         for (SongFileEntity song : album.getChildSongs()) {
           songIdentifiers.add(
-              new SongIdentifier(locationId, albumId, song.getPersistentIdentity()));
+              new SongIdentifier(locationId, albumId, song.getId()));
         }
       }
     } catch (EntityDoesNotExistException e) {
@@ -791,8 +791,8 @@ public class SongQueueServiceImpl
 
       for (String songPathname : PlaylistManager.loadPlayList(new File(filename))) {
         SongFileEntity song = this.songLibraryRoot.getSongByPath(songPathname);
-        songIdentifiers.add(new SongIdentifier(locationId, song.getAlbum().getPersistentIdentity(),
-            song.getPersistentIdentity()));
+        songIdentifiers.add(new SongIdentifier(locationId, song.getAlbum().getId(),
+            song.getId()));
       }
 
       AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest =

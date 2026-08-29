@@ -105,14 +105,14 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     return userRoot.getUserByEmailAddressNullIfNotExists(REGISTERED_EMAIL);
   }
 
-  /** Minimal {@link SongFileEntity} whose {@code getAlbum().getPersistentIdentity()} and own
-   *  {@code getPersistentIdentity()} resolve to the given ids, matching what
+  /** Minimal {@link SongFileEntity} whose {@code getAlbum().getId()} and own
+   *  {@code getId()} resolve to the given ids, matching what
    *  {@link UserEntity#addSongToPlaylist} needs to build a {@link SongIdentifier}. */
   private static SongFileEntity buildSong(int albumId, int songId) {
     AlbumFolderEntity album = new AlbumFolderEntity(null, "Album" + albumId);
-    album.setPersistentIdentity(albumId);
+    album.setId(albumId);
     SongFileEntity song = new SongFileEntity(album, "Song" + songId + ".mp3");
-    song.setPersistentIdentity(songId);
+    song.setId(songId);
     return song;
   }
 

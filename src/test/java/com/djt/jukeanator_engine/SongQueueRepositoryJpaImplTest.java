@@ -10,21 +10,17 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.testcontainers.DockerClientFactory;
 import jakarta.persistence.EntityManagerFactory;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
@@ -42,45 +38,46 @@ import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryJpaImpl;
 
 /**
- * Integration tests for {@link SongQueueRepositoryJpaImpl}, run against a real MySQL
- * Testcontainer (see {@link MySqlTestcontainersConfiguration}), the same combination already
- * proven out by {@link SongLibraryRepositoryJpaImplTest}.
+ * Integration tests for {@link SongQueueRepositoryJpaImpl}, run against a live local MySQL
+ * instance (see {@code application.yml}'s {@code spring.datasource.*} defaults), the same
+ * combination already proven out by {@link SongLibraryRepositoryJpaImplTest}.
  *
  * <p>Unlike {@code SongLibraryRepositoryJpaImplTest} (which autowires {@code SongLibraryRepository}
  * directly, since locationId is just a method parameter there), {@link SongQueueRepositoryJpaImpl}
  * resolves its own {@code locationId} internally via {@link SongLibraryService#getOwnLocationId()}
  * -- the same collaborator {@code SongQueueRepositoryFileSystemImpl} depends on to resolve queued
  * songs. So every test here constructs the repository directly (autowiring only the shared
- * {@code EntityManagerFactory}/{@code PlatformTransactionManager} from the Testcontainer-backed
+ * {@code EntityManagerFactory}/{@code PlatformTransactionManager} from the live datasource-backed
  * context) against a mocked {@link SongLibraryService}, letting each test pin down exactly which
  * locationId and library fixture it's exercising without needing a real filesystem scan.
  *
  * <p>{@code app.repository-type=jpa} is set so {@code song_queue_entries.location_id}'s
- * {@code NOT NULL} foreign key into {@code locations} (see {@code
- * db/migration/mysql/V5__init_song_queue_schema.sql}) has a real row to point at, exactly as
+ * {@code NOT NULL} foreign key into {@code location} (see {@code
+ * db/migration/mysql/V5__init_song_queue_schema.sql}/{@code
+ * V7__rename_locations_to_location_and_add_fields.sql}) has a real row to point at, exactly as
  * {@code SongLibraryRepositoryJpaImplTest} does for the song-library tables' same FK; it also
  * satisfies {@code JpaDataSourceAutoConfigurationImport} so the JPA datasource/Hibernate/Flyway
  * stack actually comes up.
  *
+ * <p>Requires a real MySQL server with a {@code jukeanator_test} database the {@code jukeanator}
+ * user can access -- see {@code src/test/resources/application-mysql.yml}. Deliberately a
+ * separate database from {@code application.yml}'s own {@code jukeanator}, which is reserved for
+ * manual QA against a master instance running locally. No Docker/Testcontainers dependency.
+ *
  * @author tmyers
  */
-@Import(MySqlTestcontainersConfiguration.class)
 @SpringBootTest
 @ActiveProfiles({ "test", "mysql" })
 @TestPropertySource(properties = { "app.repository-type=jpa" })
 class SongQueueRepositoryJpaImplTest {
 
+  private static final Integer GENRE_ID = 1;
+  private static final Integer ARTIST_ID = 2;
   private static final Integer ALBUM_ONE_ID = 501;
   private static final Integer ALBUM_TWO_ID = 502;
   private static final Integer SONG_A_ID = 9001; // under album one
   private static final Integer SONG_B_ID = 9002; // under album one
   private static final Integer SONG_C_ID = 9003; // under album two
-
-  @BeforeAll
-  static void requiresDocker() {
-    Assumptions.assumeTrue(DockerClientFactory.instance().isDockerAvailable(),
-        "Docker is required to run this test");
-  }
 
   @Autowired
   private LocationRepository locationRepository;
@@ -177,13 +174,26 @@ class SongQueueRepositoryJpaImplTest {
     SongQueueRootEntity root = new SongQueueRootEntity(SongQueueRootEntity.SONG_QUEUE_FILENAME);
     SongFileEntity songA = libraryRoot.getSongById(ALBUM_ONE_ID, SONG_A_ID);
     SongQueueEntryEntity entry = root.addSongToQueue("alice@example.com", songA, 1);
-    Instant expected = entry.getQueuedAtTime().truncatedTo(ChronoUnit.SECONDS);
+    Instant original = entry.getQueuedAtTime();
 
     repository.storeAggregateRoot(root);
 
     SongQueueRootEntity reloaded =
         repository.loadAggregateRoot(SongQueueRootEntity.SONG_QUEUE_FILENAME);
-    assertEquals(expected, reloaded.getSongs().get(0).getQueuedAtTime());
+    Instant reloadedTime = reloaded.getSongs().get(0).getQueuedAtTime();
+
+    // queued_at_time is a plain MySQL TIMESTAMP (0 fractional-second precision), which *rounds*
+    // a sub-second value to the nearest second on insert -- not the floor-truncation
+    // Instant.truncatedTo(ChronoUnit.SECONDS) performs. Comparing against a floor-truncated
+    // "expected" value is flaky by construction: whenever original's millisecond component is
+    // >= 500, MySQL rounds up a second while truncatedTo() rounds down, a ~50% chance of failure
+    // on every run, not a rare race. Asserting the bounded difference instead captures the actual
+    // intent (only sub-second precision is lost) regardless of which rounding direction the
+    // database uses.
+    long diffMillis = Math.abs(Duration.between(original, reloadedTime).toMillis());
+    assertTrue(diffMillis <= 1000, "queuedAtTime should only lose sub-second precision when "
+        + "persisted to a TIMESTAMP(0) column, but differed by " + diffMillis + "ms (original="
+        + original + ", reloaded=" + reloadedTime + ")");
   }
 
   // ── skip-and-warn on a song that no longer exists in the library ───────────
@@ -314,8 +324,12 @@ class SongQueueRepositoryJpaImplTest {
 
     LocationRootEntity locationRoot = locationRepository.loadAggregateRoot(0);
     Integer locationId = locationRepository.nextPersistentIdentity();
-    locationRoot.addLocation(
-        new LocationEntity(locationId, name, null, null, "test-api-key-hash-" + locationId));
+    // Suffixed with the (guaranteed-unique) locationId -- see SongLibraryRepositoryJpaImplTest's
+    // identical helper for why: against a live, persistent MySQL instance, a plain fixture name
+    // can collide with another test class's own fixture or with SongLibraryServiceImpl's own
+    // default-location bootstrap.
+    locationRoot.addLocation(new LocationEntity(locationId, name + " " + locationId, null, null,
+        "test-api-key-hash-" + locationId));
     locationRepository.storeAggregateRoot(locationRoot);
     return locationId;
   }
@@ -325,19 +339,21 @@ class SongQueueRepositoryJpaImplTest {
     RootFolderEntity root = new RootFolderEntity("/fixture/song-queue-test");
 
     GenreFolderEntity genre = new GenreFolderEntity(root, "Rock");
+    genre.setId(GENRE_ID);
     root.addChildFolder(genre);
 
     ArtistFolderEntity artist = new ArtistFolderEntity(genre, "Artist One");
+    artist.setId(ARTIST_ID);
     genre.addChildFolder(artist);
 
     AlbumFolderEntity albumOne = new AlbumFolderEntity(artist, "Album One");
-    albumOne.setPersistentIdentity(ALBUM_ONE_ID);
+    albumOne.setId(ALBUM_ONE_ID);
     artist.addChildFolder(albumOne);
     albumOne.addChildSong(newSong(albumOne, "01 - Song A.mp3", SONG_A_ID, 1));
     albumOne.addChildSong(newSong(albumOne, "02 - Song B.mp3", SONG_B_ID, 2));
 
     AlbumFolderEntity albumTwo = new AlbumFolderEntity(artist, "Album Two");
-    albumTwo.setPersistentIdentity(ALBUM_TWO_ID);
+    albumTwo.setId(ALBUM_TWO_ID);
     artist.addChildFolder(albumTwo);
     albumTwo.addChildSong(newSong(albumTwo, "01 - Song C.mp3", SONG_C_ID, 1));
 
@@ -350,13 +366,15 @@ class SongQueueRepositoryJpaImplTest {
     RootFolderEntity root = new RootFolderEntity("/fixture/song-queue-test");
 
     GenreFolderEntity genre = new GenreFolderEntity(root, "Rock");
+    genre.setId(GENRE_ID);
     root.addChildFolder(genre);
 
     ArtistFolderEntity artist = new ArtistFolderEntity(genre, "Artist One");
+    artist.setId(ARTIST_ID);
     genre.addChildFolder(artist);
 
     AlbumFolderEntity albumOne = new AlbumFolderEntity(artist, "Album One");
-    albumOne.setPersistentIdentity(ALBUM_ONE_ID);
+    albumOne.setId(ALBUM_ONE_ID);
     artist.addChildFolder(albumOne);
     albumOne.addChildSong(newSong(albumOne, "01 - Song A.mp3", SONG_A_ID, 1));
     albumOne.addChildSong(newSong(albumOne, "02 - Song B.mp3", SONG_B_ID, 2));
@@ -369,7 +387,7 @@ class SongQueueRepositoryJpaImplTest {
       int trackNumber) {
 
     SongFileEntity song = new SongFileEntity(album, filename);
-    song.setPersistentIdentity(songId);
+    song.setId(songId);
     song.setArtistName("Artist One");
     song.setSongName(filename);
     song.setTrackNumber(trackNumber);

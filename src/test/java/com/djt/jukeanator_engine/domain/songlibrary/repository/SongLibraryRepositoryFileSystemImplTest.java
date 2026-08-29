@@ -13,6 +13,7 @@ import java.nio.file.attribute.FileTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 
 /** Unit tests for {@link SongLibraryRepositoryFileSystemImpl}. */
@@ -53,7 +54,10 @@ public class SongLibraryRepositoryFileSystemImplTest {
 
     RootFolderEntity loaded = repository.loadAggregateRoot("Rock On Third");
 
-    assertEquals("Rock On Third", loaded.getLocationName());
+    // parentLocation is transient -- it never survives (de)serialization by design (see
+    // RootFolderEntity's field javadoc); SongLibraryServiceImpl re-wires it uniformly after any
+    // repository load, so a raw repository-level load correctly leaves it null here.
+    assertEquals(rootPath.toString(), loaded.getRootPath());
     assertEquals(basePath.resolve("Rock_On_Third.oos").toString(), repository.getResolvedFilePath());
     assertTrue(Files.exists(basePath.resolve("Rock_On_Third.oos")));
   }
@@ -139,7 +143,8 @@ public class SongLibraryRepositoryFileSystemImplTest {
   private RootFolderEntity newRoot(Path rootPath, String locationName) {
 
     RootFolderEntity root = new RootFolderEntity(rootPath.toString());
-    root.getMetadata().setLocationName(locationName);
+    root.setParentLocation(
+        new LocationEntity(1, locationName, null, null, "test-api-key-hash"));
     root.initialize();
     return root;
   }

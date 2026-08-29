@@ -55,7 +55,7 @@ public final class SongQueueMapper {
     SongFileEntity song = entity.getSong();
 
     return new SongQueueEntryPersistenceDto(entity.getUsername(),
-        song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity(),
+        song.getAlbum().getId(), song.getId(),
         song.getNaturalIdentity(), entity.getPriority(), entity.getQueuedAtTime());
   }
 

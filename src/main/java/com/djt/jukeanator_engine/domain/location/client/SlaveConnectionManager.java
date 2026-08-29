@@ -25,7 +25,7 @@ import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
-import com.djt.jukeanator_engine.domain.songlibrary.model.LocationMetaDataFileEntity;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.event.AllSongsDonePlayingEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackPausedEvent;
@@ -72,6 +72,7 @@ public class SlaveConnectionManager {
   private final SongQueueService songQueueService;
   private final SongPlayerService songPlayerService;
   private final SongLibraryService songLibraryService;
+  private final LocationService locationService;
   private final ObjectMapper objectMapper;
 
   private final WebSocketStompClient stompClient;
@@ -87,12 +88,13 @@ public class SlaveConnectionManager {
 
   public SlaveConnectionManager(AppProperties appProperties, SongQueueService songQueueService,
       SongPlayerService songPlayerService, SongLibraryService songLibraryService,
-      ObjectMapper objectMapper) {
+      LocationService locationService, ObjectMapper objectMapper) {
 
     this.appProperties = appProperties;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
     this.songLibraryService = songLibraryService;
+    this.locationService = locationService;
     this.objectMapper = objectMapper;
 
     this.stompClient = new WebSocketStompClient(new StandardWebSocketClient());
@@ -290,20 +292,17 @@ public class SlaveConnectionManager {
 
       Integer confirmedLocationId = (Integer) payload;
       try {
-        LocationMetaDataFileEntity metadata = songLibraryService
-            .getSongLibraryRoot(songLibraryService.getOwnLocationId()).getMetadata();
-        if (!confirmedLocationId.equals(metadata.getLocationId())) {
-          log.info("Master assigned locationId {} (was {} locally) — correcting {}",
-              confirmedLocationId, metadata.getLocationId(),
-              LocationMetaDataFileEntity.LOCATION_METADATA_FILENAME);
-          metadata.setLocationId(confirmedLocationId);
-          metadata.writeMetadataToFileSystem();
+        Integer currentLocationId = songLibraryService.getOwnLocationId();
+        if (!confirmedLocationId.equals(currentLocationId)) {
+          log.info("Master assigned locationId {} (was {} locally) — correcting local location record",
+              confirmedLocationId, currentLocationId);
+          locationService.reconcileOwnLocationId(confirmedLocationId);
           // Re-key SongLibraryServiceImpl's own locationId->root cache under the corrected id --
           // it was populated under the old (pre-correction) id at startup.
           songLibraryService.reinitializeOwnLocation();
         }
       } catch (Exception e) {
-        log.warn("Could not reconcile confirmed locationId {} with local metadata",
+        log.warn("Could not reconcile confirmed locationId {} with local location record",
             confirmedLocationId, e);
       }
     }

@@ -34,16 +34,16 @@ public class FolderEntity extends AbstractLibraryEntity {
     return childFolders;
   }
 
-  public FolderEntity getChildFolder(Integer persistentIdentity)
+  public FolderEntity getChildFolder(Integer id)
       throws EntityDoesNotExistException {
 
     for (FolderEntity childFolder : childFolders) {
-      if (childFolder.getPersistentIdentity().equals(persistentIdentity)) {
+      if (childFolder.getId().equals(id)) {
         return childFolder;
       }
     }
-    throw new EntityDoesNotExistException("Child Folder with persistentIdentity: ["
-        + persistentIdentity + "] not found in [" + this.getNaturalIdentity() + "].");
+    throw new EntityDoesNotExistException(
+        "Child Folder with id: [" + id + "] not found in [" + this.getNaturalIdentity() + "].");
   }
 
   public FolderEntity getChildFolderByName(String name) throws EntityDoesNotExistException {

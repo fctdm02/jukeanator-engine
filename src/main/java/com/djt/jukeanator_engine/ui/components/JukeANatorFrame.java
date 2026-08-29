@@ -1008,8 +1008,8 @@ public class JukeANatorFrame extends JFrame {
     RootFolderEntity ownLibraryRoot = songLibraryService != null
         ? songLibraryService.getSongLibraryRoot(songLibraryService.getOwnLocationId())
         : null;
-    if (ownLibraryRoot != null && ownLibraryRoot.getMetadata() != null) {
-      String logoName = ownLibraryRoot.getMetadata().getLogoName();
+    if (ownLibraryRoot != null && ownLibraryRoot.getParentLocation() != null) {
+      String logoName = ownLibraryRoot.getParentLocation().getLogoName();
       if (logoName != null && !logoName.isBlank()) {
         logoIcon = imageLoader.loadImageFromDataDir(logoName, topPanelProfile.iconSize(),
             topPanelProfile.iconSize());
@@ -1226,13 +1226,20 @@ public class JukeANatorFrame extends JFrame {
   // ALBUM LIST (populates HomePanel once data arrives from the background loader)
   public void setAlbums(List<AlbumDto> albums, SearchResultDto popular) {
 
-    homePanel.setAlbums(albums, popular);
+    // JukeANatorEventListener.handleScanFileSystemForSongsEvent calls this synchronously from
+    // whatever thread published ScanFileSystemForSongsEvent (the song-scan thread, not the EDT).
+    // HomePanel.setAlbums() rebuilds and repaints Swing components -- doing that off the EDT while
+    // the EDT is concurrently painting/laying out the same component tree is what produced the
+    // garbled/overlapping album-tile text seen right after a first-run scan completes.
+    SwingUtilities.invokeLater(() -> homePanel.setAlbums(albums, popular));
   }
 
   // GENRE LIST
   public void setGenres(List<GenreDto> genres) {
 
-    genrePanel.setGenres(genres);
+    // Same off-EDT hazard as setAlbums() above -- also reached from
+    // JukeANatorEventListener.handleScanFileSystemForSongsEvent on the song-scan thread.
+    SwingUtilities.invokeLater(() -> genrePanel.setGenres(genres));
   }
 
   // SONG QUEUE LIST

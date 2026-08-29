@@ -1,0 +1,12 @@
+# Activated by the "mysql" Spring profile (see @ActiveProfiles({"test", "mysql"}) on the JPA
+# integration test classes: MySqlJukeanatorEngineApplicationTests,
+# MySqlMasterModeJukeanatorEngineApplicationTests, SongLibraryRepositoryJpaImplTest,
+# SongQueueRepositoryJpaImplTest, SongLibraryRepositoryEquivalenceTest).
+#
+# Points every one of them at a dedicated jukeanator_test database instead of application.yml's
+# own jukeanator database -- that one is reserved for manual QA against a master instance running
+# locally on this laptop, and must never be read, written, or Flyway-migrated by an automated test
+# run. Same jukeanator/password credentials; only the database differs.
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/jukeanator_test

@@ -26,15 +26,24 @@ OVERVIEW
   and SongLibraryRootEntity instances should be created and associated to one another as parent/child.
 
 3: LocationMetadataFileEntity will go away, as this information will be stored with LocationEntity.
-  
 
+4: A location's information can be edited by a new "Edit Location Info" button on the UI Admin Panel.
 
+5. The assumption is that for a new standalone/slave system, the LocationEntity is instantiated first (as well as the LocationService)
 
+6: SongLibraryService would change in that the LocationService would be injected, and the "ownLocation" LocationEntity instance would be 
+   retrieved from it and associated with the RootFolderEntity instance (and vice-versa)  For "ownership" of the relationship from a 
+   JPA perspective, it would have to be the "parent" LocationEntity
+   
+7: In Domain Driven Design parlance, the "aggregate root" would therefore be the LocationEntity, but realistically, the transactional boundary is
+just to the RootFolderEntity, as the information about a location is independent of the song library.  For JPA impl, as well as for thje web app, 
+the locationId is needed, however.   
+   
+QUESTIONS: 
 
- 
-
-
-X: In Domain Driven Design parlance, the "aggregate root" f
+1: For the current implementation, why does LocationService need a dependency on the SongLibraryService?  If it is because of the need to
+get the RootFolderEntity?  Because of the workflow above, the RootFolderEntity is associated with the LocationEntity at the time of loading/creating 
+the RootFolderEntity.
 
 
 FUTURE STATE OBJECT INHERITANCE HIERARCHY
@@ -48,8 +57,7 @@ Object Classes
   Integer version = 1;
 
 3:LocationEntity extends AbstractPersistentEntity
-  private String name;
-  private String locationName = "Rock On Third";
+  private String name = "Rock On Third";
   private String logoName = "RockOnThirdLogo.jpg";
   private Double latitude = 42.4883;
   private Double longitude = -83.143;
@@ -63,6 +71,7 @@ Object Classes
 4:AbstractLibraryEntity extends AbstractPersistentEntity
   private FolderEntity parentFolder;
   private String name;
+  private Integer id;  
  
 5:FolderEntity extends AbstractLibraryEntity
   private Set<FolderEntity> childFolders = new TreeSet<FolderEntity>();
@@ -199,16 +208,210 @@ columms:
     album_release_date      VARCHAR(20),
     album_has_explicit      BOOLEAN
 primary key constraint:
-    id
+    parent_location_id,id
 foreign key constraints:
     parent_location_id references location(id)
     parent_folder_id references song_library_folder(id)
 unique constraint:
+    parent_location_id,,name
+
+
+
+
+Formulate a plan and ask any questions first.  I expect this to be back and forth, given the major changes that will be needed here.
+
+
+Gaps and things I need decisions on
+
+1. The song_library.id uniqueness problem (blocking). Your table design makes id a plain single-column PRIMARY KEY, and note (b) says the scan-assigned persistentIdentity 
+should be saved as-is, with no separate sourceId. But SongScanner.java assigns persistentIdentity from five separate counters (folderIndex, genreIndex, artistIndex, 
+albumIndex, songIndex), each reset to 0 per scan. So today, within one location, a genre, an artist, an album, and a song can all legitimately have persistentIdentity = 0 
+simultaneously — and every location's scan restarts at 0 too. That can't be a single-column global PK as-is.To make note (b) work, I see two options:
+
+(a) Give SongScanner one shared counter across all folder/file types per scan, and make id effectively (location_id, id)-unique in practice even though the column is a bare PK
+ — meaning each location's tree still needs a way to avoid colliding with other locations' rows in the same physical column. That still doesn't give a true single-column global PK across locations.
+ 
+(b) Keep a real surrogate PK (GenerationType.SEQUENCE off the shared persistent_identity_seq, same mechanism used everywhere else in this codebase) as id, and accept that 
+this is the "sourceId" role folded into one column instead of two — i.e., we drop the redundant table-row surrogate id we have today (the current schema's persistent_identity PK is a row-insertion-order id, separate from source_id), but the domain object's own persistentIdentity field would need to actually become that sequence-generated value (assigned at persist time, not scan time) rather than the scan-local index it is today.
+
+Option (b) is a bigger behavioral change: it means a freshly-scanned RootFolderEntity held in memory (before it's ever persisted) has persistentIdentity == null for every folder/song 
+until storeAggregateRoot runs and Hibernate assigns real ids — which the filesystem-repository code path and a lot of existing scan logic assumes is populated immediately after scanFileSystemForSongs() returns. Which of these did you intend, or is there a third approach I'm missing?
+
+DECISION 1:
+<location_id,id,class_discriminator> will give uniqueness.  Also, start each index at 1.  Please verify that you understand that <location_id,id,class_discriminator> will give uniqueness.
+
+
+2. LocationEntity.locationName isn't in your own table's column list. Your class lists both name and locationName = "Rock On Third", but the location table's column list 
+has only name (no location_name column). Is locationName meant to be dropped (with name taking over as the display name, defaulting to "Rock On Third"), or did the 
+table definition just miss a column? Same question doesn't apply to logoName/latitude/longitude/isGeoFenced — those all appear in both the class and the table.
+DECISION 2:
+LocationEntity.locationName was a typo, and it should be removed/ignored, as a location's "name" does the same thing (and it is an inherited property) 
+
+
+3. New UNIQUE(name) constraint on location. Today's locations table (V2 migration) has no unique constraint on name, and registerLocation() doesn't check for a duplicate 
+name before inserting. Adding the constraint is easy; do you want registerLocation() (and the new default-location bootstrap for standalone/slave) to pre-check and return 
+a clean validation error, or is relying on the DB constraint throwing (and turning that into an error path) good enough for now?
+DECISION 3: 
+There is no need for a pre-validation check, as the number of locations will be very small and location names will be easy to manage at each individual location, so relying
+upon the DB constraint throwing an error is good enough for now. 
+ 
+
+
+
+
+
+ 
+
+With respect to the primary key constraint and unique constraint for the song_library table:
+
+1: Currently, every entity in the RootFolderEntity inheritance hierarchy, with AbstractLibraryEntity being the base class, extends from AbstractPersistentEntity.
+AbstractPersistentEntity has the following attribute defined:
+private Integer persistentIdentity;
+
+this maps to the database using persistent_identity_seq.  So, the issue here with song_library means that AbstractPersistentEntity is not a good choice for base class.
+
+
+There is another class, called AbstractAssociativeEntity, that was meant for dealing with what I am trying to accomplish, that is, having a song library item having a
+composite primary key.  AbstractAssociativeEntity has the following defined:  
+public abstract Map<String, Integer> persistentIdentity();
+
+The design of this class is to allow for entities that will have a composite primary key when mapped to the database.  So, I propose the following change for AbstractLibraryItemEntity: 
+
+public abstract class AbstractLibraryEntity extends AbstractAssociativeEntity {
+  private FolderEntity parentFolder;
+  private String name;
+  private Integer id;
+
+  @Override
+  public Map<String, Integer> getPersistentIdentity() {
+    
+    Map<String, Integer> persistentIdentity = new LinkedHashMap<>();
+    persistentIdentity.addAll(parentFolder.getPersistentIdentity());
+    persistentIdentity.put("id", id);
+    return persistentIdentity;
+  }
+  
+  @Override
+  public String getNaturalIdentity() {
+    
+    return new StringBuilder()
+        .append(parentFolder.getNaturalIdentity())
+        .append(AbstractEntity.NATURAL_IDENTITY_DELIMITER)
+        .append(name)
+        .toString();
+  }  
+
+RootFolderEntity would then have these methods defined:
+
+  @Override
+  public Map<String, Integer> getPersistentIdentity() {
+    
+    Map<String, Integer> persistentIdentity = new LinkedHashMap<>();
+    persistentIdentity.addAll(parentLocation.getPersistentIdentity());
+    persistentIdentity.put("id", id);
+    return persistentIdentity;
+  }
+  
+  @Override
+  public String getNaturalIdentity() {
+    
+    return new StringBuilder()
+        .append(parentLocation.getNaturalIdentity())
+        .append(AbstractEntity.NATURAL_IDENTITY_DELIMITER)
+        .append(name)
+        .toString();
+  }  
+
+NOTE: getPersistentIdentity() deals with the repository/database primary key constraint and getNaturalIdentity() deals with offering a "business key" or surrogate key,
+and is usually used to have a user-interpretable way of identifying an identity.  This natural identity then maps to the database as a UNIQUE constraint. 
+
+So, getting back to decision #1, I want to use a shared counter across all folder/file types per scan for SongScanner.  This would be the "id" field defined in AbstractLibraryEntity.
+
+The primary key and unique constraints for song_library table would then be:
+primary key constraint:
+    parent_location_id,parent_folder_id,id
+    
+unique constraint:
     parent_location_id,parent_folder_id,name
-index:
+
+NOTE: Again, "id" would be a unique integer across an entire song scan, using a shared counter, negating the need for using class_discriminator, as well as addressing the issue
+with song unqiueness. 
+
+Let me know if this all makes sense and ask any questions before formulating a plan.
+
+
+
+
+
+
+
+
+
+
+My answers are inline with your questions:
+I read AbstractAssociativeEntity.java — it's already in the codebase exactly as you described (abstract Map<String,Integer> getPersistentIdentity(), equals/hashCode built on that map, 
+a needsPersisting flag, its own addChild variant) and currently has zero concrete subclasses, so wiring AbstractLibraryEntity into it doesn't collide with anything else. That 
+confirms your design is sound at the base-class level. A few things I need pinned down before this becomes a plan:
+
+1. This changes the method signature on getPersistentIdentity(), and that ripples wide. Today, AbstractLibraryEntity's whole subtree (FolderEntity, GenreFolderEntity, ArtistFolderEntity, 
+ArtistFromSongEntity, AlbumFolderEntity, SongFileEntity, AbstractFileEntity) inherits Integer getPersistentIdentity()/void setPersistentIdentity(Integer) from AbstractPersistentEntity, 
+and it's called as a plain Integer in ~40 places, not just inside songlibrary — SongLibraryMapper, SongQueueMapper, SongQueueServiceImpl, SongQueueRepositoryJpaImpl (which does 
+song.getAlbum().getPersistentIdentity(), song.getPersistentIdentity() on library entities reached through the queue), RootFolderEntity, AlbumFolderEntity, FolderEntity, SongScanner, 
+SongLibraryServiceImpl, plus their tests. Once getPersistentIdentity() returns Map<String,Integer> for this hierarchy, every one of those breaks and needs to move to a new scalar 
+accessor — presumably getId()/setId(Integer), matching the private Integer id; field you sketched. Confirm getId()/setId(Integer) as the names? (Location/User/etc. stay on 
+AbstractPersistentEntity and keep getPersistentIdentity()/setPersistentIdentity() as-is — only the song-library hierarchy gets the rename.)
+ANSWER 1:
+Yes, I am confirming that I want to use getId()/setId(Integer) as the method names.
+
+
+2. The RootFolderEntity → LocationEntity map seam has a type mismatch. Your sketch does persistentIdentity.addAll(parentLocation.getPersistentIdentity()), but LocationEntity 
+stays on AbstractPersistentEntity (per decisions 2/3) — its getPersistentIdentity() returns a plain Integer, not a Map, so there's nothing to merge in that shape. I'll instead 
+do persistentIdentity.put("location_id", parentLocation.getPersistentIdentity()) — one entry seeded from Location's scalar id. Confirm "location_id" as the key name (matches the 
+parent_location_id column)? And for AbstractLibraryEntity's own version, the merge call should be putAll (Map doesn't have addAll — that's a Collection method) — I'll just use the 
+right one when I write it, flagging only in case the method name mattered to you for some other reason.
+ANSWER 2:
+Yes, I am confirming that "location_id" be used as the key name (matches the parent_location_id column)
+
+
+3. The composite PK as (parent_location_id, parent_folder_id, id) is one column more than it needs to be, and it breaks for ROOT. Since id is now unique across the entire scan for a
+location (shared counter, your decision), (parent_location_id, id) is already sufficient for uniqueness on its own — parent_folder_id doesn't add anything to the PK, it's just an 
+FK column. And the original DDL declared parent_folder_id INT NOT NULL, but the ROOT row has no parent folder (RootFolderEntity.getParentFolder() throws today) — so if 
+parent_folder_id is genuinely part of the primary key, ROOT can't have a row at all under a NOT NULL composite key.
+ANSWER 3:
+Yes, I acknowledge that <parent_location_id, id> is sufficient for the the persistent identity in the class, as well as the primary key constraint for the song_library table.
+In addition, the unique constraint be changed to <parent_location_id,name>
+
+primary key constraint:
+    parent_location_id,id
+unique constraint:
     parent_location_id,name
 
 
+I'd rather drop parent_folder_id from the PK and keep the PK as just (parent_location_id, id), with parent_folder_id staying a plain FK column that's simply NULL for the ROOT row 
+(every other row has it non-null). That matches what id's uniqueness already gives you for free and sidesteps the ROOT-row conflict entirely. Do you want that, or is there a reason 
+you want parent_folder_id in the key itself (e.g. some query/index shape) that I should design around instead — in which case how should ROOT be represented?
+
+Yes, per answer #3, I want to drop parent_folder_id from the PK and keep the PK as just (parent_location_id, id)
+
+
+I want to stress that for all these changes, that the file system repository persistence should be equivalent to database persistence.  To that end, one should be able to "convert"
+from one form to another (especially as a unit test)
+
+
+
+My answers are inline:
+1: Do you want AbstractEntity annotated @MappedSuperclass too (so version maps correctly from its new home), or would you rather version stay on 
+AbstractPersistentEntity specifically and be independently added to the future AbstractAssociativeEntity/AbstractLibraryEntity line 
+(since that's presumably why you moved it — so composite-key entities get a version too)?
+ANSWER 1:
+Yes, AbstractEntity should be annotated with @MappedSuperclass too.
+
+
+What's AbstractRepository's intended role — is its static counter meant to become the shared per-scan SongScanner counter from Decision 1 
+(in which case it needs a way to reset to 1 per scan, which seedNextPersistentIdentityFrom currently can't do, since it only ever moves the counter up), 
+or is it for something else (e.g. filesystem-repository id-minting across incremental reloads) that I shouldn't conflate with SongScanner's counter?
+ANSWER 2:
+Ignore AbstractRepository, as the counter in SongScanner from Decision 1 is all that will be needed to get unique integer values.
 
 
 
@@ -217,21 +420,28 @@ index:
 
 
 
+So when LocationService.getOrCreateOwnLocation() bootstraps the local LocationEntity on first boot, I want to confirm:
+
+Slave mode: create it with persistentIdentity = appProperties.getLocationId() (matching the id master already assigned), not an auto-generated one — otherwise the slave's 
+local record and master's record would disagree on id.
+ANSWER:
+create it with persistentIdentity = appProperties.getLocationId()
 
 
+Standalone mode (no master, app.location-id not required/set): auto-generate the id the same way registerLocation() does (locationRepository.nextPersistentIdentity(), falling 
+back to count+1 for the filesystem store).
+ANSWER:
+Auto-generate the id the same way registerLocation() does
 
 
+apiKeyHash on this local record: since nothing ever authenticates into a slave's own local LocationRepository (the real API-key check happens only on master, against 
+master's own copy of the location), I'll just generate a random throwaway hash for it (passwordEncoder.encode(<random>)) rather than trying to derive one from 
+app.location-api-key — that key is for outbound auth to master, a different secret than what apiKeyHash represents here.
+ANSWER:
+That is fine with me.
 
-
-
-
-
-
-
-
-
-
-
+Does that match what you had in mind, or should the local bootstrap path work differently?
+Yes, that matches what I had in mind.
 
 
 

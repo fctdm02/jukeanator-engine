@@ -24,6 +24,7 @@ import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
 import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
@@ -227,12 +228,14 @@ public class AppConfig {
       AppProperties appProperties,
       SongLibraryProperties songLibraryProperties,
       SongLibraryRepository repository,
+      LocationService locationService,
       SongScanner songScanner,
       ApplicationEventPublisher eventPublisher) {
-    
+
     return new SongLibraryServiceImpl(
         appProperties,
         repository,
+        locationService,
         songScanner,
         songLibraryProperties.getSearchResultSize(),
         eventPublisher);

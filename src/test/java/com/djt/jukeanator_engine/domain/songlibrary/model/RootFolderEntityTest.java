@@ -130,13 +130,13 @@ public class RootFolderEntityTest extends AbstractSongLibraryEntityTest {
     root.getArtistFromSong("Stray Cats");
 
     ArtistFromSongEntity artistFromSong = new ArtistFromSongEntity(root, "Stray Cats");
-    artistFromSong.setPersistentIdentity(99);
+    artistFromSong.setId(99);
     root.addArtistFromSong(artistFromSong);
 
     ArtistFromSongEntity retrieved = root.getArtistFromSong("Stray Cats");
     assertNotNull(retrieved);
     assertEquals("Stray Cats", retrieved.getName());
-    assertEquals(Integer.valueOf(99), retrieved.getPersistentIdentity());
+    assertEquals(Integer.valueOf(99), retrieved.getId());
   }
 
   // ─────────────────────────────────────────────────────────────────────────

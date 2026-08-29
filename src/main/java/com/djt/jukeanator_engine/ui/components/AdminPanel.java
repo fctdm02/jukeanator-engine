@@ -26,6 +26,7 @@ import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -51,6 +52,8 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
+import com.djt.jukeanator_engine.domain.location.dto.UpdateLocationInfoRequest;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
@@ -343,6 +346,7 @@ public class AdminPanel extends JPanel {
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton("Add Admin\nUser", ColorTheme.get().accentGold, e -> doAddAdminUser()));
     strip.add(sideButton("Add\nLocation", ColorTheme.get().accentGold, e -> doAddLocation()));
+    strip.add(sideButton("Edit Location\nInfo", ColorTheme.get().accentGold, e -> doEditLocationInfo()));
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton("⊟ Minimize", ColorTheme.get().accentBlue, e -> doMinimize()));
     strip.add(sideButton("✕ Exit", ColorTheme.get().accentRed, e -> doExit()));
@@ -878,6 +882,194 @@ public class AdminPanel extends JPanel {
 
       c.gridx = 1;
       panel.add(field, c);
+    }
+  }
+
+  private void doEditLocationInfo() {
+
+    SwingSecurityUtil.runAsync(() -> {
+      try {
+        LocationEntity current = locationService.getOrCreateOwnLocation(null);
+        SwingUtilities
+            .invokeLater(() -> new EditLocationInfoDialog(ownerFrame, current).setVisible(true));
+      } catch (Exception ex) {
+        ex.printStackTrace();
+        SwingUtilities.invokeLater(() -> showOverlayMessage("Error",
+            "Could not load location info: "
+                + (ex.getMessage() != null ? ex.getMessage() : ex.toString()),
+            ColorTheme.get().accentRed));
+      }
+    });
+  }
+
+  /**
+   * Custom (non-{@code JOptionPane}) modal prompt for editing this standalone/slave instance's own
+   * {@link LocationEntity} -- name, coordinates, logo, geofencing -- via
+   * {@link LocationService#updateOwnLocationInfo(UpdateLocationInfoRequest)}. Pre-filled from the
+   * current record (fetched on {@link #doEditLocationInfo}, before this dialog is constructed).
+   */
+  private class EditLocationInfoDialog extends JDialog {
+
+    private static final long serialVersionUID = 1L;
+
+    private final JTextField nameField = new JTextField(18);
+    private final JTextField latitudeField = new JTextField(18);
+    private final JTextField longitudeField = new JTextField(18);
+    private final JTextField logoNameField = new JTextField(18);
+    private final JCheckBox geoFencedCheckBox = new JCheckBox("Geo-fenced");
+    private final JLabel errorLabel = new JLabel(" ");
+
+    EditLocationInfoDialog(Frame owner, LocationEntity current) {
+      super(owner, "Edit Location Info", true);
+
+      getContentPane().setBackground(ColorTheme.get().bgOverlayCard);
+      setLayout(new BorderLayout(0, 16));
+      ((JPanel) getContentPane()).setBorder(new EmptyBorder(20, 24, 16, 24));
+
+      JLabel title = new JLabel("Edit Location Info");
+      title.setForeground(ColorTheme.get().accentGold);
+      title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+      add(title, BorderLayout.NORTH);
+
+      nameField.setText(current.getName());
+      latitudeField
+          .setText(current.getLatitude() != null ? String.valueOf(current.getLatitude()) : "");
+      longitudeField
+          .setText(current.getLongitude() != null ? String.valueOf(current.getLongitude()) : "");
+      logoNameField.setText(current.getLogoName() != null ? current.getLogoName() : "");
+      geoFencedCheckBox.setSelected(current.isGeoFenced());
+
+      add(buildFieldsPanel(), BorderLayout.CENTER);
+      add(buildButtonRow(), BorderLayout.SOUTH);
+
+      getRootPane().registerKeyboardAction(e -> dispose(),
+          javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+          javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+      pack();
+      setResizable(false);
+      setLocationRelativeTo(owner);
+    }
+
+    private JPanel buildFieldsPanel() {
+
+      JPanel fields = new JPanel(new GridBagLayout());
+      fields.setOpaque(false);
+
+      GridBagConstraints c = new GridBagConstraints();
+      c.insets = new Insets(6, 6, 6, 6);
+      c.anchor = GridBagConstraints.WEST;
+
+      addFieldRow(fields, c, 0, "Name:", nameField);
+      addFieldRow(fields, c, 1, "Latitude:", latitudeField);
+      addFieldRow(fields, c, 2, "Longitude:", longitudeField);
+      addFieldRow(fields, c, 3, "Logo Name:", logoNameField);
+
+      geoFencedCheckBox.setOpaque(false);
+      geoFencedCheckBox.setForeground(ColorTheme.get().textPrimary);
+      geoFencedCheckBox.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
+      c.gridx = 0;
+      c.gridy = 4;
+      c.gridwidth = 2;
+      fields.add(geoFencedCheckBox, c);
+
+      c.gridy = 5;
+      c.insets = new Insets(2, 6, 0, 6);
+      errorLabel.setForeground(ColorTheme.get().accentRed);
+      errorLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      fields.add(errorLabel, c);
+
+      return fields;
+    }
+
+    private void addFieldRow(JPanel fields, GridBagConstraints c, int row, String labelText,
+        JTextField field) {
+
+      JLabel label = new JLabel(labelText);
+      label.setForeground(ColorTheme.get().textSecondary);
+      label.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
+
+      field.setForeground(ColorTheme.get().textPrimary);
+      field.setBackground(ColorTheme.get().bgFieldDark);
+      field.setCaretColor(ColorTheme.get().accentBlue);
+      field.setBorder(BorderFactory.createCompoundBorder(
+          BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
+          new EmptyBorder(4, 6, 4, 6)));
+
+      c.gridx = 0;
+      c.gridy = row;
+      c.gridwidth = 1;
+      fields.add(label, c);
+
+      c.gridx = 1;
+      fields.add(field, c);
+    }
+
+    private JPanel buildButtonRow() {
+
+      JButton saveBtn = new JButton("Save Changes");
+      styleOverlayButton(saveBtn);
+      saveBtn.addActionListener(e -> attemptSave());
+
+      JButton cancelBtn = new JButton("Cancel");
+      styleOverlayButton(cancelBtn);
+      cancelBtn.addActionListener(e -> dispose());
+
+      JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
+      row.setOpaque(false);
+      row.add(saveBtn);
+      row.add(cancelBtn);
+      return row;
+    }
+
+    private void attemptSave() {
+
+      String name = nameField.getText().trim();
+      String latitudeText = latitudeField.getText().trim();
+      String longitudeText = longitudeField.getText().trim();
+      String logoName = logoNameField.getText().trim();
+
+      if (name.isEmpty() || latitudeText.isEmpty() || longitudeText.isEmpty()) {
+        errorLabel.setText("Name, latitude, and longitude are required.");
+        return;
+      }
+
+      final double latitude;
+      final double longitude;
+      try {
+        latitude = Double.parseDouble(latitudeText);
+        longitude = Double.parseDouble(longitudeText);
+      } catch (NumberFormatException nfe) {
+        errorLabel.setText("Latitude and longitude must be numbers.");
+        return;
+      }
+
+      if (latitude < -90 || latitude > 90) {
+        errorLabel.setText("Latitude must be between -90 and 90.");
+        return;
+      }
+      if (longitude < -180 || longitude > 180) {
+        errorLabel.setText("Longitude must be between -180 and 180.");
+        return;
+      }
+
+      UpdateLocationInfoRequest request = new UpdateLocationInfoRequest(name,
+          Double.valueOf(latitude), Double.valueOf(longitude), logoName.isEmpty() ? null : logoName,
+          geoFencedCheckBox.isSelected());
+
+      SwingSecurityUtil.runAsync(() -> {
+        try {
+          locationService.updateOwnLocationInfo(request);
+          SwingUtilities.invokeLater(() -> {
+            dispose();
+            showOverlayMessage("Location Updated", "Location info saved.",
+                ColorTheme.get().accentGreen);
+          });
+        } catch (Exception ex) {
+          SwingUtilities.invokeLater(() -> errorLabel.setText(
+              ex.getMessage() != null ? ex.getMessage() : "Could not update location info."));
+        }
+      });
     }
   }
 
