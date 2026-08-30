@@ -153,10 +153,10 @@ public class JukeANatorFrame extends JFrame {
   // listener knows not to fight the intentional minimize.
   private boolean adminMinimizeRequested = false;
 
-  // Guards the tab ChangeListener against spurious resets that fire when the
-  // overlay card system shows or hides — neither action is a genuine tab switch.
-  private boolean overlayTransitionInProgress = false;
-  private int lastSelectedTabIndex = -1;
+  // Set once the HOT HERE idle-reset has fired for the current idle episode, so the
+  // once-per-second IdleMonitor tick doesn't re-run the reset every tick while the
+  // machine stays idle. Cleared on the next real activity.
+  private boolean hotHereIdleResetDone = false;
 
   private AddSongToQueueCard addSongToQueueCard;
   private EditAlbumCard editAlbumCard;
@@ -365,7 +365,6 @@ public class JukeANatorFrame extends JFrame {
         // CASE 1: If AdminPanel is currently showing, return to the previous screen
         if (contentPanelTabs.getSelectedIndex() == 6) {
           contentPanelTabs.setSelectedIndex(preAdminTabIndex);
-          lastSelectedTabIndex = preAdminTabIndex;
           return;
         }
 
@@ -380,7 +379,6 @@ public class JukeANatorFrame extends JFrame {
         preAdminTabIndex = contentPanelTabs.getSelectedIndex();
 
         contentPanelTabs.setSelectedIndex(6);
-        lastSelectedTabIndex = 6;
       }
     });
 
@@ -425,9 +423,14 @@ public class JukeANatorFrame extends JFrame {
     }
 
     // After 10 minutes of no mouse/keyboard activity, return the jukebox to the
-    // HOT HERE tab (index 3) so an idle machine settles back on the promotional
-    // screen. Don't yank the Admin panel (tab index 6) out from under a
-    // technician who is reading the screen with no input.
+    // HOT HERE tab (index 3) and reset it to its default view, so an idle machine
+    // settles back on the promotional screen exactly as it looks after a fresh
+    // reset — regardless of which tab was active, or whether Hot Here was already
+    // showing but scrolled/drilled into a detail card. Don't yank the Admin panel
+    // (tab index 6) out from under a technician who is reading the screen with no
+    // input. hotHereIdleResetDone holds the reset to once per idle episode — the
+    // IdleMonitor timer ticks every second once idle, and onActive re-arms it on
+    // the next real activity.
     new IdleMonitor(10 * 60_000L,
 
         () -> SwingUtilities.invokeLater(() -> {
@@ -436,11 +439,16 @@ public class JukeANatorFrame extends JFrame {
             return;
           }
 
+          if (hotHereIdleResetDone) {
+            return;
+          }
+          hotHereIdleResetDone = true;
+
           contentPanelTabs.setSelectedIndex(3);
+          hotHerePanel.resetToDefaultView();
         }),
 
-        () -> {
-        });
+        () -> hotHereIdleResetDone = false);
 
     // ── HIBERNATION ────────────────────────────────────────────────────
     if (this.enableHibernation) {
@@ -812,29 +820,6 @@ public class JukeANatorFrame extends JFrame {
 
     // Select HOT HERE (index 3) as the default visible tab
     tabs.setSelectedIndex(3);
-    lastSelectedTabIndex = 3;
-
-    // Reset each tab to its default state when the user switches to it.
-    // Suppress resets triggered by the overlay card system showing/hiding
-    // (both transitions make the JTabbedPane hidden/visible, which spuriously
-    // fires this listener even though the selected index hasn't changed).
-    tabs.addChangeListener(e -> {
-      if (overlayTransitionInProgress)
-        return;
-      int selected = tabs.getSelectedIndex();
-      if (selected == lastSelectedTabIndex)
-        return;
-      lastSelectedTabIndex = selected;
-      switch (selected) {
-        case 1 -> homePanel.resetToDefaultView();
-        case 2 -> searchPanel.resetToDefaultView();
-        case 3 -> hotHerePanel.resetToDefaultView();
-        case 4 -> genrePanel.resetToDefaultView();
-        case 5 -> queuePanel.resetToDefaultView();
-        default -> {
-          /* DUMMY and ADMIN require no reset */ }
-      }
-    });
 
     return tabs;
   }
@@ -1371,9 +1356,7 @@ public class JukeANatorFrame extends JFrame {
 
   /** Returns to the TABS card — the previously-active tab/state is preserved as-is. */
   private void hideOverlay() {
-    overlayTransitionInProgress = true;
     overlayCardLayout.show(overlayRoot, CARD_TABS);
-    overlayTransitionInProgress = false;
     requestFocusInWindow();
   }
 
@@ -1474,10 +1457,7 @@ public class JukeANatorFrame extends JFrame {
       public void popToRoot() {
         nowPlayingAlbumCard = null;
         hideOverlay();
-        overlayTransitionInProgress = true;
         contentPanelTabs.setSelectedIndex(returnTabIndex);
-        lastSelectedTabIndex = returnTabIndex;
-        overlayTransitionInProgress = false;
       }
 
       @Override
@@ -1493,9 +1473,7 @@ public class JukeANatorFrame extends JFrame {
     nowPlayingAlbumCard.setOpaque(false);
 
     replaceOverlayCard(CARD_NOW_PLAYING_ALBUM, nowPlayingAlbumCard);
-    overlayTransitionInProgress = true;
     overlayCardLayout.show(overlayRoot, CARD_NOW_PLAYING_ALBUM);
-    overlayTransitionInProgress = false;
   }
 
   /**
@@ -1514,9 +1492,7 @@ public class JukeANatorFrame extends JFrame {
       editAlbumCard.editAlbum(selectedAlbum, invalidAlbumsList);
     }
 
-    overlayTransitionInProgress = true;
     overlayCardLayout.show(overlayRoot, CARD_EDIT_ALBUM);
-    overlayTransitionInProgress = false;
   }
 
   /**
@@ -1543,15 +1519,12 @@ public class JukeANatorFrame extends JFrame {
           // Switch to the Admin panel without making the tab visible or enabled —
           // the tab header stays permanently hidden so it cannot be clicked directly.
           contentPanelTabs.setSelectedIndex(6);
-          lastSelectedTabIndex = 6;
         }), /* onDismiss */ this::hideOverlay);
 
     loginToAdminPanelCard.setOpaque(false);
 
     replaceOverlayCard(CARD_LOGIN, loginToAdminPanelCard);
-    overlayTransitionInProgress = true;
     overlayCardLayout.show(overlayRoot, CARD_LOGIN);
-    overlayTransitionInProgress = false;
     loginToAdminPanelCard.onShown();
   }
 
@@ -1567,7 +1540,6 @@ public class JukeANatorFrame extends JFrame {
 
     preAdminTabIndex = contentPanelTabs.getSelectedIndex();
     contentPanelTabs.setSelectedIndex(6);
-    lastSelectedTabIndex = 6;
     adminPanel.showScanFileSystemDialog();
   }
 

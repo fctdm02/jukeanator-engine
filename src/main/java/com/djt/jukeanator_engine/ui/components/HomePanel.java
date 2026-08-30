@@ -177,17 +177,6 @@ public class HomePanel extends JPanel implements TabNavigator {
     cardLayout.show(rootPanel, detailReturnCard);
   }
 
-  /**
-   * Resets the Home tab to the root album grid. Unlike the other tabs' resetToDefaultView(), this
-   * does not reset the page or selected letter — it shows the grid exactly as the user left it,
-   * at whatever page/letter and sort order were last active.
-   */
-  public void resetToDefaultView() {
-    currentDetailCard = null;
-    detailReturnCard = CARD_GRID;
-    cardLayout.show(rootPanel, CARD_GRID);
-  }
-
   // ─────────────────────────────────────────────────────────────────────────
   // ARTIST CARD
   // ─────────────────────────────────────────────────────────────────────────

@@ -163,14 +163,6 @@ public class SearchPanel extends JPanel implements TabNavigator {
     cardLayout.show(rootPanel, detailReturnCard);
   }
 
-  /**
-   * Resets the Search tab to its initial entry state (blank query, no results). Called whenever the
-   * user switches to this tab.
-   */
-  public void resetToDefaultView() {
-    resetSearch();
-  }
-
   // ─────────────────────────────────────────────────────────────────────────
   // HERO PANEL WITH ENHANCED LIGHTENING GLASS OVERLAY
   // ─────────────────────────────────────────────────────────────────────────

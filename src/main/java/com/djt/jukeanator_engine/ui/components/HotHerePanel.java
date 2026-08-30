@@ -375,7 +375,9 @@ public class HotHerePanel extends JPanel implements TabNavigator {
    * Resets the Hot Here tab to its default view: returns to the content card and scrolls all three
    * result columns back to their first page. Does NOT re-query the service — the existing results
    * data is kept intact so that the event-driven popularity update path remains the sole source of
-   * refreshed data.
+   * refreshed data. Called by {@link JukeANatorFrame}'s idle monitor after 10 minutes of
+   * inactivity — not by ordinary tab switching, so navigating within Hot Here and switching away
+   * and back leaves the view exactly as it was left.
    */
   public void resetToDefaultView() {
     currentDetailCard = null;

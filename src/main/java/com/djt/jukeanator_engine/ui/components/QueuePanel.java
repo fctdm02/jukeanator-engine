@@ -148,17 +148,6 @@ public class QueuePanel extends JPanel {
     requestFocusInWindow();
   }
 
-  /**
-   * Resets the Queue tab to its default view: clears the current row selection and refreshes the
-   * queue list, matching the {@code resetToDefaultView()} contract used by Home / Search / Hot
-   * Here / Genres when the tab is switched to.
-   */
-  public void resetToDefaultView() {
-    selectedIndex = -1;
-    rebuildQueueRows();
-    requestFocusInWindow();
-  }
-
   // ── Layout ────────────────────────────────────────────────────────────────
 
   private JPanel buildMainPanel() {
