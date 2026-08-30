@@ -153,10 +153,10 @@ public class JukeANatorFrame extends JFrame {
   // listener knows not to fight the intentional minimize.
   private boolean adminMinimizeRequested = false;
 
-  // Set once the HOT HERE idle-reset has fired for the current idle episode, so the
-  // once-per-second IdleMonitor tick doesn't re-run the reset every tick while the
-  // machine stays idle. Cleared on the next real activity.
-  private boolean hotHereIdleResetDone = false;
+  // Set once the idle-timeout, reset-every-tab-to-default behavior has fired for the
+  // current idle episode, so the once-per-second IdleMonitor tick doesn't re-run the
+  // reset every tick while the machine stays idle. Cleared on the next real activity.
+  private boolean idleResetDone = false;
 
   private AddSongToQueueCard addSongToQueueCard;
   private EditAlbumCard editAlbumCard;
@@ -422,15 +422,14 @@ public class JukeANatorFrame extends JFrame {
           }));
     }
 
-    // After 10 minutes of no mouse/keyboard activity, return the jukebox to the
-    // HOT HERE tab (index 3) and reset it to its default view, so an idle machine
-    // settles back on the promotional screen exactly as it looks after a fresh
-    // reset — regardless of which tab was active, or whether Hot Here was already
-    // showing but scrolled/drilled into a detail card. Don't yank the Admin panel
-    // (tab index 6) out from under a technician who is reading the screen with no
-    // input. hotHereIdleResetDone holds the reset to once per idle episode — the
-    // IdleMonitor timer ticks every second once idle, and onActive re-arms it on
-    // the next real activity.
+    // After 10 minutes of no mouse/keyboard activity, reset every tab to its default
+    // view and bring the jukebox to rest on the HOT HERE tab (index 3), so an idle
+    // machine settles back on the promotional screen exactly as it looks after a
+    // fresh start — regardless of which tab was active, or how far the user had
+    // navigated into any of them. Don't yank the Admin panel (tab index 6) out from
+    // under a technician who is reading the screen with no input. idleResetDone
+    // holds the reset to once per idle episode — the IdleMonitor timer ticks every
+    // second once idle, and onActive re-arms it on the next real activity.
     new IdleMonitor(10 * 60_000L,
 
         () -> SwingUtilities.invokeLater(() -> {
@@ -439,16 +438,21 @@ public class JukeANatorFrame extends JFrame {
             return;
           }
 
-          if (hotHereIdleResetDone) {
+          if (idleResetDone) {
             return;
           }
-          hotHereIdleResetDone = true;
+          idleResetDone = true;
+
+          homePanel.resetToDefaultView();
+          searchPanel.resetToDefaultView();
+          hotHerePanel.resetToDefaultView();
+          genrePanel.resetToDefaultView();
+          queuePanel.resetToDefaultView();
 
           contentPanelTabs.setSelectedIndex(3);
-          hotHerePanel.resetToDefaultView();
         }),
 
-        () -> hotHereIdleResetDone = false);
+        () -> idleResetDone = false);
 
     // ── HIBERNATION ────────────────────────────────────────────────────
     if (this.enableHibernation) {

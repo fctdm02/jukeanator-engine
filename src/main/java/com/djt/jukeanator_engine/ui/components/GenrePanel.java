@@ -185,6 +185,18 @@ public class GenrePanel extends JPanel implements TabNavigator {
     cardLayout.show(rootPanel, detailReturnCard);
   }
 
+  /**
+   * Resets the Genres tab to the top-level genre grid. Called after 10 minutes of inactivity, as
+   * part of resetting every tab to its default state.
+   */
+  public void resetToDefaultView() {
+    currentDetailCard = null;
+    detailReturnCard = CARD_GENRES;
+    currentPage = 0;
+    refreshGenresUI();
+    cardLayout.show(rootPanel, CARD_GENRES);
+  }
+
   private JPanel buildGenreGridCard() {
 
     JPanel pageWrapper = new JPanel(new BorderLayout());

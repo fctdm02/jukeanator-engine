@@ -148,6 +148,17 @@ public class QueuePanel extends JPanel {
     requestFocusInWindow();
   }
 
+  /**
+   * Resets the Queue tab to its default view: clears the current row selection and refreshes the
+   * queue list. Called after 10 minutes of inactivity, as part of resetting every tab to its
+   * default state.
+   */
+  public void resetToDefaultView() {
+    selectedIndex = -1;
+    rebuildQueueRows();
+    requestFocusInWindow();
+  }
+
   // ── Layout ────────────────────────────────────────────────────────────────
 
   private JPanel buildMainPanel() {
