@@ -19,7 +19,7 @@ app:
   # elsewhere. The song library's own music-folder location is discovered from whatever's
   # already stored here, or (on first run) via the JFC/Swing "scan for songs" prompt.
   # data-dir: C:\kiosk\data
-  data-dir: ~  
+  # data-dir: ~  
 
 logging:
   level:
