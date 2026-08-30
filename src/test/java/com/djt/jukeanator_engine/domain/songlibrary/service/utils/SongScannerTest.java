@@ -13,6 +13,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -58,8 +59,14 @@ public class SongScannerTest {
 
   private SongScanner newScanner(boolean requiresMetadata, boolean useGenre,
       boolean useTopFolderForGenre) {
+    return newScanner(requiresMetadata, false, useGenre, useTopFolderForGenre);
+  }
+
+  private SongScanner newScanner(boolean requiresMetadata, boolean disableInternetSearch,
+      boolean useGenre, boolean useTopFolderForGenre) {
     return new SongScanner(discogsClientWrapper, musicBrainzClientWrapper, jAudioTaggerClient,
-        coverArtDownloader, requiresMetadata, useGenre, useTopFolderForGenre, MP3_ONLY);
+        coverArtDownloader, requiresMetadata, disableInternetSearch, useGenre,
+        useTopFolderForGenre, MP3_ONLY);
   }
 
   private void writeFile(Path dir, String filename) throws IOException {
@@ -85,39 +92,39 @@ public class SongScannerTest {
   @Test
   public void constructorRejectsNullDiscogsClientWrapper() {
     assertThrows(NullPointerException.class, () -> new SongScanner(null, musicBrainzClientWrapper,
-        jAudioTaggerClient, coverArtDownloader, false, false, false, MP3_ONLY));
+        jAudioTaggerClient, coverArtDownloader, false, false, false, false, MP3_ONLY));
   }
 
   @Test
   public void constructorRejectsNullMusicBrainzClientWrapper() {
     assertThrows(NullPointerException.class, () -> new SongScanner(discogsClientWrapper, null,
-        jAudioTaggerClient, coverArtDownloader, false, false, false, MP3_ONLY));
+        jAudioTaggerClient, coverArtDownloader, false, false, false, false, MP3_ONLY));
   }
 
   @Test
   public void constructorRejectsNullJAudioTaggerClient() {
     assertThrows(NullPointerException.class, () -> new SongScanner(discogsClientWrapper,
-        musicBrainzClientWrapper, null, coverArtDownloader, false, false, false, MP3_ONLY));
+        musicBrainzClientWrapper, null, coverArtDownloader, false, false, false, false, MP3_ONLY));
   }
 
   @Test
   public void constructorRejectsNullCoverArtDownloader() {
     assertThrows(NullPointerException.class, () -> new SongScanner(discogsClientWrapper,
-        musicBrainzClientWrapper, jAudioTaggerClient, null, false, false, false, MP3_ONLY));
+        musicBrainzClientWrapper, jAudioTaggerClient, null, false, false, false, false, MP3_ONLY));
   }
 
   @Test
   public void constructorRejectsNullAcceptedExtensions() {
     assertThrows(NullPointerException.class,
         () -> new SongScanner(discogsClientWrapper, musicBrainzClientWrapper, jAudioTaggerClient,
-            coverArtDownloader, false, false, false, null));
+            coverArtDownloader, false, false, false, false, null));
   }
 
   @Test
   public void constructorRejectsEmptyAcceptedExtensions() {
     assertThrows(IllegalStateException.class,
         () -> new SongScanner(discogsClientWrapper, musicBrainzClientWrapper, jAudioTaggerClient,
-            coverArtDownloader, false, false, false, Set.of()));
+            coverArtDownloader, false, false, false, false, Set.of()));
   }
 
   @Test
@@ -409,6 +416,45 @@ public class SongScannerTest {
   }
 
   // =========================================================================================
+  // disableInternetSearch
+  // =========================================================================================
+
+  @Test
+  public void scanFileSystemForSongsSkipsInternetFallbackWhenDisableInternetSearchIsTrue(
+      @TempDir Path root) throws IOException {
+
+    writeFile(root.resolve("ArtistA/AlbumA"), "ArtistA-01-SongOne.mp3");
+
+    SongScanner scanner = newScanner(true, true, false, false);
+    scanner.scanFileSystemForSongs(root.toString());
+
+    verifyNoInteractions(discogsClientWrapper, musicBrainzClientWrapper, coverArtDownloader);
+  }
+
+  @Test
+  public void searchInternetForAlbumMetadataStillWorksWhenDisableInternetSearchIsTrue() {
+
+    AlbumMetadataDto dto = new AlbumMetadataDto("Artist", "Album", "Label", "2000", "Rock", "", false);
+    when(musicBrainzClientWrapper.searchForAlbumMetadata("Artist", "Album", false, 3))
+        .thenReturn(List.of(dto));
+
+    SongScanner scanner = newScanner(false, true, false, false);
+    List<AlbumMetadataDto> results = scanner.searchInternetForAlbumMetadata("Artist", "Album", 3);
+
+    assertEquals(1, results.size());
+    assertSame(dto, results.get(0));
+  }
+
+  @Test
+  public void downloadCoverArtStillDelegatesWhenDisableInternetSearchIsTrue() {
+
+    SongScanner scanner = newScanner(false, true, false, false);
+    scanner.downloadCoverArt("/path/to/cover.jpg", "http://example.com/x.jpg");
+
+    verify(coverArtDownloader).downloadCoverArt("/path/to/cover.jpg", "http://example.com/x.jpg");
+  }
+
+  // =========================================================================================
   // searchInternetForAlbumMetadata / downloadCoverArt
   // =========================================================================================
 
@@ -499,12 +545,13 @@ public class SongScannerTest {
     JAudioTaggerClient jAudioTaggerClient = new JAudioTaggerClient();
     CoverArtDownloader coverArtDownloader = new CoverArtDownloader();
     boolean requiresMetadata = true;
+    boolean disableInternetSearch = false;
     boolean useGenre = true;
     boolean useTopFolderForGenre = true;
     Set<String> acceptedSongFileExtensions = Set.of(".mp3");
     SongScanner songScanner = new SongScanner(discogsClientWrapper, musicBrainzClientWrapper,
-        jAudioTaggerClient, coverArtDownloader, requiresMetadata, useGenre, useTopFolderForGenre,
-        acceptedSongFileExtensions);
+        jAudioTaggerClient, coverArtDownloader, requiresMetadata, disableInternetSearch, useGenre,
+        useTopFolderForGenre, acceptedSongFileExtensions);
     String rootPath =
         "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/utils/SongScannerTest/RequireMetadataUseGenreTopFolder/";
 

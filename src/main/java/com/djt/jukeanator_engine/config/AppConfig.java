@@ -142,6 +142,7 @@ public class AppConfig {
         jAudioTaggerClient,
         coverArtDownloader,
         songLibraryProperties.isRequiresMetadata(),
+        songLibraryProperties.isDisableInternetSearch(),
         songLibraryProperties.isUseGenre(),
         songLibraryProperties.isUseTopFolderForGenre(),
         songLibraryProperties.getAcceptedSongFileExtensions());

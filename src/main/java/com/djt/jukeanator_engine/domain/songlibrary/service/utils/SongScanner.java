@@ -27,6 +27,7 @@ public final class SongScanner {
 
   private RootFolderEntity rootFolder;
   private boolean requiresMetadata;
+  private boolean disableInternetSearch;
   private boolean useGenre;
   private boolean useTopFolderForGenre;
   private Set<String> acceptedSongFileExtensions;
@@ -43,8 +44,9 @@ public final class SongScanner {
 
   public SongScanner(DiscogsClientWrapper discogsClientWrapper,
       MusicBrainzClientWrapper musicBrainzClientWrapper, JAudioTaggerClient jAudioTaggerClient,
-      CoverArtDownloader coverArtDownloader, boolean requiresMetadata, boolean useGenre,
-      boolean useTopFolderForGenre, Set<String> acceptedSongFileExtensions) {
+      CoverArtDownloader coverArtDownloader, boolean requiresMetadata,
+      boolean disableInternetSearch, boolean useGenre, boolean useTopFolderForGenre,
+      Set<String> acceptedSongFileExtensions) {
     requireNonNull(discogsClientWrapper, "discogsClientWrapper cannot be null");
     requireNonNull(musicBrainzClientWrapper, "musicBrainzClientWrapper cannot be null");
     requireNonNull(jAudioTaggerClient, "jAudioTaggerClient cannot be null");
@@ -55,6 +57,7 @@ public final class SongScanner {
     this.jAudioTaggerClient = jAudioTaggerClient;
     this.coverArtDownloader = coverArtDownloader;
     this.requiresMetadata = requiresMetadata;
+    this.disableInternetSearch = disableInternetSearch;
     this.useGenre = useGenre;
     this.useTopFolderForGenre = useTopFolderForGenre;
     this.acceptedSongFileExtensions = acceptedSongFileExtensions;
@@ -226,7 +229,7 @@ public final class SongScanner {
       // Execute the post-processing track correction and compilation analysis
       album.postProcessSongs();
 
-      if (!hasValidCoverArt || (requiresMetadata && !hasValidMetadata)) {
+      if (!disableInternetSearch && (!hasValidCoverArt || (requiresMetadata && !hasValidMetadata))) {
 
         List<AlbumMetadataDto> albumMetadataResults = searchInternetForAlbumMetadata(album);
 

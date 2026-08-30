@@ -17,6 +17,7 @@ import org.springframework.validation.annotation.Validated;
 public class SongLibraryProperties {
 
   private boolean requiresMetadata;
+  private boolean disableInternetSearch;
   private boolean useGenre;
   private boolean useTopFolderForGenre;
   private Set<String> acceptedSongFileExtensions;
@@ -52,6 +53,14 @@ public class SongLibraryProperties {
 
   public void setRequiresMetadata(boolean requiresMetadata) {
     this.requiresMetadata = requiresMetadata;
+  }
+
+  public boolean isDisableInternetSearch() {
+    return disableInternetSearch;
+  }
+
+  public void setDisableInternetSearch(boolean disableInternetSearch) {
+    this.disableInternetSearch = disableInternetSearch;
   }
 
   public boolean isUseGenre() {
