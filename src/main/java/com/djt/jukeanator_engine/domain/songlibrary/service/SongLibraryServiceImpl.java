@@ -268,7 +268,7 @@ public class SongLibraryServiceImpl
    * replacing underscores with spaces -- the inverse of
    * {@code SongLibraryRepositoryFileSystemImpl.sanitizeLocationNameForFilename}, which replaces
    * spaces (and other filesystem-unsafe characters) with underscores when writing. E.g.
-   * {@code Rock_On_Third.oos} -> {@code "Rock On Third"}.
+   * {@code Location_Name.oos} -> {@code "Location Name"}.
    */
   private String deriveLocationNameFromOosFilename(Path oosFile) {
 
@@ -972,6 +972,23 @@ public class SongLibraryServiceImpl
   @Override
   public void reinitializeOwnLocation() {
     initialize();
+  }
+
+  @Override
+  public void renameOwnLocationLibraryFileIfNameChanged(String previousLocationName) {
+
+    requireNotMaster();
+
+    // getLocationName() delegates to parentLocation.getName() -- the very same LocationEntity
+    // LocationService#updateOwnLocationInfo just mutated in place, so this already reflects the
+    // new name by the time this is called.
+    String currentLocationName = this.ownRoot.getLocationName();
+    if (Objects.equals(previousLocationName, currentLocationName)) {
+      return;
+    }
+
+    this.songLibraryRepository.renameLocationLibraryFile(previousLocationName,
+        currentLocationName);
   }
 
   @Override

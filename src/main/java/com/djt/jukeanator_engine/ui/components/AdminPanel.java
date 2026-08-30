@@ -919,8 +919,15 @@ public class AdminPanel extends JPanel {
     private final JCheckBox geoFencedCheckBox = new JCheckBox("Geo-fenced");
     private final JLabel errorLabel = new JLabel(" ");
 
+    // Captured before any edit, so the song-library file can be renamed from its old name to
+    // whatever the name field is saved as -- current.getName() itself can't be read again after
+    // the save, since updateOwnLocationInfo mutates this same LocationEntity instance in place.
+    private final String originalName;
+
     EditLocationInfoDialog(Frame owner, LocationEntity current) {
       super(owner, "Edit Location Info", true);
+
+      this.originalName = current.getName();
 
       getContentPane().setBackground(ColorTheme.get().bgOverlayCard);
       setLayout(new BorderLayout(0, 16));
@@ -1060,6 +1067,15 @@ public class AdminPanel extends JPanel {
       SwingSecurityUtil.runAsync(() -> {
         try {
           locationService.updateOwnLocationInfo(request);
+          try {
+            // Best-effort: the name update itself already succeeded above, and a startup-time
+            // fallback (SongLibraryRepositoryFileSystemImpl.loadAggregateRoot) reconciles a
+            // stale filename on next restart regardless -- so a rename failure here shouldn't
+            // undo/block the location info that was just saved.
+            songLibraryService.renameOwnLocationLibraryFileIfNameChanged(originalName);
+          } catch (Exception renameEx) {
+            renameEx.printStackTrace();
+          }
           SwingUtilities.invokeLater(() -> {
             dispose();
             showOverlayMessage("Location Updated", "Location info saved.",

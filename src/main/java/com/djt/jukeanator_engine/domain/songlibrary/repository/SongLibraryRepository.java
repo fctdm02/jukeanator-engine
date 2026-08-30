@@ -27,6 +27,19 @@ public interface SongLibraryRepository extends AggregateRootRepository<RootFolde
   }
 
   /**
+   * Renames the persisted {@code .oos} file from {@code oldLocationName}'s expected filename to
+   * {@code newLocationName}'s, if it exists and the name actually changed -- called right after
+   * {@code LocationService#updateOwnLocationInfo} edits this instance's own location's name (e.g.
+   * via the Admin Panel's "Edit Location Info" dialog), so the file takes its new name
+   * immediately instead of waiting for the next restart's load-time reconciliation (see {@link
+   * #OOS_FILE_EXTENSION}'s javadoc). A no-op by default -- non-filesystem-backed implementations
+   * (e.g. JPA) have no per-location file to rename.
+   */
+  default void renameLocationLibraryFile(String oldLocationName, String newLocationName) {
+    // no-op by default
+  }
+
+  /**
    *
    * @throws EntityDoesNotExistException
    */

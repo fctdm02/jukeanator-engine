@@ -10,6 +10,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.slf4j.Logger;
@@ -229,7 +230,35 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
     return basePath + File.separator + sanitizeLocationNameForFilename(locationName)
         + SongLibraryRepository.OOS_FILE_EXTENSION;
   }
-  
+
+  @Override
+  public void renameLocationLibraryFile(String oldLocationName, String newLocationName) {
+
+    if (Objects.equals(oldLocationName, newLocationName)) {
+      return;
+    }
+
+    Path oldFile = Path.of(buildExpectedFilePath(oldLocationName));
+    if (!Files.exists(oldFile)) {
+      log.info("No song library file at {} to rename for location name change '{}' -> '{}' -- "
+          + "nothing to do (e.g. a fresh install with no library persisted yet).", oldFile,
+          oldLocationName, newLocationName);
+      return;
+    }
+
+    Path newFile = Path.of(buildExpectedFilePath(newLocationName));
+    try {
+      Files.move(oldFile, newFile);
+      this.resolvedFilePath = newFile.toString();
+      log.info("Renamed song library file from {} to {} to match new location name.", oldFile,
+          newFile);
+    } catch (IOException ioe) {
+      throw new SongLibraryServiceException("Could not rename song library file from " + oldFile
+          + " to " + newFile + ": " + ioe.getMessage(), ioe);
+    }
+  }
+
+
   @Override
   public Integer updateNumPlaysForSong(
       RootFolderEntity root, 

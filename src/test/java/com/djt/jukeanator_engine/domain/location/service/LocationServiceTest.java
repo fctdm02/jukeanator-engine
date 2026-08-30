@@ -123,7 +123,7 @@ public class LocationServiceTest {
     LocationSummaryDto summary = summaries.get(0);
     assertEquals(REGISTERED_LOCATION_ID, summary.locationId());
     assertEquals("Rock On Third", summary.name());
-    assertEquals("RockOnThirdLogo.jpg", summary.logoName());
+    assertEquals("LocationLogo.jpg", summary.logoName());
     assertTrue(summary.online());
   }
 

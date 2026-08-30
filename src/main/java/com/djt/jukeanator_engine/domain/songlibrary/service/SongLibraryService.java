@@ -250,6 +250,19 @@ public interface SongLibraryService {
   void reinitializeOwnLocation();
 
   /**
+   * Renames this instance's own persisted song-library file to match a just-changed location
+   * name, so the file takes effect immediately rather than waiting for the next restart's
+   * load-time reconciliation. Called right after {@code
+   * LocationService#updateOwnLocationInfo} edits this instance's own location's name (e.g. via
+   * the Admin Panel's "Edit Location Info" dialog) -- a no-op if {@code previousLocationName}
+   * matches the (already-updated) current name, or on master, which owns no location/library of
+   * its own.
+   *
+   * @param previousLocationName this instance's own location name just before the edit
+   */
+  void renameOwnLocationLibraryFileIfNameChanged(String previousLocationName);
+
+  /**
    * Indicates whether the song library could not be loaded from persisted storage the last time it
    * was (re)initialized — e.g. a fresh install with no library file yet, or a persisted file that
    * could not be read — meaning the in-memory library is currently a freshly-created empty one. Used

@@ -131,6 +131,51 @@ public class SongLibraryRepositoryFileSystemImplTest {
     assertEquals(basePath.resolve("Rox_on_3rd_.oos").toString(), repository.getResolvedFilePath());
   }
 
+  // ── renameLocationLibraryFile ───────────────────────────────────────────
+
+  @Test
+  void renameLocationLibraryFile_movesFileToNewName_whenOldFileExists(@TempDir Path basePath,
+      @TempDir Path rootPath) throws Exception {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+    repository.storeAggregateRoot(newRoot(rootPath, "Rock On Third"));
+
+    repository.renameLocationLibraryFile("Rock On Third", "Downtown Lounge");
+
+    assertFalse(Files.exists(basePath.resolve("Rock_On_Third.oos")),
+        "Old-named file should no longer exist");
+    assertTrue(Files.exists(basePath.resolve("Downtown_Lounge.oos")),
+        "New-named file should exist");
+    assertEquals(basePath.resolve("Downtown_Lounge.oos").toString(),
+        repository.getResolvedFilePath());
+  }
+
+  @Test
+  void renameLocationLibraryFile_isNoOp_whenNameUnchanged(@TempDir Path basePath,
+      @TempDir Path rootPath) throws Exception {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+    repository.storeAggregateRoot(newRoot(rootPath, "Rock On Third"));
+
+    repository.renameLocationLibraryFile("Rock On Third", "Rock On Third");
+
+    assertTrue(Files.exists(basePath.resolve("Rock_On_Third.oos")));
+  }
+
+  @Test
+  void renameLocationLibraryFile_isNoOp_whenOldFileDoesNotExist(@TempDir Path basePath) {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+
+    repository.renameLocationLibraryFile("Rock On Third", "Downtown Lounge");
+
+    assertFalse(Files.exists(basePath.resolve("Downtown_Lounge.oos")));
+    assertNull(repository.getResolvedFilePath());
+  }
+
   @Test
   void getResolvedFilePath_isNull_beforeAnyLoadOrStore(@TempDir Path basePath) {
 

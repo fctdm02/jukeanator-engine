@@ -29,13 +29,13 @@ public class LocationEntity extends AbstractPersistentEntity {
   private static final long serialVersionUID = 1L;
 
   @Column(nullable = false, unique = true)
-  private String name = "Rock On Third";
+  private String name = "Location Name";
 
-  private Double latitude = 42.4883;
-  private Double longitude = -83.143;
+  private Double latitude = 42.3314;
+  private Double longitude = -83.0458;
 
   @Column(name = "logo_name")
-  private String logoName = "RockOnThirdLogo.jpg";
+  private String logoName = "LocationLogo.jpg";
 
   @Column(name = "is_geo_fenced")
   private boolean isGeoFenced = true;
