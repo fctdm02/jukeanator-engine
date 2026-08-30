@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.location.dto.OwnLocationDto;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -74,6 +76,19 @@ public class UserController {
   public ResponseEntity<Integer> getOwnLocationId() {
 
     return ResponseEntity.ok(songLibraryService.getOwnLocationId());
+  }
+
+  /**
+   * This instance's own location's display name + logo, for the web UI's location header —
+   * {@code null} on master, which owns no location of its own.
+   */
+  @GetMapping("/own-location")
+  public ResponseEntity<OwnLocationDto> getOwnLocation() {
+
+    LocationEntity location = songLibraryService.getOwnLocation();
+    return ResponseEntity.ok(location == null ? null
+        : new OwnLocationDto(location.getPersistentIdentity(), location.getName(),
+            location.getLogoName()));
   }
 
   /** Returns home-page content and search history for the currently authenticated user. */

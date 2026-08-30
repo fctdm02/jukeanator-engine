@@ -965,6 +965,11 @@ public class SongLibraryServiceImpl
   }
 
   @Override
+  public LocationEntity getOwnLocation() {
+    return this.ownLocation;
+  }
+
+  @Override
   public void reinitializeOwnLocation() {
     initialize();
   }

@@ -31,6 +31,7 @@ public final class LocationMapper {
     return new LocationDto(
         entity.getPersistentIdentity(),
         entity.getName(),
+        entity.getLogoName(),
         entity.getLatitude(),
         entity.getLongitude(),
         entity.getApiKeyHash(),
@@ -59,6 +60,7 @@ public final class LocationMapper {
         dto.getLongitude(),
         dto.getApiKeyHash());
 
+    location.setLogoName(dto.getLogoName());
     location.setStatus(LocationStatus.valueOf(dto.getStatus()));
     location.setLastSeenAt(dto.getLastSeenAt());
     location.setLibraryLastSyncedAt(dto.getLibraryLastSyncedAt());

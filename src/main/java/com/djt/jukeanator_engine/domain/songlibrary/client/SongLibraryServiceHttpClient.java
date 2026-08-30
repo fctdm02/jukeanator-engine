@@ -4,6 +4,7 @@ import java.util.List;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.client.RestClient;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -224,6 +225,11 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
 
   @Override
   public Integer getOwnLocationId() {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public LocationEntity getOwnLocation() {
     throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 

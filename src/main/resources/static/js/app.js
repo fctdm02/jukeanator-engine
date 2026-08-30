@@ -5,6 +5,9 @@
     role: localStorage.getItem('role'),
     emailAddress: localStorage.getItem('emailAddress'),
     locationId: null,      // this instance's own location; fetched once at boot (see init below)
+    currentLocation: null, // {locationId, name, logoName} shown in the header; fetched at boot
+    locations: [],         // full picker list from GET /api/locations; empty on standalone/slave
+                            // (master-only endpoint) — see init below
     pendingScreen: null,   // { screen, params } to navigate to after login
     navStack: [],          // { screen, params } entries for back navigation
     currentMainTab: 'music',
@@ -172,8 +175,8 @@
         <header class="top-bar">
           <div class="account-panel">
             <div class="account-left">
-              <button class="location-btn">
-                The Rock on Third <span class="location-arrow">&#8964;</span>
+              <button class="location-btn${state.locations.length > 1 ? ' location-btn--pickable' : ''}" id="locationBtn">
+                ${locationButtonInnerHtml()}
               </button>
               <span class="credits-value" id="creditsValue">Credits: 0</span>
             </div>
@@ -210,6 +213,10 @@
       } else {
         renderMain('addfunds');
       }
+    });
+
+    document.getElementById('locationBtn').addEventListener('click', () => {
+      if (state.locations.length > 1) showLocationPickerSheet();
     });
 
     document.getElementById('accountBtn').addEventListener('click', () => {
@@ -1914,6 +1921,75 @@
     wireSongListEvents();
   }
 
+  // ── Location header + picker sheet ─────────────────────────────────────
+
+  function locationLogoSrc(location) {
+    return location && location.logoName ? `/images/${location.logoName}` : '/images/JukeANatorLogo.png';
+  }
+
+  function locationButtonInnerHtml() {
+    const loc = state.currentLocation;
+    const name = loc ? loc.name : 'Select Location';
+    const arrow = state.locations.length > 1 ? '<span class="location-arrow">&#8964;</span>' : '';
+    return `
+      <img class="location-logo" src="${locationLogoSrc(loc)}" alt=""
+        onerror="this.src='/images/JukeANatorLogo.png'">
+      <span class="location-name">${escHtml(name)}</span>
+      ${arrow}`;
+  }
+
+  function selectLocation(loc) {
+    state.currentLocation = loc;
+    state.locationId = loc.locationId;
+    renderMain(state.currentMainTab);
+  }
+
+  function showLocationPickerSheet() {
+    const existing = document.getElementById('locationPickerOverlay');
+    if (existing) existing.remove();
+
+    const listHtml = state.locations.map((loc, i) => `
+      <div class="select-playlist-row" data-index="${i}">
+        <div class="select-playlist-thumb">
+          <img src="${locationLogoSrc(loc)}" alt="" onerror="this.src='/images/JukeANatorLogo.png'"
+            style="width:100%;height:100%;object-fit:contain;">
+        </div>
+        <div class="select-playlist-name">${escHtml(loc.name)}${loc.online === false
+          ? ' <span class="location-offline-badge">offline</span>' : ''}</div>
+      </div>`).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'locationPickerOverlay';
+    overlay.className = 'song-popup-overlay';
+    overlay.innerHTML = `
+      <div class="song-popup select-playlist-sheet" id="locationPickerSheet">
+        <div class="song-popup-handle"></div>
+        <div class="select-playlist-title">Select a location</div>
+        ${listHtml}
+      </div>`;
+
+    document.getElementById('app-shell').appendChild(overlay);
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('song-popup-visible')));
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) dismissLocationPickerSheet();
+    });
+
+    state.locations.forEach((loc, i) => {
+      overlay.querySelectorAll('.select-playlist-row')[i]?.addEventListener('click', () => {
+        dismissLocationPickerSheet();
+        selectLocation(loc);
+      });
+    });
+  }
+
+  function dismissLocationPickerSheet() {
+    const overlay = document.getElementById('locationPickerOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('song-popup-visible');
+    setTimeout(() => overlay.remove(), 300);
+  }
+
   function showSelectPlaylistSheet(song) {
     const existing = document.getElementById('selectPlaylistOverlay');
     if (existing) existing.remove();
@@ -2081,6 +2157,21 @@
       state.locationId = await api('/api/users/own-location-id');
     } catch {
       state.locationId = null;
+    }
+    try {
+      state.currentLocation = await api('/api/users/own-location');
+    } catch {
+      state.currentLocation = null;
+    }
+    try {
+      // Master-only picker list; 404s on standalone/slave — no list to pick from there.
+      state.locations = await api('/api/locations') || [];
+    } catch {
+      state.locations = [];
+    }
+    if (!state.currentLocation && state.locations.length) {
+      state.currentLocation = state.locations[0];
+      state.locationId = state.currentLocation.locationId;
     }
     renderMain('music');
     connectWebSocket();

@@ -14,6 +14,7 @@ public final class LocationDto implements Serializable {
 
   private Integer persistentIdentity;
   private String name;
+  private String logoName;
   private Double latitude;
   private Double longitude;
   private String apiKeyHash;
@@ -23,12 +24,13 @@ public final class LocationDto implements Serializable {
 
   public LocationDto() {}
 
-  public LocationDto(Integer persistentIdentity, String name,
+  public LocationDto(Integer persistentIdentity, String name, String logoName,
       Double latitude, Double longitude, String apiKeyHash, String status, Instant lastSeenAt,
       Instant libraryLastSyncedAt) {
 
     this.persistentIdentity = persistentIdentity;
     this.name = name;
+    this.logoName = logoName;
     this.latitude = latitude;
     this.longitude = longitude;
     this.apiKeyHash = apiKeyHash;
@@ -51,6 +53,14 @@ public final class LocationDto implements Serializable {
 
   public void setName(String name) {
     this.name = name;
+  }
+
+  public String getLogoName() {
+    return logoName;
+  }
+
+  public void setLogoName(String logoName) {
+    this.logoName = logoName;
   }
 
   public Double getLatitude() {

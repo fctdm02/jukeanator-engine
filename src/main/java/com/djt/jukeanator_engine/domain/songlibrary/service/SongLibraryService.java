@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import java.util.List;
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
@@ -223,6 +224,17 @@ public interface SongLibraryService {
    */
   @PublicServiceMethod
   Integer getOwnLocationId();
+
+  /**
+   * The full {@link LocationEntity} this instance itself owns (name, logo, coordinates), or
+   * {@code null} on the master instance, which owns no location of its own. Mirrors {@link
+   * #getOwnLocationId()} but returns the whole entity, for display purposes (e.g. the web UI's
+   * own-location name/logo header).
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   */
+  @PublicServiceMethod
+  LocationEntity getOwnLocation();
 
   /**
    * Re-runs the same startup discovery {@code SongLibraryServiceImpl}'s constructor uses, so that

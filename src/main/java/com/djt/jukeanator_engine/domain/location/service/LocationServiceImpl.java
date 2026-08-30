@@ -130,7 +130,7 @@ public class LocationServiceImpl implements LocationService {
     for (LocationEntity location : this.locationRoot.getLocations()) {
       boolean online = connectedSlaveRegistry.isConnected(location.getPersistentIdentity());
       summaries.add(new LocationSummaryDto(location.getPersistentIdentity(), location.getName(),
-          location.getLatitude(), location.getLongitude(), online));
+          location.getLogoName(), location.getLatitude(), location.getLongitude(), online));
     }
     return summaries;
   }

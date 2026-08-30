@@ -161,6 +161,24 @@ html, body {
   color: var(--muted);
 }
 
+.location-btn--pickable {
+  cursor: pointer;
+}
+
+.location-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.location-offline-badge {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
 .credits-value {
   color: var(--text);
   font-size: 0.9rem;
