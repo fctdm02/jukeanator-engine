@@ -18,8 +18,8 @@ app:
   # hashes. Defaults to <user.home>/.jukeanator when unset -- override here to store it
   # elsewhere. The song library's own music-folder location is discovered from whatever's
   # already stored here, or (on first run) via the JFC/Swing "scan for songs" prompt.
-  # data-dir: ~
-    data-dir: C:\kiosk\data
+  # data-dir: C:\kiosk\data
+  data-dir: ~  
 
 logging:
   level:
