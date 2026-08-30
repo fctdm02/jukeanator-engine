@@ -36,10 +36,9 @@ public class LocationConfig {
   @Bean
   @ConditionalOnProperty(name = "app.repository-type", havingValue = "filesystem",
       matchIfMissing = true)
-  public LocationRepository locationRepositoryFileSystemImpl(AppProperties appProperties,
-      LocationProperties locationProperties) {
+  public LocationRepository locationRepositoryFileSystemImpl(AppProperties appProperties) {
 
-    return new LocationRepositoryFileSystemImpl(effectiveStorageRoot(appProperties, locationProperties));
+    return new LocationRepositoryFileSystemImpl(appProperties.getDataDir());
   }
 
   @Bean
@@ -63,7 +62,7 @@ public class LocationConfig {
       SongLibraryRepository songLibraryRepository) {
 
     return new LocationServiceImpl(locationRepository, passwordEncoder, eventPublisher,
-        objectMapper, effectiveStorageRoot(appProperties, locationProperties),
+        objectMapper, perLocationSyncStorageRoot(appProperties, locationProperties),
         connectedSlaveRegistry, songLibraryRepository);
   }
 
@@ -93,7 +92,11 @@ public class LocationConfig {
         locationProperties.getCommandTimeoutMs());
   }
 
-  private static String effectiveStorageRoot(AppProperties appProperties,
+  // Governs only where synced per-location library.json/cover-art land (LocationServiceImpl's
+  // locationStorageRoot) -- independent of where the location list itself is stored, which is
+  // always app.data-dir directly for the filesystem repository, matching every other
+  // filesystem-backed repository in the app.
+  private static String perLocationSyncStorageRoot(AppProperties appProperties,
       LocationProperties locationProperties) {
 
     if (locationProperties.getStorageRoot() != null
