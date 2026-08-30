@@ -27,7 +27,7 @@ import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JDialog;
+import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -105,23 +105,13 @@ public class AdminPanel extends JPanel {
    * exclusive mode, Windows does not reliably hand keyboard focus to a newly created window, so a
    * dialog in its own window would appear unfocused and force the user to Alt+Tab back to it.
    * Painting the notice inside the existing window (via {@link JLayeredPane}) avoids that entirely.
+   * {@link #overlayFormCard} below reuses the same trick for the admin panel's data-entry forms
+   * (Add Admin User, Add Location, Edit Location Info), which used to be separate {@code JDialog}
+   * windows and suffered exactly this focus loss.
    */
   private Color overlayCardAccent = Color.WHITE;
-  private final JPanel overlayCard = new JPanel() {
-    private static final long serialVersionUID = 1L;
-
-    @Override
-    protected void paintComponent(Graphics g) {
-      Graphics2D g2 = (Graphics2D) g.create();
-      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-      g2.setColor(ColorTheme.get().bgAdminHeader);
-      g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
-      g2.setColor(overlayCardAccent);
-      g2.setStroke(new java.awt.BasicStroke(2f));
-      g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
-      g2.dispose();
-    }
-  };
+  private final JPanel overlayCard = newRoundedOverlayCard();
+  private final JPanel overlayFormCard = newRoundedOverlayCard();
   private final JPanel overlayScrim = new JPanel();
   private final JLabel overlayTitleLabel = new JLabel();
   private final JLabel overlayMessageLabel = new JLabel();
@@ -185,6 +175,29 @@ public class AdminPanel extends JPanel {
     return layeredPane;
   }
 
+  /**
+   * A rounded-rect card styled with {@link #overlayCardAccent}, shared by {@link #overlayCard} and
+   * {@link #overlayFormCard} -- only one of the two is ever visible at a time, so both can safely
+   * read the same accent field.
+   */
+  private JPanel newRoundedOverlayCard() {
+    return new JPanel() {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      protected void paintComponent(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setColor(ColorTheme.get().bgAdminHeader);
+        g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
+        g2.setColor(overlayCardAccent);
+        g2.setStroke(new java.awt.BasicStroke(2f));
+        g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 16, 16);
+        g2.dispose();
+      }
+    };
+  }
+
   /** Builds the (initially hidden) scrim + card chrome reused by every overlay message/confirm. */
   private void initOverlay() {
 
@@ -195,6 +208,11 @@ public class AdminPanel extends JPanel {
     overlayCard.setOpaque(false);
     overlayCard.setLayout(new BoxLayout(overlayCard, BoxLayout.Y_AXIS));
     overlayCard.setBorder(new EmptyBorder(20, 28, 18, 28));
+
+    overlayFormCard.setOpaque(false);
+    overlayFormCard.setLayout(new BorderLayout(0, 16));
+    overlayFormCard.setBorder(new EmptyBorder(20, 24, 16, 24));
+    overlayFormCard.setVisible(false);
 
     overlayTitleLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
     overlayTitleLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
@@ -218,6 +236,7 @@ public class AdminPanel extends JPanel {
     overlayCard.add(buttonRow);
 
     overlayScrim.add(overlayCard, new GridBagConstraints());
+    overlayScrim.add(overlayFormCard, new GridBagConstraints());
   }
 
   private static void styleOverlayButton(JButton btn) {
@@ -267,11 +286,33 @@ public class AdminPanel extends JPanel {
     });
     overlaySecondaryBtn.addActionListener(e -> hideOverlay());
 
+    overlayFormCard.setVisible(false);
+    overlayCard.setVisible(true);
     overlayScrim.setVisible(true);
     overlayCard.repaint();
     overlayScrim.revalidate();
     JButton toFocus = confirmMode ? overlaySecondaryBtn : overlayPrimaryBtn;
     SwingUtilities.invokeLater(toFocus::requestFocusInWindow);
+  }
+
+  /**
+   * Shows {@code content} in the same in-window modal scrim as {@link #showOverlayMessage}/
+   * {@link #showOverlayConfirm}, instead of a separate {@code JDialog} window -- see the
+   * {@link #overlayCard} javadoc for why a real top-level window loses keyboard focus while
+   * {@link JukeANatorFrame#showFullscreen()} holds full-screen exclusive mode on Windows.
+   */
+  private void showOverlayForm(Color accent, JComponent content) {
+
+    overlayCardAccent = accent;
+    overlayFormCard.removeAll();
+    overlayFormCard.add(content, BorderLayout.CENTER);
+
+    overlayCard.setVisible(false);
+    overlayFormCard.setVisible(true);
+    overlayScrim.setVisible(true);
+    overlayFormCard.revalidate();
+    overlayFormCard.repaint();
+    overlayScrim.revalidate();
   }
 
   private void hideOverlay() {
@@ -511,47 +552,44 @@ public class AdminPanel extends JPanel {
   // ADMIN USER ACTIONS (UserService)
   // ─────────────────────────────────────────────────────────────────────────
   private void doAddAdminUser() {
-    new AddAdminUserDialog(ownerFrame).setVisible(true);
+    new AddAdminUserForm().show();
   }
 
   /**
    * Custom (non-{@code JOptionPane}) modal prompt collecting the fields for a
    * {@link RegisterRequest}, then calling {@link UserService#addAdminUser(RegisterRequest)} with
-   * {@code ROLE_ADMIN}. Styled to match the rest of the admin panel's dark theme rather than
-   * relying on the platform look-and-feel of a stock dialog.
+   * {@code ROLE_ADMIN}. Shown via {@link #showOverlayForm} rather than a separate {@code JDialog}
+   * window -- see {@link #overlayCard}.
    */
-  private class AddAdminUserDialog extends JDialog {
-
-    private static final long serialVersionUID = 1L;
+  private class AddAdminUserForm {
 
     private final JTextField firstNameField = new JTextField(18);
     private final JTextField lastNameField = new JTextField(18);
     private final JTextField emailField = new JTextField(18);
     private final JPasswordField passwordField = new JPasswordField(18);
     private final JLabel errorLabel = new JLabel(" ");
+    private final JPanel content = new JPanel(new BorderLayout(0, 16));
 
-    AddAdminUserDialog(Frame owner) {
-      super(owner, "Add Admin User", true);
+    AddAdminUserForm() {
 
-      getContentPane().setBackground(ColorTheme.get().bgOverlayCard);
-      setLayout(new BorderLayout(0, 16));
-      ((JPanel) getContentPane()).setBorder(new EmptyBorder(20, 24, 16, 24));
+      content.setOpaque(false);
 
       JLabel title = new JLabel("Create Admin User");
       title.setForeground(ColorTheme.get().accentGold);
       title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
-      add(title, BorderLayout.NORTH);
+      content.add(title, BorderLayout.NORTH);
 
-      add(buildFieldsPanel(), BorderLayout.CENTER);
-      add(buildButtonRow(), BorderLayout.SOUTH);
+      content.add(buildFieldsPanel(), BorderLayout.CENTER);
+      content.add(buildButtonRow(), BorderLayout.SOUTH);
 
-      getRootPane().registerKeyboardAction(e -> dispose(),
+      content.registerKeyboardAction(e -> hideOverlay(),
           javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
-          javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW);
+          JComponent.WHEN_IN_FOCUSED_WINDOW);
+    }
 
-      pack();
-      setResizable(false);
-      setLocationRelativeTo(owner);
+    void show() {
+      showOverlayForm(ColorTheme.get().accentGold, content);
+      SwingUtilities.invokeLater(firstNameField::requestFocusInWindow);
     }
 
     private JPanel buildFieldsPanel() {
@@ -610,7 +648,7 @@ public class AdminPanel extends JPanel {
 
       JButton cancelBtn = new JButton("Cancel");
       styleOverlayButton(cancelBtn);
-      cancelBtn.addActionListener(e -> dispose());
+      cancelBtn.addActionListener(e -> hideOverlay());
 
       JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
       row.setOpaque(false);
@@ -637,7 +675,7 @@ public class AdminPanel extends JPanel {
         try {
           userService.addAdminUser(request);
           SwingUtilities.invokeLater(() -> {
-            dispose();
+            hideOverlay();
             showOverlayMessage("Admin User Created", "Created admin user: " + email,
                 ColorTheme.get().accentGreen);
           });
@@ -653,7 +691,7 @@ public class AdminPanel extends JPanel {
   // LOCATION ACTIONS (LocationService)
   // ─────────────────────────────────────────────────────────────────────────
   private void doAddLocation() {
-    new AddLocationDialog(ownerFrame).setVisible(true);
+    new AddLocationForm().show();
   }
 
   /**
@@ -664,39 +702,38 @@ public class AdminPanel extends JPanel {
    * instance's own JSON-backed location store, giving the operator a ready-made record (including
    * the {@code apiKeyHash}) to hand-write into a SQL insert against the master's hosted database.
    * On success, the response's {@code apiKey} is shown in a selectable field since it is returned
-   * exactly once and can never be recovered afterward — only its hash is persisted.
+   * exactly once and can never be recovered afterward — only its hash is persisted. Shown via
+   * {@link #showOverlayForm} rather than a separate {@code JDialog} window -- see {@link
+   * #overlayCard}.
    */
-  private class AddLocationDialog extends JDialog {
-
-    private static final long serialVersionUID = 1L;
+  private class AddLocationForm {
 
     private final JTextField nameField = new JTextField(18);
     private final JTextField latitudeField = new JTextField(18);
     private final JTextField longitudeField = new JTextField(18);
     private final JLabel errorLabel = new JLabel(" ");
+    private final JPanel content = new JPanel(new BorderLayout(0, 16));
 
-    AddLocationDialog(Frame owner) {
-      super(owner, "Add Location", true);
+    AddLocationForm() {
 
-      getContentPane().setBackground(ColorTheme.get().bgOverlayCard);
-      setLayout(new BorderLayout(0, 16));
-      ((JPanel) getContentPane()).setBorder(new EmptyBorder(20, 24, 16, 24));
+      content.setOpaque(false);
 
       JLabel title = new JLabel("Register Location");
       title.setForeground(ColorTheme.get().accentGold);
       title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
-      add(title, BorderLayout.NORTH);
+      content.add(title, BorderLayout.NORTH);
 
-      add(buildFieldsPanel(), BorderLayout.CENTER);
-      add(buildButtonRow(), BorderLayout.SOUTH);
+      content.add(buildFieldsPanel(), BorderLayout.CENTER);
+      content.add(buildButtonRow(), BorderLayout.SOUTH);
 
-      getRootPane().registerKeyboardAction(e -> dispose(),
+      content.registerKeyboardAction(e -> hideOverlay(),
           javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
-          javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW);
+          JComponent.WHEN_IN_FOCUSED_WINDOW);
+    }
 
-      pack();
-      setResizable(false);
-      setLocationRelativeTo(owner);
+    void show() {
+      showOverlayForm(ColorTheme.get().accentGold, content);
+      SwingUtilities.invokeLater(nameField::requestFocusInWindow);
     }
 
     private JPanel buildFieldsPanel() {
@@ -754,7 +791,7 @@ public class AdminPanel extends JPanel {
 
       JButton cancelBtn = new JButton("Cancel");
       styleOverlayButton(cancelBtn);
-      cancelBtn.addActionListener(e -> dispose());
+      cancelBtn.addActionListener(e -> hideOverlay());
 
       JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
       row.setOpaque(false);
@@ -815,13 +852,13 @@ public class AdminPanel extends JPanel {
      */
     private void showProvisionedResult(ProvisionedLocationDto provisioned) {
 
-      getContentPane().removeAll();
+      content.removeAll();
 
       JLabel resultTitle = new JLabel("Location Registered");
       resultTitle.setForeground(ColorTheme.get().accentGreen);
       resultTitle
           .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
-      add(resultTitle, BorderLayout.NORTH);
+      content.add(resultTitle, BorderLayout.NORTH);
 
       JPanel result = new JPanel(new GridBagLayout());
       result.setOpaque(false);
@@ -842,20 +879,20 @@ public class AdminPanel extends JPanel {
       c.insets = new Insets(12, 6, 0, 6);
       result.add(warning, c);
 
-      add(result, BorderLayout.CENTER);
+      content.add(result, BorderLayout.CENTER);
 
       JButton doneBtn = new JButton("Done");
       styleOverlayButton(doneBtn);
-      doneBtn.addActionListener(e -> dispose());
+      doneBtn.addActionListener(e -> hideOverlay());
       JPanel buttonRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
       buttonRow.setOpaque(false);
       buttonRow.add(doneBtn);
-      add(buttonRow, BorderLayout.SOUTH);
+      content.add(buttonRow, BorderLayout.SOUTH);
 
-      getContentPane().revalidate();
-      getContentPane().repaint();
-      pack();
-      setLocationRelativeTo(ownerFrame);
+      content.revalidate();
+      content.repaint();
+      overlayScrim.revalidate();
+      overlayScrim.repaint();
     }
 
     private void addReadOnlyRow(JPanel panel, GridBagConstraints c, int row, String labelText,
@@ -890,8 +927,7 @@ public class AdminPanel extends JPanel {
     SwingSecurityUtil.runAsync(() -> {
       try {
         LocationEntity current = locationService.getOrCreateOwnLocation(null);
-        SwingUtilities
-            .invokeLater(() -> new EditLocationInfoDialog(ownerFrame, current).setVisible(true));
+        SwingUtilities.invokeLater(() -> new EditLocationInfoForm(current).show());
       } catch (Exception ex) {
         ex.printStackTrace();
         SwingUtilities.invokeLater(() -> showOverlayMessage("Error",
@@ -906,11 +942,11 @@ public class AdminPanel extends JPanel {
    * Custom (non-{@code JOptionPane}) modal prompt for editing this standalone/slave instance's own
    * {@link LocationEntity} -- name, coordinates, logo, geofencing -- via
    * {@link LocationService#updateOwnLocationInfo(UpdateLocationInfoRequest)}. Pre-filled from the
-   * current record (fetched on {@link #doEditLocationInfo}, before this dialog is constructed).
+   * current record (fetched on {@link #doEditLocationInfo}, before this form is constructed).
+   * Shown via {@link #showOverlayForm} rather than a separate {@code JDialog} window -- see
+   * {@link #overlayCard}.
    */
-  private class EditLocationInfoDialog extends JDialog {
-
-    private static final long serialVersionUID = 1L;
+  private class EditLocationInfoForm {
 
     private final JTextField nameField = new JTextField(18);
     private final JTextField latitudeField = new JTextField(18);
@@ -918,25 +954,23 @@ public class AdminPanel extends JPanel {
     private final JTextField logoNameField = new JTextField(18);
     private final JCheckBox geoFencedCheckBox = new JCheckBox("Geo-fenced");
     private final JLabel errorLabel = new JLabel(" ");
+    private final JPanel content = new JPanel(new BorderLayout(0, 16));
 
     // Captured before any edit, so the song-library file can be renamed from its old name to
     // whatever the name field is saved as -- current.getName() itself can't be read again after
     // the save, since updateOwnLocationInfo mutates this same LocationEntity instance in place.
     private final String originalName;
 
-    EditLocationInfoDialog(Frame owner, LocationEntity current) {
-      super(owner, "Edit Location Info", true);
+    EditLocationInfoForm(LocationEntity current) {
 
       this.originalName = current.getName();
 
-      getContentPane().setBackground(ColorTheme.get().bgOverlayCard);
-      setLayout(new BorderLayout(0, 16));
-      ((JPanel) getContentPane()).setBorder(new EmptyBorder(20, 24, 16, 24));
+      content.setOpaque(false);
 
       JLabel title = new JLabel("Edit Location Info");
       title.setForeground(ColorTheme.get().accentGold);
       title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
-      add(title, BorderLayout.NORTH);
+      content.add(title, BorderLayout.NORTH);
 
       nameField.setText(current.getName());
       latitudeField
@@ -946,16 +980,17 @@ public class AdminPanel extends JPanel {
       logoNameField.setText(current.getLogoName() != null ? current.getLogoName() : "");
       geoFencedCheckBox.setSelected(current.isGeoFenced());
 
-      add(buildFieldsPanel(), BorderLayout.CENTER);
-      add(buildButtonRow(), BorderLayout.SOUTH);
+      content.add(buildFieldsPanel(), BorderLayout.CENTER);
+      content.add(buildButtonRow(), BorderLayout.SOUTH);
 
-      getRootPane().registerKeyboardAction(e -> dispose(),
+      content.registerKeyboardAction(e -> hideOverlay(),
           javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
-          javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW);
+          JComponent.WHEN_IN_FOCUSED_WINDOW);
+    }
 
-      pack();
-      setResizable(false);
-      setLocationRelativeTo(owner);
+    void show() {
+      showOverlayForm(ColorTheme.get().accentGold, content);
+      SwingUtilities.invokeLater(nameField::requestFocusInWindow);
     }
 
     private JPanel buildFieldsPanel() {
@@ -1020,7 +1055,7 @@ public class AdminPanel extends JPanel {
 
       JButton cancelBtn = new JButton("Cancel");
       styleOverlayButton(cancelBtn);
-      cancelBtn.addActionListener(e -> dispose());
+      cancelBtn.addActionListener(e -> hideOverlay());
 
       JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
       row.setOpaque(false);
@@ -1077,7 +1112,7 @@ public class AdminPanel extends JPanel {
             renameEx.printStackTrace();
           }
           SwingUtilities.invokeLater(() -> {
-            dispose();
+            hideOverlay();
             showOverlayMessage("Location Updated", "Location info saved.",
                 ColorTheme.get().accentGreen);
           });
