@@ -416,6 +416,63 @@ public class SongScannerTest {
   }
 
   // =========================================================================================
+  // legacy ".metadata" file migration
+  // =========================================================================================
+
+  @Test
+  public void scanFileSystemForSongsMigratesLegacyMetadataFileWhenRequiresMetadataIsTrue(
+      @TempDir Path root) throws IOException {
+
+    Path albumDir = root.resolve("ArtistA/AlbumA");
+    writeFile(albumDir, "ArtistA-01-SongOne.mp3");
+    Files.writeString(albumDir.resolve("cover.jpg"), "fake-cover");
+    Files.writeString(albumDir.resolve("metadata.txt"),
+        "Genre=\nCoverArtURL=\nReleaseDate=\nRecordLabel=Unknown\nHasExplicit=false",
+        StandardCharsets.UTF_8);
+    Files.writeString(albumDir.resolve(".metadata"),
+        "HasExplicit=false\nReleaseDate=1985\nRecordLabel=Jive\nCoverArtURL=http://example.com/cover.jpg",
+        StandardCharsets.UTF_8);
+
+    SongScanner scanner = newScanner(true, false, false);
+    RootFolderEntity result = scanner.scanFileSystemForSongs(root.toString());
+
+    AlbumFolderEntity album = result.getAllAlbums().get(0);
+    assertTrue(album.hasValidMetadata());
+    assertEquals("Jive", album.getRecordLabel());
+
+    List<String> metadataLines = Files.readAllLines(albumDir.resolve("metadata.txt"));
+    assertTrue(metadataLines.contains("RecordLabel=Jive"));
+    assertTrue(metadataLines.contains("ReleaseDate=1985"));
+    assertTrue(metadataLines.contains("CoverArtURL=http://example.com/cover.jpg"));
+
+    // Since the legacy file already produced valid metadata, nothing further should be looked up.
+    verify(jAudioTaggerClient, never()).getTags(anyString());
+    verifyNoInteractions(discogsClientWrapper, musicBrainzClientWrapper);
+  }
+
+  @Test
+  public void scanFileSystemForSongsIgnoresLegacyMetadataFileWhenRequiresMetadataIsFalse(
+      @TempDir Path root) throws IOException {
+
+    Path albumDir = root.resolve("ArtistA/AlbumA");
+    writeFile(albumDir, "ArtistA-01-SongOne.mp3");
+    Files.writeString(albumDir.resolve("cover.jpg"), "fake-cover");
+    Files.writeString(albumDir.resolve("metadata.txt"),
+        "Genre=\nCoverArtURL=\nReleaseDate=\nRecordLabel=Unknown\nHasExplicit=false",
+        StandardCharsets.UTF_8);
+    Files.writeString(albumDir.resolve(".metadata"),
+        "HasExplicit=false\nReleaseDate=1985\nRecordLabel=Jive\nCoverArtURL=http://example.com/cover.jpg",
+        StandardCharsets.UTF_8);
+
+    SongScanner scanner = newScanner(false, false, false);
+    scanner.scanFileSystemForSongs(root.toString());
+
+    List<String> metadataLines = Files.readAllLines(albumDir.resolve("metadata.txt"));
+    assertTrue(metadataLines.contains("RecordLabel=Unknown"));
+    assertFalse(metadataLines.contains("RecordLabel=Jive"));
+  }
+
+  // =========================================================================================
   // disableInternetSearch
   // =========================================================================================
 

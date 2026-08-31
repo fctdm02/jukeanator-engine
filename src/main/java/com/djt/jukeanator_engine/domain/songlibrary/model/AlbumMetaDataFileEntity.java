@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -102,7 +103,47 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
       return;
     }
 
-    try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+    readKeyValueMetadata(path, StandardCharsets.UTF_8);
+
+    isLoaded = true;
+  }
+
+  /**
+   * If a legacy ".metadata" file (from the prior version of the application) is present
+   * alongside metadata.txt, it is authoritative: its values are read and immediately written
+   * back out to metadata.txt (and kept in-memory), overwriting whatever was there before.
+   *
+   * <p>Legacy files predate this application's switch to UTF-8 and were written using the
+   * platform's default (typically Windows) charset, so they are read as ISO-8859-1 -- a
+   * single-byte charset that maps every byte to a character and therefore never fails to
+   * decode, unlike UTF-8.
+   *
+   * @return true if a legacy file was found and applied, false otherwise
+   */
+  public boolean applyLegacyMetadataIfPresent() {
+
+    Path path = Path.of(getNaturalIdentity());
+    Path parentDir = path.getParent();
+    if (parentDir == null) {
+      return false;
+    }
+
+    Path legacyPath = parentDir.resolve(AlbumFolderEntity.LEGACY_METADATA_FILENAME);
+    if (!Files.exists(legacyPath)) {
+      return false;
+    }
+
+    readKeyValueMetadata(legacyPath, StandardCharsets.ISO_8859_1);
+    isLoaded = true;
+
+    writeMetadataToFileSystem();
+
+    return true;
+  }
+
+  private void readKeyValueMetadata(Path path, Charset charset) {
+
+    try (BufferedReader reader = Files.newBufferedReader(path, charset)) {
       String line;
 
       while ((line = reader.readLine()) != null) {
@@ -123,8 +164,6 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
     } catch (IOException e) {
       throw new SongLibraryServiceException("Could not read metadata: " + path, e);
     }
-
-    isLoaded = true;
   }
 
   public void writeMetadataToFileSystem() {

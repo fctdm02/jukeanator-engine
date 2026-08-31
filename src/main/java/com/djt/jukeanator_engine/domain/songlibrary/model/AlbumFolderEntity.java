@@ -12,6 +12,7 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
   private static final long serialVersionUID = 1L;
 
   public static final String METADATA_FILENAME = "metadata.txt";
+  public static final String LEGACY_METADATA_FILENAME = ".metadata";
   public static final String COVER_ART_FILENAME = "cover.jpg";
   public static final String JPG_EXTENSION = ".jpg";
 
@@ -127,6 +128,17 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
 
   public boolean hasValidMetadata() {
     return this.metaData.isValid();
+  }
+
+  /**
+   * If a legacy ".metadata" file (from the prior version of the application) exists in this
+   * album's folder, it takes priority over metadata.txt: its values are read and used to
+   * overwrite metadata.txt (and this entity's in-memory fields).
+   *
+   * @return true if a legacy file was found and applied, false otherwise
+   */
+  public boolean applyLegacyMetadataIfPresent() {
+    return this.metaData.applyLegacyMetadataIfPresent();
   }
 
   public void createCoverArtEntity() {

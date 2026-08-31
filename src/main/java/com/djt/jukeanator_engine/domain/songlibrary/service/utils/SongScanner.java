@@ -153,6 +153,13 @@ public final class SongScanner {
       boolean hasValidCoverArt = album.hasValidCoverArt();
       boolean hasValidMetadata = album.hasValidMetadata();
 
+      // A legacy ".metadata" file from the prior version of the application takes priority
+      // over metadata.txt when present -- migrate it in before deciding what (if anything)
+      // still needs to be looked up from tags or the internet.
+      if (requiresMetadata && album.applyLegacyMetadataIfPresent()) {
+        hasValidMetadata = album.hasValidMetadata();
+      }
+
       // First, see if we can retrieve any of this information from tags embedded in the song file
       List<SongFileEntity> songList = album.getChildSongs();
       for (int j = 0; j < songList.size(); j++) {
