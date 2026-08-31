@@ -47,14 +47,14 @@ import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryReposi
  * Testcontainers config is package-private.
  *
  * <p>Requires a real MySQL server with a {@code jukeanator_test} database the {@code jukeanator}
- * user can access -- see {@code src/test/resources/application-mysql.yml}. Deliberately a
+ * user can access -- see {@code src/test/resources/application-test.yml}. Deliberately a
  * separate database from {@code application.yml}'s own {@code jukeanator}, which is reserved for
  * manual QA against a master instance running locally. No Docker/Testcontainers dependency.
  *
  * @author tmyers
  */
 @SpringBootTest
-@ActiveProfiles({ "test", "mysql" })
+@ActiveProfiles("test")
 @TestPropertySource(properties = { "app.repository-type=jpa" })
 class SongLibraryRepositoryJpaImplTest {
 

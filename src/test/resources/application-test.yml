@@ -2,10 +2,14 @@
 
 app:
   ui-enabled: false   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
-  repository-type: filesystem   # filesystem | jpa; governs song-library, song-queue, background-music, user, and location alike
+  repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* below); governs song-library, song-queue, background-music, user, and location alike
+  mode: standalone   # standalone | master | slave
+  master-instance-url: ~   # required if mode=slave, e.g. https://jukeanator.com
+  location-id: ~            # required if mode=slave, assigned at provisioning
+  location-api-key: ~       # required if mode=slave, issued at provisioning
   jwt:
     secret: fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP
-    expiration-ms: 3600000
+    expiration-ms: 3600000   # 1 hour
   logging:
     file-path: logs/jukeanator-service.log
     max-file-size: 5MB
@@ -16,16 +20,34 @@ app:
 logging:
   level:
     com.djt.jukeanator_engine: INFO
-            
+
 spring:
   application:
     name: JukeANator
   aop:
     proxy-target-class: false   # use JDK interface proxies, not CGLIB
+  # MySQL is the only supported local database -- no --spring.profiles.active flag needed. Setting
+  # app.repository-type to jpa (see above) now always means "JPA against this MySQL datasource."
+  # Points at a dedicated jukeanator_test database instead of application.yml's own jukeanator
+  # database -- that one is reserved for manual QA against a master instance running locally on
+  # this laptop, and must never be read, written, or Flyway-migrated by an automated test run.
+  # Same jukeanator/password credentials; only the database differs. Override via the DB_*
+  # environment variables for anything beyond local dev. Setup: sudo apt install mysql-server &&
+  # sudo mysql_secure_installation. Requires the schema created by
+  # src/main/resources/db/migration/mysql/V1__init_user_schema.sql and V2__init_location_schema.sql
+  # (run automatically by Flyway on startup).
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/jukeanator_test}
+    username: ${DB_USERNAME:jukeanator}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Flyway owns the schema; Hibernate only checks the mapping matches
   flyway:
-    # Scope migrations to a subfolder matching the live datasource's vendor (mysql | h2 for the
-    # default/test embedded fallback). Without this, Flyway treats db/migration/** as one flat
-    # namespace -- see db/migration/mysql.
+    # Scope migrations to a subfolder matching the live datasource's vendor. {vendor} is
+    # auto-detected from the JDBC connection's metadata (resolves to "mysql" here), not from a
+    # Spring profile -- see db/migration/mysql.
     locations: classpath:db/migration/{vendor}
 
 song-library:
@@ -40,7 +62,7 @@ song-library:
     - .mp3
     - .flac
     - .wav
-  search-result-size: 100  
+  search-result-size: 100
 
 song-queue:
   reset-queue-at-startup: true
@@ -65,19 +87,23 @@ song-player:
   player-volume: 100 # 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software amplification)
   master-volume: 100
   enable-line-in-on-silence: false # mutually exclusive with enable-background-music
-  line-in-volume: 75  
-  
+  line-in-volume: 75
+
+location:   # repository/service beans exist regardless of app.mode; see LocationConfig
+  storage-root: ~   # defaults under app.data-dir/locations when unset
+  command-timeout-ms: 10000   # master-only: how long to wait for a slave to reply to a command
+
 user-interface:
   always-on-top: false
   enable-screen-saver: false
   # HIBERNATE CONFIGURATION
   enable-hibernation: false
   hibernate-begin: 3 # In 24 hour/military time (e.g. 3:00 hours is 3:00AM) Only used when enableHibernation is true
-  hibernate-end: 9   # In 24 hour/military time  
+  hibernate-end: 9   # In 24 hour/military time
   # CREDIT CONFIGURATION
   increment-credits-key: a
   num-credits: 0
-  priority-cost-multiplier: 2  
+  priority-cost-multiplier: 2
   credits-per-dollar: 3
   five-dollar-bonus-credits: 3
   ten-dollar-bonus-credits: 10

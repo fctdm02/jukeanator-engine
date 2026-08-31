@@ -1,4 +1,5 @@
+Genre=
 CoverArtURL=
-ReleaseDate=
-RecordLabel=Unknown
+ReleaseDate=Nov 24, 1998
+RecordLabel=©1998 Time Life Records
 HasExplicit=false
