@@ -1,19 +1,32 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.ApplicationEventPublisher;
 import com.djt.jukeanator_engine.config.AppProperties;
+import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
+import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
+import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
 
@@ -92,5 +105,145 @@ public class SongLibraryServiceImplTest {
 
     assertThrows(SongLibraryServiceException.class,
         () -> service.renameOwnLocationLibraryFileIfNameChanged("Old Name"));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // scanFileSystemForSongs -- JPA round-trip integrity check
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private SongLibraryServiceImpl newScanService(String repositoryType, String dataDir,
+      SongLibraryRepository songLibraryRepository, LocationService locationService,
+      SongScanner songScanner, ApplicationEventPublisher eventPublisher, LocationEntity ownLocation)
+      throws EntityDoesNotExistException {
+
+    AppProperties appProperties = new AppProperties();
+    appProperties.setDataDir(dataDir);
+    appProperties.setMode("standalone");
+    appProperties.setRepositoryType(repositoryType);
+
+    when(locationService.getOrCreateOwnLocation(null)).thenReturn(ownLocation);
+    // Simplest "fresh install, no .oos file yet" setup -- initialize() falls back to an empty
+    // placeholder root, which is still wired up to ownLocation the same as a real load.
+    when(songLibraryRepository.loadAggregateRoot(anyInt()))
+        .thenThrow(new EntityDoesNotExistException("no library yet"));
+
+    return new SongLibraryServiceImpl(appProperties, songLibraryRepository, locationService,
+        songScanner, Integer.valueOf(100), eventPublisher);
+  }
+
+  private RootFolderEntity buildSmallRoot(String rootPath, String albumName)
+      throws EntityAlreadyExistsException {
+
+    RootFolderEntity root = new RootFolderEntity(rootPath);
+    root.setId(1);
+
+    GenreFolderEntity genre = new GenreFolderEntity(root, "Rock");
+    genre.setId(2);
+    root.addChildFolder(genre);
+
+    ArtistFolderEntity artist = new ArtistFolderEntity(genre, "Artist One");
+    artist.setId(3);
+    genre.addChildFolder(artist);
+
+    AlbumFolderEntity album = new AlbumFolderEntity(artist, albumName);
+    album.setId(4);
+    artist.addChildFolder(album);
+    album.createCoverArtEntity();
+    album.createMetadataEntity();
+    album.getMetaData().setLoaded(true);
+
+    SongFileEntity song = new SongFileEntity(album, "Song.mp3");
+    song.setId(5);
+    song.setArtistName("Artist One");
+    song.setSongName("Song");
+    song.setTrackNumber(1);
+    song.setNumPlays(0);
+    album.addChildSong(song);
+
+    root.initialize();
+    return root;
+  }
+
+  @Test
+  void scanFileSystemForSongs_throwsSongLibraryServiceException_whenJpaReloadDiverges()
+      throws Exception {
+
+    SongLibraryRepository songLibraryRepository = mock(SongLibraryRepository.class);
+    LocationService locationService = mock(LocationService.class);
+    SongScanner songScanner = mock(SongScanner.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    LocationEntity ownLocation = new LocationEntity(1, "Test Location", null, null, "hash");
+
+    SongLibraryServiceImpl service = newScanService("jpa", "unused-for-this-test",
+        songLibraryRepository, locationService, songScanner, eventPublisher, ownLocation);
+
+    RootFolderEntity scannedRoot = buildSmallRoot("/scan/path", "Scanned Album");
+    RootFolderEntity rehydratedRoot = buildSmallRoot("/scan/path", "Different Album");
+
+    when(songScanner.scanFileSystemForSongs(anyString())).thenReturn(scannedRoot);
+    // doReturn(...).when(...), not when(...).thenReturn(...) -- the mock is already stubbed (in
+    // newScanService) to throw for loadAggregateRoot(anyInt()), and when(...) would actually
+    // invoke that existing stub while setting up this one, throwing before .thenReturn() ever
+    // gets attached.
+    doReturn(rehydratedRoot).when(songLibraryRepository).loadAggregateRoot(1);
+
+    assertThrows(SongLibraryServiceException.class,
+        () -> service.scanFileSystemForSongs(new ScanRequest("/scan/path")));
+
+    verify(eventPublisher, never()).publishEvent(any(ScanFileSystemForSongsEvent.class));
+  }
+
+  @Test
+  void scanFileSystemForSongs_succeeds_whenJpaReloadMatches(@TempDir Path tempDir)
+      throws Exception {
+
+    SongLibraryRepository songLibraryRepository = mock(SongLibraryRepository.class);
+    LocationService locationService = mock(LocationService.class);
+    SongScanner songScanner = mock(SongScanner.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    LocationEntity ownLocation = new LocationEntity(1, "Test Location", null, null, "hash");
+
+    SongLibraryServiceImpl service = newScanService("jpa", tempDir.toString(),
+        songLibraryRepository, locationService, songScanner, eventPublisher, ownLocation);
+
+    RootFolderEntity scannedRoot = buildSmallRoot("/scan/path", "Same Album");
+    RootFolderEntity rehydratedRoot = buildSmallRoot("/scan/path", "Same Album");
+
+    when(songScanner.scanFileSystemForSongs(anyString())).thenReturn(scannedRoot);
+    // doReturn(...).when(...), not when(...).thenReturn(...) -- the mock is already stubbed (in
+    // newScanService) to throw for loadAggregateRoot(anyInt()), and when(...) would actually
+    // invoke that existing stub while setting up this one, throwing before .thenReturn() ever
+    // gets attached.
+    doReturn(rehydratedRoot).when(songLibraryRepository).loadAggregateRoot(1);
+
+    assertDoesNotThrow(() -> service.scanFileSystemForSongs(new ScanRequest("/scan/path")));
+
+    verify(eventPublisher).publishEvent(any(ScanFileSystemForSongsEvent.class));
+  }
+
+  @Test
+  void scanFileSystemForSongs_skipsIntegrityCheck_whenRepositoryTypeIsFilesystem(
+      @TempDir Path tempDir) throws Exception {
+
+    SongLibraryRepository songLibraryRepository = mock(SongLibraryRepository.class);
+    LocationService locationService = mock(LocationService.class);
+    SongScanner songScanner = mock(SongScanner.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    LocationEntity ownLocation = new LocationEntity(1, "Test Location", null, null, "hash");
+
+    SongLibraryServiceImpl service = newScanService("filesystem", tempDir.toString(),
+        songLibraryRepository, locationService, songScanner, eventPublisher, ownLocation);
+
+    RootFolderEntity scannedRoot = buildSmallRoot("/scan/path", "Scanned Album");
+    RootFolderEntity mismatchedRoot = buildSmallRoot("/scan/path", "Totally Different Album");
+
+    when(songScanner.scanFileSystemForSongs(anyString())).thenReturn(scannedRoot);
+    // Even though this would diverge from scannedRoot, the check must never run for the
+    // filesystem backend, so loadAggregateRoot should never even be consulted for this purpose.
+    doReturn(mismatchedRoot).when(songLibraryRepository).loadAggregateRoot(1);
+
+    assertDoesNotThrow(() -> service.scanFileSystemForSongs(new ScanRequest("/scan/path")));
+
+    verify(eventPublisher).publishEvent(any(ScanFileSystemForSongsEvent.class));
   }
 }

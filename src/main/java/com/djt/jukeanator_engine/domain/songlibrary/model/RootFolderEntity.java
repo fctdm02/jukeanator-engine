@@ -60,6 +60,57 @@ public class RootFolderEntity extends FolderEntity {
     this.albumsMap = new TreeMap<>();
     this.songsMap = new TreeMap<>();
 
+    List<AlbumFolderEntity> allAlbums = getAllAlbums();
+
+    // Derive artistsFromSongs from the currently-loaded songs' embedded artist names when nothing
+    // has populated it yet -- e.g. a tree just reloaded from SongLibraryRepositoryJpaImpl, which
+    // never persists ArtistFromSongEntity rows at all (there's no single natural parent for one:
+    // it can span albums under different real parents, and one album can carry multiple different
+    // embedded-artist credits). A real scan already populates this via SongScanner well before
+    // initialize() runs, so this is a no-op there. Each derived artist's id is the negated minimum
+    // id among its songs -- deterministic, and guaranteed never to collide with a real
+    // (always-positive) persisted id, since this artist is itself never written to song_library as
+    // its own row.
+    if (this.artistsFromSongs.isEmpty()) {
+
+      if (this.artistsFromSongsMap == null) {
+        this.artistsFromSongsMap = new TreeMap<>();
+      }
+
+      Map<String, ArtistFromSongEntity> derivedByName = new TreeMap<>();
+      Map<String, Integer> minSongIdByName = new TreeMap<>();
+
+      for (AlbumFolderEntity album : allAlbums) {
+        for (SongFileEntity song : album.getChildSongs()) {
+
+          String songArtistName = song.getArtistName();
+          if (songArtistName == null || songArtistName.isBlank()) {
+            continue;
+          }
+
+          Integer songId = song.getId();
+          Integer currentMin = minSongIdByName.get(songArtistName);
+          if (currentMin == null || songId.compareTo(currentMin) < 0) {
+            minSongIdByName.put(songArtistName, songId);
+          }
+
+          ArtistFromSongEntity artistFromSong = derivedByName.get(songArtistName);
+          if (artistFromSong == null) {
+            artistFromSong = new ArtistFromSongEntity(this, songArtistName);
+            derivedByName.put(songArtistName, artistFromSong);
+          }
+          artistFromSong.addAlbum(album);
+        }
+      }
+
+      for (Map.Entry<String, ArtistFromSongEntity> entry : derivedByName.entrySet()) {
+        ArtistFromSongEntity artistFromSong = entry.getValue();
+        artistFromSong.setId(-minSongIdByName.get(entry.getKey()));
+        this.artistsFromSongs.add(artistFromSong);
+        this.artistsFromSongsMap.put(entry.getKey(), artistFromSong);
+      }
+    }
+
     // Iterate over artistsFromSongs and add to artistsMap
     for (ArtistFromSongEntity artistFromSong : this.artistsFromSongs) {
 
@@ -69,7 +120,6 @@ public class RootFolderEntity extends FolderEntity {
       }
     }
 
-    List<AlbumFolderEntity> allAlbums = getAllAlbums();
     for (AlbumFolderEntity album : allAlbums) {
 
       GenreFolderEntity genre = album.getParentGenre();
@@ -163,6 +213,10 @@ public class RootFolderEntity extends FolderEntity {
 
     this.artistsFromSongs.add(artistFromSong);
     return this.artistsFromSongsMap.put(artistFromSong.getName(), artistFromSong);
+  }
+
+  public Collection<ArtistFromSongEntity> getArtistsFromSongs() {
+    return this.artistsFromSongs;
   }
 
   public Set<FolderEntity> pruneNonAlbumContainingChildFolders() {

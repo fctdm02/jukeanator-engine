@@ -52,6 +52,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.LibraryItem;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
+import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongLibraryStructuralComparator;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
@@ -75,6 +76,7 @@ public class SongLibraryServiceImpl
   private final SongScanner songScanner;
   private final Integer searchResultSize;
   private final boolean isMaster;
+  private final boolean jpaRepositoryType;
 
   // This instance's own initial guess at its locationId (app.location-id) -- passed to
   // LocationService.getOrCreateOwnLocation() the first time this instance ever boots, so a slave's
@@ -116,6 +118,7 @@ public class SongLibraryServiceImpl
     this.searchResultSize = searchResultSize;
     this.eventPublisher = eventPublisher;
     this.isMaster = appProperties.isMaster();
+    this.jpaRepositoryType = "jpa".equals(appProperties.getRepositoryType());
     this.configuredLocationId = appProperties.getLocationId();
 
     // Initialize the song library
@@ -735,6 +738,31 @@ public class SongLibraryServiceImpl
       scannedRoot.restoreSongStatisticsForRootPath(this.dataDir, scannedRoot.getRootPath());
 
       this.songLibraryRepository.storeAggregateRoot(scannedRoot);
+
+      if (this.jpaRepositoryType) {
+
+        RootFolderEntity rehydratedRoot = null;
+        try {
+          rehydratedRoot = this.songLibraryRepository.loadAggregateRoot(
+              this.ownLocation.getPersistentIdentity());
+        } catch (EntityDoesNotExistException ednee) {
+          throw new SongLibraryServiceException(
+              "Song library round-trip check failed: could not reload the song library for "
+                  + "locationId [" + this.ownLocation.getPersistentIdentity()
+                  + "] immediately after storing it.", ednee);
+        }
+
+        List<String> differences =
+            SongLibraryStructuralComparator.findDifferences(scannedRoot, rehydratedRoot);
+        if (!differences.isEmpty()) {
+          throw new SongLibraryServiceException(
+              "Song library round-trip check failed for locationId ["
+                  + this.ownLocation.getPersistentIdentity()
+                  + "] -- the tree reloaded from song_library does not match what was just "
+                  + "scanned: " + differences);
+        }
+      }
+
       scannedRoot.storeSongStatistics(this.dataDir);
       scannedRoot.initialize();
 

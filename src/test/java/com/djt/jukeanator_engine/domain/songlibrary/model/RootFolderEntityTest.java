@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -137,6 +138,45 @@ public class RootFolderEntityTest extends AbstractSongLibraryEntityTest {
     assertNotNull(retrieved);
     assertEquals("Stray Cats", retrieved.getName());
     assertEquals(Integer.valueOf(99), retrieved.getId());
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // initialize() -- derives artistsFromSongs from songs' embedded artist names when nothing has
+  // populated it yet (this fixture, like a tree just reloaded via SongLibraryRepositoryJpaImpl,
+  // never calls addArtistFromSong itself before initialize() runs in setUpLibrary)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  @Test
+  void initialize_derivesArtistsFromSongs_whenNonePopulated() {
+
+    ArtistFromSongEntity ledZeppelin = root.getArtistFromSong("Led Zeppelin");
+    assertNotNull(ledZeppelin, "Led Zeppelin should be derived from songs' embedded artist names");
+
+    List<String> albumNames =
+        ledZeppelin.getAlbums().stream().map(AlbumFolderEntity::getName).sorted().toList();
+    assertEquals(List.of("Classic Rock Mix", "Led Zeppelin IV", "Physical Graffiti"), albumNames,
+        "Led Zeppelin is credited on songs in all three of these albums");
+  }
+
+  @Test
+  void initialize_derivesArtistsFromSongs_forEveryDistinctEmbeddedArtistName() {
+
+    assertNotNull(root.getArtistFromSong("Madonna"));
+    assertNotNull(root.getArtistFromSong("AC DC"));
+    assertNull(root.getArtistFromSong("Unknown Artist"));
+  }
+
+  @Test
+  void initialize_isIdempotent_forDerivedArtistsFromSongs() {
+
+    ArtistFromSongEntity firstCall = root.getArtistFromSong("Led Zeppelin");
+    assertNotNull(firstCall);
+
+    root.initialize();
+
+    ArtistFromSongEntity secondCall = root.getArtistFromSong("Led Zeppelin");
+    assertSame(firstCall, secondCall,
+        "A second initialize() call must not re-derive/replace an already-populated artistsFromSongs");
   }
 
   // ─────────────────────────────────────────────────────────────────────────

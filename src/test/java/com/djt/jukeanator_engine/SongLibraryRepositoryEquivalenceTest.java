@@ -88,6 +88,7 @@ class SongLibraryRepositoryEquivalenceTest {
     assertEquals(describeArtists(filesystemLoaded), describeArtists(jpaLoaded));
     assertEquals(describeAlbums(filesystemLoaded), describeAlbums(jpaLoaded));
     assertEquals(describeSongs(filesystemLoaded), describeSongs(jpaLoaded));
+    assertEquals(describeArtistsFromSongs(filesystemLoaded), describeArtistsFromSongs(jpaLoaded));
   }
 
   // ── fixtures ─────────────────────────────────────────────────────────────
@@ -193,5 +194,17 @@ class SongLibraryRepositoryEquivalenceTest {
           + song.getArtistName() + "|" + song.getTrackNumber() + "|" + song.getNumPlays());
     }
     return descriptions.stream().sorted(Comparator.naturalOrder()).toList();
+  }
+
+  // ArtistFromSongEntity is never itself persisted to song_library (see
+  // SongLibraryRepositoryJpaImpl's class javadoc) -- RootFolderEntity.initialize() derives it from
+  // already-loaded songs' embedded artist names instead, independently on each backend. Compared
+  // by name + associated album ids only, deliberately without id: the derived id is a
+  // locally-computed value (negated minimum song id), not itself a persisted column.
+  private List<String> describeArtistsFromSongs(RootFolderEntity root) {
+    return root.getArtistsFromSongs().stream()
+        .map(a -> a.getName() + "|"
+            + a.getAlbums().stream().map(AlbumFolderEntity::getId).sorted().toList())
+        .sorted().toList();
   }
 }
