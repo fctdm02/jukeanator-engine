@@ -531,9 +531,12 @@ public class SongQueueServiceImpl
           addSongToQueueRequest, SongQueueEntryDto.class);
     }
 
-    SongQueueEntryDto queueEntryDto =
-        addSongToQueue(addSongToQueueRequest.getUsername(), addSongToQueueRequest.getAlbumId(),
-            addSongToQueueRequest.getSongId(), addSongToQueueRequest.getPriority());
+    SongQueueEntryDto queueEntryDto;
+    synchronized (this) {
+      queueEntryDto =
+          addSongToQueue(addSongToQueueRequest.getUsername(), addSongToQueueRequest.getAlbumId(),
+              addSongToQueueRequest.getSongId(), addSongToQueueRequest.getPriority());
+    }
 
     eventPublisher.publishEvent(new SongAddedToQueueEvent(queueEntryDto));
     eventPublisher.publishEvent(new SongQueueChangedEvent(getQueuedSongs(locationId)));

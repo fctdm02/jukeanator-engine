@@ -10,6 +10,8 @@ import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 
@@ -99,8 +101,32 @@ public final class UserRepositoryJpaImpl implements UserRepository {
         }
       }
 
+      // A brand-new UserEntity still carries the placeholder persistentIdentity that
+      // UserServiceImpl/UserEntity assign for the filesystem-repository's benefit (there's no DB
+      // there to generate one) -- e.g. userRoot.getUsers().size() + 1. That placeholder is
+      // meaningless here: merge()-ing an entity whose id doesn't yet exist in `users` makes
+      // Hibernate assume the row must already exist and issue an UPDATE instead of an INSERT,
+      // which matches zero rows and throws OptimisticLockException ("...or unsaved-value mapping
+      // was incorrect"). persist() instead lets the real @GeneratedValue(SEQUENCE) on
+      // AbstractPersistentEntity.persistentIdentity mint the actual id -- but persist() also
+      // requires the entity to look genuinely transient, so any pre-assigned id (on the user
+      // itself, and, since a user row can't have pre-existing playlist/transaction rows before it
+      // exists, on its cascaded playlists/transactions too) has to be cleared first; SEQUENCE
+      // generation then assigns the real ids on `user` and its children in place, so the
+      // in-memory userRoot graph and the DB agree without any further plumbing.
       for (UserEntity user : root.getUsers()) {
-        entityManager.merge(user);
+        if (persistedIds.contains(user.getPersistentIdentity())) {
+          entityManager.merge(user);
+        } else {
+          user.setPersistentIdentity(null);
+          for (PlaylistEntity playlist : user.getPlaylists()) {
+            playlist.setPersistentIdentity(null);
+          }
+          for (CreditTransactionEntity transaction : user.getTransactions()) {
+            transaction.setPersistentIdentity(null);
+          }
+          entityManager.persist(user);
+        }
       }
     });
   }

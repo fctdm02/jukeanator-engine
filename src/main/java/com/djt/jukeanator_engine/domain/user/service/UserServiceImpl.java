@@ -111,7 +111,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     return registerWithRole(request, UserRole.ROLE_ADMIN);
   }
 
-  private AuthResponse registerWithRole(RegisterRequest request, UserRole role) {
+  private synchronized AuthResponse registerWithRole(RegisterRequest request, UserRole role) {
 
     UserEntity check = userRoot.getUserByEmailAddressNullIfNotExists(request.emailAddress());
     if (check != null) {
@@ -132,7 +132,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public AuthResponse login(LoginRequest request) {
+  public synchronized AuthResponse login(LoginRequest request) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(request.emailAddress());;
     if (user == null) {
@@ -150,7 +150,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private static final int DEFAULT_CREDITS = 6;
 
   @Override
-  public UserProfileDto getProfile(String emailAddress) {
+  public synchronized UserProfileDto getProfile(String emailAddress) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);;
     if (user == null) {
@@ -173,7 +173,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private static final int MAX_HOT_HERE = 10;
 
   @Override
-  public HomePageDto getPublicHomePage() {
+  public synchronized HomePageDto getPublicHomePage() {
     var popular = songLibraryService.getMusicByPopularity(songLibraryService.getOwnLocationId());
     var artists = popular.getArtists().stream().limit(MAX_HOT_HERE).toList();
     var songs = popular.getSongs().stream().limit(MAX_HOT_HERE).toList();
@@ -181,7 +181,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public UserHomePageDto getHomePage(String emailAddress) {
+  public synchronized UserHomePageDto getHomePage(String emailAddress) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -235,7 +235,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public void changePassword(String emailAddress, ChangePasswordRequest request) {
+  public synchronized void changePassword(String emailAddress, ChangePasswordRequest request) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -251,7 +251,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public void deleteAccount(String emailAddress) {
+  public synchronized void deleteAccount(String emailAddress) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -269,7 +269,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public UserProfileDto updateProfile(String emailAddress, UpdateProfileRequest request) {
+  public synchronized UserProfileDto updateProfile(String emailAddress, UpdateProfileRequest request) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -286,7 +286,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public List<String> getSearchHistory(String emailAddress) {
+  public synchronized List<String> getSearchHistory(String emailAddress) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -297,7 +297,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public void addSearchHistory(String emailAddress, String query) {
+  public synchronized void addSearchHistory(String emailAddress, String query) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -310,7 +310,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public void removeSearchHistory(String emailAddress, int index) {
+  public synchronized void removeSearchHistory(String emailAddress, int index) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -323,7 +323,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public boolean createPlaylist(String emailAddress, String playlistName)
+  public synchronized boolean createPlaylist(String emailAddress, String playlistName)
       throws EntityAlreadyExistsException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
@@ -339,7 +339,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public boolean addSongToPlaylist(String emailAddress, String playlistName, Integer locationId,
+  public synchronized boolean addSongToPlaylist(String emailAddress, String playlistName, Integer locationId,
       SongFileEntity song) throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
@@ -355,7 +355,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public boolean removeSongFromPlaylist(String emailAddress, String playlistName,
+  public synchronized boolean removeSongFromPlaylist(String emailAddress, String playlistName,
       Integer locationId, SongFileEntity song) throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
@@ -371,7 +371,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public boolean deletePlaylist(String emailAddress, String playlistName)
+  public synchronized boolean deletePlaylist(String emailAddress, String playlistName)
       throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
@@ -387,7 +387,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public boolean addSongToMyFavoritesPlaylist(String emailAddress, Integer locationId,
+  public synchronized boolean addSongToMyFavoritesPlaylist(String emailAddress, Integer locationId,
       SongFileEntity song) throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
@@ -404,7 +404,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public boolean removeSongFromMyFavoritesPlaylist(String emailAddress, Integer locationId,
+  public synchronized boolean removeSongFromMyFavoritesPlaylist(String emailAddress, Integer locationId,
       SongFileEntity song) throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
@@ -421,7 +421,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public List<PlaylistSummaryDto> getPlaylists(String emailAddress) {
+  public synchronized List<PlaylistSummaryDto> getPlaylists(String emailAddress) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -438,7 +438,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public List<SongDto> getPlaylistSongs(String emailAddress, String playlistName)
+  public synchronized List<SongDto> getPlaylistSongs(String emailAddress, String playlistName)
       throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
@@ -466,7 +466,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public void reorderPlaylistSongs(String emailAddress, String playlistName,
+  public synchronized void reorderPlaylistSongs(String emailAddress, String playlistName,
       List<SongIdentifier> songs) throws EntityDoesNotExistException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
@@ -487,7 +487,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public List<SongIdentifier> getFavoriteSongIdentifiers(String emailAddress) {
+  public synchronized List<SongIdentifier> getFavoriteSongIdentifiers(String emailAddress) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
@@ -508,7 +508,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event, Integer locationId) {
+  public synchronized void handleSongAddedToQueueEvent(SongAddedToQueueEvent event, Integer locationId) {
 
     String username = event.queueEntry().getUsername();
 
@@ -565,7 +565,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public void chargeCreditsForQueueAction(String emailAddress, Integer priority, Integer locationId) {
+  public synchronized void chargeCreditsForQueueAction(String emailAddress, Integer priority, Integer locationId) {
 
     // Same rationale as handleSongAddedToQueueEvent above — in slave mode this is only ever
     // reachable via a direct hit on the slave's own (untouched) endpoints, never via the
@@ -587,7 +587,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public List<CreditTransactionDto> getCreditLedgerForLocation(Integer locationId, Instant from,
+  public synchronized List<CreditTransactionDto> getCreditLedgerForLocation(Integer locationId, Instant from,
       Instant to) {
 
     return userRoot.getUsers().stream()

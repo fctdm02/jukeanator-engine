@@ -14,6 +14,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -359,5 +360,56 @@ public class SongLibraryServiceImplTest {
     verify(songLibraryRepository, never()).storeAggregateRoot(any(RootFolderEntity.class));
     assertTrue(service.isLibraryLoadFailedAtStartup());
     assertEquals("", service.getSongLibraryRoot(1).getRootPath());
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // storeSongLibraryAndStatistics -- JPA also keeps a filesystem (.oos) backup and CDStats.TXT
+  // ─────────────────────────────────────────────────────────────────────────
+
+  @Test
+  void storeSongLibraryAndStatistics_writesFilesystemBackupAndCdStats_whenRepositoryTypeIsJpa(
+      @TempDir Path tempDir) throws Exception {
+
+    SongLibraryRepository songLibraryRepository = mock(SongLibraryRepository.class);
+    LocationService locationService = mock(LocationService.class);
+    SongScanner songScanner = mock(SongScanner.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    LocationEntity ownLocation = new LocationEntity(1, "Location Name", null, null, "hash");
+
+    // initialize() adopts this leftover local .oos file into the (mocked, empty) JPA store, so
+    // ownRoot ends up populated without needing a full scan -- see
+    // initialize_adoptsLocalOosFile_intoJpaStore_whenDatabaseHasNoRowYet above.
+    RootFolderEntity localRoot = newEmptyRoot("/scan/path", 1, ownLocation);
+    Path oosFile = tempDir.resolve("Location_Name.oos");
+    new SongLibraryObjectPersistor().writeSongLibraryToDisk(localRoot, oosFile.toString());
+
+    RootFolderEntity rehydratedRoot = newEmptyRoot("/scan/path", 1, ownLocation);
+
+    when(locationService.getOrCreateOwnLocation(null)).thenReturn(ownLocation);
+    when(songLibraryRepository.loadAggregateRoot(1))
+        .thenThrow(new EntityDoesNotExistException("no library yet"))
+        .thenReturn(rehydratedRoot);
+
+    AppProperties appProperties = new AppProperties();
+    appProperties.setDataDir(tempDir.toString());
+    appProperties.setMode("standalone");
+    appProperties.setRepositoryType("jpa");
+
+    SongLibraryServiceImpl service = new SongLibraryServiceImpl(appProperties,
+        songLibraryRepository, locationService, songScanner, Integer.valueOf(100), eventPublisher);
+
+    // Delete the setup .oos file so its later presence proves storeSongLibraryAndStatistics()
+    // itself rewrote it, rather than it merely surviving from construction-time adoption.
+    Files.delete(oosFile);
+
+    service.storeSongLibraryAndStatistics();
+
+    assertTrue(Files.exists(oosFile),
+        "JPA mode should keep a filesystem (.oos) backup of the in-memory library up to date, so "
+            + "this instance can be switched back to repositoryType: filesystem without losing data");
+    assertTrue(Files.exists(tempDir.resolve(RootFolderEntity.CD_STATS)),
+        "JPA mode should still write CDStats.TXT -- it's the persistent record a filesystem-mode "
+            + "scan reads back via restoreSongStatisticsForRootPath() to carry num-plays forward "
+            + "across a rescan, in case this instance is later switched back to filesystem");
   }
 }

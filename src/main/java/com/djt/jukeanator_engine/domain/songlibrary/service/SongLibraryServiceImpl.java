@@ -53,6 +53,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
+import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongLibraryStructuralComparator;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
@@ -127,8 +128,12 @@ public class SongLibraryServiceImpl
 
     // If the CD Stats file was hand-edited (e.g. to tweak song play counts for manual testing)
     // after the song library was last persisted, restore statistics from it now so the edits
-    // take effect at startup.
-    restoreSongStatisticsIfCdStatsFileIsNewer();
+    // take effect at startup. Not applicable under JPA, where num-plays live in song_library
+    // and are always current -- CDStats.TXT there is only a migrate-back-to-filesystem backup
+    // (see storeSongLibraryAndStatistics()), never a source of truth to restore from.
+    if (!this.jpaRepositoryType) {
+      restoreSongStatisticsIfCdStatsFileIsNewer();
+    }
   }
 
   public void initialize() {
@@ -363,7 +368,6 @@ public class SongLibraryServiceImpl
     return stem.replace('_', ' ');
   }
 
-  // TODO: No need to restore stats if JPA repository
   private void restoreSongStatisticsIfCdStatsFileIsNewer() {
 
     String resolvedSongLibraryPath = this.songLibraryRepository.getResolvedFilePath();
@@ -929,7 +933,19 @@ public class SongLibraryServiceImpl
       // Store the song library
       this.songLibraryRepository.storeAggregateRoot(this.ownRoot);
 
-      // Store the song statistics
+      if (this.jpaRepositoryType) {
+
+        // Keep a filesystem (.oos) backup of the in-memory library up to date too, so this
+        // instance can be switched back to repositoryType: filesystem later without losing data
+        // -- the reverse of adoptLocalOosFileIntoJpaStore's filesystem-to-JPA migration.
+        new SongLibraryRepositoryFileSystemImpl(this.dataDir).storeAggregateRoot(this.ownRoot);
+      }
+
+      // Store the song statistics. Num-plays are already kept current per-event under JPA (via
+      // SongLibraryRepository.updateNumPlaysForSong()), but CDStats.TXT is also the persistent
+      // record that a filesystem-mode scan reads back via restoreSongStatisticsForRootPath() to
+      // carry num-plays forward across a rescan -- so keep it current even under JPA in case this
+      // instance is later switched back to repositoryType: filesystem and rescanned.
       this.ownRoot.storeSongStatistics(this.dataDir);
 
       return Integer.valueOf(this.ownRoot.getAlbums().size());
