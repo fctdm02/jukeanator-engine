@@ -7,6 +7,7 @@ import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.LinearGradientPaint;
 import java.awt.geom.Point2D;
+import java.util.List;
 import java.util.Random;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -39,7 +40,7 @@ public class ScreenSaverWindow extends JWindow {
 
   private final SongPlayerService songPlayerService;
   private final SongLibraryService songLibraryService;
-  private int numAlbums = 0; // lazy-initialised on first updateContent() call
+  private List<AlbumDto> albums; // lazy-initialised on first updateContent() call
   private final ImageIcon logo;
   private final ImageIcon textImage;
 
@@ -227,12 +228,13 @@ public class ScreenSaverWindow extends JWindow {
 
     } else {
 
-      if (numAlbums == 0) {
-        numAlbums = this.songLibraryService.getAlbums(this.songLibraryService.getOwnLocationId()).size();
+      if (albums == null) {
+        albums = this.songLibraryService.getAlbums(this.songLibraryService.getOwnLocationId());
       }
-      AlbumDto album = this.songLibraryService.getAlbumById(this.songLibraryService.getOwnLocationId(),
-          new Random().nextInt(this.numAlbums));
-      coverArt = imageLoader.loadFilesystemImage(album.getCoverArtPath(), 350, 350);
+      if (!albums.isEmpty()) {
+        AlbumDto album = albums.get(new Random().nextInt(albums.size()));
+        coverArt = imageLoader.loadFilesystemImage(album.getCoverArtPath(), 350, 350);
+      }
 
     }
 

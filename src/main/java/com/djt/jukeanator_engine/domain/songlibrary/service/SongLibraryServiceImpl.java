@@ -51,6 +51,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.LibraryItem;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongLibraryStructuralComparator;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
@@ -155,13 +156,7 @@ public class SongLibraryServiceImpl
     // songs at startup.
     try {
 
-      Path oosFile = findMostRecentOosFile().orElse(null);
-
-      RootFolderEntity loaded = (oosFile != null)
-          ? this.songLibraryRepository.loadAggregateRoot(deriveLocationNameFromOosFilename(oosFile))
-          : this.songLibraryRepository.loadAggregateRoot(this.ownLocation.getPersistentIdentity());
-
-      this.ownRoot = loaded;
+      this.ownRoot = loadOwnRoot();
       this.libraryLoadFailedAtStartup = false;
 
     } catch (EntityDoesNotExistException ednee) {
@@ -232,6 +227,92 @@ public class SongLibraryServiceImpl
           "Admin/scan methods are not supported on the master instance -- they are inherently local "
               + "to the slave that owns the library.");
     }
+  }
+
+  /**
+   * Resolves this instance's own song library root from {@link #songLibraryRepository}. Filesystem
+   * mode has no id-keyed storage -- {@code loadAggregateRoot(int)} always throws there -- so it must
+   * be looked up by the name derived from a leftover {@code .oos} file when one exists. JPA mode is
+   * the opposite: it's keyed by locationId, so a leftover {@code .oos} file (e.g. from before this
+   * instance was migrated from filesystem to JPA) is only relevant as a fallback if the database has
+   * no row yet -- see {@link #adoptLocalOosFileIntoJpaStore}.
+   */
+  private RootFolderEntity loadOwnRoot() throws EntityDoesNotExistException {
+
+    if (!this.jpaRepositoryType) {
+
+      Path oosFile = findMostRecentOosFile().orElse(null);
+
+      return (oosFile != null)
+          ? this.songLibraryRepository.loadAggregateRoot(deriveLocationNameFromOosFilename(oosFile))
+          : this.songLibraryRepository.loadAggregateRoot(this.ownLocation.getPersistentIdentity());
+    }
+
+    try {
+      return this.songLibraryRepository.loadAggregateRoot(this.ownLocation.getPersistentIdentity());
+    } catch (EntityDoesNotExistException ednee) {
+      return adoptLocalOosFileIntoJpaStore(ednee);
+    }
+  }
+
+  /**
+   * Called when JPA mode finds no database row for this location -- most commonly because this
+   * {@code dataDir} was previously run in filesystem mode, which left a {@code .oos} file behind. If
+   * such a file exists, deserialize it, store it into the JPA repository, then perform the same
+   * store/reload structural round-trip check {@link #scanFileSystemForSongs(ScanRequest)} performs
+   * after a fresh scan -- so a corrupt or incompatible local file fails startup loudly instead of
+   * silently adopting bad data. If no local {@code .oos} file exists either, rethrow {@code
+   * notFound} so the caller falls back to the empty-placeholder/prompt-for-scan path, same as a
+   * genuinely new install.
+   */
+  private RootFolderEntity adoptLocalOosFileIntoJpaStore(EntityDoesNotExistException notFound)
+      throws EntityDoesNotExistException {
+
+    Path oosFile = findMostRecentOosFile().orElse(null);
+    if (oosFile == null) {
+      throw notFound;
+    }
+
+    RootFolderEntity localRoot;
+    try {
+      localRoot = new SongLibraryObjectPersistor().loadSongLibraryFromDisk(oosFile.toString());
+      localRoot.initialize();
+    } catch (ClassNotFoundException | IOException | RuntimeException e) {
+      log.warn("Found local song library file {} while looking for locationId [{}] in the JPA "
+          + "repository, but could not read it -- ignoring it.", oosFile,
+          this.ownLocation.getPersistentIdentity(), e);
+      throw notFound;
+    }
+
+    log.info("No song library found in the database for locationId [{}], but found a local song "
+        + "library file at {} -- adopting it into the database.",
+        this.ownLocation.getPersistentIdentity(), oosFile);
+
+    localRoot.setParentLocation(this.ownLocation);
+    this.songLibraryRepository.storeAggregateRoot(localRoot);
+
+    RootFolderEntity rehydratedRoot;
+    try {
+      rehydratedRoot =
+          this.songLibraryRepository.loadAggregateRoot(this.ownLocation.getPersistentIdentity());
+    } catch (EntityDoesNotExistException ednee) {
+      throw new SongLibraryServiceException(
+          "Adopted local song library file " + oosFile + " into the database for locationId ["
+              + this.ownLocation.getPersistentIdentity()
+              + "] but could not reload it immediately after storing it.", ednee);
+    }
+
+    List<String> differences =
+        SongLibraryStructuralComparator.findDifferences(localRoot, rehydratedRoot);
+    if (!differences.isEmpty()) {
+      throw new SongLibraryServiceException(
+          "Adopted local song library file " + oosFile + " into the database for locationId ["
+              + this.ownLocation.getPersistentIdentity()
+              + "], but the tree reloaded from the database does not match the local copy: "
+              + differences);
+    }
+
+    return rehydratedRoot;
   }
 
   /**

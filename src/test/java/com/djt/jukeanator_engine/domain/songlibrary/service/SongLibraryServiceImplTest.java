@@ -1,7 +1,11 @@
 package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -27,6 +31,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
 
@@ -245,5 +250,114 @@ public class SongLibraryServiceImplTest {
     assertDoesNotThrow(() -> service.scanFileSystemForSongs(new ScanRequest("/scan/path")));
 
     verify(eventPublisher).publishEvent(any(ScanFileSystemForSongsEvent.class));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // initialize() -- adopting a leftover local .oos file into a JPA store that has no row yet
+  // (e.g. this dataDir was previously run in filesystem mode)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private RootFolderEntity newEmptyRoot(String rootPath, int id, LocationEntity parentLocation) {
+
+    RootFolderEntity root = new RootFolderEntity(rootPath);
+    root.setId(id);
+    root.setParentLocation(parentLocation);
+    root.initialize();
+    return root;
+  }
+
+  @Test
+  void initialize_adoptsLocalOosFile_intoJpaStore_whenDatabaseHasNoRowYet(@TempDir Path tempDir)
+      throws Exception {
+
+    SongLibraryRepository songLibraryRepository = mock(SongLibraryRepository.class);
+    LocationService locationService = mock(LocationService.class);
+    SongScanner songScanner = mock(SongScanner.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    LocationEntity ownLocation = new LocationEntity(1, "Location Name", null, null, "hash");
+
+    RootFolderEntity localRoot = newEmptyRoot("/scan/path", 1, ownLocation);
+    new SongLibraryObjectPersistor().writeSongLibraryToDisk(localRoot,
+        tempDir.resolve("Location_Name.oos").toString());
+
+    RootFolderEntity rehydratedRoot = newEmptyRoot("/scan/path", 1, ownLocation);
+
+    when(locationService.getOrCreateOwnLocation(null)).thenReturn(ownLocation);
+    // First call (inside loadOwnRoot()) simulates "no row for this location yet" -- the JPA store
+    // hasn't been populated. Second call (the post-adoption round-trip check) returns the
+    // structurally-matching reloaded tree.
+    when(songLibraryRepository.loadAggregateRoot(1))
+        .thenThrow(new EntityDoesNotExistException("no library yet"))
+        .thenReturn(rehydratedRoot);
+
+    AppProperties appProperties = new AppProperties();
+    appProperties.setDataDir(tempDir.toString());
+    appProperties.setMode("standalone");
+    appProperties.setRepositoryType("jpa");
+
+    SongLibraryServiceImpl service = new SongLibraryServiceImpl(appProperties,
+        songLibraryRepository, locationService, songScanner, Integer.valueOf(100), eventPublisher);
+
+    verify(songLibraryRepository).storeAggregateRoot(any(RootFolderEntity.class));
+    assertSame(rehydratedRoot, service.getSongLibraryRoot(1));
+    assertFalse(service.isLibraryLoadFailedAtStartup());
+  }
+
+  @Test
+  void initialize_throws_whenAdoptedOosFileDivergesFromReloadedJpaTree(@TempDir Path tempDir)
+      throws Exception {
+
+    SongLibraryRepository songLibraryRepository = mock(SongLibraryRepository.class);
+    LocationService locationService = mock(LocationService.class);
+    SongScanner songScanner = mock(SongScanner.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    LocationEntity ownLocation = new LocationEntity(1, "Location Name", null, null, "hash");
+
+    RootFolderEntity localRoot = newEmptyRoot("/scan/path", 1, ownLocation);
+    new SongLibraryObjectPersistor().writeSongLibraryToDisk(localRoot,
+        tempDir.resolve("Location_Name.oos").toString());
+
+    RootFolderEntity mismatchedRoot = newEmptyRoot("/different/scan/path", 1, ownLocation);
+
+    when(locationService.getOrCreateOwnLocation(null)).thenReturn(ownLocation);
+    when(songLibraryRepository.loadAggregateRoot(1))
+        .thenThrow(new EntityDoesNotExistException("no library yet"))
+        .thenReturn(mismatchedRoot);
+
+    AppProperties appProperties = new AppProperties();
+    appProperties.setDataDir(tempDir.toString());
+    appProperties.setMode("standalone");
+    appProperties.setRepositoryType("jpa");
+
+    assertThrows(SongLibraryServiceException.class,
+        () -> new SongLibraryServiceImpl(appProperties, songLibraryRepository, locationService,
+            songScanner, Integer.valueOf(100), eventPublisher));
+  }
+
+  @Test
+  void initialize_fallsBackToEmptyPlaceholder_whenJpaHasNoRowAndNoLocalOosFile(
+      @TempDir Path tempDir) throws Exception {
+
+    SongLibraryRepository songLibraryRepository = mock(SongLibraryRepository.class);
+    LocationService locationService = mock(LocationService.class);
+    SongScanner songScanner = mock(SongScanner.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    LocationEntity ownLocation = new LocationEntity(1, "Location Name", null, null, "hash");
+
+    when(locationService.getOrCreateOwnLocation(null)).thenReturn(ownLocation);
+    when(songLibraryRepository.loadAggregateRoot(1))
+        .thenThrow(new EntityDoesNotExistException("no library yet"));
+
+    AppProperties appProperties = new AppProperties();
+    appProperties.setDataDir(tempDir.toString());
+    appProperties.setMode("standalone");
+    appProperties.setRepositoryType("jpa");
+
+    SongLibraryServiceImpl service = new SongLibraryServiceImpl(appProperties,
+        songLibraryRepository, locationService, songScanner, Integer.valueOf(100), eventPublisher);
+
+    verify(songLibraryRepository, never()).storeAggregateRoot(any(RootFolderEntity.class));
+    assertTrue(service.isLibraryLoadFailedAtStartup());
+    assertEquals("", service.getSongLibraryRoot(1).getRootPath());
   }
 }
