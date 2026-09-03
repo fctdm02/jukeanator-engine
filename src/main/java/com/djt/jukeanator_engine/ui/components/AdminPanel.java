@@ -95,6 +95,13 @@ public class AdminPanel extends JPanel {
   private int popularityT2 = 5;
   private int popularityT3 = 15;
 
+  // ── Song queue lock state UI ──────────────────────────────────────────────
+  // Set once by buildLibraryButtons() during construction, then toggled by
+  // doLockQueue()/doUnlockQueue() and initialized from songQueueService.isLocked().
+  private JButton lockQueueButton;
+  private JButton unlockQueueButton;
+  private final JLabel queueLockedLabel = buildQueueLockedLabel();
+
   // ── Invalid Metadata Tracking Cache ──────────────────────────────────────
   private final List<AlbumDto> albumsWithInvalidMetadata = new ArrayList<>();
 
@@ -149,6 +156,7 @@ public class AdminPanel extends JPanel {
 
     loadAlbumList();
     setQueue(songQueueService.getQueuedSongs(songQueueService.getOwnLocationId()));
+    updateQueueLockUi(songQueueService.isLocked());
 
     requestFocusInWindow();
   }
@@ -380,6 +388,11 @@ public class AdminPanel extends JPanel {
 
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton("Queue\nAlbum", ColorTheme.get().accentGreen, e -> doAddAlbumToQueue()));
+    lockQueueButton = sideButton("Lock\nQueue", ColorTheme.get().accentGreen, e -> doLockQueue());
+    unlockQueueButton =
+        sideButton("Unlock\nQueue", ColorTheme.get().accentGreen, e -> doUnlockQueue());
+    strip.add(lockQueueButton);
+    strip.add(unlockQueueButton);
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton("Edit\nAlbum", ColorTheme.get().accentGold, e -> doEditAlbum()));
     strip.add(sideButton("Reset\nStats", ColorTheme.get().accentOrange, e -> doResetStats()));
@@ -470,6 +483,46 @@ public class AdminPanel extends JPanel {
         ex.printStackTrace();
       }
     });
+  }
+
+  private void doLockQueue() {
+    try {
+      songQueueService.lock();
+      updateQueueLockUi(true);
+    } catch (Exception ex) {
+      ex.printStackTrace();
+    }
+  }
+
+  private void doUnlockQueue() {
+    try {
+      songQueueService.unlock();
+      updateQueueLockUi(false);
+    } catch (Exception ex) {
+      ex.printStackTrace();
+    }
+  }
+
+  /**
+   * Reflects the song queue's lock state in the sidebar buttons (the button for the action that is
+   * NOT currently available is greyed out/disabled) and toggles the "LOCKED" indicator next to the
+   * "Queue:" section header.
+   */
+  private void updateQueueLockUi(boolean locked) {
+    lockQueueButton.setEnabled(!locked);
+    unlockQueueButton.setEnabled(locked);
+    lockQueueButton.repaint();
+    unlockQueueButton.repaint();
+    queueLockedLabel.setVisible(locked);
+  }
+
+  /** Hidden by default -- shown next to the "Queue:" header while the queue is locked. */
+  private static JLabel buildQueueLockedLabel() {
+    JLabel label = new JLabel("🔒");
+    label.setForeground(ColorTheme.get().accentYellow);
+    label.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+    label.setVisible(false);
+    return label;
   }
 
   private void doEditAlbum() {
@@ -1502,7 +1555,13 @@ public class AdminPanel extends JPanel {
     JLabel lbl = new JLabel("Queue:");
     lbl.setForeground(accent);
     lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
-    header.add(lbl, BorderLayout.WEST);
+
+    JPanel westWrap = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 8, 0));
+    westWrap.setOpaque(false);
+    westWrap.add(lbl);
+    westWrap.add(queueLockedLabel);
+
+    header.add(westWrap, BorderLayout.WEST);
     header.add(SongTrackCellRenderer.buildPriorityLegend(), BorderLayout.EAST);
     return header;
   }
@@ -1628,9 +1687,6 @@ public class AdminPanel extends JPanel {
   private static JButton sideButton(String label, Color accent,
       java.awt.event.ActionListener action) {
 
-    final Color GRAD_TOP = accent.darker();
-    final Color GRAD_BOTTOM = accent.darker().darker();
-
     // Split into icon line + text line if a newline is present
     final String[] parts = label.split("\n", 2);
     final String line1 = parts[0];
@@ -1667,6 +1723,11 @@ public class AdminPanel extends JPanel {
         int shelfH = Math.round(visH * 0.22f);
         int faceH = visH - shelfH;
 
+        boolean enabled = isEnabled();
+        Color gradTop = enabled ? accent.darker() : ColorTheme.get().btnGreyFace.brighter();
+        Color gradBottom = enabled ? accent.darker().darker() : ColorTheme.get().btnGreyFace;
+        Color borderColor = enabled ? accent : ColorTheme.get().btnGreyBorder;
+
         // Drop-shadow
         g2.setColor(ColorTheme.get().adminSideBtnShadow);
         g2.fillRoundRect(1, shadowH, w - 2, visH, arc, arc);
@@ -1676,24 +1737,28 @@ public class AdminPanel extends JPanel {
         g2.fillRoundRect(1, faceH, w - 2, shelfH + arc / 2, arc, arc);
 
         // Face gradient
-        Color top = hovered ? GRAD_TOP.brighter() : GRAD_TOP;
-        Color bot = hovered ? GRAD_BOTTOM.brighter() : GRAD_BOTTOM;
+        Color top = (enabled && hovered) ? gradTop.brighter() : gradTop;
+        Color bot = (enabled && hovered) ? gradBottom.brighter() : gradBottom;
         g2.setPaint(new GradientPaint(0, 0, top, 0, faceH, bot));
         g2.fillRoundRect(1, 0, w - 2, faceH + arc / 2, arc, arc);
 
         // Specular edge
-        g2.setColor(new Color(Math.min(255, accent.getRed() + 80),
-            Math.min(255, accent.getGreen() + 80), Math.min(255, accent.getBlue() + 80), 160));
+        if (enabled) {
+          g2.setColor(new Color(Math.min(255, accent.getRed() + 80),
+              Math.min(255, accent.getGreen() + 80), Math.min(255, accent.getBlue() + 80), 160));
+        } else {
+          g2.setColor(new Color(255, 255, 255, 30));
+        }
         g2.setStroke(new java.awt.BasicStroke(1f));
         g2.drawLine(arc, 1, w - arc - 1, 1);
 
         // Border
-        g2.setColor(hovered ? accent.brighter() : accent);
+        g2.setColor((enabled && hovered) ? accent.brighter() : borderColor);
         g2.setStroke(new java.awt.BasicStroke(1.5f));
         g2.drawRoundRect(1, 1, w - 3, visH - 2, arc, arc);
 
         // Text — one or two lines centred on the face
-        g2.setColor(ColorTheme.get().textPrimary);
+        g2.setColor(enabled ? ColorTheme.get().textPrimary : ColorTheme.get().btnGreyText);
         if (line2 == null) {
           // Single line
           g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSideBtn1));

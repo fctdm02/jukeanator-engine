@@ -154,6 +154,21 @@ public class SongQueueServiceHttpClient implements SongQueueService {
   }
 
   @Override
+  public void lock() {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public void unlock() {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public boolean isLocked() {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
   public Integer saveQueueAsPlaylist(Integer locationId, String filename) {
 
     return restClient.post().uri(basePath(locationId) + "/saveQueueAsPlaylist").body(filename)

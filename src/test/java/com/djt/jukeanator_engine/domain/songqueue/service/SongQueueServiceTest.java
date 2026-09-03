@@ -3,6 +3,7 @@ package com.djt.jukeanator_engine.domain.songqueue.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.List;
@@ -54,9 +55,11 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
     AlbumDto album = albums.get(0);
     SongDto song = album.songs().get(0);
     
-    // Lock the queue so that the queued song is not dequeued and played.
-    // TODO: CLAUDE
-    // songQueueService.lock();    
+    // Lock the queue so that the queued song is not dequeued and played out from under this test
+    // by SongPlayerServiceImpl's background queue-processing thread, which reacts to
+    // SongAddedToQueueEvent (fired by addSongToQueue() below) by asynchronously calling
+    // songQueueService.dequeueNextSong() on its own thread.
+    songQueueService.lock();
 
     // Add a song to the song queue
     Integer albumId = album.albumId();
@@ -75,6 +78,9 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
     SongQueueEntryDto queuedSong = queuedSongs.get(0);
     assertEquals(queuedSong.song().songName(), song.songName(), "Song name is incorrect");
 
+    // Unlock the queue so that this test can now dequeue the song itself.
+    songQueueService.unlock();
+
     // Remove the first entry in the queue (normally only the song player service should do this)
     SongQueueEntryDto firstQueuedSong = songQueueService.dequeueNextSong();
     assertNotNull(firstQueuedSong, "firstQueuedSong should not be null");
@@ -85,5 +91,68 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
     queuedSongs = songQueueService.getQueuedSongs(songLibraryService.getOwnLocationId());
     assertNotNull(queuedSongs, "queuedSongs should not be null");
     assertTrue(queuedSongs.size() == 0, "queuedSongs size should be zero");
+  }
+
+  @Test
+  void lockPreventsDequeueButAllowsQueueing() throws IOException, InterruptedException {
+
+    // Scan for songs
+    ScanRequest scanRequest = new ScanRequest(
+        "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/"
+            + "utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
+    songLibraryService.scanFileSystemForSongs(scanRequest);
+    List<AlbumDto> albums = songLibraryService.getAlbums(songLibraryService.getOwnLocationId());
+    AlbumDto album = albums.get(0);
+    SongDto song = album.songs().get(0);
+
+    songQueueService.lock();
+    try {
+
+      assertTrue(songQueueService.isLocked(), "isLocked() should return true after lock()");
+
+      // Queueing a song should still be allowed while the queue is locked.
+      AddSongToQueueRequest addSongToQueueRequest = new AddSongToQueueRequest(
+          SongQueueService.LOCAL_USERNAME, album.albumId(), song.songId(), Integer.valueOf(1));
+      SongQueueEntryDto queueEntry = songQueueService.addSongToQueue(
+          songLibraryService.getOwnLocationId(), addSongToQueueRequest);
+      assertNotNull(queueEntry, "Songs should still be queueable while the queue is locked");
+
+      // Give SongPlayerServiceImpl's background queue-processing thread (triggered by the
+      // SongAddedToQueueEvent published above) a moment to attempt -- and be blocked from --
+      // dequeuing the song we just queued.
+      Thread.sleep(500);
+
+      List<SongQueueEntryDto> queuedSongs =
+          songQueueService.getQueuedSongs(songLibraryService.getOwnLocationId());
+      boolean stillQueued = queuedSongs.stream()
+          .anyMatch(entry -> entry.song().songName().equals(song.songName()));
+      assertTrue(stillQueued, "Song should not have been dequeued while the queue is locked");
+
+      // A direct call to dequeueNextSong() should also be refused while locked.
+      assertNull(songQueueService.dequeueNextSong(),
+          "dequeueNextSong() should return null while the queue is locked");
+
+    } finally {
+      songQueueService.unlock();
+    }
+
+    assertFalse(songQueueService.isLocked(), "isLocked() should return false after unlock()");
+
+    // Once unlocked, dequeueing should work again.
+    SongQueueEntryDto dequeuedSong = songQueueService.dequeueNextSong();
+    assertNotNull(dequeuedSong, "dequeueNextSong() should work again once the queue is unlocked");
+    assertEquals(song.songName(), dequeuedSong.song().songName(), "Song name is incorrect");
+  }
+
+  @Test
+  void isLockedReflectsLockUnlockState() {
+
+    assertFalse(songQueueService.isLocked(), "Queue should start unlocked");
+
+    songQueueService.lock();
+    assertTrue(songQueueService.isLocked(), "isLocked() should return true after lock()");
+
+    songQueueService.unlock();
+    assertFalse(songQueueService.isLocked(), "isLocked() should return false after unlock()");
   }
 }

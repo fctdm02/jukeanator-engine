@@ -92,6 +92,14 @@ public class SongQueueServiceImpl
   /** Reference to the track that is currently playing on the output system */
   private SongFileEntity currentlyPlayingSong;
 
+  // ── Song Queue Lock State ────────────────────────────────────────────────
+  /**
+   * When {@code true}, {@link #dequeueNextSong()} will not dequeue/play any song -- songs may
+   * still be queued via {@link #addSongToQueue}/{@link #addAlbumToQueue}/
+   * {@link #addMultipleSongsToQueue}. Toggled via {@link #lock()}/{@link #unlock()}.
+   */
+  private volatile boolean isSongQueueLocked = false;
+
   public SongQueueServiceImpl(SongQueueProperties songQueueProperties,
       SongLibraryService songLibraryService, BackgroundMusicService backgroundMusicService,
       SongQueueRepository songQueueRepository, ApplicationEventPublisher eventPublisher,
@@ -200,6 +208,10 @@ public class SongQueueServiceImpl
 
   @Override
   public synchronized SongQueueEntryDto dequeueNextSong() {
+
+    if (isSongQueueLocked) {
+      return null;
+    }
 
     List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
 
@@ -756,6 +768,21 @@ public class SongQueueServiceImpl
       throw new SongQueueServiceException("Could not remove song down in queue, albumId: " + albumId
           + ", songId: " + songId + ", error: " + e.getMessage(), e);
     }
+  }
+
+  @Override
+  public void lock() {
+    isSongQueueLocked = true;
+  }
+
+  @Override
+  public void unlock() {
+    isSongQueueLocked = false;
+  }
+
+  @Override
+  public boolean isLocked() {
+    return isSongQueueLocked;
   }
 
   @Override

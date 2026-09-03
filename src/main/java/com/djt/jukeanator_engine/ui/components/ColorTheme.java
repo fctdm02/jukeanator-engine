@@ -110,6 +110,9 @@ public final class ColorTheme {
   /** Red accent for explicit-content badges and AMI warning borders. */
   public final Color accentExplicit = new Color(220, 60, 60);
 
+  /** Yellow accent — admin queue locked symbol. */
+  public final Color accentYellow = new Color(255, 255, 0);
+  
   // ═══════════════════════════════════════════════════════════════════════════
   // TEXT
   // Origin: virtually all components

@@ -128,6 +128,25 @@ public interface SongQueueService {
   Integer removeSongDownFromQueue(Integer locationId, ChangeSongQueueRequest changeSongQueueRequest);
 
   /**
+   * Locks the song queue. While locked, songs may still be queued (see {@link #addSongToQueue},
+   * {@link #addAlbumToQueue}, {@link #addMultipleSongsToQueue}), but {@link #dequeueNextSong()}
+   * will not dequeue/play any song.
+   */
+  void lock();
+
+  /**
+   * Unlocks the song queue, so that {@link #dequeueNextSong()} is once again allowed to
+   * dequeue/play songs.
+   */
+  void unlock();
+
+  /**
+   * @return {@code true} if the song queue is currently locked (see {@link #lock()}), {@code
+   *         false} otherwise.
+   */
+  boolean isLocked();
+
+  /**
    *
    * @param filename
    * @return
