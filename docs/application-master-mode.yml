@@ -72,7 +72,7 @@ song-queue:
   allow-explicit-songs-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) Only used when allowExplicitSongsAtAllTimes is false
 
 background-music:   # master never runs BackgroundMusicService (NotMasterModeCondition), so this section is inert here
-  enable-background-music: true # assumes playlist file called BackgroundMusic.TXT exists in rootPath
+  enable-background-music: true # assumes playlist file called BackgroundMusic.TXT exists in dataDir
   enable-smart-background-music-additions: true # will play songs from same artist/album from background music
   smart-background-music-additions-factor: 3 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
   smart-background-music-additions-begin: 19 # In 24 hour/military time (e.g. 19:00 hours is 7:00PM) start time for enableSmartBackgroundMusicAdditions

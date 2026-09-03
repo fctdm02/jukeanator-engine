@@ -11,7 +11,7 @@ import org.springframework.validation.annotation.Validated;
 public class BackgroundMusicProperties {
 
   // BACKGROUND MUSIC (MUTUALLY EXCLUSIVE TO LINE IN MUSIC), WILL BE EMPLOYED TO KEEP QUEUE AT A MIN
-  // SIZE. ASSUMES PLAYLIST FILE CALLED: "BackgroundMusic.TXT" EXISTS IN rootPath
+  // SIZE. ASSUMES PLAYLIST FILE CALLED: "BackgroundMusic.TXT" EXISTS IN dataDir
   private boolean enableBackgroundMusic = false;
   private boolean enableSmartBackgroundMusicAdditions = true; // will play songs from same
                                                                // artist/album from background music
