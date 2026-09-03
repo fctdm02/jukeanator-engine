@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jukeanator-master",
+      "runtimeExecutable": "/home/lmuser/projects/jukeanator-engine/mvnw",
+      "runtimeArgs": ["spring-boot:run", "-DskipTests", "-Dspring-boot.run.arguments=--app.mode=master --app.ui-enabled=false --app.repository-type=jpa"],
+      "port": 8080
+    }
+  ]
+}
