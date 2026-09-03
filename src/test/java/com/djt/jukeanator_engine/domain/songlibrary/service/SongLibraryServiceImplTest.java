@@ -113,6 +113,43 @@ public class SongLibraryServiceImplTest {
         () -> service.renameOwnLocationLibraryFileIfNameChanged("Old Name"));
   }
 
+  @Test
+  void renameOwnLocationLibraryFileIfNameChanged_alsoRenamesJpaFilesystemBackup(
+      @TempDir Path tempDir) throws Exception {
+
+    SongLibraryRepository songLibraryRepository = mock(SongLibraryRepository.class);
+    LocationService locationService = mock(LocationService.class);
+    SongScanner songScanner = mock(SongScanner.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    LocationEntity ownLocation = new LocationEntity(1, "New Name", null, null, "hash");
+
+    when(locationService.getOrCreateOwnLocation(null)).thenReturn(ownLocation);
+    when(songLibraryRepository.loadAggregateRoot(1))
+        .thenThrow(new EntityDoesNotExistException("no library yet"));
+
+    AppProperties appProperties = new AppProperties();
+    appProperties.setDataDir(tempDir.toString());
+    appProperties.setMode("standalone");
+    appProperties.setRepositoryType("jpa");
+
+    SongLibraryServiceImpl service = new SongLibraryServiceImpl(appProperties,
+        songLibraryRepository, locationService, songScanner, Integer.valueOf(100), eventPublisher);
+
+    // Simulates a .oos backup already on disk under the pre-rename name, left behind by an
+    // earlier storeSongLibraryAndStatistics() call (see that method's JPA-backup test above).
+    Path oldBackupFile = tempDir.resolve("Old_Name.oos");
+    Files.createFile(oldBackupFile);
+
+    service.renameOwnLocationLibraryFileIfNameChanged("Old Name");
+
+    verify(songLibraryRepository).renameLocationLibraryFile("Old Name", "New Name");
+    assertFalse(Files.exists(oldBackupFile),
+        "the stale .oos backup under the old location name should have been renamed away");
+    assertTrue(Files.exists(tempDir.resolve("New_Name.oos")),
+        "the .oos backup should now exist under the new location name so it doesn't linger as an "
+            + "orphan until the next storeSongLibraryAndStatistics() call");
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // scanFileSystemForSongs -- JPA round-trip integrity check
   // ─────────────────────────────────────────────────────────────────────────

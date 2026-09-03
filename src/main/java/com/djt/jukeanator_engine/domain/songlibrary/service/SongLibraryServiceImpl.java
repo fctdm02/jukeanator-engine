@@ -1114,6 +1114,20 @@ public class SongLibraryServiceImpl
 
     this.songLibraryRepository.renameLocationLibraryFile(previousLocationName,
         currentLocationName);
+
+    if (this.jpaRepositoryType) {
+
+      // Under JPA, the primary repository has no per-location file of its own to rename (see
+      // SongLibraryRepository#renameLocationLibraryFile's no-op default) -- the call above was a
+      // no-op. But storeSongLibraryAndStatistics() keeps a .oos backup on disk under JPA too (so
+      // this instance can be switched back to repositoryType: filesystem later without losing
+      // data), and that backup's filename is just as location-name-derived as the filesystem
+      // repository's own file. Rename it here too, so it doesn't linger under the old name as an
+      // orphan until the next storeSongLibraryAndStatistics() call writes a second file under the
+      // new name.
+      new SongLibraryRepositoryFileSystemImpl(this.dataDir)
+          .renameLocationLibraryFile(previousLocationName, currentLocationName);
+    }
   }
 
   @Override
