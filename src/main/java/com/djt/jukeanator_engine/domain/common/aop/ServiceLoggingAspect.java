@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 
 /**
  * AOP logging interceptor that fires around every method on every service interface in this
@@ -36,7 +37,9 @@ import org.springframework.stereotype.Component;
  * structured {@code LoginRequest} / {@code RegisterRequest} objects are passed as arguments.
  *
  * <h3>Log level</h3> Entry/exit are logged at {@code DEBUG}. Exceptions are additionally logged at
- * {@code WARN} (the exception itself is still propagated).
+ * {@code WARN} (the exception itself is still propagated), except for
+ * {@link com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException}, which is
+ * logged at {@code INFO} since fat-fingered login attempts are routine, not noteworthy.
  *
  * @author tmyers
  */
@@ -99,8 +102,15 @@ public class ServiceLoggingAspect {
 
     } catch (Throwable t) {
       long elapsed = System.currentTimeMillis() - start;
-      log.warn("[SERVICE] user='{}' ← {}  THREW {}  ({}ms): {}", username, methodName,
-          t.getClass().getSimpleName(), elapsed, t.getMessage());
+      // Invalid login attempts are routine client behavior (fat-fingered email/password), not
+      // noteworthy application events, so they're logged at INFO rather than WARN.
+      if (t instanceof InvalidCredentialsException) {
+        log.info("[SERVICE] user='{}' ← {}  THREW {}  ({}ms): {}", username, methodName,
+            t.getClass().getSimpleName(), elapsed, t.getMessage());
+      } else {
+        log.warn("[SERVICE] user='{}' ← {}  THREW {}  ({}ms): {}", username, methodName,
+            t.getClass().getSimpleName(), elapsed, t.getMessage());
+      }
       throw t;
     }
   }

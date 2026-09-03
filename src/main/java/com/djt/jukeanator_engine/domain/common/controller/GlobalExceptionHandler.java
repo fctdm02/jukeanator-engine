@@ -12,6 +12,7 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsExce
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.location.exception.LocationOfflineException;
+import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,6 +44,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidPrincipalException.class)
     public void handleInvalidPrincipal(InvalidPrincipalException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
         logExpected(HttpStatus.UNAUTHORIZED, ex, request);
+        write(HttpStatus.UNAUTHORIZED, ex, response);
+    }
+
+    // Invalid login (unknown email or wrong password) is routine client behavior -- people
+    // fat-finger their credentials constantly -- so it's logged at INFO, one level below the WARN
+    // used for other expected 4xx outcomes, rather than treated as noteworthy.
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public void handleInvalidCredentials(InvalidCredentialsException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        log.info("[{}] {} {} — {}: {}", HttpStatus.UNAUTHORIZED.value(), request.getMethod(),
+                request.getRequestURI(), ex.getClass().getSimpleName(), ex.getMessage());
         write(HttpStatus.UNAUTHORIZED, ex, response);
     }
 

@@ -21,6 +21,7 @@ import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 
 /**
  * @author tmyers
@@ -50,9 +51,11 @@ public interface UserService {
    *
    * @param request
    * @return
+   * @throws InvalidCredentialsException if the email address is not registered, or the password
+   *         does not match
    */
   @PublicServiceMethod
-  AuthResponse login(LoginRequest request);
+  AuthResponse login(LoginRequest request) throws InvalidCredentialsException;
 
   /**
    *

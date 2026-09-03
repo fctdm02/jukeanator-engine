@@ -32,6 +32,7 @@ import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 
@@ -55,7 +56,8 @@ public class UserController {
   }
 
   @PostMapping("/login")
-  public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+  public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request)
+      throws InvalidCredentialsException {
 
     return ResponseEntity.ok(userService.login(request));
   }

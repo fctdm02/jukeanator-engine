@@ -39,6 +39,7 @@ import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
+import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.CreditTransactionType;
@@ -132,15 +133,15 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public synchronized AuthResponse login(LoginRequest request) {
+  public synchronized AuthResponse login(LoginRequest request) throws InvalidCredentialsException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(request.emailAddress());;
     if (user == null) {
-      throw new UserServiceException("Invalid credentials");
+      throw new InvalidCredentialsException("Invalid credentials");
     }
 
     if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-      throw new UserServiceException("Invalid credentials");
+      throw new InvalidCredentialsException("Invalid credentials");
     }
 
     String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole().name());

@@ -47,6 +47,7 @@ import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
+import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
@@ -130,7 +131,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   }
 
   @Test
-  void lifecycle() {
+  void lifecycle() throws Exception {
 
     // Use a unique email address per run so the test is idempotent across repeated
     // executions against a persistent (non-rolled-back) datastore.
@@ -157,11 +158,11 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     // Logging in with an incorrect password should fail
     LoginRequest badLoginRequest = new LoginRequest(emailAddress, "wrongPassword");
-    assertThrows(UserServiceException.class, () -> userService.login(badLoginRequest));
+    assertThrows(InvalidCredentialsException.class, () -> userService.login(badLoginRequest));
 
     // Logging in with an unknown email address should fail
     LoginRequest unknownLoginRequest = new LoginRequest("unknown@example.com", "password123");
-    assertThrows(UserServiceException.class, () -> userService.login(unknownLoginRequest));
+    assertThrows(InvalidCredentialsException.class, () -> userService.login(unknownLoginRequest));
 
     // Get the profile for the registered user
     UserProfileDto profile = userService.getProfile(emailAddress);
