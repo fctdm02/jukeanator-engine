@@ -69,7 +69,7 @@ public class JukeANatorEventListener {
 
     if (frame == null) return;
 
-    frame.setNowPlaying(event.songQueueEntry().getSong());
+    frame.setNowPlaying(event.songQueueEntry().song());
   }
 
   @EventListener

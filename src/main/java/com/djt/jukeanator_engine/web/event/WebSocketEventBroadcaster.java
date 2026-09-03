@@ -66,7 +66,7 @@ public class WebSocketEventBroadcaster {
   @EventListener
   public void handlePlaybackStarted(SongPlaybackStartedEvent event) {
     messagingTemplate.convertAndSend("/topic/now-playing",
-        new NowPlayingMessage(event.songQueueEntry().getSong()));
+        new NowPlayingMessage(event.songQueueEntry().song()));
     messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
@@ -89,10 +89,10 @@ public class WebSocketEventBroadcaster {
 
   @EventListener
   public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
-    String username = event.queueEntry().getUsername();
+    String username = event.queueEntry().username();
     if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
       messagingTemplate.convertAndSendToUser(
-          username, "/queue/recent-plays", event.queueEntry().getSong());
+          username, "/queue/recent-plays", event.queueEntry().song());
     }
   }
 

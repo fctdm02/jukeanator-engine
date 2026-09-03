@@ -133,11 +133,11 @@ public class SongLibraryController {
       @PathVariable Integer id) throws EntityDoesNotExistException, IOException {
 
     ArtistDto artist = songLibraryService.getArtistById(locationId, id);
-    if (artist.getCoverArtPath() == null) {
+    if (artist.coverArtPath() == null) {
       throw new EntityDoesNotExistException("No cover art path set for artist: " + id);
     }
 
-    Path coverArtPath = Paths.get(artist.getCoverArtPath());
+    Path coverArtPath = Paths.get(artist.coverArtPath());
     if (!Files.isRegularFile(coverArtPath)) {
       throw new EntityDoesNotExistException(
           "Cover art file does not exist for artist: " + id + " at path: " + coverArtPath);
@@ -156,10 +156,10 @@ public class SongLibraryController {
     if (isOwnLocation) {
 
       AlbumDto album = songLibraryService.getAlbumById(locationId, id);
-      if (album == null || album.getCoverArtPath() == null) {
+      if (album == null || album.coverArtPath() == null) {
         throw new EntityDoesNotExistException("No cover art path set for album: " + id);
       }
-      coverArtPath = Paths.get(album.getCoverArtPath());
+      coverArtPath = Paths.get(album.coverArtPath());
 
     } else {
 

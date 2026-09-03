@@ -73,9 +73,9 @@ public class SongQueueController {
    */
   private Integer findQueuedPriority(Integer locationId, int albumId, int songId) {
     return songQueueService.getQueuedSongs(locationId).stream()
-        .filter(entry -> entry.getSong().getAlbumId() == albumId
-            && entry.getSong().getSongId() == songId)
-        .map(SongQueueEntryDto::getPriority)
+        .filter(entry -> entry.song().albumId() == albumId
+            && entry.song().songId() == songId)
+        .map(SongQueueEntryDto::priority)
         .findFirst()
         .orElse(1);
   }
@@ -119,9 +119,9 @@ public class SongQueueController {
     if (authentication != null && authentication.getPrincipal() instanceof String email) {
       addSongToQueueRequest = new AddSongToQueueRequest(
           email,
-          addSongToQueueRequest.getAlbumId(),
-          addSongToQueueRequest.getSongId(),
-          addSongToQueueRequest.getPriority());
+          addSongToQueueRequest.albumId(),
+          addSongToQueueRequest.songId(),
+          addSongToQueueRequest.priority());
     }
 
     SongQueueEntryDto entry = songQueueService.addSongToQueue(locationId, addSongToQueueRequest);
@@ -164,8 +164,8 @@ public class SongQueueController {
   public Integer moveSongUpInQueue(@PathVariable Integer locationId,
       @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication) {
 
-    Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.getAlbumId(),
-        changeSongQueueRequest.getSongId());
+    Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.albumId(),
+        changeSongQueueRequest.songId());
     Integer result = songQueueService.moveSongUpInQueue(locationId, changeSongQueueRequest);
     if (result != null && result > 0) {
       chargeWebUserForQueueAction(authentication, priority, locationId);
@@ -177,8 +177,8 @@ public class SongQueueController {
   public Integer moveSongDownInQueue(@PathVariable Integer locationId,
       @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication) {
 
-    Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.getAlbumId(),
-        changeSongQueueRequest.getSongId());
+    Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.albumId(),
+        changeSongQueueRequest.songId());
     Integer result = songQueueService.moveSongDownInQueue(locationId, changeSongQueueRequest);
     if (result != null && result > 0) {
       chargeWebUserForQueueAction(authentication, priority, locationId);
@@ -190,8 +190,8 @@ public class SongQueueController {
   public Integer removeSongDownFromQueue(@PathVariable Integer locationId,
       @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication) {
 
-    Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.getAlbumId(),
-        changeSongQueueRequest.getSongId());
+    Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.albumId(),
+        changeSongQueueRequest.songId());
     Integer result = songQueueService.removeSongDownFromQueue(locationId, changeSongQueueRequest);
     if (result != null && result > 0) {
       chargeWebUserForQueueAction(authentication, priority, locationId);

@@ -109,8 +109,13 @@ public final class DiscogsClientWrapper {
         }
       }
 
+      boolean isEmpty = false;
+      if (releaseDate == null || releaseDate.isBlank()) {
+        isEmpty = true;
+      }
+      
       albumMetadataResults.add(new AlbumMetadataDto(artistName, albumName, recordLabel, releaseDate,
-          genre, coverArtUrl, hasExplicit));
+          genre, coverArtUrl, hasExplicit, isEmpty));
     }
 
     return albumMetadataResults;

@@ -375,7 +375,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     // Previously: imageLoader.loadImage(resource, 240, 240) — hard-coded 240px.
     // Now: genreProfile.imageSize() supplies the resolution-scaled pixel size.
     int imgSize = genreProfile.imageSize();
-    String name = genre.getGenreName();
+    String name = genre.genreName();
     try {
       ImageIcon cached = genreIconCache.get(name);
       if (cached != null) {
@@ -418,9 +418,9 @@ public class GenrePanel extends JPanel implements TabNavigator {
     SearchResultDto results;
     try {
       results = songLibraryService.getGenreMusicByPopularity(songLibraryService.getOwnLocationId(),
-          genre.getGenreName());
+          genre.genreName());
     } catch (Exception e) {
-      results = new SearchResultDto();
+      results = new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
     }
 
     GenreDetailPanel detailPanel = new GenreDetailPanel(genre, results, imageLoader, "← Back",
@@ -444,7 +444,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
   private void pushArtistFromGenre(ArtistDto artist) {
 
     ArtistDto full = null;
-    String artistName = artist.getArtistName();
+    String artistName = artist.artistName();
     try {
       full = songLibraryService.getArtistByName(songLibraryService.getOwnLocationId(), artistName);
     } catch (Exception e) {
@@ -476,7 +476,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
   private AlbumDto fetchFull(AlbumDto album) {
     try {
-      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.getAlbumId());
+      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.albumId());
     } catch (Exception e) {
       return album;
     }

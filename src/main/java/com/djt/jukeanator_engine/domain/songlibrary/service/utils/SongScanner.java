@@ -211,8 +211,13 @@ public final class SongScanner {
             String recordLabel = tags.get(JAudioTaggerClient.RECORD_LABEL);
             String releaseDate = tags.get(JAudioTaggerClient.RELEASE_DATE);
 
+            boolean isEmpty = false;
+            if (releaseDate == null || releaseDate.isBlank()) {
+              isEmpty = true;
+            }
+            
             AlbumMetadataDto metadata =
-                new AlbumMetadataDto("", "", recordLabel, releaseDate, "", "", false);
+                new AlbumMetadataDto("", "", recordLabel, releaseDate, "", "", false, isEmpty);
 
             if (!metadata.isEmpty()) {
 
@@ -243,7 +248,7 @@ public final class SongScanner {
         if (!hasValidCoverArt && !albumMetadataResults.isEmpty()) {
 
           AlbumMetadataDto albumMetadataResult = albumMetadataResults.get(0);
-          String coverArtUrl = albumMetadataResult.getCoverArtUrl();
+          String coverArtUrl = albumMetadataResult.coverArtUrl();
           downloadCoverArt(coverArtPath, coverArtUrl);
         }
 

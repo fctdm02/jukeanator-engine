@@ -82,15 +82,15 @@ public class GenreDetailPanel extends JPanel {
     this.onArtistClicked = onArtistClicked;
     this.songLibraryService = songLibraryService;
 
-    SearchResultDto safe = results != null ? results : new SearchResultDto();
-    this.artists = safeList(safe.getArtists());
-    this.albums = safeList(safe.getAlbums());
-    this.songs = safeList(safe.getSongs());
+    SearchResultDto safe = results != null ? results : new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
+    this.artists = safeList(safe.artists());
+    this.albums = safeList(safe.albums());
+    this.songs = safeList(safe.songs());
 
     // ── Header ────────────────────────────────────────────────────────────
     ImageIcon genreImage = null;
     try {
-      String resourceName = genre.getGenreName() + ".png";
+      String resourceName = genre.genreName() + ".png";
       int imgW = LayoutTheme.get().detailHeaderImageW;
       int imgH = LayoutTheme.get().detailHeaderImageH;
       genreImage = imageLoader.loadImageFromDataDir(resourceName, imgW, imgH);
@@ -108,7 +108,7 @@ public class GenreDetailPanel extends JPanel {
     String subtitle =
         artists.size() + " artists  •  " + albums.size() + " albums  •  " + songs.size() + " songs";
 
-    headerPanel = new DetailHeaderPanel(backLabel, onBack, genreImage, "♪", genre.getGenreName(),
+    headerPanel = new DetailHeaderPanel(backLabel, onBack, genreImage, "♪", genre.genreName(),
         subtitle, buildSortButtonPanel());
     headerPanel.setOpaque(false);
     // Matches the border used by HomePanel's and HotHerePanel's headers so all three
@@ -233,15 +233,15 @@ public class GenreDetailPanel extends JPanel {
     try {
       SearchResultDto fresh = switch (mode) {
         case POPULARITY -> songLibraryService.getGenreMusicByPopularity(
-            songLibraryService.getOwnLocationId(), genre.getGenreName());
+            songLibraryService.getOwnLocationId(), genre.genreName());
         case TITLE -> songLibraryService.getGenreMusicByTitle(songLibraryService.getOwnLocationId(),
-            genre.getGenreName());
+            genre.genreName());
       };
       if (fresh == null)
-        fresh = new SearchResultDto();
-      artists = safeList(fresh.getArtists());
-      albums = safeList(fresh.getAlbums());
-      songs = safeList(fresh.getSongs());
+        fresh = new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
+      artists = safeList(fresh.artists());
+      albums = safeList(fresh.albums());
+      songs = safeList(fresh.songs());
     } catch (Exception ignored) {
     }
 

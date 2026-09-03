@@ -497,26 +497,26 @@ public class EditAlbumCard extends JPanel {
       return;
 
     lblTopHeader.setText(
-        "Editing: " + currentAlbum.getAlbumName() + " (" + currentAlbum.getArtistName() + ")");
+        "Editing: " + currentAlbum.albumName() + " (" + currentAlbum.artistName() + ")");
     tfReleaseDate
-        .setText(currentAlbum.getReleaseDate() == null ? "" : currentAlbum.getReleaseDate());
+        .setText(currentAlbum.releaseDate() == null ? "" : currentAlbum.releaseDate());
     tfRecordLabel
-        .setText(currentAlbum.getRecordLabel() == null ? "" : currentAlbum.getRecordLabel());
+        .setText(currentAlbum.recordLabel() == null ? "" : currentAlbum.recordLabel());
     chbHasExplicit
-        .setSelected(currentAlbum.getHasExplicit() != null && currentAlbum.getHasExplicit());
+        .setSelected(currentAlbum.hasExplicit() != null && currentAlbum.hasExplicit());
 
     // Use "Various Artists" instead of "Compilations" for better internet search results
-    String searchArtistName = currentAlbum.getArtistName();
+    String searchArtistName = currentAlbum.artistName();
     if ("Compilations".equalsIgnoreCase(searchArtistName)) {
       searchArtistName = "Various Artists";
     }
     tfSearchArtist.setText(searchArtistName);
-    tfSearchAlbum.setText(currentAlbum.getAlbumName());
+    tfSearchAlbum.setText(currentAlbum.albumName());
 
     // Local file system cover art asset rendering
     lblCurrentCoverArt.setIcon(null);
     lblCurrentCoverArt.setText("");
-    String coverArtPath = currentAlbum.getCoverArtPath();
+    String coverArtPath = currentAlbum.coverArtPath();
     if (coverArtPath != null && !coverArtPath.isBlank()) {
       File file = new File(coverArtPath);
       if (file.exists()) {
@@ -594,14 +594,14 @@ public class EditAlbumCard extends JPanel {
     AlbumMetadataDto selectedMeta = searchResults.get(currentResultIndex);
 
     tfResultReleaseDate
-        .setText(selectedMeta.getReleaseDate() == null ? "" : selectedMeta.getReleaseDate());
+        .setText(selectedMeta.releaseDate() == null ? "" : selectedMeta.releaseDate());
     tfResultRecordLabel
-        .setText(selectedMeta.getRecordLabel() == null ? "" : selectedMeta.getRecordLabel());
+        .setText(selectedMeta.recordLabel() == null ? "" : selectedMeta.recordLabel());
     chbResultHasExplicit.setSelected(selectedMeta.hasExplicit());
 
     String yearVal = tfResultReleaseDate.getText().trim();
     String labelVal = tfResultRecordLabel.getText().trim();
-    String urlStr = selectedMeta.getCoverArtUrl();
+    String urlStr = selectedMeta.coverArtUrl();
 
     evaluateUpdateMetadataButtonState();
     boolean hasValidMetadata =
@@ -685,10 +685,15 @@ public class EditAlbumCard extends JPanel {
 
     try {
 
+      boolean isEmpty = false;
+      if (updatedYear == null || updatedYear.isBlank()) {
+        isEmpty = true;
+      }
+      
       AlbumMetadataDto metadata =
-          new AlbumMetadataDto("", "", updatedLabel, updatedYear, "", "", updatedExplicit);
+          new AlbumMetadataDto("", "", updatedLabel, updatedYear, "", "", updatedExplicit, isEmpty);
 
-      songLibraryService.updateAlbumMetadata(currentAlbum.getAlbumId(), metadata);
+      songLibraryService.updateAlbumMetadata(currentAlbum.albumId(), metadata);
 
       String messageDetails = String.format("Updated — Year: %s | Label: %s | Explicit: %b",
           updatedYear, updatedLabel, updatedExplicit);
@@ -719,7 +724,7 @@ public class EditAlbumCard extends JPanel {
 
       // Constructs operational scan paths safely linked to the active track record context
       DownloadAlbumCoverArtRequest downloadAlbumCoverArtRequest =
-          new DownloadAlbumCoverArtRequest(currentAlbum.getAlbumId(), liveArtUrlStr);
+          new DownloadAlbumCoverArtRequest(currentAlbum.albumId(), liveArtUrlStr);
 
       songLibraryService.downloadAlbumCoverArt(downloadAlbumCoverArtRequest);
 
@@ -770,7 +775,7 @@ public class EditAlbumCard extends JPanel {
       return;
     }
 
-    String coverArtPath = currentAlbum.getCoverArtPath();
+    String coverArtPath = currentAlbum.coverArtPath();
     if (coverArtPath == null || coverArtPath.isBlank()) {
       setStatus("Current album has no cover art path defined — cannot write cover.jpg.",
           ColorTheme.get().editAlbumStatusWarn);

@@ -62,8 +62,8 @@ public final class SongQueueMapper {
   public static SongQueueEntryEntity toEntity(SongQueueEntryPersistenceDto dto,
       SongFileEntity song) {
 
-    SongQueueEntryEntity entity = new SongQueueEntryEntity(dto.getUsername(), song, dto.getPriority());
-    entity.setQueuedAtTime(dto.getQueuedAtTime());
+    SongQueueEntryEntity entity = new SongQueueEntryEntity(dto.username(), song, dto.priority());
+    entity.setQueuedAtTime(dto.queuedAtTime());
 
     return entity;
   }

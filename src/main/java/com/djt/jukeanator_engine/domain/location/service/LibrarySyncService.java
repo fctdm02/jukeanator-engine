@@ -102,7 +102,7 @@ public class LibrarySyncService {
     }
 
     for (AlbumDto album : songLibraryService.getAlbums(songLibraryService.getOwnLocationId())) {
-      if (ack.sourceAlbumIdsNeedingCoverArt().contains(album.getAlbumId())) {
+      if (ack.sourceAlbumIdsNeedingCoverArt().contains(album.albumId())) {
         uploadCoverArt(album);
       }
     }
@@ -112,27 +112,27 @@ public class LibrarySyncService {
 
     List<LibrarySnapshotGenreDto> genres = new ArrayList<>();
     for (GenreDto genre : songLibraryService.getGenres(songLibraryService.getOwnLocationId())) {
-      genres.add(new LibrarySnapshotGenreDto(genre.getGenreId(), genre.getGenreName()));
+      genres.add(new LibrarySnapshotGenreDto(genre.genreId(), genre.genreName()));
     }
 
     List<LibrarySnapshotArtistDto> artists = new ArrayList<>();
     for (ArtistDto artist : songLibraryService.getArtists(songLibraryService.getOwnLocationId())) {
-      artists.add(new LibrarySnapshotArtistDto(artist.getArtistId(), artist.getArtistName()));
+      artists.add(new LibrarySnapshotArtistDto(artist.artistId(), artist.artistName()));
     }
 
     List<LibrarySnapshotAlbumDto> albums = new ArrayList<>();
     for (AlbumDto album : songLibraryService.getAlbums(songLibraryService.getOwnLocationId())) {
 
       List<LibrarySnapshotSongDto> songs = new ArrayList<>();
-      for (SongDto song : album.getSongs()) {
-        songs.add(new LibrarySnapshotSongDto(song.getSongId(), song.getSongName(),
-            song.getTrackNumber(), song.getNumPlays()));
+      for (SongDto song : album.songs()) {
+        songs.add(new LibrarySnapshotSongDto(song.songId(), song.songName(),
+            song.trackNumber(), song.numPlays()));
       }
 
-      albums.add(new LibrarySnapshotAlbumDto(album.getAlbumId(), album.getAlbumName(),
-          album.getArtistId(), album.getArtistName(), album.getGenreId(), album.getGenreName(),
-          hashCoverArt(album.getCoverArtPath()), album.getHasExplicit(), album.getRecordLabel(),
-          album.getReleaseDate(), album.isCompilation(), songs));
+      albums.add(new LibrarySnapshotAlbumDto(album.albumId(), album.albumName(),
+          album.artistId(), album.artistName(), album.genreId(), album.genreName(),
+          hashCoverArt(album.coverArtPath()), album.hasExplicit(), album.recordLabel(),
+          album.releaseDate(), album.isCompilation(), songs));
     }
 
     return new LibrarySnapshotDto(genres, artists, albums);
@@ -140,16 +140,16 @@ public class LibrarySyncService {
 
   private void uploadCoverArt(AlbumDto album) {
 
-    if (album.getCoverArtPath() == null) {
+    if (album.coverArtPath() == null) {
       return;
     }
 
     byte[] imageBytes;
     try {
-      imageBytes = Files.readAllBytes(Path.of(album.getCoverArtPath()));
+      imageBytes = Files.readAllBytes(Path.of(album.coverArtPath()));
     } catch (Exception e) {
-      log.warn("Could not read cover art at " + album.getCoverArtPath() + " for albumId "
-          + album.getAlbumId(), e);
+      log.warn("Could not read cover art at " + album.coverArtPath() + " for albumId "
+          + album.albumId(), e);
       return;
     }
 
@@ -157,7 +157,7 @@ public class LibrarySyncService {
 
     restClient.post()
         .uri("/api/locations/{locationId}/library-sync/cover-art/{sourceAlbumId}",
-            locationId, album.getAlbumId())
+            locationId, album.albumId())
         .header("location-id", String.valueOf(locationId))
         .header("location-api-key", appProperties.getLocationApiKey())
         .contentType(MediaType.IMAGE_JPEG)

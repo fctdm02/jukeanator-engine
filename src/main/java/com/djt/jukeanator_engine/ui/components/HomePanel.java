@@ -223,16 +223,16 @@ public class HomePanel extends JPanel implements TabNavigator {
 
     List<AlbumDto> albums = rawAlbums != null ? rawAlbums : List.of();
 
-    albumsByTitle = sortAlbums(albums, AlbumDto::getAlbumName);
-    letterMapByTitle = buildLetterMap(albumsByTitle, AlbumDto::getAlbumName);
+    albumsByTitle = sortAlbums(albums, AlbumDto::albumName);
+    letterMapByTitle = buildLetterMap(albumsByTitle, AlbumDto::albumName);
 
-    albumsByArtist = sortAlbums(albums, AlbumDto::getArtistName);
-    letterMapByArtist = buildLetterMap(albumsByArtist, AlbumDto::getArtistName);
+    albumsByArtist = sortAlbums(albums, AlbumDto::artistName);
+    letterMapByArtist = buildLetterMap(albumsByArtist, AlbumDto::artistName);
 
-    int artistCount = popular != null && popular.getArtists() != null
-        ? popular.getArtists().size() : 0;
-    int songCount = popular != null && popular.getSongs() != null
-        ? popular.getSongs().size() : 0;
+    int artistCount = popular != null && popular.artists() != null
+        ? popular.artists().size() : 0;
+    int songCount = popular != null && popular.songs() != null
+        ? popular.songs().size() : 0;
 
     JPanel gridCard = buildGridCard(artistCount, songCount);
     replaceCard(CARD_GRID, gridCard);
@@ -310,7 +310,7 @@ public class HomePanel extends JPanel implements TabNavigator {
     // Pass the same key extractor that was used to build the letter map so that
     // letterForIndex() highlights the correct letter when ❮/❯ paginate across buckets.
     java.util.function.Function<AlbumDto, String> keyExtractor =
-        mode == SortMode.TITLE ? AlbumDto::getAlbumName : AlbumDto::getArtistName;
+        mode == SortMode.TITLE ? AlbumDto::albumName : AlbumDto::artistName;
     return new AlbumGridPanel(albums, letterMap, imageLoader, albumGridProfile,
         album -> pushAlbumDetail(album), true, keyExtractor);
   }
@@ -505,7 +505,7 @@ public class HomePanel extends JPanel implements TabNavigator {
    */
   private AlbumDto fetchFull(AlbumDto album) {
     try {
-      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.getAlbumId());
+      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.albumId());
     } catch (Exception e) {
       return album;
     }

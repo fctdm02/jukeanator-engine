@@ -10,16 +10,5 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
  * @param artistsHotHere Artists currently trending at this venue.
  * @param songsHotHere   Songs currently trending at this venue.
  */
-public class HomePageDto {
-
-  private final List<ArtistDto> artistsHotHere;
-  private final List<SongDto>   songsHotHere;
-
-  public HomePageDto(List<ArtistDto> artistsHotHere, List<SongDto> songsHotHere) {
-    this.artistsHotHere = artistsHotHere;
-    this.songsHotHere   = songsHotHere;
-  }
-
-  public List<ArtistDto> getArtistsHotHere() { return artistsHotHere; }
-  public List<SongDto>   getSongsHotHere()   { return songsHotHere; }
+public record HomePageDto(List<ArtistDto> artistsHotHere, List<SongDto> songsHotHere) {
 }

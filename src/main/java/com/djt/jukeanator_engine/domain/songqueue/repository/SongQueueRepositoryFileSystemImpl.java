@@ -59,17 +59,17 @@ public final class SongQueueRepositoryFileSystemImpl extends AbstractRepositoryF
     RootFolderEntity songLibraryRoot =
         songLibraryService.getSongLibraryRoot(songLibraryService.getOwnLocationId());
 
-    SongQueueRootEntity root = new SongQueueRootEntity(dto.getRootPath());
-    for (SongQueueEntryPersistenceDto entryDto : dto.getEntries()) {
+    SongQueueRootEntity root = new SongQueueRootEntity(dto.rootPath());
+    for (SongQueueEntryPersistenceDto entryDto : dto.entries()) {
 
       try {
-        SongFileEntity song = songLibraryRoot.getSongById(entryDto.getAlbumId(), entryDto.getSongId());
+        SongFileEntity song = songLibraryRoot.getSongById(entryDto.albumId(), entryDto.songId());
         SongQueueEntryEntity entry = SongQueueMapper.toEntity(entryDto, song);
         root.getSongs().add(entry);
       } catch (EntityDoesNotExistException ednee) {
         log.warn(
             "Skipping persisted song queue entry whose song no longer exists in the library: albumId={}, songId={}",
-            entryDto.getAlbumId(), entryDto.getSongId());
+            entryDto.albumId(), entryDto.songId());
       }
     }
 

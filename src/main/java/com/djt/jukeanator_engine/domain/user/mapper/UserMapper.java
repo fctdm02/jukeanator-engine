@@ -83,7 +83,7 @@ public final class UserMapper {
 
     UserRootEntity root = new UserRootEntity();
 
-    for (UserDto userDto : dto.getUsers()) {
+    for (UserDto userDto : dto.users()) {
       root.addUser(toEntity(userDto));
     }
 
@@ -93,35 +93,35 @@ public final class UserMapper {
   public static UserEntity toEntity(UserDto dto) {
 
     UserEntity user = new UserEntity(
-        dto.getPersistentIdentity(),
-        dto.getFirstName(),
-        dto.getLastName(),
-        dto.getEmailAddress(),
-        dto.getPasswordHash(),
-        dto.getNumCredits(),
-        UserRole.valueOf(dto.getRole()));
+        dto.persistentIdentity(),
+        dto.firstName(),
+        dto.lastName(),
+        dto.emailAddress(),
+        dto.passwordHash(),
+        dto.numCredits(),
+        UserRole.valueOf(dto.role()));
 
-    user.setSongPlayHistory(dto.getSongPlayHistory());
-    user.setSearchHistory(dto.getSearchHistory());
+    user.setSongPlayHistory(dto.songPlayHistory());
+    user.setSearchHistory(dto.searchHistory());
 
     // The UserEntity constructor above already seeded a fresh "My Favorites" playlist; discard
     // it in favor of the persisted playlists, which already include it.
     user.getPlaylists().clear();
-    for (PlaylistDto playlistDto : dto.getPlaylists()) {
-      user.restorePlaylist(new PlaylistEntity(playlistDto.getPersistentIdentity(),
-          playlistDto.getOwner(), playlistDto.getName(), playlistDto.getSongs()));
+    for (PlaylistDto playlistDto : dto.playlists()) {
+      user.restorePlaylist(new PlaylistEntity(playlistDto.persistentIdentity(),
+          playlistDto.owner(), playlistDto.name(), playlistDto.songs()));
     }
 
-    for (CreditTransactionEntryDto transactionDto : dto.getTransactions()) {
+    for (CreditTransactionEntryDto transactionDto : dto.transactions()) {
       user.addTransaction(new CreditTransactionEntity(
-          transactionDto.getPersistentIdentity(),
-          transactionDto.getLocationId(),
-          transactionDto.getAmount(),
-          transactionDto.getType(),
-          transactionDto.getTimestamp(),
-          transactionDto.getSongAlbumId(),
-          transactionDto.getSongId(),
-          transactionDto.getResultingBalance()));
+          transactionDto.persistentIdentity(),
+          transactionDto.locationId(),
+          transactionDto.amount(),
+          transactionDto.type(),
+          transactionDto.timestamp(),
+          transactionDto.songAlbumId(),
+          transactionDto.songId(),
+          transactionDto.resultingBalance()));
     }
 
     return user;

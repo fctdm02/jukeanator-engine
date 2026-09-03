@@ -256,11 +256,11 @@ public class UserController {
     }
     try {
       for (PlaylistSummaryDto p : userService.getPlaylists(emailAddress)) {
-        if (p.getName().equals(playlistName)) {
-          if (p.getFirstSongAlbumId() != null) {
+        if (p.name().equals(playlistName)) {
+          if (p.firstSongAlbumId() != null) {
             return ResponseEntity.status(HttpStatus.FOUND)
                 .header("Location",
-                    "/api/song-library/albums/" + p.getFirstSongAlbumId() + "/coverArt")
+                    "/api/song-library/albums/" + p.firstSongAlbumId() + "/coverArt")
                 .build();
           }
           break;

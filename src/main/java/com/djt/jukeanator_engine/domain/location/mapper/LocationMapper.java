@@ -44,7 +44,7 @@ public final class LocationMapper {
 
     LocationRootEntity root = new LocationRootEntity();
 
-    for (LocationDto locationDto : dto.getLocations()) {
+    for (LocationDto locationDto : dto.locations()) {
       root.addLocation(toEntity(locationDto));
     }
 
@@ -54,16 +54,16 @@ public final class LocationMapper {
   public static LocationEntity toEntity(LocationDto dto) {
 
     LocationEntity location = new LocationEntity(
-        dto.getPersistentIdentity(),
-        dto.getName(),
-        dto.getLatitude(),
-        dto.getLongitude(),
-        dto.getApiKeyHash());
+        dto.persistentIdentity(),
+        dto.name(),
+        dto.latitude(),
+        dto.longitude(),
+        dto.apiKeyHash());
 
-    location.setLogoName(dto.getLogoName());
-    location.setStatus(LocationStatus.valueOf(dto.getStatus()));
-    location.setLastSeenAt(dto.getLastSeenAt());
-    location.setLibraryLastSyncedAt(dto.getLibraryLastSyncedAt());
+    location.setLogoName(dto.logoName());
+    location.setStatus(LocationStatus.valueOf(dto.status()));
+    location.setLastSeenAt(dto.lastSeenAt());
+    location.setLibraryLastSyncedAt(dto.libraryLastSyncedAt());
 
     return location;
   }

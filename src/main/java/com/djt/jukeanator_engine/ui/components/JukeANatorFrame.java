@@ -1250,10 +1250,10 @@ public class JukeANatorFrame extends JFrame {
         return;
       }
 
-      songLabel.setText(songDto.getSongName());
-      artistLabel.setText(songDto.getArtistName());
-      albumLabel.setText(songDto.getAlbumName());
-      albumArtLabel.setIcon(imageLoader.loadFilesystemImage(songDto.getCoverArtPath(),
+      songLabel.setText(songDto.songName());
+      artistLabel.setText(songDto.artistName());
+      albumLabel.setText(songDto.albumName());
+      albumArtLabel.setIcon(imageLoader.loadFilesystemImage(songDto.coverArtPath(),
           topPanelProfile.iconSize(), topPanelProfile.iconSize()));
       currentNowPlayingSong = songDto;
 
@@ -1409,7 +1409,7 @@ public class JukeANatorFrame extends JFrame {
     // getHighestPriority() returns the next available priority; normal plays
     // always use priority 1, so we pass 1 here as a representative value.
     String reason = songQueueService.isSongEligibleForQueue(songQueueService.getOwnLocationId(),
-        song.getAlbumId(), song.getSongId(), 1);
+        song.albumId(), song.songId(), 1);
 
     addSongToQueueCard = new AddSongToQueueCard(song, imageLoader, priorityCostMultiplier,
         songQueueService, creditManager, onDismiss);
@@ -1447,7 +1447,7 @@ public class JukeANatorFrame extends JFrame {
     AlbumDto full;
     try {
       full = songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(),
-          currentNowPlayingSong.getAlbumId());
+          currentNowPlayingSong.albumId());
     } catch (Exception e) {
       return; // cannot show detail without album data
     }

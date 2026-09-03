@@ -163,7 +163,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
     SongQueueEntryDto current = this.nowPlayingSong;
     if (current != null) {
 
-      return current.getSong();
+      return current.song();
     }
     return null;
   }
@@ -367,7 +367,7 @@ public class SongPlayerServiceImpl implements SongPlayerService {
       }
 
       nowPlayingSong = nextSong;
-      String songPath = nextSong.getSongPath();
+      String songPath = nextSong.songPath();
       log.info("Playing song: {}", songPath);
       player.playSongMedia(songPath);
       eventPublisher.publishEvent(new SongPlaybackStartedEvent(nextSong));

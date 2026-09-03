@@ -69,8 +69,8 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // from it in memory each time it refreshes — switching "Order By" never
   // re-queries SongLibraryService, it only swaps which of these two views is
   // shown. ────────────────────────────────────────────────────────────────────
-  private SearchResultDto resultsByPopularity = new SearchResultDto();
-  private SearchResultDto resultsByTitle = new SearchResultDto();
+  private SearchResultDto resultsByPopularity = new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
+  private SearchResultDto resultsByTitle = new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
   private SortMode currentSort = SortMode.POPULARITY;
 
   // ── Header (kept to allow rebuilding on data refresh) ─────────────────────
@@ -150,7 +150,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
       throw new RuntimeException("Could not get music by popularity, error: " + e.getMessage(), e);
     }
     if (this.resultsByPopularity == null) {
-      this.resultsByPopularity = new SearchResultDto();
+      this.resultsByPopularity = new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
     }
 
     // Derive the title-sorted view in memory from the same popularity payload —
@@ -176,16 +176,16 @@ public class HotHerePanel extends JPanel implements TabNavigator {
    */
   private SearchResultDto sortByTitle(SearchResultDto source) {
 
-    List<ArtistDto> artists = new ArrayList<>(safeList(source.getArtists()));
-    artists.sort(Comparator.comparing(a -> titleSortKey(a.getArtistName())));
+    List<ArtistDto> artists = new ArrayList<>(safeList(source.artists()));
+    artists.sort(Comparator.comparing(a -> titleSortKey(a.artistName())));
 
-    List<AlbumDto> albums = new ArrayList<>(safeList(source.getAlbums()));
-    albums.sort(Comparator.comparing(a -> titleSortKey(a.getAlbumName())));
+    List<AlbumDto> albums = new ArrayList<>(safeList(source.albums()));
+    albums.sort(Comparator.comparing(a -> titleSortKey(a.albumName())));
 
-    List<SongDto> songs = new ArrayList<>(safeList(source.getSongs()));
-    songs.sort(Comparator.comparing(s -> titleSortKey(s.getSongName())));
+    List<SongDto> songs = new ArrayList<>(safeList(source.songs()));
+    songs.sort(Comparator.comparing(s -> titleSortKey(s.songName())));
 
-    return new SearchResultDto(songs, artists, albums);
+    return new SearchResultDto(songs, artists, albums, artists.size(), albums.size(), songs.size());
   }
 
   /**
@@ -208,9 +208,9 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   private void rebuildHeaderPanel() {
 
     SearchResultDto current = currentSort == SortMode.POPULARITY ? resultsByPopularity : resultsByTitle;
-    int artistCount = safeList(current.getArtists()).size();
-    int albumCount = safeList(current.getAlbums()).size();
-    int songCount = safeList(current.getSongs()).size();
+    int artistCount = safeList(current.artists()).size();
+    int albumCount = safeList(current.albums()).size();
+    int songCount = safeList(current.songs()).size();
 
     // Icon size/sizing matches the Home screen's "All Albums" header. No dedicated
     // Hot Here artwork exists yet, so the load falls through to the "🔥" fallback
@@ -398,9 +398,9 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     columnsPanel.removeAll();
 
     SearchResultDto current = currentSort == SortMode.POPULARITY ? resultsByPopularity : resultsByTitle;
-    List<ArtistDto> artists = safeList(current.getArtists());
-    List<AlbumDto> albums = safeList(current.getAlbums());
-    List<SongDto> songs = safeList(current.getSongs());
+    List<ArtistDto> artists = safeList(current.artists());
+    List<AlbumDto> albums = safeList(current.albums());
+    List<SongDto> songs = safeList(current.songs());
 
     int previewCount = LayoutTheme.get().hotHerePreviewCount;
 
@@ -457,7 +457,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   private void pushArtist(ArtistDto artist) {
 
     ArtistDto full = null;
-    String artistName = artist.getArtistName();
+    String artistName = artist.artistName();
     try {
       full = songLibraryService.getArtistByName(songLibraryService.getOwnLocationId(), artistName);
     } catch (Exception e) {
@@ -477,7 +477,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // ─────────────────────────────────────────────────────────────────────────
   private AlbumDto fetchFull(AlbumDto album) {
     try {
-      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.getAlbumId());
+      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.albumId());
     } catch (Exception e) {
       return album;
     }

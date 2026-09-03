@@ -175,8 +175,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public synchronized HomePageDto getPublicHomePage() {
     var popular = songLibraryService.getMusicByPopularity(songLibraryService.getOwnLocationId());
-    var artists = popular.getArtists().stream().limit(MAX_HOT_HERE).toList();
-    var songs = popular.getSongs().stream().limit(MAX_HOT_HERE).toList();
+    var artists = popular.artists().stream().limit(MAX_HOT_HERE).toList();
+    var songs = popular.songs().stream().limit(MAX_HOT_HERE).toList();
     return new HomePageDto(artists, songs);
   }
 
@@ -219,8 +219,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     HomePageDto publicHomePageDto = getPublicHomePage();
     
     UserHomePageDto userHomePageDto =
-        new UserHomePageDto(recentPlays, playlistNames, publicHomePageDto.getArtistsHotHere(),
-            publicHomePageDto.getSongsHotHere(), user.getSearchHistory());
+        new UserHomePageDto(recentPlays, playlistNames, publicHomePageDto.artistsHotHere(),
+            publicHomePageDto.songsHotHere(), user.getSearchHistory());
 
     return userHomePageDto;
   }
@@ -510,7 +510,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public synchronized void handleSongAddedToQueueEvent(SongAddedToQueueEvent event, Integer locationId) {
 
-    String username = event.queueEntry().getUsername();
+    String username = event.queueEntry().username();
 
     // In slave mode, a remotely-dispatched (master-relayed) command's addSongToQueue fires this
     // exact same local event via SongQueueServiceImpl's own event publish — but the web/mobile
@@ -541,9 +541,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new UserServiceException("User not found: " + username);
     }
 
-    SongDto song = event.queueEntry().getSong();
+    SongDto song = event.queueEntry().song();
     user.addSongToSongPlayHistory(
-        new SongIdentifier(locationId, song.getAlbumId(), song.getSongId()));
+        new SongIdentifier(locationId, song.albumId(), song.songId()));
 
     // Deduct Web UI credits for non-local (web) users.
     // Cost = priority * WEB_COST_PER_PRIORITY_LEVEL:
@@ -551,9 +551,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     // priority play (priority == N) → N * 2 credits
     if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
       int priority =
-          event.queueEntry().getPriority() != null ? event.queueEntry().getPriority() : 1;
+          event.queueEntry().priority() != null ? event.queueEntry().priority() : 1;
       deductCredits(user, username, priority * WEB_COST_PER_PRIORITY_LEVEL, CreditTransactionType.QUEUE_ADD,
-          locationId, song.getAlbumId(), song.getSongId());
+          locationId, song.albumId(), song.songId());
     }
 
     this.userRepository.storeAggregateRoot(this.userRoot);

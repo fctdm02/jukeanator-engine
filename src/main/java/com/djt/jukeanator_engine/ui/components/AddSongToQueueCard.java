@@ -150,8 +150,8 @@ public class AddSongToQueueCard extends JPanel {
     headingLabel
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongTitle));
 
-    JLabel songNameLabel = new JLabel(song.getSongName() != null
-        ? "\u201C" + song.getSongName() + "\u201D by " + song.getArtistName() + ""
+    JLabel songNameLabel = new JLabel(song.songName() != null
+        ? "\u201C" + song.songName() + "\u201D by " + song.artistName() + ""
         : "", SwingConstants.CENTER);
     songNameLabel.setAlignmentX(CENTER_ALIGNMENT);
     songNameLabel.setForeground(ColorTheme.get().accentGold);
@@ -232,9 +232,9 @@ public class AddSongToQueueCard extends JPanel {
     cover.setBackground(ColorTheme.get().bgCoverArtPlaceholder);
     cover.setBorder(BorderFactory.createLineBorder(ColorTheme.get().coverArtBorder, 1));
 
-    if (song.getCoverArtPath() != null) {
+    if (song.coverArtPath() != null) {
       try {
-        ImageIcon icon = imageLoader.loadFilesystemImage(song.getCoverArtPath(), 160, 160);
+        ImageIcon icon = imageLoader.loadFilesystemImage(song.coverArtPath(), 160, 160);
         if (icon != null) {
           cover.setIcon(icon);
         }
@@ -246,17 +246,17 @@ public class AddSongToQueueCard extends JPanel {
     text.setOpaque(false);
     text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
 
-    JLabel songName = new JLabel(song.getSongName() != null ? song.getSongName() : "");
+    JLabel songName = new JLabel(song.songName() != null ? song.songName() : "");
     songName.setForeground(ColorTheme.get().textPrimary);
     songName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongTitle));
 
-    JLabel artistName = new JLabel(song.getArtistName() != null ? song.getArtistName() : "");
+    JLabel artistName = new JLabel(song.artistName() != null ? song.artistName() : "");
     artistName.setForeground(ColorTheme.get().textPrimary);
     artistName
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongArtist));
 
     JLabel albumName =
-        new JLabel(AlbumGridPanel.albumDisplayName(song.getAlbumName(), song.getGenreName()));
+        new JLabel(AlbumGridPanel.albumDisplayName(song.albumName(), song.genreName()));
     albumName.setForeground(ColorTheme.get().textPrimary);
     albumName
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongArtist));
@@ -308,7 +308,7 @@ public class AddSongToQueueCard extends JPanel {
 
             SwingSecurityUtil.runAsync(() -> songQueueService.addSongToQueue(
                 songQueueService.getOwnLocationId(), new AddSongToQueueRequest(
-                    SongQueueService.LOCAL_USERNAME, song.getAlbumId(), song.getSongId(), 1)));
+                    SongQueueService.LOCAL_USERNAME, song.albumId(), song.songId(), 1)));
 
             dismiss();
           }
@@ -320,8 +320,8 @@ public class AddSongToQueueCard extends JPanel {
 
             SwingSecurityUtil.runAsync(() -> songQueueService.addSongToQueue(
                 songQueueService.getOwnLocationId(),
-                new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, song.getAlbumId(),
-                    song.getSongId(), highestPriority)));
+                new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, song.albumId(),
+                    song.songId(), highestPriority)));
 
             dismiss();
           }

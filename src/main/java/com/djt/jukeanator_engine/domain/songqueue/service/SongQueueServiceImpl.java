@@ -534,8 +534,8 @@ public class SongQueueServiceImpl
     SongQueueEntryDto queueEntryDto;
     synchronized (this) {
       queueEntryDto =
-          addSongToQueue(addSongToQueueRequest.getUsername(), addSongToQueueRequest.getAlbumId(),
-              addSongToQueueRequest.getSongId(), addSongToQueueRequest.getPriority());
+          addSongToQueue(addSongToQueueRequest.username(), addSongToQueueRequest.albumId(),
+              addSongToQueueRequest.songId(), addSongToQueueRequest.priority());
     }
 
     eventPublisher.publishEvent(new SongAddedToQueueEvent(queueEntryDto));
@@ -555,9 +555,9 @@ public class SongQueueServiceImpl
       return List.of();
     }
 
-    String username = addAlbumToQueueRequest.getUsername();
-    Integer albumId = addAlbumToQueueRequest.getAlbumId();
-    Integer priority = addAlbumToQueueRequest.getPriority();
+    String username = addAlbumToQueueRequest.username();
+    Integer albumId = addAlbumToQueueRequest.albumId();
+    Integer priority = addAlbumToQueueRequest.priority();
 
     List<SongIdentifier> songIdentifiers = new ArrayList<>();
     try {
@@ -586,16 +586,16 @@ public class SongQueueServiceImpl
     }
 
     if (addMultipleSongsToQueueRequest == null
-        || addMultipleSongsToQueueRequest.getSongIdentifiers().isEmpty()) {
+        || addMultipleSongsToQueueRequest.songIdentifiers().isEmpty()) {
       return List.of();
     }
 
     List<SongQueueEntryDto> queueEntries = new ArrayList<>();
 
-    for (SongIdentifier songIdentifier : addMultipleSongsToQueueRequest.getSongIdentifiers()) {
+    for (SongIdentifier songIdentifier : addMultipleSongsToQueueRequest.songIdentifiers()) {
       queueEntries.add(
-          addSongToQueue(addMultipleSongsToQueueRequest.getUsername(), songIdentifier.getAlbumId(),
-              songIdentifier.getSongId(), addMultipleSongsToQueueRequest.getPriority()));
+          addSongToQueue(addMultipleSongsToQueueRequest.username(), songIdentifier.getAlbumId(),
+              songIdentifier.getSongId(), addMultipleSongsToQueueRequest.priority()));
     }
 
     eventPublisher.publishEvent(new MultipleSongsAddedToQueueEvent(queueEntries));
@@ -642,8 +642,8 @@ public class SongQueueServiceImpl
       return requireGateway(locationId).sendCommand(locationId, "moveSongUpInQueue",
           changeSongQueueRequest, Integer.class);
     }
-    int albumId = changeSongQueueRequest.getAlbumId();
-    int songId = changeSongQueueRequest.getSongId();
+    int albumId = changeSongQueueRequest.albumId();
+    int songId = changeSongQueueRequest.songId();
 
     Integer numSongsInQueue = -1;
     try {
@@ -651,8 +651,8 @@ public class SongQueueServiceImpl
       if (album != null) {
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
-          int preferredIndex = changeSongQueueRequest.getQueuePosition() != null
-              ? changeSongQueueRequest.getQueuePosition()
+          int preferredIndex = changeSongQueueRequest.queuePosition() != null
+              ? changeSongQueueRequest.queuePosition()
               : -1;
           numSongsInQueue = songQueueRoot.moveSongUpInQueue(song, preferredIndex);
           if (numSongsInQueue.intValue() > 0) {
@@ -682,8 +682,8 @@ public class SongQueueServiceImpl
       return requireGateway(locationId).sendCommand(locationId, "moveSongDownInQueue",
           changeSongQueueRequest, Integer.class);
     }
-    int albumId = changeSongQueueRequest.getAlbumId();
-    int songId = changeSongQueueRequest.getSongId();
+    int albumId = changeSongQueueRequest.albumId();
+    int songId = changeSongQueueRequest.songId();
 
     Integer numSongsInQueue = -1;
     try {
@@ -691,8 +691,8 @@ public class SongQueueServiceImpl
       if (album != null) {
         SongFileEntity song = album.getChildSong(songId);
         if (song != null) {
-          int preferredIndex = changeSongQueueRequest.getQueuePosition() != null
-              ? changeSongQueueRequest.getQueuePosition()
+          int preferredIndex = changeSongQueueRequest.queuePosition() != null
+              ? changeSongQueueRequest.queuePosition()
               : -1;
           numSongsInQueue = songQueueRoot.moveSongDownInQueue(song, preferredIndex);
           if (numSongsInQueue.intValue() > 0) {
@@ -722,8 +722,8 @@ public class SongQueueServiceImpl
       return requireGateway(locationId).sendCommand(locationId, "removeSongDownFromQueue",
           changeSongQueueRequest, Integer.class);
     }
-    int albumId = changeSongQueueRequest.getAlbumId();
-    int songId = changeSongQueueRequest.getSongId();
+    int albumId = changeSongQueueRequest.albumId();
+    int songId = changeSongQueueRequest.songId();
 
     Integer numSongsRemoved = 0;
     try {
@@ -785,8 +785,8 @@ public class SongQueueServiceImpl
       return requireGateway(locationId).sendCommand(locationId, "loadPlaylistIntoQueue",
           loadPlaylistIntoQueueRequest, Integer.class);
     }
-    String username = loadPlaylistIntoQueueRequest.getUsername();
-    String filename = loadPlaylistIntoQueueRequest.getFilename();
+    String username = loadPlaylistIntoQueueRequest.username();
+    String filename = loadPlaylistIntoQueueRequest.filename();
 
     try {
       List<SongIdentifier> songIdentifiers = new ArrayList<>();

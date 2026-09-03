@@ -448,7 +448,7 @@ public class AdminPanel extends JPanel {
     }
 
     // Capture the ID safely
-    final Integer albumId = selected.getAlbumId();
+    final Integer albumId = selected.albumId();
 
     SwingSecurityUtil.runAsync(() -> {
       try {
@@ -457,7 +457,7 @@ public class AdminPanel extends JPanel {
 
         // 2. Submit to the queue engine (Fires events, updates data models)
         songQueueService.addAlbumToQueue(songQueueService.getOwnLocationId(),
-            new AddAlbumToQueueRequest(SongQueueService.LOCAL_USERNAME, full.getAlbumId(), 1));
+            new AddAlbumToQueueRequest(SongQueueService.LOCAL_USERNAME, full.albumId(), 1));
 
         // 3. Explicitly request the fresh queue list from the service layer
         // WHILE STILL on the background thread.
@@ -1176,8 +1176,8 @@ public class AdminPanel extends JPanel {
       int idx = queueList.getSelectedIndex();
       for (int i = 0; i < idx; i++) {
         songQueueService.moveSongUpInQueue(songQueueService.getOwnLocationId(),
-            new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
-                selected.getSong().getSongId()));
+            new ChangeSongQueueRequest(selected.song().albumId(),
+                selected.song().songId()));
       }
       songPlayerService.playNextTrack(songLibraryService.getOwnLocationId());
     } catch (Exception ex) {
@@ -1195,7 +1195,7 @@ public class AdminPanel extends JPanel {
       return;
     try {
       songQueueService.moveSongUpInQueue(songQueueService.getOwnLocationId(),
-          new ChangeSongQueueRequest(selected.getSong().getAlbumId(), selected.getSong().getSongId(),
+          new ChangeSongQueueRequest(selected.song().albumId(), selected.song().songId(),
               idx));
       SongQueueEntryDto above = queueListModel.get(idx - 1);
       queueListModel.set(idx - 1, selected);
@@ -1216,7 +1216,7 @@ public class AdminPanel extends JPanel {
       return;
     try {
       songQueueService.moveSongDownInQueue(songQueueService.getOwnLocationId(),
-          new ChangeSongQueueRequest(selected.getSong().getAlbumId(), selected.getSong().getSongId(),
+          new ChangeSongQueueRequest(selected.song().albumId(), selected.song().songId(),
               idx));
       SongQueueEntryDto below = queueListModel.get(idx + 1);
       queueListModel.set(idx + 1, selected);
@@ -1237,8 +1237,8 @@ public class AdminPanel extends JPanel {
     }
     try {
       songQueueService.removeSongDownFromQueue(songQueueService.getOwnLocationId(),
-          new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
-              selected.getSong().getSongId()));
+          new ChangeSongQueueRequest(selected.song().albumId(),
+              selected.song().songId()));
     } catch (Exception ex) {
       ex.printStackTrace();
     }
@@ -1363,19 +1363,19 @@ public class AdminPanel extends JPanel {
   private boolean isMetadataInvalid(AlbumDto album) {
 
     // Check missing, blank, or fallback release dates (1950)
-    if (album.getReleaseDate() == null || album.getReleaseDate().isBlank()
-        || "1950".equals(album.getReleaseDate().trim())) {
+    if (album.releaseDate() == null || album.releaseDate().isBlank()
+        || "1950".equals(album.releaseDate().trim())) {
       return true;
     }
 
     // Check missing, blank, or fallback record label designations (Unknown)
-    if (album.getRecordLabel() == null || album.getRecordLabel().isBlank()
-        || "Unknown".equalsIgnoreCase(album.getRecordLabel().trim())) {
+    if (album.recordLabel() == null || album.recordLabel().isBlank()
+        || "Unknown".equalsIgnoreCase(album.recordLabel().trim())) {
       return true;
     }
 
     // Check physical sizing dimensions on tracking image path assets (At least 250x250)
-    String coverArtPath = album.getCoverArtPath();
+    String coverArtPath = album.coverArtPath();
     if (coverArtPath == null || coverArtPath.isBlank()) {
       return true;
     }
@@ -1448,9 +1448,9 @@ public class AdminPanel extends JPanel {
       super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
 
       if (value instanceof AlbumDto album) {
-        String artist = album.getArtistName() != null ? album.getArtistName() : "";
+        String artist = album.artistName() != null ? album.artistName() : "";
         String display =
-            AlbumGridPanel.albumDisplayName(album.getAlbumName(), album.getGenreName());
+            AlbumGridPanel.albumDisplayName(album.albumName(), album.genreName());
         setText(artist + " \u2014 " + display);
       }
 
@@ -1560,7 +1560,7 @@ public class AdminPanel extends JPanel {
         for (int i = 0; i < albumListModel.getSize(); i++) {
           AlbumDto album = albumListModel.getElementAt(i);
           String display = AlbumGridPanel
-              .albumDisplayName(album.getAlbumName(), album.getGenreName()).toLowerCase();
+              .albumDisplayName(album.albumName(), album.genreName()).toLowerCase();
           if (display.startsWith(filter)) {
             albumList.setSelectedIndex(i);
             albumList.ensureIndexIsVisible(i);
