@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.List;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,8 +37,7 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
     assertNotNull(songQueueService, "Service should be injected");
   }
 
-  @Test
-  @Disabled
+  @Test  
   void lifecycle() throws IOException {
 
     // Scan for songs
@@ -55,6 +53,10 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
     // Get a song from an album
     AlbumDto album = albums.get(0);
     SongDto song = album.songs().get(0);
+    
+    // Lock the queue so that the queued song is not dequeued and played.
+    // TODO: CLAUDE
+    // songQueueService.lock();    
 
     // Add a song to the song queue
     Integer albumId = album.albumId();
@@ -67,8 +69,7 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
     assertNotNull(queueEntry, "queueEntry should not be null");
 
     // Get the contents of the song queue
-    List<SongQueueEntryDto> queuedSongs =
-        songQueueService.getQueuedSongs(songLibraryService.getOwnLocationId());
+    List<SongQueueEntryDto> queuedSongs = songQueueService.getQueuedSongs(songLibraryService.getOwnLocationId());
     assertNotNull(queuedSongs, "queuedSongs should not be null");
     assertTrue(queuedSongs.size() > 0, "queuedSongs size should be non-zero");
     SongQueueEntryDto queuedSong = queuedSongs.get(0);
