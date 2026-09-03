@@ -445,7 +445,7 @@ public class SongLibraryServiceImpl
     }
 
     if (searchFor == null || searchFor.strip().isEmpty()) {
-      return new SearchResultDto(List.of(), List.of(), List.of());
+      return new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
     }
 
     String searchForNormalized = stripNonKeyboardCharacters(searchFor.strip().toLowerCase());
@@ -539,8 +539,14 @@ public class SongLibraryServiceImpl
     List<AlbumFolderEntity> albums = root.getAlbums().stream().filter(hasPlays)
         .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
 
-    SearchResultDto dto = new SearchResultDto(SongLibraryMapper.toSongDtoList(songs),
-        SongLibraryMapper.toArtistDtoList(artists), SongLibraryMapper.toAlbumDtoList(albums));
+    SearchResultDto dto = new SearchResultDto(
+        SongLibraryMapper.toSongDtoList(songs),
+        SongLibraryMapper.toArtistDtoList(artists), 
+        SongLibraryMapper.toAlbumDtoList(albums),
+        artists.size(),
+        albums.size(),
+        songs.size());
+    
     return dto;
   }
 
@@ -707,7 +713,7 @@ public class SongLibraryServiceImpl
       Collections.sort(albumIds);
       dtos.add(SongLibraryMapper.toGenreDto(genre, albumIds, Integer.valueOf(numPlays)));
     }
-    dtos.sort(Comparator.reverseOrder());
+    dtos.sort(Comparator.comparing(GenreDto::numPlays).reversed());
     return dtos;
   }
 
@@ -807,7 +813,7 @@ public class SongLibraryServiceImpl
 
     requireNotMaster();
 
-    String scanPath = scanRequest.getScanPath();
+    String scanPath = scanRequest.scanPath();
 
     try {
 
@@ -1001,12 +1007,12 @@ public class SongLibraryServiceImpl
     try {
 
       AlbumFolderEntity album =
-          this.ownRoot.getAlbumById(downloadAlbumCoverArtRequest.getAlbumId());
+          this.ownRoot.getAlbumById(downloadAlbumCoverArtRequest.albumId());
 
       String coverArtPath = album.getCoverArtPath();
 
       this.songScanner.downloadCoverArt(coverArtPath,
-          downloadAlbumCoverArtRequest.getCoverArtUrl());
+          downloadAlbumCoverArtRequest.coverArtUrl());
 
       return coverArtPath;
 
@@ -1022,8 +1028,8 @@ public class SongLibraryServiceImpl
 
     requireNotMaster();
 
-    String username = authenticateForAdminPanelRequest.getUsername();
-    String password = authenticateForAdminPanelRequest.getPassword();
+    String username = authenticateForAdminPanelRequest.username();
+    String password = authenticateForAdminPanelRequest.password();
 
     if (username == null || username.isBlank() || password == null || password.isBlank()) {
       return Boolean.FALSE;
@@ -1174,12 +1180,12 @@ public class SongLibraryServiceImpl
 
       // Update the number of song plays and store to the repository
       Integer locationId = getOwnLocationId();
-      Integer albumId = event.queueEntry().getSong().getAlbumId();
-      Integer songId = event.queueEntry().getSong().getSongId();
+      Integer albumId = event.queueEntry().song().albumId();
+      Integer songId = event.queueEntry().song().songId();
       
       SongFileEntity song = this.ownRoot.getSongById(
-          event.queueEntry().getSong().getAlbumId(), 
-          event.queueEntry().getSong().getSongId());
+          event.queueEntry().song().albumId(), 
+          event.queueEntry().song().songId());
 
       Integer numPlays = song.incrementNumPlays();
 
@@ -1208,12 +1214,12 @@ public class SongLibraryServiceImpl
 
         // Update the number of song plays and store to the repository
         Integer locationId = getOwnLocationId();
-        Integer albumId = queueEntry.getSong().getAlbumId();
-        Integer songId = queueEntry.getSong().getSongId();
+        Integer albumId = queueEntry.song().albumId();
+        Integer songId = queueEntry.song().songId();
         
         SongFileEntity song = this.ownRoot.getSongById(
-            queueEntry.getSong().getAlbumId(), 
-            queueEntry.getSong().getSongId());
+            queueEntry.song().albumId(), 
+            queueEntry.song().songId());
 
         Integer numPlays = song.incrementNumPlays();
 

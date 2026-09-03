@@ -59,11 +59,11 @@ public class SongPlayerServiceTest extends AbstractServiceIntegrationTest {
 
     // Get a song from an album
     AlbumDto album = albums.get(0);
-    SongDto song = album.getSongs().get(0);
+    SongDto song = album.songs().get(0);
 
     // Add a song to the song queue
-    Integer albumId = album.getAlbumId();
-    Integer songId = song.getSongId();
+    Integer albumId = album.albumId();
+    Integer songId = song.songId();
     Integer priority = Integer.valueOf(1);
     AddSongToQueueRequest addSongToQueueRequest =
         new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, albumId, songId, priority);

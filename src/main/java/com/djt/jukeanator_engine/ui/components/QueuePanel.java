@@ -337,7 +337,7 @@ public class QueuePanel extends JPanel {
     row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     // ── Popularity bars (WEST) ────────────────────────────────────────────
-    int plays = entry.getSong().getNumPlays() == null ? 0 : entry.getSong().getNumPlays();
+    int plays = entry.song().numPlays() == null ? 0 : entry.song().numPlays();
     int bars = SongTrackCellRenderer.barsForPlays(plays, popularityT1, popularityT2, popularityT3);
     JPanel barsPanel = new SongTrackCellRenderer.PopularityBarsPanel(bars);
     barsPanel.setOpaque(false);
@@ -347,7 +347,7 @@ public class QueuePanel extends JPanel {
     barsPanel.setPreferredSize(new Dimension(3 * (barW + barGap) + 6, barMaxH + 4));
 
     // ── Queue position ─────────────────────────────────────────────────────
-    int trackNumber = entry.getSong().getTrackNumber();
+    int trackNumber = entry.song().trackNumber();
     JLabel numLabel = new JLabel(String.format("%02d", trackNumber));
     numLabel.setForeground(TEXT_SECONDARY);
     numLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
@@ -373,12 +373,12 @@ public class QueuePanel extends JPanel {
     JPanel textCluster = new JPanel(new BorderLayout(10, 0));
     textCluster.setOpaque(false);
 
-    JLabel artistLabel = new JLabel(entry.getSong().getArtistName());
+    JLabel artistLabel = new JLabel(entry.song().artistName());
     artistLabel.setForeground(TEXT_PRIMARY);
     artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
     artistLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationArtistW, 30));
 
-    JLabel songLabel = new JLabel(entry.getSong().getSongName());
+    JLabel songLabel = new JLabel(entry.song().songName());
     songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
     songLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationSongW, 30));
 
@@ -386,7 +386,7 @@ public class QueuePanel extends JPanel {
     if (selected) {
       songLabel.setForeground(ACCENT_BLUE);
     } else {
-      int priority = entry.getPriority() == null ? 0 : entry.getPriority();
+      int priority = entry.priority() == null ? 0 : entry.priority();
       int slot = Math.min(priority, SongTrackCellRenderer.PRIORITY_COLORS.length - 1);
       songLabel.setForeground(SongTrackCellRenderer.PRIORITY_COLORS[slot]);
     }
@@ -478,8 +478,8 @@ public class QueuePanel extends JPanel {
     SwingSecurityUtil.runAsync(() -> {
       try {
         songQueueService.moveSongUpInQueue(songQueueService.getOwnLocationId(),
-            new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
-                selected.getSong().getSongId()));
+            new ChangeSongQueueRequest(selected.song().albumId(),
+                selected.song().songId()));
       } catch (Exception ex) {
         ex.printStackTrace();
       }
@@ -506,8 +506,8 @@ public class QueuePanel extends JPanel {
     SwingSecurityUtil.runAsync(() -> {
       try {
         songQueueService.moveSongDownInQueue(songQueueService.getOwnLocationId(),
-            new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
-                selected.getSong().getSongId()));
+            new ChangeSongQueueRequest(selected.song().albumId(),
+                selected.song().songId()));
       } catch (Exception ex) {
         ex.printStackTrace();
       }
@@ -533,8 +533,8 @@ public class QueuePanel extends JPanel {
     SwingSecurityUtil.runAsync(() -> {
       try {
         songQueueService.removeSongDownFromQueue(songQueueService.getOwnLocationId(),
-            new ChangeSongQueueRequest(selected.getSong().getAlbumId(),
-                selected.getSong().getSongId()));
+            new ChangeSongQueueRequest(selected.song().albumId(),
+                selected.song().songId()));
       } catch (Exception ex) {
         ex.printStackTrace();
       }
@@ -554,7 +554,7 @@ public class QueuePanel extends JPanel {
 
   /** Cost = 3 × entry's priority (minimum 1). */
   private static int computeCost(SongQueueEntryDto entry) {
-    int priority = entry.getPriority() == null ? 0 : entry.getPriority();
+    int priority = entry.priority() == null ? 0 : entry.priority();
     return Math.max(1, priority * 3);
   }
 

@@ -175,21 +175,21 @@ public class SongTrackCellRenderer extends JPanel
       SongQueueEntryDto entry, int index, boolean isSelected, boolean cellHasFocus) {
 
     // ── Popularity bars ────────────────────────────────────────────────────
-    int plays = entry.getSong().getNumPlays() == null ? 0 : entry.getSong().getNumPlays();
+    int plays = entry.song().numPlays() == null ? 0 : entry.song().numPlays();
     int active = barsForPlays(plays, t1, t2, t3);
     barsPanel.setActiveBars(active);
 
     // ── Track number ─────────────────────────────────────────────────────────
-    int trackNumber = entry.getSong().getTrackNumber();
+    int trackNumber = entry.song().trackNumber();
     numLabel.setText(String.format("%02d", trackNumber));
 
     // ── Song / sub text ────────────────────────────────────────────────────
-    String songName = entry.getSong().getSongName();
+    String songName = entry.song().songName();
     if (showRequester) {
-      songName += " (" + entry.getUsername() + ")";
+      songName += " (" + entry.username() + ")";
     }
     song.setText(songName);
-    sub.setText(entry.getSong().getArtistName() + "  •  " + entry.getSong().getAlbumName());
+    sub.setText(entry.song().artistName() + "  •  " + entry.song().albumName());
 
     // Bottom separator line — matches the JSeparator drawn between rows in the
     // Search / Hot Here / Genre result columns. Omitted on the last row.
@@ -202,7 +202,7 @@ public class SongTrackCellRenderer extends JPanel
 
     // ── Thumbnail ──────────────────────────────────────────────────────────
     thumb.setIcon(null);
-    String coverPath = entry.getSong().getCoverArtPath();
+    String coverPath = entry.song().coverArtPath();
     if (coverPath != null && imageLoader != null) {
       int thumbSize = thumb.getPreferredSize().width;
       ImageIcon icon = imageLoader.loadFilesystemImage(coverPath, thumbSize, thumbSize);
@@ -222,7 +222,7 @@ public class SongTrackCellRenderer extends JPanel
     } else {
       setOpaque(false);
       if (usePriorityColor) {
-        int priority = entry.getPriority() == null ? 0 : entry.getPriority();
+        int priority = entry.priority() == null ? 0 : entry.priority();
         int slot = Math.min(priority, PRIORITY_COLORS.length - 1);
         song.setForeground(PRIORITY_COLORS[slot]);
       } else {

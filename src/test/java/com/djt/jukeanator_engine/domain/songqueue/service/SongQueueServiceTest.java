@@ -54,11 +54,11 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
 
     // Get a song from an album
     AlbumDto album = albums.get(0);
-    SongDto song = album.getSongs().get(0);
+    SongDto song = album.songs().get(0);
 
     // Add a song to the song queue
-    Integer albumId = album.getAlbumId();
-    Integer songId = song.getSongId();
+    Integer albumId = album.albumId();
+    Integer songId = song.songId();
     Integer priority = Integer.valueOf(1);
     AddSongToQueueRequest addSongToQueueRequest =
         new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, albumId, songId, priority);
@@ -72,12 +72,12 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
     assertNotNull(queuedSongs, "queuedSongs should not be null");
     assertTrue(queuedSongs.size() > 0, "queuedSongs size should be non-zero");
     SongQueueEntryDto queuedSong = queuedSongs.get(0);
-    assertEquals(queuedSong.getSong().getSongName(), song.getSongName(), "Song name is incorrect");
+    assertEquals(queuedSong.song().songName(), song.songName(), "Song name is incorrect");
 
     // Remove the first entry in the queue (normally only the song player service should do this)
     SongQueueEntryDto firstQueuedSong = songQueueService.dequeueNextSong();
     assertNotNull(firstQueuedSong, "firstQueuedSong should not be null");
-    assertEquals(firstQueuedSong.getSong().getSongName(), song.getSongName(),
+    assertEquals(firstQueuedSong.song().songName(), song.songName(),
         "Song name is incorrect");
 
     // Verify that the song queue is now empty

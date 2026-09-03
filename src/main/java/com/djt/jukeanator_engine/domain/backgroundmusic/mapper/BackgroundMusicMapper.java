@@ -48,10 +48,10 @@ public final class BackgroundMusicMapper {
   public static BackgroundMusicSongEntity toEntity(BackgroundMusicSongDto dto) {
 
     return new BackgroundMusicSongEntity(
-        dto.getPersistentIdentity(),
-        dto.getSongFilePath(),
-        dto.getTimeLastPlayed(),
-        dto.getNumberOfPlays());
+        dto.persistentIdentity(),
+        dto.songFilePath(),
+        dto.timeLastPlayed(),
+        dto.numberOfPlays());
   }
 
   public static List<SmartBackgroundMusicSongDto> toSmartDtoList(
@@ -93,12 +93,12 @@ public final class BackgroundMusicMapper {
   public static SmartBackgroundMusicSongEntity toSmartEntity(SmartBackgroundMusicSongDto dto) {
 
     return new SmartBackgroundMusicSongEntity(
-        dto.getPersistentIdentity(),
-        dto.getSongFilePath(),
-        dto.getTimeLastPlayed(),
-        dto.getNumberOfPlays(),
-        dto.getSourceSong(),
-        dto.getSourceSongNumPlays(),
-        dto.getReason());
+        dto.persistentIdentity(),
+        dto.songFilePath(),
+        dto.timeLastPlayed(),
+        dto.numberOfPlays(),
+        dto.sourceSong(),
+        dto.sourceSongNumPlays(),
+        dto.reason());
   }
 }

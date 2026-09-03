@@ -51,7 +51,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
 
   @Test
   void getMusicByPopularity_delegatesToService() throws Exception {
-    SearchResultDto result = new SearchResultDto(List.of(aSong()), List.of(), List.of());
+    SearchResultDto result = new SearchResultDto(List.of(aSong()), List.of(), List.of(), 0, 0, 0);
     when(songLibraryService.getMusicByPopularity(LOCATION_ID)).thenReturn(result);
 
     mockMvc.perform(get(BASE_PATH + "/popular"))
@@ -63,7 +63,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
 
   @Test
   void getMusicBySearch_passesSearchParam() throws Exception {
-    when(songLibraryService.getMusicBySearch(LOCATION_ID, "foo", 20)).thenReturn(new SearchResultDto());
+    when(songLibraryService.getMusicBySearch(LOCATION_ID, "foo", 20)).thenReturn(new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0));
 
     mockMvc.perform(get(BASE_PATH + "/search").param("searchFor", "foo"))
         .andExpect(status().isOk());
@@ -84,7 +84,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   @Test
   void getGenreMusicByPopularity_passesGenreName() throws Exception {
     when(songLibraryService.getGenreMusicByPopularity(LOCATION_ID, "Rock"))
-        .thenReturn(new SearchResultDto());
+        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0));
 
     mockMvc.perform(get(BASE_PATH + "/genres/popular").param("genreName", "Rock"))
         .andExpect(status().isOk());
@@ -94,7 +94,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
 
   @Test
   void getGenreMusicByTitle_passesGenreName() throws Exception {
-    when(songLibraryService.getGenreMusicByTitle(LOCATION_ID, "Rock")).thenReturn(new SearchResultDto());
+    when(songLibraryService.getGenreMusicByTitle(LOCATION_ID, "Rock")).thenReturn(new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0));
 
     mockMvc.perform(get(BASE_PATH + "/genres/title").param("genreName", "Rock"))
         .andExpect(status().isOk());
@@ -123,14 +123,65 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   }
 
   @Test
+  void getArtistById_passesId() throws Exception {
+    // Called by the web UI's artist detail screen (renderArtistDetail in app.js) when navigated
+    // to via an artist's own tile rather than via an album.
+    ArtistDto artist = new ArtistDto(1, "Artist", "/cover.jpg", 1, 10, 5, List.of());
+    when(songLibraryService.getArtistById(LOCATION_ID, 1)).thenReturn(artist);
+
+    mockMvc.perform(get(BASE_PATH + "/artists/1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.artistName", is("Artist")));
+  }
+
+  @Test
+  void getArtistByAlbumId_passesAlbumId() throws Exception {
+    // Called by the web UI's artist detail screen (renderArtistDetail in app.js) when navigated
+    // to from an album tile, which only carries an albumId, not the artist's own id.
+    ArtistDto artist = new ArtistDto(1, "Artist", "/cover.jpg", 1, 10, 5, List.of());
+    when(songLibraryService.getArtistByAlbumId(LOCATION_ID, 3)).thenReturn(artist);
+
+    mockMvc.perform(get(BASE_PATH + "/artistByAlbum/3"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.artistName", is("Artist")));
+  }
+
+  @Test
+  void getArtistCoverArt_returnsNotFoundWhenCoverArtPathMissing() throws Exception {
+    ArtistDto artist = new ArtistDto(1, "Artist", null, 1, 10, 5, List.of());
+    when(songLibraryService.getArtistById(LOCATION_ID, 1)).thenReturn(artist);
+
+    mockMvc.perform(get(BASE_PATH + "/artists/1/coverArt"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
   void getAlbums_returnsListFromService() throws Exception {
     AlbumDto album = new AlbumDto(1, "Genre", 2, "Artist", 3, "Album", false, "Label", "2020",
-        "/cover.jpg", false, List.of(aSong()));
+        "/cover.jpg", false, 0, List.of(aSong()));
     when(songLibraryService.getAlbums(LOCATION_ID)).thenReturn(List.of(album));
 
     mockMvc.perform(get(BASE_PATH + "/albums"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].albumName", is("Album")));
+  }
+
+  @Test
+  void getAlbumById_serializesBooleanFieldsUsingRecordComponentNames() throws Exception {
+    // Locks down the wire format of AlbumDto's boolean fields now that it's a record: Jackson
+    // names a record's JSON properties after the record component verbatim (no JavaBean-style
+    // "is"/"get" prefix stripping), so "isCompilation" no longer collapses to "compilation" the
+    // way it did when AlbumDto was a plain class with an isCompilation() getter. If AlbumDto ever
+    // moves back to a class, or the component gets renamed, this test will catch the wire-format
+    // change.
+    AlbumDto album = new AlbumDto(1, "Genre", 2, "Artist", 3, "Album", true, "Label", "2020",
+        "/cover.jpg", true, 0, List.of(aSong()));
+    when(songLibraryService.getAlbumById(LOCATION_ID, 3)).thenReturn(album);
+
+    mockMvc.perform(get(BASE_PATH + "/albums/3"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.hasExplicit", is(true)))
+        .andExpect(jsonPath("$.isCompilation", is(true)));
   }
 
   @Test
@@ -146,7 +197,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   @Test
   void getAlbumById_passesId() throws Exception {
     AlbumDto album = new AlbumDto(1, "Genre", 2, "Artist", 3, "Album", false, "Label", "2020",
-        "/cover.jpg", false, List.of(aSong()));
+        "/cover.jpg", false, 0, List.of(aSong()));
     when(songLibraryService.getAlbumById(LOCATION_ID, 3)).thenReturn(album);
 
     mockMvc.perform(get(BASE_PATH + "/albums/3"))
@@ -167,7 +218,7 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   void getAlbumCoverArt_returnsNotFoundWhenCoverArtPathMissing() throws Exception {
     when(songLibraryService.getOwnLocationId()).thenReturn(LOCATION_ID);
     AlbumDto album = new AlbumDto(1, "Genre", 2, "Artist", 3, "Album", false, "Label", "2020",
-        null, false, List.of());
+        null, false, 0, List.of());
     when(songLibraryService.getAlbumById(LOCATION_ID, 3)).thenReturn(album);
 
     mockMvc.perform(get(BASE_PATH + "/albums/3/coverArt"))
@@ -229,7 +280,11 @@ class SongLibraryControllerTest extends AbstractControllerTest {
 
   @Test
   void updateAlbumMetadata_passesAlbumIdAndMetadata() throws Exception {
-    AlbumMetadataDto metadata = anAlbumMetadataDto();
+    // hasExplicit/isEmpty are true here (rather than reusing anAlbumMetadataDto()'s all-false
+    // defaults) so the response-body assertions below actually distinguish "field serialized
+    // under the right key" from "field defaulted to false anyway."
+    AlbumMetadataDto metadata =
+        new AlbumMetadataDto("Artist", "Album", "Label", "2020", "Rock", "/cover.jpg", true, true);
     when(songLibraryService.updateAlbumMetadata(eq(3), any(AlbumMetadataDto.class)))
         .thenReturn(metadata);
 
@@ -241,13 +296,20 @@ class SongLibraryControllerTest extends AbstractControllerTest {
           "releaseDate": "2020",
           "genre": "Rock",
           "coverArtUrl": "/cover.jpg",
-          "hasExplicit": false
+          "hasExplicit": true,
+          "isEmpty": true
         }""";
 
     mockMvc.perform(post(BASE_PATH + "/albums/3/updateAlbumMetadata")
             .contentType(MediaType.APPLICATION_JSON)
             .content(requestBody))
-        .andExpect(status().isOk());
+        .andExpect(status().isOk())
+        // Locks down AlbumMetadataDto's wire format now that it's a record: both fields must
+        // round-trip under their literal component names ("hasExplicit", "isEmpty"), not the
+        // JavaBean-stripped names ("explicit", "empty") the old getter-based class would have
+        // produced for a boolean isEmpty() accessor.
+        .andExpect(jsonPath("$.hasExplicit", is(true)))
+        .andExpect(jsonPath("$.isEmpty", is(true)));
 
     verify(songLibraryService).updateAlbumMetadata(eq(3), any(AlbumMetadataDto.class));
   }
@@ -281,6 +343,6 @@ class SongLibraryControllerTest extends AbstractControllerTest {
   }
 
   private AlbumMetadataDto anAlbumMetadataDto() {
-    return new AlbumMetadataDto("Artist", "Album", "Label", "2020", "Rock", "/cover.jpg", false);
+    return new AlbumMetadataDto("Artist", "Album", "Label", "2020", "Rock", "/cover.jpg", false, false);
   }
 }

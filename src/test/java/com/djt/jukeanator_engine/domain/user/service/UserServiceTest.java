@@ -305,28 +305,28 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void getPublicHomePage_returnsHotHereArtistsAndSongsFromSongLibrary() {
 
     when(songLibraryService.getMusicByPopularity(any()))
-        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
+        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0));
 
     var homePage = userServiceImpl.getPublicHomePage();
 
     assertNotNull(homePage);
-    assertTrue(homePage.getArtistsHotHere().isEmpty());
-    assertTrue(homePage.getSongsHotHere().isEmpty());
+    assertTrue(homePage.artistsHotHere().isEmpty());
+    assertTrue(homePage.songsHotHere().isEmpty());
   }
 
   @Test
   void getHomePage_returnsPlaylistNamesAndSearchHistoryForRegisteredUser() {
 
     when(songLibraryService.getMusicByPopularity(any()))
-        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
+        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0));
     registeredUser().addToSearchHistory("beatles", 10);
 
     UserHomePageDto homePage = userServiceImpl.getHomePage(REGISTERED_EMAIL);
 
     assertNotNull(homePage);
-    assertEquals(List.of(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME), homePage.getMyPlaylists());
-    assertEquals(List.of("beatles"), homePage.getSearchHistory());
-    assertTrue(homePage.getMyRecentPlays().isEmpty());
+    assertEquals(List.of(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME), homePage.myPlaylists());
+    assertEquals(List.of("beatles"), homePage.searchHistory());
+    assertTrue(homePage.myRecentPlays().isEmpty());
   }
 
   @Test
@@ -465,8 +465,8 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     List<PlaylistSummaryDto> playlists = userServiceImpl.getPlaylists(REGISTERED_EMAIL);
 
     assertEquals(1, playlists.size());
-    assertEquals(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, playlists.get(0).getName());
-    assertEquals(0, playlists.get(0).getSongCount());
+    assertEquals(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, playlists.get(0).name());
+    assertEquals(0, playlists.get(0).songCount());
   }
 
   @Test

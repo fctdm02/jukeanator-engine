@@ -194,7 +194,7 @@ public class SlaveConnectionManager {
 
   @EventListener
   public void handlePlaybackStarted(SongPlaybackStartedEvent event) {
-    sendEvent("now-playing", event.songQueueEntry().getSong());
+    sendEvent("now-playing", event.songQueueEntry().song());
     sendEvent("playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 

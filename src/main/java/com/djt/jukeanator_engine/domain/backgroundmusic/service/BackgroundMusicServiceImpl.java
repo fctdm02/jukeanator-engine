@@ -693,19 +693,19 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       excludedPaths.add(coreSongPath);
 
       // ── Same-artist / same-album candidates ──────────────────────────────
-      if (sameArtistSlots > 0 && genreResults.getSongs() != null) {
+      if (sameArtistSlots > 0 && genreResults.songs() != null) {
 
         List<SongDto> sameArtistSongs = new ArrayList<>();
         Map<Integer, SmartAdditionReason> reasonBySongId = new HashMap<>();
-        for (SongDto s : genreResults.getSongs()) {
-          boolean sameArtist = artistName.equalsIgnoreCase(s.getArtistName());
-          boolean sameAlbum = albumId.equals(s.getAlbumId());
+        for (SongDto s : genreResults.songs()) {
+          boolean sameArtist = artistName.equalsIgnoreCase(s.artistName());
+          boolean sameAlbum = albumId.equals(s.albumId());
           // Exclude the core song itself; prefer same album, fall back to same artist.
-          boolean isCoreSong = coreSong.getId().equals(s.getSongId())
-              && albumId.equals(s.getAlbumId());
+          boolean isCoreSong = coreSong.getId().equals(s.songId())
+              && albumId.equals(s.albumId());
           if (!isCoreSong && (sameArtist || sameAlbum) && isEligibleByPlayCount(s)) {
             sameArtistSongs.add(s);
-            reasonBySongId.put(s.getSongId(),
+            reasonBySongId.put(s.songId(),
                 sameAlbum ? SmartAdditionReason.SAME_ALBUM : SmartAdditionReason.SAME_ARTIST);
           }
         }
@@ -718,9 +718,9 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
         for (int i = 0; i < Math.min(sameArtistSlots, topSameArtist.size()); i++) {
           SongDto s = topSameArtist.get(i);
-          SongFileEntity entity = findSongEntity(s.getAlbumId(), s.getSongId());
+          SongFileEntity entity = findSongEntity(s.albumId(), s.songId());
           if (entity != null && !excludedPaths.contains(entity.getNaturalIdentity())) {
-            SmartAdditionReason reason = reasonBySongId.get(s.getSongId());
+            SmartAdditionReason reason = reasonBySongId.get(s.songId());
             newPool.add(new SmartBackgroundMusicSongEntity(null, entity.getNaturalIdentity(),
                 coreSongPath, coreSong.getNumPlays(), reason));
             excludedPaths.add(entity.getNaturalIdentity());
@@ -729,12 +729,12 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       }
 
       // ── Genre candidates (different artist/album, popular) ────────────────
-      if (genreSlots > 0 && genreResults.getSongs() != null) {
+      if (genreSlots > 0 && genreResults.songs() != null) {
 
         List<SongDto> genreSongs = new ArrayList<>();
-        for (SongDto s : genreResults.getSongs()) {
-          boolean differentArtist = !artistName.equalsIgnoreCase(s.getArtistName());
-          boolean differentAlbum = !albumId.equals(s.getAlbumId());
+        for (SongDto s : genreResults.songs()) {
+          boolean differentArtist = !artistName.equalsIgnoreCase(s.artistName());
+          boolean differentAlbum = !albumId.equals(s.albumId());
           if (differentArtist && differentAlbum && isEligibleByPlayCount(s)) {
             genreSongs.add(s);
           }
@@ -749,7 +749,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         for (SongDto s : topGenre) {
           if (added >= genreSlots)
             break;
-          SongFileEntity entity = findSongEntity(s.getAlbumId(), s.getSongId());
+          SongFileEntity entity = findSongEntity(s.albumId(), s.songId());
           if (entity != null && !excludedPaths.contains(entity.getNaturalIdentity())) {
             newPool.add(new SmartBackgroundMusicSongEntity(null, entity.getNaturalIdentity(),
                 coreSongPath, coreSong.getNumPlays(), SmartAdditionReason.POPULAR_SONG_FROM_GENRE));
@@ -780,7 +780,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * making it eligible as a smart-addition candidate.
    */
   private boolean isEligibleByPlayCount(SongDto s) {
-    return isEligibleByPlayCount(s.getNumPlays());
+    return isEligibleByPlayCount(s.numPlays());
   }
 
   /**
@@ -938,7 +938,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
     try {
       this.currentlyQueuedPaths = event.queuedSongs().stream()
-          .map(SongQueueEntryDto::getSongPath)
+          .map(SongQueueEntryDto::songPath)
           .collect(Collectors.toCollection(HashSet::new));
     } catch (Exception e) {
       log.warn("handleSongQueueChangedEvent: failed to update queued-paths cache: {}",
@@ -964,7 +964,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
     try {
 
-      String playedPath = event.songQueueEntry().getSongPath();
+      String playedPath = event.songQueueEntry().songPath();
 
       Integer backgroundId = normalizedPathToId.get(playedPath);
       if (backgroundId != null) {

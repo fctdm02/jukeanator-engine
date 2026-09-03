@@ -78,15 +78,20 @@ public final class SongLibraryMapper {
     return toAlbumDto(artist, albumEntity);
   }
 
-  public static AlbumDto toAlbumDto(ArtistFolderEntity artist, AlbumFolderEntity albumEntity) {
+	public static AlbumDto toAlbumDto(ArtistFolderEntity artist, AlbumFolderEntity albumEntity) {
 
-    return new AlbumDto(albumEntity.getParentGenre().getId(),
-        albumEntity.getParentGenre().getName(), artist.getId(), artist.getName(),
-        albumEntity.getId(), albumEntity.getName(), albumEntity.hasExplicit(),
-        albumEntity.getRecordLabel(), albumEntity.getReleaseDate().toString(),
-        albumEntity.getCoverArtPath(), albumEntity.isCompilation(),
-        SongLibraryMapper.toSongDtoList(artist, albumEntity, albumEntity.getChildSongs()));
-  }
+		List<SongDto> songs = SongLibraryMapper.toSongDtoList(artist, albumEntity, albumEntity.getChildSongs());
+
+		int songNumPlays = 0;
+		for (SongDto song : songs) {
+			songNumPlays = songNumPlays + song.numPlays();
+		}
+
+		return new AlbumDto(albumEntity.getParentGenre().getId(), albumEntity.getParentGenre().getName(),
+				artist.getId(), artist.getName(), albumEntity.getId(), albumEntity.getName(), albumEntity.hasExplicit(),
+				albumEntity.getRecordLabel(), albumEntity.getReleaseDate().toString(), albumEntity.getCoverArtPath(),
+				albumEntity.isCompilation(), Integer.valueOf(songNumPlays), songs);
+	}
 
   public static List<SongDto> toSongDtoList(Collection<SongFileEntity> songEntities) {
 

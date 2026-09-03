@@ -24,22 +24,22 @@ public class ArtistDetailPanel extends JPanel {
     // Albums arrive pre-sorted by popularity (numPlays descending) from
     // SongLibraryMapper.toArtistDto().
     // Do not re-sort here; preserve that ordering for display.
-    List<AlbumDto> albums = artist.getAlbums() != null ? artist.getAlbums() : List.of();
+    List<AlbumDto> albums = artist.albums() != null ? artist.albums() : List.of();
 
     ImageIcon artistImage = null;
-    if (artist.getCoverArtPath() != null) {
+    if (artist.coverArtPath() != null) {
       try {
-        artistImage = imageLoader.loadFilesystemImage(artist.getCoverArtPath(), 72, 72);
+        artistImage = imageLoader.loadFilesystemImage(artist.coverArtPath(), 72, 72);
       } catch (Exception ignored) {
       }
     }
 
-    int numAlbums = artist.getAlbums() != null ? artist.getAlbums().size() : 0;
-    int numSongs = artist.getSongCount() != null ? artist.getSongCount() : 0;
+    int numAlbums = artist.albums() != null ? artist.albums().size() : 0;
+    int numSongs = artist.songCount() != null ? artist.songCount() : 0;
 
     String subtitle = numAlbums + " albums  •  " + numSongs + " songs";
 
-    add(new DetailHeaderPanel(backLabel, onBack, artistImage, "♪", artist.getArtistName(),
+    add(new DetailHeaderPanel(backLabel, onBack, artistImage, "♪", artist.artistName(),
         subtitle), BorderLayout.NORTH);
 
     // Unpack the profile here — AlbumGridPanel still receives four ints so its

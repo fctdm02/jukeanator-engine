@@ -161,7 +161,7 @@ public class JAudioTaggerClientTest {
 						String album = tags.get(JAudioTaggerClient.ALBUM_NAME);
 						albumMetadataResults = musicBrainzClientWrapper.searchForAlbumMetadata(artist, album, useGenre);
 						AlbumMetadataDto albumMetadataResult = albumMetadataResults.get(0);
-						genre = albumMetadataResult.getGenre();
+						genre = albumMetadataResult.genre();
 						
 						if ((genre == null || genre.isBlank()) && discogsClientWrapper.hasValidApiKey()) {
 
@@ -170,7 +170,7 @@ public class JAudioTaggerClientTest {
 							album = tags.get(JAudioTaggerClient.ALBUM_NAME);
 							albumMetadataResults = discogsClientWrapper.searchForAlbumMetadata(artist, album);
 	                        albumMetadataResult = albumMetadataResults.get(0);
-	                        genre = albumMetadataResult.getGenre();							
+	                        genre = albumMetadataResult.genre();							
 						}					
 						
 						if (genre != null && !genre.isBlank() && !genre.equals("Other")) {
@@ -191,7 +191,7 @@ public class JAudioTaggerClientTest {
 					String album = tags.get(JAudioTaggerClient.ALBUM_NAME);
 					albumMetadataResults = musicBrainzClientWrapper.searchForAlbumMetadata(artist, album, useGenre);
 					AlbumMetadataDto albumMetadataResult = albumMetadataResults.get(0);
-					coverArtUrl = albumMetadataResult.getCoverArtUrl();
+					coverArtUrl = albumMetadataResult.coverArtUrl();
 					
 					if ((coverArtUrl == null || coverArtUrl.isBlank()) && discogsClientWrapper.hasValidApiKey()) {
 
@@ -200,7 +200,7 @@ public class JAudioTaggerClientTest {
 						album = tags.get(JAudioTaggerClient.ALBUM_NAME);
 						albumMetadataResults = discogsClientWrapper.searchForAlbumMetadata(artist, album);
 	                    albumMetadataResult = albumMetadataResults.get(0);
-	                    coverArtUrl = albumMetadataResult.getCoverArtUrl();
+	                    coverArtUrl = albumMetadataResult.coverArtUrl();
 					}					
 					
 					if (coverArtUrl != null && !coverArtUrl.isBlank()) {

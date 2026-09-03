@@ -146,9 +146,9 @@ public class AlbumGridPanel extends JPanel {
 
     Thread preloader = new Thread(() -> {
       for (AlbumDto album : albums) {
-        if (album.getCoverArtPath() != null) {
+        if (album.coverArtPath() != null) {
           try {
-            imageLoader.loadFilesystemImage(album.getCoverArtPath(), albumGridProfile.artW(),
+            imageLoader.loadFilesystemImage(album.coverArtPath(), albumGridProfile.artW(),
                 albumGridProfile.artH());
           } catch (Exception ignored) {
           }
@@ -343,10 +343,10 @@ public class AlbumGridPanel extends JPanel {
 
     // Match by album ID (unique) so duplicate album names across different artists
     // never resolve to the wrong album in the master list.
-    Integer targetId = bucket.get(0).getAlbumId();
+    Integer targetId = bucket.get(0).albumId();
 
     for (int i = 0; i < albums.size(); i++) {
-      if (targetId != null && targetId.equals(albums.get(i).getAlbumId())) {
+      if (targetId != null && targetId.equals(albums.get(i).albumId())) {
         return i;
       }
     }
@@ -365,7 +365,7 @@ public class AlbumGridPanel extends JPanel {
     // Use the same key extractor that was used to build the letter map so
     // the highlighted letter always matches the active sort field (artist or title).
     String name = letterKeyExtractor != null ? letterKeyExtractor.apply(albumAtIdx)
-        : albumAtIdx.getAlbumName();
+        : albumAtIdx.albumName();
 
     if (name == null || name.isBlank())
       return "#";
@@ -546,9 +546,9 @@ public class AlbumGridPanel extends JPanel {
     artLabel.setVerticalAlignment(SwingConstants.CENTER);
     artLabel.setOpaque(false);
 
-    if (album.getCoverArtPath() != null) {
+    if (album.coverArtPath() != null) {
       try {
-        ImageIcon icon = imageLoader.loadFilesystemImage(album.getCoverArtPath(),
+        ImageIcon icon = imageLoader.loadFilesystemImage(album.coverArtPath(),
             albumGridProfile.artW(), albumGridProfile.artH());
         if (icon != null)
           artLabel.setIcon(icon);
@@ -570,7 +570,7 @@ public class AlbumGridPanel extends JPanel {
     artWrapper.add(artLabel, artGbc);
 
     // ── Explicit warning image — overlaid on top of the cover art ────────────
-    if (Boolean.TRUE.equals(album.getHasExplicit())) {
+    if (Boolean.TRUE.equals(album.hasExplicit())) {
       // Scale the warning image to 80% of the art width; height is set to half
       // that to match the standard 2:1 Parental Advisory sticker aspect ratio.
       int overlayW = (albumGridProfile.artW() * 2) / 5;
@@ -606,7 +606,7 @@ public class AlbumGridPanel extends JPanel {
 
     // Artist is shown first (smaller font), album title second (larger font, bold) —
     // matches the Home screen's default Artist-first ordering.
-    JLabel artistLabel = new JLabel(album.getArtistName() != null ? album.getArtistName() : "",
+    JLabel artistLabel = new JLabel(album.artistName() != null ? album.artistName() : "",
         SwingConstants.CENTER);
     artistLabel.setForeground(ColorTheme.get().textSecondary);
     artistLabel
@@ -615,7 +615,7 @@ public class AlbumGridPanel extends JPanel {
 
     JLabel albumLabel = new JLabel(
         "<html><div style='text-align:center;'>"
-            + albumDisplayName(album.getAlbumName(), album.getGenreName()).replace("&", "&amp;")
+            + albumDisplayName(album.albumName(), album.genreName()).replace("&", "&amp;")
                 .replace("<", "&lt;").replace(">", "&gt;")
             + "</div></html>",
         SwingConstants.CENTER);
@@ -623,7 +623,7 @@ public class AlbumGridPanel extends JPanel {
     albumLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAlbumLabel));
     albumLabel.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
     // Tooltip shows the full untruncated name when the tile is too narrow.
-    albumLabel.setToolTipText(albumDisplayName(album.getAlbumName(), album.getGenreName()));
+    albumLabel.setToolTipText(albumDisplayName(album.albumName(), album.genreName()));
 
     // Artist first, album title second — consistent across Home and ArtistDetailPanel.
     textPanel.add(artistLabel);

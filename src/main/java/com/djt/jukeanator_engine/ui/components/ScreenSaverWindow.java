@@ -222,9 +222,9 @@ public class ScreenSaverWindow extends JWindow {
     ImageIcon coverArt = null;
     SongDto currentSong =
         this.songPlayerService.getNowPlayingSong(this.songLibraryService.getOwnLocationId());
-    if (currentSong != null && currentSong.getCoverArtPath() != null) {
+    if (currentSong != null && currentSong.coverArtPath() != null) {
 
-      coverArt = imageLoader.loadFilesystemImage(currentSong.getCoverArtPath(), 350, 350);
+      coverArt = imageLoader.loadFilesystemImage(currentSong.coverArtPath(), 350, 350);
 
     } else {
 
@@ -233,7 +233,7 @@ public class ScreenSaverWindow extends JWindow {
       }
       if (!albums.isEmpty()) {
         AlbumDto album = albums.get(new Random().nextInt(albums.size()));
-        coverArt = imageLoader.loadFilesystemImage(album.getCoverArtPath(), 350, 350);
+        coverArt = imageLoader.loadFilesystemImage(album.coverArtPath(), 350, 350);
       }
 
     }

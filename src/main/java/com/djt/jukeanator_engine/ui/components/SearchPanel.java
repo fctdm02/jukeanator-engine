@@ -386,9 +386,9 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private void rebuildResultsCard() {
     resultsCard.removeAll();
 
-    List<ArtistDto> artists = safeList(lastResult.getArtists());
-    List<AlbumDto> albums = safeList(lastResult.getAlbums());
-    List<SongDto> songs = safeList(lastResult.getSongs());
+    List<ArtistDto> artists = safeList(lastResult.artists());
+    List<AlbumDto> albums = safeList(lastResult.albums());
+    List<SongDto> songs = safeList(lastResult.songs());
 
     JPanel columnsLayoutContainer = new JPanel(new GridLayout(1, 3, 0, 0));
     columnsLayoutContainer.setOpaque(false);
@@ -456,7 +456,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private void pushArtist(ArtistDto artist) {
 
     ArtistDto full = null;
-    String artistName = artist.getArtistName();
+    String artistName = artist.artistName();
     try {
       full = songLibraryService.getArtistByName(songLibraryService.getOwnLocationId(), artistName);
     } catch (Exception e) {
@@ -473,7 +473,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
   private AlbumDto fetchFull(AlbumDto album) {
     try {
-      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.getAlbumId());
+      return songLibraryService.getAlbumById(songLibraryService.getOwnLocationId(), album.albumId());
     } catch (Exception e) {
       return album;
     }

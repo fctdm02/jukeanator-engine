@@ -168,8 +168,13 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
 
   public void writeMetadataToFileSystem() {
 
-    AlbumMetadataDto metadata = new AlbumMetadataDto("", "", recordLabel,
-        releaseDate, genre, coverArtUrl, hasExplicit);
+    boolean isEmpty = false;
+    if (releaseDate == null || releaseDate.isBlank()) {
+      isEmpty = true;
+    }
+
+    AlbumMetadataDto metadata = new AlbumMetadataDto("", "", recordLabel, releaseDate, genre,
+        coverArtUrl, hasExplicit, isEmpty);
 
     writeMetadataToFileSystem(metadata);
   }
@@ -177,10 +182,10 @@ public class AlbumMetaDataFileEntity extends AbstractFileEntity implements Seria
   public void writeMetadataToFileSystem(AlbumMetadataDto metadata) {
 
     // Populate fields safely
-    this.genre = safe(metadata.getGenre());
-    this.coverArtUrl = safe(metadata.getCoverArtUrl());
-    this.recordLabel = safe(metadata.getRecordLabel());
-    this.releaseDate = safe(metadata.getReleaseDate());
+    this.genre = safe(metadata.genre());
+    this.coverArtUrl = safe(metadata.coverArtUrl());
+    this.recordLabel = safe(metadata.recordLabel());
+    this.releaseDate = safe(metadata.releaseDate());
     this.hasExplicit = metadata.hasExplicit();
 
     Path path = Path.of(getNaturalIdentity());

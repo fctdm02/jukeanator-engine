@@ -35,19 +35,19 @@ public class MusicBrainzClientWrapperTest {
 
     String expected =
         "https://coverartarchive.org/release/005d4e48-e2be-410b-a56f-e6d64622f48b/front";
-    String actual = albumMetadataResult.getCoverArtUrl();
+    String actual = albumMetadataResult.coverArtUrl();
     assertEquals(expected, actual, "coverArtUrl is incorrect");
 
     expected = "Chrysalis";
-    actual = albumMetadataResult.getRecordLabel();
+    actual = albumMetadataResult.recordLabel();
     assertEquals(expected, actual, "recordLabel is incorrect");
 
     expected = "1985";
-    actual = albumMetadataResult.getReleaseDate();
+    actual = albumMetadataResult.releaseDate();
     assertEquals(expected, actual, "releaseDate is incorrect");
 
     expected = "Rock";
-    actual = albumMetadataResult.getGenre();
+    actual = albumMetadataResult.genre();
     assertEquals(expected, actual, "genre is incorrect");
   }
 }

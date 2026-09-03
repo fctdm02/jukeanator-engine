@@ -349,7 +349,7 @@ public class SongScannerTest {
     writeFile(root.resolve("ArtistA/AlbumA"), "ArtistA-01-SongOne.mp3");
 
     AlbumMetadataDto metadataDto =
-        new AlbumMetadataDto("ArtistA", "AlbumA", "", "", "", "http://example.com/cover.jpg", false);
+        new AlbumMetadataDto("ArtistA", "AlbumA", "", "", "", "http://example.com/cover.jpg", false, true);
     when(musicBrainzClientWrapper.searchForAlbumMetadata(anyString(), anyString(), anyBoolean(),
         anyInt())).thenReturn(List.of(metadataDto));
 
@@ -403,7 +403,7 @@ public class SongScannerTest {
     when(jAudioTaggerClient.getTags(anyString())).thenReturn(Map.of());
 
     AlbumMetadataDto internetMetadata =
-        new AlbumMetadataDto("ArtistA", "AlbumA", "Atlantic", "1990", "Rock", "", false);
+        new AlbumMetadataDto("ArtistA", "AlbumA", "Atlantic", "1990", "Rock", "", false, false);
     when(musicBrainzClientWrapper.searchForAlbumMetadata(anyString(), anyString(), anyBoolean(),
         anyInt())).thenReturn(List.of(internetMetadata));
 
@@ -491,7 +491,7 @@ public class SongScannerTest {
   @Test
   public void searchInternetForAlbumMetadataStillWorksWhenDisableInternetSearchIsTrue() {
 
-    AlbumMetadataDto dto = new AlbumMetadataDto("Artist", "Album", "Label", "2000", "Rock", "", false);
+    AlbumMetadataDto dto = new AlbumMetadataDto("Artist", "Album", "Label", "2000", "Rock", "", false, false);
     when(musicBrainzClientWrapper.searchForAlbumMetadata("Artist", "Album", false, 3))
         .thenReturn(List.of(dto));
 
@@ -518,7 +518,7 @@ public class SongScannerTest {
   @Test
   public void searchInternetForAlbumMetadataReturnsMusicBrainzResultsWithoutQueryingDiscogs() {
 
-    AlbumMetadataDto dto = new AlbumMetadataDto("Artist", "Album", "Label", "2000", "Rock", "", false);
+    AlbumMetadataDto dto = new AlbumMetadataDto("Artist", "Album", "Label", "2000", "Rock", "", false, false);
     when(musicBrainzClientWrapper.searchForAlbumMetadata("Artist", "Album", false, 3))
         .thenReturn(List.of(dto));
 
@@ -537,7 +537,7 @@ public class SongScannerTest {
         .thenReturn(List.of());
     when(discogsClientWrapper.hasValidApiKey()).thenReturn(true);
 
-    AlbumMetadataDto dto = new AlbumMetadataDto("Artist", "Album", "Label", "2000", "Rock", "", false);
+    AlbumMetadataDto dto = new AlbumMetadataDto("Artist", "Album", "Label", "2000", "Rock", "", false, false);
     when(discogsClientWrapper.searchForAlbumMetadata("Artist", "Album", 3)).thenReturn(List.of(dto));
 
     SongScanner scanner = newScanner(false, false, false);

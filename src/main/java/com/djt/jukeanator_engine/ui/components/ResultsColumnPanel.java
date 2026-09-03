@@ -260,27 +260,27 @@ public final class ResultsColumnPanel {
 
   private static <T> String extractFields(T item, String category, JLabel line1, JLabel line2) {
     if ("ARTISTS".equals(category) && item instanceof ArtistDto a) {
-      line1.setText(a.getArtistName());
+      line1.setText(a.artistName());
 
-      int songCount = a.getSongCount();
-      int albumCount = a.getAlbumCount();
+      int songCount = a.songCount();
+      int albumCount = a.albumCount();
 
       line2.setText(songCount + " " + (songCount == 1 ? "song" : "songs") + ", " + albumCount + " "
           + (albumCount == 1 ? "album" : "albums"));
 
-      return a.getCoverArtPath();
+      return a.coverArtPath();
     }
 
     if ("ALBUMS".equals(category) && item instanceof AlbumDto a) {
-      line1.setText(AlbumGridPanel.albumDisplayName(a.getAlbumName(), a.getGenreName()));
-      line2.setText(a.getArtistName());
-      return a.getCoverArtPath();
+      line1.setText(AlbumGridPanel.albumDisplayName(a.albumName(), a.genreName()));
+      line2.setText(a.artistName());
+      return a.coverArtPath();
     }
 
     if ("SONGS".equals(category) && item instanceof SongDto s) {
-      line1.setText(s.getSongName());
-      line2.setText(s.getArtistName());
-      return s.getCoverArtPath();
+      line1.setText(s.songName());
+      line2.setText(s.artistName());
+      return s.coverArtPath();
     }
 
     return null;
