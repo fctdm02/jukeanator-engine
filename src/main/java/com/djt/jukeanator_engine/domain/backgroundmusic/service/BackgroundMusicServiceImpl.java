@@ -199,7 +199,10 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    */
   private void loadAndReconcile() throws IOException {
 
-    List<String> playlistPaths = backgroundMusicHelper.readBackgroundMusicPlaylist(this.dataDir);
+    List<String> playlistPaths = backgroundMusicHelper.readBackgroundMusicPlaylist(this.dataDir)
+        .stream()
+        .map(backgroundMusicHelper::normalizeDriveLetterBackslashes)
+        .collect(Collectors.toList());
     this.currentPlaylistPaths = new HashSet<>(playlistPaths);
 
     List<String> genreExclusions =
@@ -219,7 +222,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
     Set<String> knownPaths = new HashSet<>();
     for (BackgroundMusicSongEntity song : allSongs) {
-      knownPaths.add(song.getSongFilePath());
+      knownPaths.add(normalizedPath(song));
     }
 
     boolean changed = false;
@@ -265,7 +268,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
     this.notPlayedIds = allSongs.stream()
         .filter(BackgroundMusicSongEntity::isNotYetPlayed)
-        .filter(song -> currentPlaylistPaths.contains(song.getSongFilePath()))
+        .filter(song -> currentPlaylistPaths.contains(normalizedPath(song)))
         .map(BackgroundMusicSongEntity::getPersistentIdentity)
         .collect(Collectors.toCollection(ArrayList::new));
   }
