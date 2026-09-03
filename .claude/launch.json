@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "jukeanator-web",
-      "runtimeExecutable": "sleep",
-      "runtimeArgs": ["999999"],
+      "runtimeExecutable": "C:\\dev-wks\\projects\\jukeanator-engine\\mvnw.cmd",
+      "runtimeArgs": ["spring-boot:run", "-Dspring-boot.run.arguments=--app.data-dir=C:\\kiosk\\data --app.config-dir=C:\\kiosk\\config"],
       "port": 8080
     }
   ]
