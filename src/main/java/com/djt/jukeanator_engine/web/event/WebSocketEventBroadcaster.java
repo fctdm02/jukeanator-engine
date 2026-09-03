@@ -19,7 +19,9 @@ import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueEmptyEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import java.util.List;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 
 /**
@@ -61,6 +63,17 @@ public class WebSocketEventBroadcaster {
   @EventListener
   public void handleSongQueueChangedEvent(SongQueueChangedEvent event) {
     messagingTemplate.convertAndSend("/topic/queue", event.queuedSongs());
+  }
+
+  /**
+   * Dequeuing from an already-empty queue skips {@link SongQueueChangedEvent} entirely (see
+   * {@code SongQueueServiceImpl.dequeueNextSong()}), so this is the only signal that reaches the
+   * web UI in that case. Broadcast on the same {@code /topic/queue} topic as an empty list so the
+   * frontend's single subscription handles both "queue changed" and "queue is now empty".
+   */
+  @EventListener
+  public void handleSongQueueEmptyEvent(SongQueueEmptyEvent event) {
+    messagingTemplate.convertAndSend("/topic/queue", List.of());
   }
 
   @EventListener

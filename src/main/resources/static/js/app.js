@@ -18,6 +18,7 @@
     numCredits: 0,         // cached credit count; refreshed on loadCredits()
     myPlaylists: [],       // [{name, songCount, firstSongAlbumId}] from GET /api/users/playlists
     favoriteSongIds: new Set(), // Set of 'albumId_songId' strings
+    queueHasSongs: false,   // drives "View Queue" button visibility; kept live via /topic/queue
   };
 
   const COST_PLAY = 2; // Web UI normal play cost (double the JFC 1-credit cost)
@@ -468,20 +469,33 @@
     if (!widget) return;
     try {
       const song = await api('/api/song-player/nowPlayingSong');
+      // Initial "View Queue" visibility, before any /topic/queue push arrives:
+      // hidden unless something is actually playing right now.
+      state.queueHasSongs = !!song;
       setNowPlayingWidget(widget, song);
     } catch {
+      state.queueHasSongs = false;
       setNowPlayingWidget(widget, null);
     }
   }
 
+  // Toggles the "View Queue" button per state.queueHasSongs without touching the
+  // rest of the now-playing widget markup (used by the live /topic/queue handler).
+  function updateViewQueueVisibility() {
+    const btn = document.getElementById('viewQueueBtn');
+    if (btn) btn.hidden = !state.queueHasSongs;
+  }
+
   function setNowPlayingWidget(widget, song) {
+    const viewQueueBtnHtml =
+      `<button class="now-playing-view-queue" id="viewQueueBtn" ${state.queueHasSongs ? '' : 'hidden'}>View Queue</button>`;
     if (!song) {
       widget.innerHTML = `
         <div class="now-playing-idle">
           <div class="idle-title">No music playing</div>
           <div class="idle-sub">Let's play some music!</div>
         </div>
-        <button class="now-playing-view-queue" id="viewQueueBtn">View Queue</button>`;
+        ${viewQueueBtnHtml}`;
     } else {
       const crawlText = `${escHtml(song.artistName || '')}${song.albumName ? ' &middot; ' + escHtml(song.albumName) : ''}`;
       widget.innerHTML = `
@@ -493,7 +507,7 @@
             <div class="now-playing-crawl">${crawlText}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${crawlText}</div>
           </div>
         </div>
-        <button class="now-playing-view-queue" id="viewQueueBtn">View Queue</button>`;
+        ${viewQueueBtnHtml}`;
     }
     document.getElementById('viewQueueBtn')?.addEventListener('click', () => navigateSub('song-queue'));
   }
@@ -2125,6 +2139,15 @@
         if (!widget) return;
         const msg = JSON.parse(frame.body);
         setNowPlayingWidget(widget, msg.song);
+      });
+
+      // Fires on SongAddedToQueueEvent/MultipleSongsAddedToQueueEvent (always paired with a
+      // SongQueueChangedEvent broadcast) and SongQueueEmptyEvent (broadcast as an empty list) --
+      // keeps the "View Queue" button in sync with whether there's anything queued.
+      stompClient.subscribe('/topic/queue', (frame) => {
+        const queuedSongs = JSON.parse(frame.body) || [];
+        state.queueHasSongs = queuedSongs.length > 0;
+        updateViewQueueVisibility();
       });
 
       // User-specific updates — only fire for the logged-in user

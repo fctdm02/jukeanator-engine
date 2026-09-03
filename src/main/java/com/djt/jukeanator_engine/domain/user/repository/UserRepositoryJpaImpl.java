@@ -116,6 +116,41 @@ public final class UserRepositoryJpaImpl implements UserRepository {
       // in-memory userRoot graph and the DB agree without any further plumbing.
       for (UserEntity user : root.getUsers()) {
         if (persistedIds.contains(user.getPersistentIdentity())) {
+
+          // The same placeholder-id problem described above applies just as much to a single new
+          // PlaylistEntity/CreditTransactionEntity added onto an otherwise-already-persisted user
+          // (e.g. UserServiceImpl.deductCredits() assigning getTransactions().size() + 1): merge()
+          // on a non-null id it doesn't recognize issues an UPDATE that matches zero rows instead
+          // of an INSERT, throwing OptimisticLockException. Unlike the brand-new-user persist()
+          // path below, merge() also returns a copy rather than mutating `user` in place, so its
+          // cascade wouldn't write the real generated id back onto our long-lived in-memory
+          // userRoot anyway -- persist() each new child directly first (which does mutate in
+          // place) so it's already a managed, real-id'd entity by the time merge(user) cascades
+          // over the rest of the (unchanged) collection.
+          Set<Integer> persistedTransactionIds = new HashSet<>(entityManager
+              .createQuery("select t.persistentIdentity from CreditTransactionEntity t "
+                  + "where t.user.persistentIdentity = :userId", Integer.class)
+              .setParameter("userId", user.getPersistentIdentity())
+              .getResultList());
+          for (CreditTransactionEntity transaction : user.getTransactions()) {
+            if (!persistedTransactionIds.contains(transaction.getPersistentIdentity())) {
+              transaction.setPersistentIdentity(null);
+              entityManager.persist(transaction);
+            }
+          }
+
+          Set<Integer> persistedPlaylistIds = new HashSet<>(entityManager
+              .createQuery("select p.persistentIdentity from PlaylistEntity p "
+                  + "where p.user.persistentIdentity = :userId", Integer.class)
+              .setParameter("userId", user.getPersistentIdentity())
+              .getResultList());
+          for (PlaylistEntity playlist : user.getPlaylists()) {
+            if (!persistedPlaylistIds.contains(playlist.getPersistentIdentity())) {
+              playlist.setPersistentIdentity(null);
+              entityManager.persist(playlist);
+            }
+          }
+
           entityManager.merge(user);
         } else {
           user.setPersistentIdentity(null);
