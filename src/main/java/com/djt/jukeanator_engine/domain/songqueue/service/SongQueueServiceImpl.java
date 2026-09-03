@@ -301,6 +301,7 @@ public class SongQueueServiceImpl
           isSongEligibleForQueue(songLibraryService.getOwnLocationId(), coreAlbumId, coreSongId, 0);
       if (coreIneligibility == null) {
         addSongToQueue("BG_MUSIC", coreAlbumId, coreSongId, 0);
+        backgroundMusicService.markSongQueued(coreSong);
       } else {
         log.debug("autoPopulateQueue: core BG song {} not eligible: {}", coreSong,
             coreIneligibility);
@@ -335,6 +336,7 @@ public class SongQueueServiceImpl
             smartAlbumId, smartSongId, 0);
         if (smartIneligibility == null) {
           addSongToQueue("SMART_BG_MUSIC", smartAlbumId, smartSongId, 0);
+          backgroundMusicService.markSongQueued(smartSong);
         } else {
           log.debug("autoPopulateQueue: smart-addition song {} not eligible: {}", smartSong,
               smartIneligibility);

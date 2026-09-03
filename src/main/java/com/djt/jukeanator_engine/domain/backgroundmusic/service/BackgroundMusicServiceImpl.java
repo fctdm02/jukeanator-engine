@@ -950,6 +950,43 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   }
 
   /**
+   * Stamps {@code timeLastPlayed} for whichever pool {@code song} came from (background-music
+   * and/or smart-addition), and persists it immediately — called right after the song is
+   * successfully added to the queue, so a song sitting in the queue isn't re-drawn as a candidate
+   * before it gets its turn to play. Unlike {@link #handleSongPlaybackStartedEvent}, this does
+   * <b>not</b> increment {@code numberOfPlays} — that still only happens once the song actually
+   * starts playing.
+   */
+  @Override
+  public void markSongQueued(SongFileEntity song) {
+
+    try {
+
+      String queuedPath =
+          backgroundMusicHelper.normalizeDriveLetterBackslashes(song.getNaturalIdentity());
+
+      Integer backgroundId = normalizedPathToId.get(queuedPath);
+      if (backgroundId != null) {
+        BackgroundMusicSongEntity bgSong = songsById.get(backgroundId);
+        bgSong.setTimeLastPlayed(Instant.now());
+        notPlayedIds.remove(backgroundId);
+        backgroundMusicRepository.updatePlayStats(allSongs, bgSong);
+      }
+
+      Integer smartId = smartNormalizedPathToId.get(queuedPath);
+      if (smartId != null) {
+        SmartBackgroundMusicSongEntity smartSong = smartSongsById.get(smartId);
+        smartSong.setTimeLastPlayed(Instant.now());
+        smartNotPlayedIds.remove(smartId);
+        smartBackgroundMusicRepository.updatePlayStats(smartPool, smartSong);
+      }
+
+    } catch (Exception e) {
+      log.warn("markSongQueued: failed to mark song queued for {}: {}", song, e.getMessage(), e);
+    }
+  }
+
+  /**
    * Marks a background or smart-addition song as played — updating {@code timeLastPlayed} and
    * persisting it — if, and only if, the song that just started playing matches one of them. This
    * is the sole place {@code timeLastPlayed} is set: selection alone (via {@link #getNextSong()}

@@ -54,6 +54,18 @@ public interface BackgroundMusicService {
   SongFileEntity getNextSmartAdditionSong(SongFileEntity coreSong);
 
   /**
+   * Records that {@code song} was just added to the song queue as a background-music or
+   * smart-addition pick — updating and persisting {@code timeLastPlayed} for whichever of the two
+   * pools it came from (a no-op if it matches neither). This is distinct from
+   * {@link #handleSongPlaybackStartedEvent}, which reflects the song actually starting to play and
+   * also increments the play count; queueing only stamps {@code timeLastPlayed} so an
+   * already-queued-but-not-yet-played song is not immediately re-selected.
+   *
+   * @param song the background-music or smart-addition song that was just queued
+   */
+  void markSongQueued(SongFileEntity song);
+
+  /**
    * NOTE: System method, not to be invoked on behalf of a user
    *
    * @param event

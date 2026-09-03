@@ -43,6 +43,11 @@ public class NoOpBackgroundMusicService implements BackgroundMusicService {
   }
 
   @Override
+  public void markSongQueued(SongFileEntity song) {
+    // no-op
+  }
+
+  @Override
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
     // no-op
   }
