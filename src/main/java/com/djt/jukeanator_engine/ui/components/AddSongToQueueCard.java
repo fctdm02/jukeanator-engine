@@ -20,6 +20,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
@@ -45,6 +46,14 @@ public class AddSongToQueueCard extends JPanel {
   private JButton normalButton;
   private JButton priorityButton;
   private Runnable creditListener;
+
+  /**
+   * Auto-dismisses the card after {@link LayoutTheme#overlayTimeoutSeconds} of it sitting open
+   * with no Play/Priority Play/Cancel tap -- otherwise it floats indefinitely above the tab strip
+   * (it isn't part of any tab's own {@code resetToDefaultView()} state, so the frame's 10-minute
+   * idle-reset never reaches it).
+   */
+  private final Timer timeoutTimer;
 
   /** Card name for the normal play-selection view. */
   private static final String INNER_CARD_MAIN = "MAIN";
@@ -74,6 +83,9 @@ public class AddSongToQueueCard extends JPanel {
     this.creditManager = creditManager;
     this.onDismiss = onDismiss;
 
+    this.timeoutTimer = new Timer(LayoutTheme.get().overlayTimeoutSeconds * 1000, e -> dismiss());
+    this.timeoutTimer.setRepeats(false);
+
     setOpaque(false);
     setLayout(new java.awt.GridBagLayout());
     JPanel sized = buildBorderPanel();
@@ -84,8 +96,9 @@ public class AddSongToQueueCard extends JPanel {
 
   // Background is painted by overlayRoot in JukeANatorFrame — no paintComponent override needed.
 
-  /** Called whenever this card is shown — resets focus. */
+  /** Called whenever this card is shown — resets focus and (re)starts the auto-dismiss timeout. */
   public void onShown() {
+    timeoutTimer.restart();
     requestFocusInWindow();
   }
 
@@ -347,6 +360,7 @@ public class AddSongToQueueCard extends JPanel {
   }
 
   private void dismiss() {
+    timeoutTimer.stop();
     if (onDismiss != null) {
       SwingUtilities.invokeLater(onDismiss);
     }
@@ -593,6 +607,7 @@ public class AddSongToQueueCard extends JPanel {
 
   /** Must be called when this card is permanently discarded so listeners don't leak. */
   public void teardown() {
+    timeoutTimer.stop();
     if (creditListener != null) {
       creditManager.removeListener(creditListener);
     }

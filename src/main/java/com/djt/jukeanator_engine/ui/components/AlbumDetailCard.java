@@ -12,6 +12,7 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import javax.swing.JButton;
 import javax.swing.JPanel;
+import javax.swing.Timer;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
@@ -19,6 +20,17 @@ import com.djt.jukeanator_engine.ui.model.CreditManager;
 public class AlbumDetailCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
+
+  /**
+   * Auto-dismisses back to {@code navigator}'s root after
+   * {@link LayoutTheme#overlayTimeoutSeconds} of no "← Back" tap. Matters most for
+   * {@code JukeANatorFrame}'s "now playing" usage of this card, which floats as its own
+   * standalone overlay (not part of any tab's own {@code resetToDefaultView()} state, so the
+   * frame's 10-minute idle-reset never reaches it) — started immediately since every call site
+   * constructs and shows this card in the same action, so there's no separate "shown" event to
+   * hook.
+   */
+  private final Timer timeoutTimer;
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -42,6 +54,17 @@ public class AlbumDetailCard extends JPanel {
 
     add(albumView, BorderLayout.CENTER);
     add(buildFooter(navigator), BorderLayout.SOUTH);
+
+    this.timeoutTimer =
+        new Timer(LayoutTheme.get().overlayTimeoutSeconds * 1000, e -> dismiss(navigator));
+    this.timeoutTimer.setRepeats(false);
+    this.timeoutTimer.start();
+  }
+
+  /** Stops the auto-dismiss timer (idempotent) and returns to {@code navigator}'s root. */
+  private void dismiss(TabNavigator navigator) {
+    timeoutTimer.stop();
+    navigator.popToRoot();
   }
 
   private JPanel buildFooter(TabNavigator navigator) {
@@ -55,7 +78,7 @@ public class AlbumDetailCard extends JPanel {
     JPanel buttons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 12, 0));
     buttons.setOpaque(false);
 
-    JButton backButton = createBackButton("← Back", navigator::popToRoot);
+    JButton backButton = createBackButton("← Back", () -> dismiss(navigator));
     buttons.add(backButton);
 
     footer.add(buttons, BorderLayout.WEST);
