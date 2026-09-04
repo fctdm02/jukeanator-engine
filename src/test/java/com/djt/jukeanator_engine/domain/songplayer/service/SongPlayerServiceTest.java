@@ -66,7 +66,7 @@ public class SongPlayerServiceTest extends AbstractServiceIntegrationTest {
     Integer songId = song.songId();
     Integer priority = Integer.valueOf(1);
     AddSongToQueueRequest addSongToQueueRequest =
-        new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, albumId, songId, priority);
+        new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, albumId, songId, priority, false);
     SongQueueEntryDto queueEntry = songQueueService.addSongToQueue(
         songLibraryService.getOwnLocationId(), addSongToQueueRequest);
     assertNotNull(queueEntry, "queueEntry should not be null");

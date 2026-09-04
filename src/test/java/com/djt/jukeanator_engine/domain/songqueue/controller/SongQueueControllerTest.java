@@ -89,7 +89,7 @@ class SongQueueControllerTest extends AbstractControllerTest {
     // This location is the controller's own -- addSong therefore takes the event-driven credit
     // charge path (see SongQueueController's class javadoc), not the explicit one.
     when(songLibraryService.getOwnLocationId()).thenReturn(LOCATION_ID);
-    AddSongToQueueRequest request = new AddSongToQueueRequest("user", 3, 4, 5);
+    AddSongToQueueRequest request = new AddSongToQueueRequest("user", 3, 4, 5, false);
     when(songQueueService.addSongToQueue(any(), any(AddSongToQueueRequest.class)))
         .thenReturn(aQueueEntry());
 

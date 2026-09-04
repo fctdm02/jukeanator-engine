@@ -95,7 +95,7 @@ class SongQueueRepositoryFileSystemImplTest {
 
     service1.addSongToQueue(LOCATION_ID,
         new com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest(
-            "real-user@example.com", ALBUM_ID, SONG_ID, 1));
+            "real-user@example.com", ALBUM_ID, SONG_ID, 1, false));
 
     // "Process 2" boots fresh -- brand-new repository AND service instances, same dataDir,
     // exactly like AppConfig's @Bean factory methods construct on every application restart.

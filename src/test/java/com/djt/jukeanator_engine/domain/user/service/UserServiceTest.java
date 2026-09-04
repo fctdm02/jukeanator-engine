@@ -524,11 +524,11 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(5, 500), 1, null);
 
-    userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry));
+    userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, false));
 
     UserEntity user = registeredUser();
     assertTrue(user.getSongPlayHistory().contains(new SongIdentifier(null, 5, 500)));
-    assertEquals(4, user.getNumCredits()); // 6 - (priority 1 * 2 credits)
+    assertEquals(4, user.getNumCredits()); // 6 - (normal play: fixed 1 * webCostMultiplier 2)
     verify(eventPublisher).publishEvent(any(UserCreditsChangedEvent.class));
     verify(userRepository).storeAggregateRoot(userRoot);
   }
@@ -538,10 +538,26 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(6, 600), 1, null);
 
-    userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry), Integer.valueOf(42));
+    userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, false),
+        Integer.valueOf(42));
 
     CreditTransactionEntity transaction = registeredUser().getTransactions().iterator().next();
     assertEquals(Integer.valueOf(42), transaction.getLocationId());
+  }
+
+  @Test
+  void handleSongAddedToQueueEvent_chargesPriorityPlayRateEvenWhenPriorityIsOne() {
+
+    // getHighestPriority() returns 1 whenever the queue's current top entry is a priority-0
+    // background song -- a genuine priority play can therefore carry the exact same priority (1)
+    // a normal play always does. The priorityPlay flag, not the priority value, must decide cost.
+    SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(7, 700), 1, null);
+
+    userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, true));
+
+    // 6 - (priority 1 * priorityCostMultiplier 2 * webCostMultiplier 2) = 2, not the
+    // normal-play-priced 4 a naive "priority <= 1" check would produce.
+    assertEquals(2, registeredUser().getNumCredits());
   }
 
   @Test

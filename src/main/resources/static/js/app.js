@@ -48,10 +48,16 @@
   // here rather than shared: the JFC/Swing UI's own cost math lives in Swing-only Java classes
   // this JS can't call). At webCostMultiplier=1, Web/Mobile costs exactly match JFC/Swing.
 
-  /** priority === 1 is a normal play (JFC/Swing's fixed 1-credit cost); priority > 1 is a priority play. */
-  function queueAddCost(priority) {
+  /**
+   * isPriorityPlay mirrors which action the user picked -- normal play is JFC/Swing's fixed
+   * 1-credit cost; priority play is priority * priorityCostMultiplier. This can't be inferred
+   * from priority alone: highestPriority is 1 whenever the queue's current top entry is a
+   * priority-0 background song, so a genuine priority play can carry the same priority (1) a
+   * normal play always does.
+   */
+  function queueAddCost(priority, isPriorityPlay) {
     const cfg = pricingConfig();
-    const swingCost = priority <= 1 ? 1 : priority * cfg.priorityCostMultiplier;
+    const swingCost = isPriorityPlay ? priority * cfg.priorityCostMultiplier : 1;
     return swingCost * cfg.webCostMultiplier;
   }
 
@@ -1659,10 +1665,12 @@
     const readOnly = !!opts.readOnly;
 
     const credits = state.numCredits;
-    const highest = readOnly ? 1 : (await api('/api/song-queue/highestPriority').catch(() => 1) || 1);
-    const priorityLevel   = highest + 1;
-    const costPlay        = queueAddCost(1);
-    const costPriority    = queueAddCost(priorityLevel);
+    // highestPriority already IS the next available priority level (queue's top + 1, or 2 if
+    // empty) -- mirrors AddSongToQueueCard, which uses it directly as both the cost basis and
+    // the priority to queue at. Do not add another +1 here.
+    const priorityLevel = readOnly ? 1 : (await api('/api/song-queue/highestPriority').catch(() => 1) || 1);
+    const costPlay        = queueAddCost(1, false);
+    const costPriority    = queueAddCost(priorityLevel, true);
     const canPlay         = credits >= costPlay;
     const canPriority     = credits >= costPriority;
 
@@ -1735,11 +1743,14 @@
     // Reset timer on any interaction inside popup
     document.getElementById('songPopup').addEventListener('click', resetSongPopupTimer);
 
-    async function submitPlay(priority) {
+    async function submitPlay(priority, isPriorityPlay) {
       try {
         await api('/api/song-queue/addSong', {
           method: 'POST',
-          body: JSON.stringify({ albumId: song.albumId, songId: song.songId, priority })
+          body: JSON.stringify({
+            albumId: song.albumId, songId: song.songId, priority,
+            priorityPlay: isPriorityPlay
+          })
         });
         dismissSongPopup();
       } catch (err) {
@@ -1750,13 +1761,13 @@
     document.getElementById('spaPlayPriority')?.addEventListener('click', async () => {
       if (!canPriority) { resetSongPopupTimer(); return; }
       resetSongPopupTimer();
-      await submitPlay(priorityLevel);
+      await submitPlay(priorityLevel, true);
     });
 
     document.getElementById('spaPlay')?.addEventListener('click', async () => {
       if (!canPlay) { resetSongPopupTimer(); return; }
       resetSongPopupTimer();
-      await submitPlay(1);
+      await submitPlay(1, false);
     });
 
     document.getElementById('spaArtist').addEventListener('click', () => {

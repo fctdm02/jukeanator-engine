@@ -555,7 +555,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       int priority =
           event.queueEntry().priority() != null ? event.queueEntry().priority() : 1;
       int cost = CreditCostCalculator.webQueueAddCost(pricingService.resolvePricingConfig(locationId),
-          priority);
+          priority, event.priorityPlay());
       deductCredits(user, username, cost, CreditTransactionType.QUEUE_ADD, locationId,
           song.albumId(), song.songId());
     }

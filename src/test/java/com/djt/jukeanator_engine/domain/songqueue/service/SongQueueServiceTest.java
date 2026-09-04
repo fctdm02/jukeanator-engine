@@ -66,7 +66,7 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
     Integer songId = song.songId();
     Integer priority = Integer.valueOf(1);
     AddSongToQueueRequest addSongToQueueRequest =
-        new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, albumId, songId, priority);
+        new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, albumId, songId, priority, false);
     SongQueueEntryDto queueEntry = songQueueService.addSongToQueue(
         songLibraryService.getOwnLocationId(), addSongToQueueRequest);
     assertNotNull(queueEntry, "queueEntry should not be null");
@@ -112,7 +112,7 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
 
       // Queueing a song should still be allowed while the queue is locked.
       AddSongToQueueRequest addSongToQueueRequest = new AddSongToQueueRequest(
-          SongQueueService.LOCAL_USERNAME, album.albumId(), song.songId(), Integer.valueOf(1));
+          SongQueueService.LOCAL_USERNAME, album.albumId(), song.songId(), Integer.valueOf(1), false);
       SongQueueEntryDto queueEntry = songQueueService.addSongToQueue(
           songLibraryService.getOwnLocationId(), addSongToQueueRequest);
       assertNotNull(queueEntry, "Songs should still be queueable while the queue is locked");

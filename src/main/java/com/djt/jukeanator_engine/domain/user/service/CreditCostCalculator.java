@@ -19,13 +19,16 @@ public final class CreditCostCalculator {
   private CreditCostCalculator() {}
 
   /**
-   * Cost to add a song to the queue. {@code priority == 1} is a normal play (mirrors
-   * AddSongToQueueCard's fixed {@code normalPlayCost}); {@code priority > 1} is a priority play
-   * (mirrors {@code highestPriority * priorityCostMultiplier}).
+   * Cost to add a song to the queue. {@code priorityPlay} mirrors which button the caller
+   * pressed -- normal play uses AddSongToQueueCard's fixed {@code normalPlayCost}; priority play
+   * uses {@code priority * priorityCostMultiplier}. This can't be inferred from {@code priority}
+   * alone: {@code getHighestPriority()} returns {@code 1} whenever the queue's current top entry
+   * is a priority-0 background song, so a genuine priority play can submit the exact same
+   * {@code priority == 1} a normal play always does.
    */
-  public static int webQueueAddCost(PricingConfig config, int priority) {
+  public static int webQueueAddCost(PricingConfig config, int priority, boolean priorityPlay) {
     int swingCost =
-        priority <= 1 ? SWING_NORMAL_PLAY_COST : priority * config.priorityCostMultiplier();
+        priorityPlay ? priority * config.priorityCostMultiplier() : SWING_NORMAL_PLAY_COST;
     return swingCost * config.webCostMultiplier();
   }
 

@@ -121,14 +121,16 @@ public class SongQueueController {
           email,
           addSongToQueueRequest.albumId(),
           addSongToQueueRequest.songId(),
-          addSongToQueueRequest.priority());
+          addSongToQueueRequest.priority(),
+          addSongToQueueRequest.priorityPlay());
     }
 
     SongQueueEntryDto entry = songQueueService.addSongToQueue(locationId, addSongToQueueRequest);
 
     if (!isOwnLocation(locationId) && authentication != null
         && authentication.getPrincipal() instanceof String) {
-      userService.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry), locationId);
+      userService.handleSongAddedToQueueEvent(
+          new SongAddedToQueueEvent(entry, addSongToQueueRequest.priorityPlay()), locationId);
     }
 
     return entry;

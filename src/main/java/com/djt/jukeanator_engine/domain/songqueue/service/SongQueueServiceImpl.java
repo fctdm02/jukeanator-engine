@@ -552,7 +552,8 @@ public class SongQueueServiceImpl
               addSongToQueueRequest.songId(), addSongToQueueRequest.priority());
     }
 
-    eventPublisher.publishEvent(new SongAddedToQueueEvent(queueEntryDto));
+    eventPublisher.publishEvent(
+        new SongAddedToQueueEvent(queueEntryDto, addSongToQueueRequest.priorityPlay()));
     eventPublisher.publishEvent(new SongQueueChangedEvent(getQueuedSongs(locationId)));
 
     return queueEntryDto;

@@ -90,14 +90,14 @@ class UserServiceJpaConcurrencyTest extends AbstractServiceIntegrationTest {
       SecurityContextHolder.setContext(callerContext);
       bothReady.countDown();
       go.await();
-      userService.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entryA));
+      userService.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entryA, false));
       return null;
     };
     Callable<Void> addSongB = () -> {
       SecurityContextHolder.setContext(callerContext);
       bothReady.countDown();
       go.await();
-      userService.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entryB));
+      userService.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entryB, false));
       return null;
     };
 

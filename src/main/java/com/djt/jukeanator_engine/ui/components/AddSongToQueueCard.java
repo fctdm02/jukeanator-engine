@@ -321,7 +321,7 @@ public class AddSongToQueueCard extends JPanel {
 
             SwingSecurityUtil.runAsync(() -> songQueueService.addSongToQueue(
                 songQueueService.getOwnLocationId(), new AddSongToQueueRequest(
-                    SongQueueService.LOCAL_USERNAME, song.albumId(), song.songId(), 1)));
+                    SongQueueService.LOCAL_USERNAME, song.albumId(), song.songId(), 1, false)));
 
             dismiss();
           }
@@ -334,7 +334,7 @@ public class AddSongToQueueCard extends JPanel {
             SwingSecurityUtil.runAsync(() -> songQueueService.addSongToQueue(
                 songQueueService.getOwnLocationId(),
                 new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, song.albumId(),
-                    song.songId(), highestPriority)));
+                    song.songId(), highestPriority, true)));
 
             dismiss();
           }
