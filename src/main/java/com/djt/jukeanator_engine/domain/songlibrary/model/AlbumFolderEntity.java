@@ -4,6 +4,7 @@ import java.time.Year;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
@@ -177,9 +178,15 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
           // bare year.
           releaseDate = Year.parse(strReleaseDate, DateTimeFormatter.ISO_LOCAL_DATE);
         } catch (Exception e2) {
-          System.err.println(
-              "Could not parse release date: " + strReleaseDate + " into Year: " + e.getMessage());
-          releaseDate = Year.parse("1950");
+          try {
+            // Some legacy release dates were stored as e.g. "Jun 15, 1999" instead.
+            releaseDate = Year.parse(strReleaseDate,
+                DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH));
+          } catch (Exception e3) {
+            System.err.println(
+                "Could not parse release date: " + strReleaseDate + " into Year: " + e.getMessage());
+            releaseDate = Year.parse("1950");
+          }
         }
       }
     }
