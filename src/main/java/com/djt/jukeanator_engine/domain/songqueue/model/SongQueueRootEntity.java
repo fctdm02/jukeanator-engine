@@ -11,7 +11,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 public class SongQueueRootEntity extends AbstractPersistentEntity {
   private static final long serialVersionUID = 2L;
 
-  public static final String SONG_QUEUE_FILENAME = "JukeANator_Playlist.json";
+  public static final String SONG_QUEUE_FILENAME = "JukeANator_SongQueue.json";
 
   // Declaring the static constant for Jan 1st, 2020 at midnight UTC
   public static final Instant JAN_1_2020 = Instant.parse("2020-01-01T00:00:00Z");

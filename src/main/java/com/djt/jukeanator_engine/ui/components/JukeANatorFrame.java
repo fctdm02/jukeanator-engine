@@ -1044,7 +1044,7 @@ public class JukeANatorFrame extends JFrame {
     creditDescription
         .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeCreditDesc));
 
-    JLabel creditDisclaimer = new JLabel(buildCreditsDisclaimer());
+    JLabel creditDisclaimer = new JLabel("(Priority plays & queue operations may cost more)");
     creditDisclaimer.setForeground(ColorTheme.get().textSecondary);
     creditDisclaimer
         .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeCreditDisclaimer));
@@ -1121,15 +1121,9 @@ public class JukeANatorFrame extends JFrame {
 
     // "plays" reads as "song plays" when the panel is otherwise showing a dollar balance instead
     // of a raw credit count -- "cr" alongside a $ balance would be a confusing mixed unit.
-    String unit = jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost() ? "plays" : "cr";
+    String unit = jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost() ? " plays" : "cr";
     return String.format("1$=%d%s | 5$=%d%s | 10$=%d%s", oneDollarCredits, unit, fiveDollarCredits,
         unit, tenDollarCredits, unit);
-  }
-
-  private String buildCreditsDisclaimer() {
-    return jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost()
-        ? "(Song priority plays and queue operations may cost more)"
-        : "(Song priority plays and queue operations may cost more credits)";
   }
 
   // NOW PLAYING PANEL
