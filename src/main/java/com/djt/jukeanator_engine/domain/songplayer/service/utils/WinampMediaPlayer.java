@@ -194,10 +194,16 @@ public class WinampMediaPlayer implements Player {
     if (!file.exists()) {
       file = new File(DEFAULT_WINAMP_EXE_PATH);
       if (!file.exists()) {
-
-        throw new RuntimeException("Cannot find winamp.exe at configured location: ["
-            + winampExePath + "], nor at default location: [" + DEFAULT_WINAMP_EXE_PATH
-            + "].  Please install Winamp and specify location in application.yml");
+        File appDirFile = resolveAppDirWinampExe();
+        if (appDirFile != null && appDirFile.exists()) {
+          file = appDirFile;
+        } else {
+          throw new RuntimeException("Cannot find winamp.exe at configured location: ["
+              + winampExePath + "], at default location: [" + DEFAULT_WINAMP_EXE_PATH
+              + "], nor alongside the application at: ["
+              + (appDirFile != null ? appDirFile.getPath() : "<unresolvable>")
+              + "].  Please install Winamp and specify location in application.yml");
+        }
       }
     }
 
@@ -231,6 +237,30 @@ public class WinampMediaPlayer implements Player {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException("Interrupted while launching winamp.exe at startup", e);
+    }
+  }
+
+  /**
+   * Resolves {@code Winamp\winamp.exe} as a sibling of the directory containing the running
+   * application archive (e.g. {@code C:\kiosk\jukeanator-engine-0.0.1-SNAPSHOT.war}), mirroring
+   * the deployment layout where {@code config}, {@code data}, and {@code Winamp} all live next to
+   * the WAR. Returns {@code null} if the application's own location cannot be determined (e.g.
+   * running from an IDE's exploded classes directory).
+   */
+  private static File resolveAppDirWinampExe() {
+    try {
+      File codeSource =
+          new File(WinampMediaPlayer.class.getProtectionDomain().getCodeSource().getLocation()
+              .toURI());
+      File appDir = codeSource.isFile() ? codeSource.getParentFile() : codeSource;
+      if (appDir == null) {
+        return null;
+      }
+      return new File(appDir, "Winamp" + File.separator + "winamp.exe");
+    } catch (Exception e) {
+      LOG.log(Level.WARNING, "Unable to resolve application directory for Winamp fallback lookup",
+          e);
+      return null;
     }
   }
 
