@@ -451,7 +451,7 @@ public class SongScannerTest {
   }
 
   @Test
-  public void scanFileSystemForSongsIgnoresLegacyMetadataFileWhenRequiresMetadataIsFalse(
+  public void scanFileSystemForSongsMigratesLegacyMetadataFileEvenWhenRequiresMetadataIsFalse(
       @TempDir Path root) throws IOException {
 
     Path albumDir = root.resolve("ArtistA/AlbumA");
@@ -461,15 +461,22 @@ public class SongScannerTest {
         "Genre=\nCoverArtURL=\nReleaseDate=\nRecordLabel=Unknown\nHasExplicit=false",
         StandardCharsets.UTF_8);
     Files.writeString(albumDir.resolve(".metadata"),
-        "HasExplicit=false\nReleaseDate=1985\nRecordLabel=Jive\nCoverArtURL=http://example.com/cover.jpg",
+        "HasExplicit=true\nReleaseDate=1985\nRecordLabel=Jive\nCoverArtURL=http://example.com/cover.jpg",
         StandardCharsets.UTF_8);
 
     SongScanner scanner = newScanner(false, false, false);
-    scanner.scanFileSystemForSongs(root.toString());
+    RootFolderEntity result = scanner.scanFileSystemForSongs(root.toString());
+
+    // Even with requiresMetadata=false, the legacy file must still be migrated so that
+    // HasExplicit is loaded into memory and enforced -- not just cover art/tag lookups skipped.
+    AlbumFolderEntity album = result.getAllAlbums().get(0);
+    assertTrue(album.hasExplicit());
+    assertEquals("Jive", album.getRecordLabel());
 
     List<String> metadataLines = Files.readAllLines(albumDir.resolve("metadata.txt"));
-    assertTrue(metadataLines.contains("RecordLabel=Unknown"));
-    assertFalse(metadataLines.contains("RecordLabel=Jive"));
+    assertTrue(metadataLines.contains("RecordLabel=Jive"));
+    assertTrue(metadataLines.contains("HasExplicit=true"));
+    assertFalse(metadataLines.contains("RecordLabel=Unknown"));
   }
 
   // =========================================================================================

@@ -155,8 +155,10 @@ public final class SongScanner {
 
       // A legacy ".metadata" file from the prior version of the application takes priority
       // over metadata.txt when present -- migrate it in before deciding what (if anything)
-      // still needs to be looked up from tags or the internet.
-      if (requiresMetadata && album.applyLegacyMetadataIfPresent()) {
+      // still needs to be looked up from tags or the internet. This runs regardless of
+      // requiresMetadata so that HasExplicit is always loaded from a legacy file; otherwise an
+      // explicit album could go unflagged and be allowed to play when it should be forbidden.
+      if (album.applyLegacyMetadataIfPresent()) {
         hasValidMetadata = album.hasValidMetadata();
       }
 
