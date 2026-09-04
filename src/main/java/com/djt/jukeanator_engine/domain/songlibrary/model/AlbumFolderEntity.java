@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.songlibrary.model;
 
 import java.time.Year;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -163,12 +164,19 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
     if (releaseDate == null) {
 
       String strReleaseDate = this.metaData.getReleaseDate();
-      if (strReleaseDate == null || strReleaseDate.isEmpty()) {
-        releaseDate = Year.parse("1950");
-      } else {
-        try {
+
+      try {
+        if (strReleaseDate == null || strReleaseDate.isEmpty()) {
+          releaseDate = Year.parse("1950");
+        } else {
           releaseDate = Year.parse(strReleaseDate);
-        } catch (Exception e) {
+        }
+      } catch (Exception e) {
+        try {
+          // Legacy release dates were stored as a full date (e.g. 1993-12-14) rather than a
+          // bare year.
+          releaseDate = Year.parse(strReleaseDate, DateTimeFormatter.ISO_LOCAL_DATE);
+        } catch (Exception e2) {
           System.err.println(
               "Could not parse release date: " + strReleaseDate + " into Year: " + e.getMessage());
           releaseDate = Year.parse("1950");

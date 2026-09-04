@@ -10,6 +10,11 @@ mvn clean package -DskipTests
 java --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar jukeanator-engine-0.0.1-SNAPSHOT.war
 ```
 
+# To Start for Claude Code
+```
+./mvnw.cmd spring-boot:run -DskipTests "-Dspring-boot.run.arguments=--app.data-dir=C:\kiosk\data --app.config-dir=C:\kiosk\config"
+```
+
 Note: JVM options (`-D...`, `--enable-native-access=...`, etc.) must come *before* `-jar <file>`; anything after the jar filename is passed to the application instead.
 
 ## Externalized config (e.g. kiosk deployments)
