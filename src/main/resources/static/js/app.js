@@ -1705,13 +1705,13 @@
           </div>
         </div>
         ${readOnly ? '' : `
-        <div class="${priorityClass}" id="spaPlayPriority">
-          <span class="spa-label">Play Priority Song</span>
-          <span class="${priorityCreditClass}">${formatCredits(costPriority, 'Credits')}${canPriority ? '' : ' ⚠'}</span>
-        </div>
         <div class="${playClass}" id="spaPlay">
           <span class="spa-label">Play Song</span>
           <span class="${playCreditClass}">${formatCredits(costPlay, 'Credits')}${canPlay ? '' : ' ⚠'}</span>
+        </div>
+        <div class="${priorityClass}" id="spaPlayPriority">
+          <span class="spa-label">Play Priority Song</span>
+          <span class="${priorityCreditClass}">${formatCredits(costPriority, 'Credits')}${canPriority ? '' : ' ⚠'}</span>
         </div>`}
         <div class="song-popup-action song-popup-action--icon" id="spaArtist">
           <span class="spa-icon">&#128100;</span>
