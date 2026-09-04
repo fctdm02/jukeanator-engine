@@ -19,17 +19,81 @@
     myPlaylists: [],       // [{name, songCount, firstSongAlbumId}] from GET /api/users/playlists
     favoriteSongIds: new Set(), // Set of 'albumId_songId' strings
     queueHasSongs: false,   // drives "View Queue" button visibility; kept live via /topic/queue
+    pricingConfig: null,    // {priorityCostMultiplier, webCostMultiplier, creditsPerDollar, ...}
+                            // from GET /api/users/pricing-config; refreshed at boot and on
+                            // selectLocation() — see loadPricingConfig()
   };
 
-  const COST_PLAY = 2; // Web UI normal play cost (double the JFC 1-credit cost)
+  // Fallback used only until the real config loads (matches JukeANatorUserInterfaceProperties'
+  // own field defaults) so nothing here can divide/multiply against an unset value.
+  const DEFAULT_PRICING_CONFIG = {
+    priorityCostMultiplier: 2, webCostMultiplier: 2, creditsPerDollar: 3,
+    displayCurrencyForCost: false,
+  };
 
-  // Web UI cost for reordering/removing a queued song — mirrors
-  // UserServiceImpl.WEB_QUEUE_ACTION_COST_PER_PRIORITY_LEVEL / WEB_QUEUE_ACTION_MIN_COST
-  // (double the JFC/Swing Queue tab's priority * 3, minimum 1).
-  const QUEUE_ACTION_COST_PER_PRIORITY_LEVEL = 6;
-  const QUEUE_ACTION_MIN_COST = 2;
+  async function loadPricingConfig() {
+    try {
+      state.pricingConfig = await api(`/api/users/pricing-config?locationId=${state.locationId}`);
+    } catch {
+      state.pricingConfig = null;
+    }
+  }
+
+  function pricingConfig() {
+    return state.pricingConfig || DEFAULT_PRICING_CONFIG;
+  }
+
+  // Every Web/Mobile UI cost is the equivalent JFC/Swing cost x webCostMultiplier -- mirrors
+  // CreditCostCalculator server-side (see its javadoc for why the Swing formulas are duplicated
+  // here rather than shared: the JFC/Swing UI's own cost math lives in Swing-only Java classes
+  // this JS can't call). At webCostMultiplier=1, Web/Mobile costs exactly match JFC/Swing.
+
+  /** priority === 1 is a normal play (JFC/Swing's fixed 1-credit cost); priority > 1 is a priority play. */
+  function queueAddCost(priority) {
+    const cfg = pricingConfig();
+    const swingCost = priority <= 1 ? 1 : priority * cfg.priorityCostMultiplier;
+    return swingCost * cfg.webCostMultiplier;
+  }
+
+  /** Reordering/removing an already-queued song — mirrors QueuePanel's fixed priority * 3 (min 1). */
   function queueActionCost(priority) {
-    return Math.max(QUEUE_ACTION_MIN_COST, (priority != null ? priority : 1) * QUEUE_ACTION_COST_PER_PRIORITY_LEVEL);
+    const cfg = pricingConfig();
+    const swingCost = Math.max(1, (priority != null ? priority : 1) * 3);
+    return swingCost * cfg.webCostMultiplier;
+  }
+
+  /**
+   * Formats a credit amount for display -- "Ncr" (or "N Credits", passing unit: 'Credits', to
+   * match a given call site's own pre-existing wording) -- or the actual dollar cost (e.g.
+   * "$0.67", rounded to the nearest cent) when displayCurrencyForCost is enabled. Mirrors
+   * CreditManager.formatCredits, except the Web/Mobile UI has no per-session "money inserted"
+   * concept (accounts carry a persistent balance topped up via credit packages), so this always
+   * converts at the location's base creditsPerDollar rate -- the same rate getProfile() already
+   * uses server-side for balanceUsd.
+   */
+  function formatCredits(credits, unit = 'cr') {
+    const cfg = pricingConfig();
+    if (!cfg.displayCurrencyForCost) {
+      return unit === 'cr' ? `${credits}cr` : `${credits} Credits`;
+    }
+    return `$${(credits / cfg.creditsPerDollar).toFixed(2)}`;
+  }
+
+  /** Formats a credit shortfall -- "ADD N CREDIT(S)" or "ADD $X.XX". */
+  function formatShortfall(neededCredits) {
+    const cfg = pricingConfig();
+    if (!cfg.displayCurrencyForCost) {
+      return `ADD ${neededCredits} CREDIT${neededCredits === 1 ? '' : 'S'}`;
+    }
+    return `ADD $${(neededCredits / cfg.creditsPerDollar).toFixed(2)}`;
+  }
+
+  /** The header widget's balance text -- "Credits: N" or "Balance: $X.XX". */
+  function creditsWidgetText(numCredits) {
+    const cfg = pricingConfig();
+    return cfg.displayCurrencyForCost
+      ? `Balance: $${(numCredits / cfg.creditsPerDollar).toFixed(2)}`
+      : `Credits: ${numCredits}`;
   }
 
   const contentPanel = document.getElementById('contentPanel');
@@ -179,7 +243,7 @@
               <button class="location-btn${state.locations.length > 1 ? ' location-btn--pickable' : ''}" id="locationBtn">
                 ${locationButtonInnerHtml()}
               </button>
-              <span class="credits-value" id="creditsValue">Credits: 0</span>
+              <span class="credits-value" id="creditsValue">${creditsWidgetText(0)}</span>
             </div>
             <button class="account-logo-btn" id="accountBtn">
               <img src="/images/AccountLogo.png" alt="Account">
@@ -452,16 +516,16 @@
   async function loadCredits(widget) {
     if (!state.token) {
       state.numCredits = 0;
-      if (widget) widget.textContent = 'Credits: 0';
+      if (widget) widget.textContent = creditsWidgetText(0);
       return;
     }
     try {
       const profile = await api('/api/users/me');
       state.numCredits = profile.numCredits ?? 0;
-      if (widget) widget.textContent = `Credits: ${state.numCredits}`;
+      if (widget) widget.textContent = creditsWidgetText(state.numCredits);
     } catch {
       state.numCredits = 0;
-      if (widget) widget.textContent = 'Credits: 0';
+      if (widget) widget.textContent = creditsWidgetText(0);
     }
   }
 
@@ -600,7 +664,9 @@
       return;
     }
 
-    const balance = profile.balanceUsd != null ? `$${Number(profile.balanceUsd).toFixed(2)} (USD)` : `${profile.numCredits} Credits`;
+    const balance = pricingConfig().displayCurrencyForCost && profile.balanceUsd != null
+      ? `$${Number(profile.balanceUsd).toFixed(2)} (USD)`
+      : `${profile.numCredits} Credits`;
 
     contentPanel.querySelector('.sub-content').innerHTML = `
       <div class="account-funds-box">
@@ -1530,12 +1596,12 @@
         }
         if (afford) {
           btn.classList.add('state-normal');
-          sub.textContent = `${cost}cr`;
+          sub.textContent = formatCredits(cost);
           btn.disabled = false;
         } else {
           btn.classList.add('state-warn');
           const needed = cost - state.numCredits;
-          sub.textContent = `ADD ${needed} CREDIT${needed === 1 ? '' : 'S'}`;
+          sub.textContent = formatShortfall(needed);
         }
       }
 
@@ -1595,8 +1661,9 @@
     const credits = state.numCredits;
     const highest = readOnly ? 1 : (await api('/api/song-queue/highestPriority').catch(() => 1) || 1);
     const priorityLevel   = highest + 1;
-    const costPriority    = priorityLevel * 2;   // Web UI = double the JFC cost
-    const canPlay         = credits >= COST_PLAY;
+    const costPlay        = queueAddCost(1);
+    const costPriority    = queueAddCost(priorityLevel);
+    const canPlay         = credits >= costPlay;
     const canPriority     = credits >= costPriority;
 
     const name      = escHtml(song.songName || song.title || '');
@@ -1632,11 +1699,11 @@
         ${readOnly ? '' : `
         <div class="${priorityClass}" id="spaPlayPriority">
           <span class="spa-label">Play Priority Song</span>
-          <span class="${priorityCreditClass}">${costPriority} Credits${canPriority ? '' : ' ⚠'}</span>
+          <span class="${priorityCreditClass}">${formatCredits(costPriority, 'Credits')}${canPriority ? '' : ' ⚠'}</span>
         </div>
         <div class="${playClass}" id="spaPlay">
           <span class="spa-label">Play Song</span>
-          <span class="${playCreditClass}">${COST_PLAY} Credits${canPlay ? '' : ' ⚠'}</span>
+          <span class="${playCreditClass}">${formatCredits(costPlay, 'Credits')}${canPlay ? '' : ' ⚠'}</span>
         </div>`}
         <div class="song-popup-action song-popup-action--icon" id="spaArtist">
           <span class="spa-icon">&#128100;</span>
@@ -1952,9 +2019,10 @@
       ${arrow}`;
   }
 
-  function selectLocation(loc) {
+  async function selectLocation(loc) {
     state.currentLocation = loc;
     state.locationId = loc.locationId;
+    await loadPricingConfig();
     renderMain(state.currentMainTab);
   }
 
@@ -2156,7 +2224,7 @@
           const msg = JSON.parse(frame.body);
           state.numCredits = msg.numCredits ?? 0;
           const widget = document.getElementById('creditsValue');
-          if (widget) widget.textContent = `Credits: ${state.numCredits}`;
+          if (widget) widget.textContent = creditsWidgetText(state.numCredits);
         });
 
         stompClient.subscribe('/user/queue/recent-plays', (frame) => {
@@ -2196,6 +2264,7 @@
       state.currentLocation = state.locations[0];
       state.locationId = state.currentLocation.locationId;
     }
+    await loadPricingConfig();
     renderMain('music');
     connectWebSocket();
   })();

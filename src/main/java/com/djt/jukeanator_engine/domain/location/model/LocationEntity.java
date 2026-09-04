@@ -54,6 +54,31 @@ public class LocationEntity extends AbstractPersistentEntity {
   @Column(name = "library_last_synced_at")
   private Instant libraryLastSyncedAt;
 
+  // Pricing config, pushed by the slave itself over the /ws-slave STOMP connection (see
+  // SlaveConnectionManager) every time it (re)connects -- the slave's own application.yml
+  // (JukeANatorUserInterfaceProperties) remains the single source of truth; these columns are
+  // just master's read-through cache of it, used to price this location's Web/Mobile UI the same
+  // way credit charging for that UI already happens on master. Null until the slave's first sync
+  // (or on standalone, where these are never populated at all -- UserServiceImpl reads
+  // JukeANatorUserInterfaceProperties directly instead).
+  @Column(name = "priority_cost_multiplier")
+  private Integer priorityCostMultiplier;
+
+  @Column(name = "credits_per_dollar")
+  private Integer creditsPerDollar;
+
+  @Column(name = "five_dollar_bonus_credits")
+  private Integer fiveDollarBonusCredits;
+
+  @Column(name = "ten_dollar_bonus_credits")
+  private Integer tenDollarBonusCredits;
+
+  @Column(name = "web_cost_multiplier")
+  private Integer webCostMultiplier;
+
+  @Column(name = "display_currency_for_cost")
+  private Boolean displayCurrencyForCost;
+
   // Not persisted -- reconstructed uniformly by SongLibraryServiceImpl right after any
   // SongLibraryRepository load. See RootFolderEntity's symmetric transient parentLocation field.
   private transient RootFolderEntity locationSongLibraryRoot;
@@ -144,6 +169,54 @@ public class LocationEntity extends AbstractPersistentEntity {
 
   public void setLibraryLastSyncedAt(Instant libraryLastSyncedAt) {
     this.libraryLastSyncedAt = libraryLastSyncedAt;
+  }
+
+  public Integer getPriorityCostMultiplier() {
+    return priorityCostMultiplier;
+  }
+
+  public void setPriorityCostMultiplier(Integer priorityCostMultiplier) {
+    this.priorityCostMultiplier = priorityCostMultiplier;
+  }
+
+  public Integer getCreditsPerDollar() {
+    return creditsPerDollar;
+  }
+
+  public void setCreditsPerDollar(Integer creditsPerDollar) {
+    this.creditsPerDollar = creditsPerDollar;
+  }
+
+  public Integer getFiveDollarBonusCredits() {
+    return fiveDollarBonusCredits;
+  }
+
+  public void setFiveDollarBonusCredits(Integer fiveDollarBonusCredits) {
+    this.fiveDollarBonusCredits = fiveDollarBonusCredits;
+  }
+
+  public Integer getTenDollarBonusCredits() {
+    return tenDollarBonusCredits;
+  }
+
+  public void setTenDollarBonusCredits(Integer tenDollarBonusCredits) {
+    this.tenDollarBonusCredits = tenDollarBonusCredits;
+  }
+
+  public Integer getWebCostMultiplier() {
+    return webCostMultiplier;
+  }
+
+  public void setWebCostMultiplier(Integer webCostMultiplier) {
+    this.webCostMultiplier = webCostMultiplier;
+  }
+
+  public Boolean getDisplayCurrencyForCost() {
+    return displayCurrencyForCost;
+  }
+
+  public void setDisplayCurrencyForCost(Boolean displayCurrencyForCost) {
+    this.displayCurrencyForCost = displayCurrencyForCost;
   }
 
   public RootFolderEntity getLocationSongLibraryRoot() {

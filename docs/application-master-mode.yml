@@ -106,5 +106,7 @@ user-interface:
   credits-per-dollar: 3
   five-dollar-bonus-credits: 3
   ten-dollar-bonus-credits: 10
+  web-cost-multiplier: 2 # unused on master (headless, ui-enabled=false) -- each location's own value (synced from its slave) governs its web pricing
+  display-currency-for-cost: false # unused on master (headless, ui-enabled=false) -- each location's own value (synced from its slave) governs its web display
   # SEARCH CONFIGURATION
   enable-type-ahead-search: true

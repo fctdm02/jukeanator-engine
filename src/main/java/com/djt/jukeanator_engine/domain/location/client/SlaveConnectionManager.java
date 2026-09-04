@@ -25,6 +25,7 @@ import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
+import com.djt.jukeanator_engine.domain.location.dto.LocationPricingConfigDto;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.event.AllSongsDonePlayingEvent;
@@ -39,6 +40,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
 
@@ -74,6 +76,7 @@ public class SlaveConnectionManager {
   private final SongLibraryService songLibraryService;
   private final LocationService locationService;
   private final ObjectMapper objectMapper;
+  private final JukeANatorUserInterfaceProperties userInterfaceProperties;
 
   private final WebSocketStompClient stompClient;
   private final ScheduledExecutorService reconnectExecutor =
@@ -88,7 +91,8 @@ public class SlaveConnectionManager {
 
   public SlaveConnectionManager(AppProperties appProperties, SongQueueService songQueueService,
       SongPlayerService songPlayerService, SongLibraryService songLibraryService,
-      LocationService locationService, ObjectMapper objectMapper) {
+      LocationService locationService, ObjectMapper objectMapper,
+      JukeANatorUserInterfaceProperties userInterfaceProperties) {
 
     this.appProperties = appProperties;
     this.songQueueService = songQueueService;
@@ -96,6 +100,7 @@ public class SlaveConnectionManager {
     this.songLibraryService = songLibraryService;
     this.locationService = locationService;
     this.objectMapper = objectMapper;
+    this.userInterfaceProperties = userInterfaceProperties;
 
     this.stompClient = new WebSocketStompClient(new StandardWebSocketClient());
     // Not MappingJackson2MessageConverter (deprecated since Spring 7, removed in a future
@@ -215,6 +220,27 @@ public class SlaveConnectionManager {
     sendEvent("playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
+  /**
+   * Pushes this slave's own {@code user-interface.*} credit-config bundle to master so master can
+   * price this location's Web/Mobile UI consistently with what this slave's JFC/Swing UI charges
+   * — the slave's application.yml remains the single source of truth; master just caches this on
+   * the corresponding {@code LocationEntity}. Sent on every (re)connect so config changes and
+   * reconnect-after-downtime both stay in sync.
+   */
+  private void sendPricingConfig(StompSession session) {
+    try {
+      session.send("/location-pricing-config",
+          new LocationPricingConfigDto(userInterfaceProperties.getPriorityCostMultiplier(),
+              userInterfaceProperties.getCreditsPerDollar(),
+              userInterfaceProperties.getFiveDollarBonusCredits(),
+              userInterfaceProperties.getTenDollarBonusCredits(),
+              userInterfaceProperties.getWebCostMultiplier(),
+              userInterfaceProperties.isDisplayCurrencyForCost()));
+    } catch (Exception e) {
+      log.debug("Could not send pricing config to master", e);
+    }
+  }
+
   private void sendEvent(String eventType, Object payload) {
 
     StompSession session = currentSession.get();
@@ -238,6 +264,7 @@ public class SlaveConnectionManager {
       currentSession.set(session);
       session.subscribe("/user/queue/commands", new CommandFrameHandler());
       session.subscribe("/user/queue/location-id-confirmed", new LocationIdConfirmedFrameHandler());
+      sendPricingConfig(session);
     }
 
     @Override

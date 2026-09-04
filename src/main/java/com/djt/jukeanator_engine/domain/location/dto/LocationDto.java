@@ -10,7 +10,9 @@ import java.util.Objects;
  */
 public record LocationDto(Integer persistentIdentity, String name, String logoName,
     Double latitude, Double longitude, String apiKeyHash, String status, Instant lastSeenAt,
-    Instant libraryLastSyncedAt) implements Serializable {
+    Instant libraryLastSyncedAt, Integer priorityCostMultiplier, Integer creditsPerDollar,
+    Integer fiveDollarBonusCredits, Integer tenDollarBonusCredits, Integer webCostMultiplier,
+    Boolean displayCurrencyForCost) implements Serializable {
 
   @Override
   public boolean equals(Object obj) {

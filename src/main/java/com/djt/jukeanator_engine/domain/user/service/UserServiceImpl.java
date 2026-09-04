@@ -34,6 +34,7 @@ import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionDto;
 import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
+import com.djt.jukeanator_engine.domain.user.dto.PricingConfigDto;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
@@ -55,19 +56,6 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
-  private static final int CREDITS_PER_DOLLAR = 3;
-
-  /** Web UI credit cost for a normal play (priority == 1). */
-  private static final int WEB_COST_PER_PRIORITY_LEVEL = 2;
-
-  /**
-   * Web UI credit cost per priority level for reordering/removing a queued song — double the
-   * JFC/Swing Queue tab's {@code priority * 3} (minimum {@value #WEB_QUEUE_ACTION_MIN_COST}),
-   * matching the same 2x multiplier used for {@link #WEB_COST_PER_PRIORITY_LEVEL}.
-   */
-  private static final int WEB_QUEUE_ACTION_COST_PER_PRIORITY_LEVEL = 6;
-  private static final int WEB_QUEUE_ACTION_MIN_COST = 2;
-
   private static final int MAX_RECENT_PLAYS = 10;
 
   private final UserRepository userRepository;
@@ -75,25 +63,28 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private final JwtUtil jwtUtil;
   private final ApplicationEventPublisher eventPublisher;
   private final SongLibraryService songLibraryService;
+  private final PricingService pricingService;
   private final boolean slaveMode;
 
   private UserRootEntity userRoot;
 
   public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder,
       JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
-      SongLibraryService songLibraryService, boolean slaveMode) {
+      SongLibraryService songLibraryService, PricingService pricingService, boolean slaveMode) {
 
     requireNonNull(userRepository, "userRepository cannot be null");
     requireNonNull(passwordEncoder, "passwordEncoder cannot be null");
     requireNonNull(jwtUtil, "jwtUtil cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
+    requireNonNull(pricingService, "pricingService cannot be null");
 
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtUtil = jwtUtil;
     this.eventPublisher = eventPublisher;
     this.songLibraryService = songLibraryService;
+    this.pricingService = pricingService;
     this.slaveMode = slaveMode;
 
     initialize();
@@ -165,8 +156,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       this.userRepository.storeAggregateRoot(this.userRoot);
     }
 
+    PricingConfig pricingConfig =
+        pricingService.resolvePricingConfig(songLibraryService.getOwnLocationId());
     java.math.BigDecimal balanceUsd = java.math.BigDecimal.valueOf(user.getNumCredits()).divide(
-        java.math.BigDecimal.valueOf(CREDITS_PER_DOLLAR), 2, java.math.RoundingMode.HALF_UP);
+        java.math.BigDecimal.valueOf(pricingConfig.creditsPerDollar()), 2,
+        java.math.RoundingMode.HALF_UP);
     return new UserProfileDto(user.getPersistentIdentity(), user.getFirstName(), user.getLastName(),
         user.getEmailAddress(), user.getNumCredits(), balanceUsd, user.getSongPlayHistory());
   }
@@ -233,6 +227,15 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
         new CreditPackageDto("pkg-28", 48, 24, new java.math.BigDecimal("28.00"), "Best Value"),
         new CreditPackageDto("pkg-14", 24, 7, new java.math.BigDecimal("14.00"), null),
         new CreditPackageDto("pkg-7", 12, 1, new java.math.BigDecimal("7.00"), null));
+  }
+
+  @Override
+  public PricingConfigDto getPricingConfig(Integer locationId) {
+
+    PricingConfig config = pricingService.resolvePricingConfig(locationId);
+    return new PricingConfigDto(config.priorityCostMultiplier(), config.creditsPerDollar(),
+        config.fiveDollarBonusCredits(), config.tenDollarBonusCredits(),
+        config.webCostMultiplier(), config.displayCurrencyForCost());
   }
 
   @Override
@@ -546,15 +549,15 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     user.addSongToSongPlayHistory(
         new SongIdentifier(locationId, song.albumId(), song.songId()));
 
-    // Deduct Web UI credits for non-local (web) users.
-    // Cost = priority * WEB_COST_PER_PRIORITY_LEVEL:
-    // normal play (priority == 1) → 2 credits
-    // priority play (priority == N) → N * 2 credits
+    // Deduct Web UI credits for non-local (web) users -- see CreditCostCalculator for the
+    // swingCost * webCostMultiplier formula.
     if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
       int priority =
           event.queueEntry().priority() != null ? event.queueEntry().priority() : 1;
-      deductCredits(user, username, priority * WEB_COST_PER_PRIORITY_LEVEL, CreditTransactionType.QUEUE_ADD,
-          locationId, song.albumId(), song.songId());
+      int cost = CreditCostCalculator.webQueueAddCost(pricingService.resolvePricingConfig(locationId),
+          priority);
+      deductCredits(user, username, cost, CreditTransactionType.QUEUE_ADD, locationId,
+          song.albumId(), song.songId());
     }
 
     this.userRepository.storeAggregateRoot(this.userRoot);
@@ -580,8 +583,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
-    int cost = Math.max(WEB_QUEUE_ACTION_MIN_COST,
-        (priority != null ? priority : 1) * WEB_QUEUE_ACTION_COST_PER_PRIORITY_LEVEL);
+    int cost = CreditCostCalculator.webQueueActionCost(pricingService.resolvePricingConfig(locationId),
+        priority != null ? priority : 1);
     deductCredits(user, emailAddress, cost, CreditTransactionType.QUEUE_ACTION, locationId, null, null);
 
     this.userRepository.storeAggregateRoot(this.userRoot);

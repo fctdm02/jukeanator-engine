@@ -106,5 +106,7 @@ user-interface:
   credits-per-dollar: 3
   five-dollar-bonus-credits: 3
   ten-dollar-bonus-credits: 10
+  web-cost-multiplier: 2 # Web/Mobile UI cost = JFC/Swing cost x this value (1 = same cost as JFC/Swing); synced to master, which may override it per-location
+  display-currency-for-cost: false # if true, will display credits, if false, will display the actual cost of a credit
   # SEARCH CONFIGURATION
   enable-type-ahead-search: true

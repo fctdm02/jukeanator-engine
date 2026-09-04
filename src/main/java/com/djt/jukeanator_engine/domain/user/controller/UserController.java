@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
@@ -28,6 +29,7 @@ import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
+import com.djt.jukeanator_engine.domain.user.dto.PricingConfigDto;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
@@ -110,6 +112,21 @@ public class UserController {
   @GetMapping("/credit-packages")
   public ResponseEntity<java.util.List<CreditPackageDto>> getCreditPackages() {
     return ResponseEntity.ok(userService.getCreditPackages());
+  }
+
+  /**
+   * The effective pricing config for {@code locationId} (defaults to this instance's own location
+   * on standalone/slave, where the web UI has no other location to price for) -- lets the client
+   * price and afford-check actions consistently with what the server will actually charge, and
+   * honor {@code displayCurrencyForCost}.
+   */
+  @GetMapping("/pricing-config")
+  public ResponseEntity<PricingConfigDto> getPricingConfig(
+      @RequestParam(required = false) Integer locationId) {
+
+    Integer resolvedLocationId =
+        locationId != null ? locationId : songLibraryService.getOwnLocationId();
+    return ResponseEntity.ok(userService.getPricingConfig(resolvedLocationId));
   }
 
   @PostMapping("/change-password")

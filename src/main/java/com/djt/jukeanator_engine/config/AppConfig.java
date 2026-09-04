@@ -58,6 +58,9 @@ import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryJpaImpl;
+import com.djt.jukeanator_engine.domain.user.service.PricingService;
+import com.djt.jukeanator_engine.domain.user.service.PricingServiceImpl;
+import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -320,6 +323,13 @@ public class AppConfig {
   }
 
   @Bean
+  public PricingService pricingService(AppProperties appProperties,
+      JukeANatorUserInterfaceProperties userInterfaceProperties, LocationService locationService) {
+
+    return new PricingServiceImpl(appProperties, userInterfaceProperties, locationService);
+  }
+
+  @Bean
   @Primary
   public UserService userService(
       AppProperties appProperties,
@@ -327,7 +337,8 @@ public class AppConfig {
       PasswordEncoder passwordEncoder,
       JwtUtil jwtUtil,
       org.springframework.context.ApplicationEventPublisher eventPublisher,
-      SongLibraryService songLibraryService) {
+      SongLibraryService songLibraryService,
+      PricingService pricingService) {
 
     return new UserServiceImpl(
         userRepository,
@@ -335,6 +346,7 @@ public class AppConfig {
         jwtUtil,
         eventPublisher,
         songLibraryService,
+        pricingService,
         appProperties.isSlave());
   }
  

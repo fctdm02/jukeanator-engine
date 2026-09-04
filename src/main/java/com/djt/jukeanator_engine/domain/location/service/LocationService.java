@@ -4,6 +4,7 @@ import java.util.List;
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
+import com.djt.jukeanator_engine.domain.location.dto.LocationPricingConfigDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
@@ -115,4 +116,22 @@ public interface LocationService {
    * Location Info" dialog. Not meaningful on master, which owns no location of its own.
    */
   LocationEntity updateOwnLocationInfo(UpdateLocationInfoRequest request);
+
+  /**
+   * Returns the location with {@code locationId}, or {@code null} if none exists. Used by
+   * {@code PricingService} on master to resolve a location's synced pricing config.
+   */
+  @PublicServiceMethod
+  LocationEntity getLocationByIdNullIfNotExists(Integer locationId);
+
+  /**
+   * Master-only. Caches a slave's own credit-config bundle (pushed on every {@code /ws-slave}
+   * (re)connect — see {@code SlaveConnectionManager}) on its {@link LocationEntity}, so master can
+   * price that location's Web/Mobile UI without needing the slave's own application.yml. A no-op
+   * if {@code locationId} does not (yet) correspond to a known location.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   */
+  @PublicServiceMethod
+  void updatePricingConfig(Integer locationId, LocationPricingConfigDto pricingConfig);
 }

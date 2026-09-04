@@ -232,7 +232,7 @@ public class JukeANatorFrame extends JFrame {
     this.enableTypeAheadSearch = this.jukeANatorUserInterfaceProperties.isEnableTypeAheadSearch();
 
     this.creditManager = new CreditManager(numCredits, creditsPerDollar, fiveDollarBonusCredits,
-        tenDollarBonusCredits);
+        tenDollarBonusCredits, jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost());
 
     this.enableScreenSaver = this.jukeANatorUserInterfaceProperties.isEnableScreenSaver();
 
@@ -329,7 +329,7 @@ public class JukeANatorFrame extends JFrame {
     //
     // Register listener to update UI instantly when credit manager updates
     this.creditManager.addListener(() -> {
-      creditsTitle.setText("CREDITS: " + creditManager.getCredits());
+      creditsTitle.setText(creditsLabelPrefix() + creditManager.formatCredits(creditManager.getCredits()));
     });
 
     // Hardware Bill Acceptor Key Bindings
@@ -1034,7 +1034,7 @@ public class JukeANatorFrame extends JFrame {
     creditsTextPanel.setOpaque(true);
     creditsTextPanel.setLayout(new BoxLayout(creditsTextPanel, BoxLayout.Y_AXIS));
 
-    creditsTitle = new JLabel("CREDITS: " + numCredits);
+    creditsTitle = new JLabel(creditsLabelPrefix() + creditManager.formatCredits(numCredits));
     creditsTitle.setForeground(ColorTheme.get().frameCreditsTitleColor);
     creditsTitle
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeCreditTitle));
@@ -1095,6 +1095,10 @@ public class JukeANatorFrame extends JFrame {
     panel.add(nowPlayingWrapper, BorderLayout.EAST);
 
     return panel;
+  }
+
+  private String creditsLabelPrefix() {
+    return jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost() ? "BALANCE: " : "CREDITS: ";
   }
 
   private String buildCreditsDescription() {

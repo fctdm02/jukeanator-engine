@@ -37,7 +37,13 @@ public final class LocationMapper {
         entity.getApiKeyHash(),
         entity.getStatus().name(),
         entity.getLastSeenAt(),
-        entity.getLibraryLastSyncedAt());
+        entity.getLibraryLastSyncedAt(),
+        entity.getPriorityCostMultiplier(),
+        entity.getCreditsPerDollar(),
+        entity.getFiveDollarBonusCredits(),
+        entity.getTenDollarBonusCredits(),
+        entity.getWebCostMultiplier(),
+        entity.getDisplayCurrencyForCost());
   }
 
   public static LocationRootEntity toEntity(LocationRootDto dto) {
@@ -64,6 +70,12 @@ public final class LocationMapper {
     location.setStatus(LocationStatus.valueOf(dto.status()));
     location.setLastSeenAt(dto.lastSeenAt());
     location.setLibraryLastSyncedAt(dto.libraryLastSyncedAt());
+    location.setPriorityCostMultiplier(dto.priorityCostMultiplier());
+    location.setCreditsPerDollar(dto.creditsPerDollar());
+    location.setFiveDollarBonusCredits(dto.fiveDollarBonusCredits());
+    location.setTenDollarBonusCredits(dto.tenDollarBonusCredits());
+    location.setWebCostMultiplier(dto.webCostMultiplier());
+    location.setDisplayCurrencyForCost(dto.displayCurrencyForCost());
 
     return location;
   }

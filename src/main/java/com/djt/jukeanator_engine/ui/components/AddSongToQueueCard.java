@@ -474,13 +474,13 @@ public class AddSongToQueueCard extends JPanel {
         int line2Y = blockY + fm1.getHeight() - fm1.getDescent() + 4 + fm2.getAscent();
 
         if (enabled) {
-          // AMI-style short format: "2cr"
-          String costText = cost + "cr";
+          // AMI-style short format: "2cr" (or "$0.50" when display-currency-for-cost is enabled)
+          String costText = creditManager.formatCredits(cost);
           g2.setColor(ColorTheme.get().accentGold);
           g2.drawString(costText, (w - fm2.stringWidth(costText)) / 2, line2Y);
         } else {
           int needed = cost - creditManager.getCredits();
-          String warnText = "ADD " + needed + (needed == 1 ? " CREDIT" : " CREDITS");
+          String warnText = creditManager.formatShortfall(needed);
           g2.setColor(ColorTheme.get().btn3dWarnBorder);
           g2.drawString(warnText, (w - fm2.stringWidth(warnText)) / 2, line2Y);
         }

@@ -20,6 +20,7 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotAlbumDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
+import com.djt.jukeanator_engine.domain.location.dto.LocationPricingConfigDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
@@ -414,6 +415,31 @@ public class LocationServiceImpl implements LocationService {
     this.locationRepository.storeAggregateRoot(this.locationRoot);
 
     return location;
+  }
+
+  @Override
+  public LocationEntity getLocationByIdNullIfNotExists(Integer locationId) {
+
+    return this.locationRoot.getLocationByIdNullIfNotExists(locationId);
+  }
+
+  @Override
+  public void updatePricingConfig(Integer locationId, LocationPricingConfigDto pricingConfig) {
+
+    LocationEntity location = this.locationRoot.getLocationByIdNullIfNotExists(locationId);
+    if (location == null) {
+      log.warn("Ignoring pricing config sync for unknown locationId: {}", locationId);
+      return;
+    }
+
+    location.setPriorityCostMultiplier(pricingConfig.priorityCostMultiplier());
+    location.setCreditsPerDollar(pricingConfig.creditsPerDollar());
+    location.setFiveDollarBonusCredits(pricingConfig.fiveDollarBonusCredits());
+    location.setTenDollarBonusCredits(pricingConfig.tenDollarBonusCredits());
+    location.setWebCostMultiplier(pricingConfig.webCostMultiplier());
+    location.setDisplayCurrencyForCost(pricingConfig.displayCurrencyForCost());
+
+    this.locationRepository.storeAggregateRoot(this.locationRoot);
   }
 
   private void requireValidLocation(Integer locationId, String apiKey) {

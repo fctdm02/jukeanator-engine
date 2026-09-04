@@ -793,12 +793,12 @@ public class QueuePanel extends JPanel {
 
           g2.setFont(font2);
           if (!warn) {
-            String costText = cost + "cr";
+            String costText = creditManager.formatCredits(cost);
             g2.setColor(ACCENT_GOLD);
             g2.drawString(costText, (w - fm2.stringWidth(costText)) / 2, line2Y);
           } else {
             int needed = Math.max(0, cost - creditManager.getCredits());
-            String warnText = "ADD " + needed + (needed == 1 ? " CREDIT" : " CREDITS");
+            String warnText = creditManager.formatShortfall(needed);
             g2.setColor(AM_WARN_BORDER);
             g2.drawString(warnText, (w - fm2.stringWidth(warnText)) / 2, line2Y);
           }

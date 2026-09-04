@@ -19,6 +19,7 @@ import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
+import com.djt.jukeanator_engine.domain.user.dto.PricingConfigDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
@@ -82,6 +83,12 @@ public interface UserService {
    * @return
    */
   List<CreditPackageDto> getCreditPackages();
+
+  /**
+   * The Web/Mobile UI's effective credit-pricing config for {@code locationId} (standalone/slave
+   * ignore it and return their own instance's config).
+   */
+  PricingConfigDto getPricingConfig(Integer locationId);
 
   /**
    * 

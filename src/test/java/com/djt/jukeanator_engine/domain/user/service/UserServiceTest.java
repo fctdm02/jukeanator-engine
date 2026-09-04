@@ -80,6 +80,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   private JwtUtil jwtUtil;
   private ApplicationEventPublisher eventPublisher;
   private SongLibraryService songLibraryService;
+  private PricingService pricingService;
   private UserRootEntity userRoot;
   private UserServiceImpl userServiceImpl;
 
@@ -91,6 +92,10 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     jwtUtil = mock(JwtUtil.class);
     eventPublisher = mock(ApplicationEventPublisher.class);
     songLibraryService = mock(SongLibraryService.class);
+    pricingService = mock(PricingService.class);
+    // Matches application-test.yml's user-interface credit-config block.
+    when(pricingService.resolvePricingConfig(any()))
+        .thenReturn(new PricingConfig(2, 3, 3, 10, 2, false));
 
     userRoot = new UserRootEntity();
     userRoot.addUser(new UserEntity(Integer.valueOf(1), "Jane", "Doe", REGISTERED_EMAIL,
@@ -99,7 +104,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     when(userRepository.loadAggregateRoot(anyString())).thenReturn(userRoot);
 
     userServiceImpl = new UserServiceImpl(userRepository, passwordEncoder, jwtUtil, eventPublisher,
-        songLibraryService, false);
+        songLibraryService, pricingService, false);
   }
 
   private UserEntity registeredUser() {

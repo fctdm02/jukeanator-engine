@@ -30,6 +30,13 @@ public class JukeANatorUserInterfaceProperties {
   private int creditsPerDollar = 3;
   private int fiveDollarBonusCredits = 3;
   private int tenDollarBonusCredits = 10;
+  // Every Web/Mobile UI cost is the equivalent JFC/Swing cost multiplied by this value -- the
+  // "convenience surcharge" for not walking up to the physical kiosk. At 1, Web/Mobile costs
+  // exactly match JFC/Swing.
+  private int webCostMultiplier = 2;
+  // If true, the UI shows the actual dollar cost of a credit (e.g. "$0.33") instead of the raw
+  // credit count (e.g. "1cr").
+  private boolean displayCurrencyForCost = false;
 
   //
   // SEARCH CONFIGURATION
@@ -124,6 +131,22 @@ public class JukeANatorUserInterfaceProperties {
 
   public void setTenDollarBonusCredits(int tenDollarBonusCredits) {
     this.tenDollarBonusCredits = tenDollarBonusCredits;
+  }
+
+  public int getWebCostMultiplier() {
+    return webCostMultiplier;
+  }
+
+  public void setWebCostMultiplier(int webCostMultiplier) {
+    this.webCostMultiplier = webCostMultiplier;
+  }
+
+  public boolean isDisplayCurrencyForCost() {
+    return displayCurrencyForCost;
+  }
+
+  public void setDisplayCurrencyForCost(boolean displayCurrencyForCost) {
+    this.displayCurrencyForCost = displayCurrencyForCost;
   }
 
   public boolean isEnableTypeAheadSearch() {

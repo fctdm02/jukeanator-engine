@@ -56,7 +56,8 @@ public class SecurityConfig {
             // ── Public: auth endpoints ────────────────────────────────────────
             .requestMatchers("/api/users/register", "/api/users/login").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/users/credit-packages", "/api/users/home-public",
-                "/api/users/own-location-id", "/api/users/own-location").permitAll()
+                "/api/users/own-location-id", "/api/users/own-location",
+                "/api/users/pricing-config").permitAll()
 
             // ── Public: static web UI assets and the websocket handshake ─────
             // /ws-slave/** (master-mode only) is the same story as /ws/**: the HTTP handshake

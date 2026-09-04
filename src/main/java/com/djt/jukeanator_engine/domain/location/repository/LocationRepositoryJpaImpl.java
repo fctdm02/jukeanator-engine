@@ -133,9 +133,13 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
 
     entityManager.createNativeQuery("insert into location "
         + "(id, version, name, latitude, longitude, api_key_hash, status, last_seen_at, "
-        + "library_last_synced_at, logo_name, is_geo_fenced) "
+        + "library_last_synced_at, logo_name, is_geo_fenced, priority_cost_multiplier, "
+        + "credits_per_dollar, five_dollar_bonus_credits, ten_dollar_bonus_credits, "
+        + "web_cost_multiplier, display_currency_for_cost) "
         + "values (:id, :version, :name, :latitude, :longitude, :apiKeyHash, :status, "
-        + ":lastSeenAt, :libraryLastSyncedAt, :logoName, :isGeoFenced)")
+        + ":lastSeenAt, :libraryLastSyncedAt, :logoName, :isGeoFenced, :priorityCostMultiplier, "
+        + ":creditsPerDollar, :fiveDollarBonusCredits, :tenDollarBonusCredits, "
+        + ":webCostMultiplier, :displayCurrencyForCost)")
         .setParameter("id", location.getPersistentIdentity())
         .setParameter("version", location.getVersion())
         .setParameter("name", location.getName())
@@ -147,6 +151,12 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
         .setParameter("libraryLastSyncedAt", location.getLibraryLastSyncedAt())
         .setParameter("logoName", location.getLogoName())
         .setParameter("isGeoFenced", location.isGeoFenced())
+        .setParameter("priorityCostMultiplier", location.getPriorityCostMultiplier())
+        .setParameter("creditsPerDollar", location.getCreditsPerDollar())
+        .setParameter("fiveDollarBonusCredits", location.getFiveDollarBonusCredits())
+        .setParameter("tenDollarBonusCredits", location.getTenDollarBonusCredits())
+        .setParameter("webCostMultiplier", location.getWebCostMultiplier())
+        .setParameter("displayCurrencyForCost", location.getDisplayCurrencyForCost())
         .executeUpdate();
   }
 
