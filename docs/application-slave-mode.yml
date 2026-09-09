@@ -18,8 +18,8 @@ app:
   # hashes. Defaults to <user.home>/.jukeanator when unset -- override here to store it
   # elsewhere. The song library's own music-folder location is discovered from whatever's
   # already stored here, or (on first run) via the JFC/Swing "scan for songs" prompt.
-  # data-dir: ~
   # data-dir: C:\kiosk\data
+  # data-dir: ~  
 
 logging:
   level:
@@ -30,6 +30,17 @@ spring:
     name: JukeANator
   aop:
     proxy-target-class: false   # use JDK interface proxies, not CGLIB
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true    
   # MySQL is the only supported local database -- no --spring.profiles.active flag needed. Setting
   # app.repository-type to jpa (see above) now always means "JPA against this MySQL datasource."
   # Override via the DB_* environment variables for anything beyond local
@@ -52,6 +63,7 @@ spring:
 
 song-library:
   requires-metadata: false
+  disable-internet-search: false  
   use-genre: true
   use-top-folder-for-genre: true
   discogs:
@@ -74,15 +86,15 @@ song-queue:
 background-music:
   enable-background-music: true # assumes playlist file called BackgroundMusic.TXT exists in dataDir
   enable-smart-background-music-additions: true # will play songs from same artist/album from background music
-  smart-background-music-additions-factor: 3 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
+  smart-background-music-additions-factor: 1 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
   smart-background-music-additions-begin: 19 # In 24 hour/military time (e.g. 19:00 hours is 7:00PM) start time for enableSmartBackgroundMusicAdditions
   smart-background-music-additions-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) end time for enableSmartBackgroundMusicAdditions
-  smart-background-music-min-plays: 5 # candidate songs need at least this many plays to be eligible as a smart addition
-  smart-background-music-favorite-albums-percentage: 50 # target % of the smart-addition pool made up of songs from albums listed in SmartBackgroundMusicAlbumInclusions.TXT
+  smart-background-music-min-plays: 0 # candidate songs need at least this many plays to be eligible as a smart addition
+  smart-background-music-favorite-albums-percentage: 25 # target % of the smart-addition pool made up of songs from albums listed in SmartBackgroundMusicAlbumInclusions.TXT
 
 song-player:
   player-type: winamp   # vlc or detached-vlc (all operating systems) | winamp (windows only)
-  winamp-exe-path: C:\\kiosk\\Winamp\\winamp.exe
+  winamp-exe-path: C:\\Program Files (x86)\\Winamp\\winamp.exe
   player-volume: 100 # 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software amplification)
   master-volume: 100
   enable-line-in-on-silence: false # mutually exclusive with enable-background-music
@@ -91,6 +103,16 @@ song-player:
 location:   # repository/service beans exist regardless of app.mode; see LocationConfig
   storage-root: ~   # defaults under app.data-dir/locations when unset
   command-timeout-ms: 10000   # master-only: how long to wait for a slave to reply to a command
+
+# https://developer.paypal.com/braintree/docs/
+braintree:
+  environment: sandbox   # sandbox | production -- always sandbox until real merchant credentials are provisioned
+  merchant-id: ${BRAINTREE_MERCHANT_ID:}
+  public-key: ${BRAINTREE_PUBLIC_KEY:}
+  private-key: ${BRAINTREE_PRIVATE_KEY:}
+
+receipt:
+  from-address: ${MAIL_FROM_ADDRESS:noreply@jukeanator.com}
 
 user-interface:
   always-on-top: false
@@ -106,7 +128,7 @@ user-interface:
   credits-per-dollar: 3
   five-dollar-bonus-credits: 3
   ten-dollar-bonus-credits: 10
-  web-cost-multiplier: 2 # Web/Mobile UI cost = JFC/Swing cost x this value (1 = same cost as JFC/Swing); synced to master, which may override it per-location
+  web-cost-multiplier: 2 # Web/Mobile UI cost = JFC/Swing cost x this value (1 = same cost as JFC/Swing)
   display-currency-for-cost: false # if true, will display credits, if false, will display the actual cost of a credit
   # SEARCH CONFIGURATION
   enable-type-ahead-search: true

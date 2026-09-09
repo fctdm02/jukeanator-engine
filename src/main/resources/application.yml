@@ -86,11 +86,11 @@ song-queue:
 background-music:
   enable-background-music: false # assumes playlist file called BackgroundMusic.TXT exists in dataDir
   enable-smart-background-music-additions: true # will play songs from same artist/album from background music
-  smart-background-music-additions-factor: 3 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
+  smart-background-music-additions-factor: 1 # for every song in BackgroundMusic.TXT, supplant with this number of songs by same album/artist, preferring popular songs
   smart-background-music-additions-begin: 19 # In 24 hour/military time (e.g. 19:00 hours is 7:00PM) start time for enableSmartBackgroundMusicAdditions
   smart-background-music-additions-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) end time for enableSmartBackgroundMusicAdditions
-  smart-background-music-min-plays: 5 # candidate songs need at least this many plays to be eligible as a smart addition
-  smart-background-music-favorite-albums-percentage: 50 # target % of the smart-addition pool made up of songs from albums listed in SmartBackgroundMusicAlbumInclusions.TXT
+  smart-background-music-min-plays: 0 # candidate songs need at least this many plays to be eligible as a smart addition
+  smart-background-music-favorite-albums-percentage: 25 # target % of the smart-addition pool made up of songs from albums listed in SmartBackgroundMusicAlbumInclusions.TXT
 
 song-player:
   player-type: winamp   # vlc or detached-vlc (all operating systems) | winamp (windows only)
@@ -112,7 +112,7 @@ braintree:
   private-key: ${BRAINTREE_PRIVATE_KEY:}
 
 receipt:
-  from-address: ${MAIL_FROM_ADDRESS:noreply@jukeanator.com}
+  from-address: ${MAIL_FROM_ADDRESS:tmyers@jukeanator.com}
 
 user-interface:
   always-on-top: false
