@@ -105,8 +105,10 @@ public class GenreDetailPanel extends JPanel {
     } catch (Exception ignored) {
     }
 
-    String subtitle =
-        artists.size() + " artists  •  " + albums.size() + " albums  •  " + songs.size() + " songs";
+    // numArtists/numAlbums/numSongs reflect every artist/album/song in this genre -- not just
+    // however many fit in the (preview-limited) artists/albums/songs lists above.
+    String subtitle = String.format("%,d artists  •  %,d albums  •  %,d songs", safe.numArtists(),
+        safe.numAlbums(), safe.numSongs());
 
     headerPanel = new DetailHeaderPanel(backLabel, onBack, genreImage, "♪", genre.genreName(),
         subtitle, buildSortButtonPanel());

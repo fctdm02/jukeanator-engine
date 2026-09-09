@@ -530,23 +530,32 @@ public class SongLibraryServiceImpl
 
     // ── Queries ───────────────────────────────────────────────────────────
 
-    List<SongFileEntity> songs = root.getSongs().stream().filter(hasPlays)
-        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
+    // Matched counts are taken from the full filtered set, before the preview limit is applied,
+    // so numArtists/numAlbums/numSongs reflect every match (e.g. every artist/album/song with a
+    // play, or every one in a genre) rather than just however many fit in the returned preview
+    // list.
+    List<SongFileEntity> matchedSongs =
+        root.getSongs().stream().filter(hasPlays).filter(inGenre).filter(matchesSearch).toList();
 
-    List<ArtistFolderEntity> artists = root.getArtists().stream().filter(hasPlays)
-        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
+    List<ArtistFolderEntity> matchedArtists =
+        root.getArtists().stream().filter(hasPlays).filter(inGenre).filter(matchesSearch).toList();
 
-    List<AlbumFolderEntity> albums = root.getAlbums().stream().filter(hasPlays)
-        .filter(inGenre).filter(matchesSearch).sorted(comparator).limit(limit).toList();
+    List<AlbumFolderEntity> matchedAlbums =
+        root.getAlbums().stream().filter(hasPlays).filter(inGenre).filter(matchesSearch).toList();
+
+    List<SongFileEntity> songs = matchedSongs.stream().sorted(comparator).limit(limit).toList();
+    List<ArtistFolderEntity> artists =
+        matchedArtists.stream().sorted(comparator).limit(limit).toList();
+    List<AlbumFolderEntity> albums = matchedAlbums.stream().sorted(comparator).limit(limit).toList();
 
     SearchResultDto dto = new SearchResultDto(
         SongLibraryMapper.toSongDtoList(songs),
-        SongLibraryMapper.toArtistDtoList(artists), 
+        SongLibraryMapper.toArtistDtoList(artists),
         SongLibraryMapper.toAlbumDtoList(albums),
-        artists.size(),
-        albums.size(),
-        songs.size());
-    
+        matchedArtists.size(),
+        matchedAlbums.size(),
+        matchedSongs.size());
+
     return dto;
   }
 

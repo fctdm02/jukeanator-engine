@@ -185,7 +185,10 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     List<SongDto> songs = new ArrayList<>(safeList(source.songs()));
     songs.sort(Comparator.comparing(s -> titleSortKey(s.songName())));
 
-    return new SearchResultDto(songs, artists, albums, artists.size(), albums.size(), songs.size());
+    // Preserve source's numArtists/numAlbums/numSongs -- those are the true totals across the
+    // whole library, whereas artists/albums/songs here are only the (preview-limited) lists.
+    return new SearchResultDto(songs, artists, albums, source.numArtists(), source.numAlbums(),
+        source.numSongs());
   }
 
   /**
@@ -207,10 +210,12 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   /** (Re)builds the header to reflect the latest counts and current sort state. */
   private void rebuildHeaderPanel() {
 
+    // numArtists/numAlbums/numSongs reflect every artist/album/song with at least one play --
+    // not just however many fit in the (preview-limited) artists()/albums()/songs() lists above.
     SearchResultDto current = currentSort == SortMode.POPULARITY ? resultsByPopularity : resultsByTitle;
-    int artistCount = safeList(current.artists()).size();
-    int albumCount = safeList(current.albums()).size();
-    int songCount = safeList(current.songs()).size();
+    int artistCount = current.numArtists();
+    int albumCount = current.numAlbums();
+    int songCount = current.numSongs();
 
     // Icon size/sizing matches the Home screen's "All Albums" header. No dedicated
     // Hot Here artwork exists yet, so the load falls through to the "🔥" fallback
@@ -219,8 +224,8 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     ImageIcon hotHereIcon =
         imageLoader.loadImage("HotHere_Header_Image.png", headerIconSize, headerIconSize);
 
-    String subtitle =
-        artistCount + " artists  •  " + albumCount + " albums  •  " + songCount + " songs";
+    String subtitle = String.format("%,d artists  •  %,d albums  •  %,d songs", artistCount,
+        albumCount, songCount);
 
     headerPanel = new DetailHeaderPanel(null, null, hotHereIcon, "🔥", "Hot Here", subtitle,
         buildSortButtonPanel(), ColorTheme.get().frameTabAccentHotHere);
