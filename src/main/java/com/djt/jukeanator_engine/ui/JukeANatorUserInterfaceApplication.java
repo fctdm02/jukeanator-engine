@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
@@ -90,15 +89,15 @@ public class JukeANatorUserInterfaceApplication {
 
     SwingSecurityUtil.runAsync(() -> {
 
-      Integer          locationId = songLibraryService.getOwnLocationId();
-      List<AlbumDto>   albums  = songLibraryService.getAlbums(locationId);
-      SearchResultDto  popular = songLibraryService.getMusicByPopularity(locationId);
-      var              genres  = songLibraryService.getGenres(locationId);
-      var              playing = songPlayerService.getNowPlayingSong(locationId);
-      var              queue   = songQueueService.getQueuedSongs(locationId);
+      Integer          locationId  = songLibraryService.getOwnLocationId();
+      List<AlbumDto>   albums      = songLibraryService.getAlbums(locationId);
+      int              artistCount = songLibraryService.getArtists(locationId).size();
+      var              genres      = songLibraryService.getGenres(locationId);
+      var              playing     = songPlayerService.getNowPlayingSong(locationId);
+      var              queue       = songQueueService.getQueuedSongs(locationId);
 
       SwingUtilities.invokeLater(() -> {
-        frame.setAlbums(albums, popular);
+        frame.setAlbums(albums, artistCount);
         frame.setGenres(genres);
         frame.setNowPlaying(playing);
         frame.setQueue(queue);

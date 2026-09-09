@@ -108,7 +108,7 @@ public class JukeANatorEventListener {
 
     Integer locationId = songLibraryService.getOwnLocationId();
     frame.setAlbums(songLibraryService.getAlbums(locationId),
-        songLibraryService.getMusicByPopularity(locationId));
+        songLibraryService.getArtists(locationId).size());
     frame.refreshMusicByPopularityResults();
     frame.setGenres(songLibraryService.getGenres(locationId));
     frame.setNowPlaying(songPlayerService.getNowPlayingSong(locationId));

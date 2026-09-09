@@ -218,8 +218,7 @@ public class HomePanel extends JPanel implements TabNavigator {
    * Sort-order toggling after this point operates purely on the in-memory lists built here — no
    * further service calls are made.
    */
-  public void setAlbums(List<AlbumDto> rawAlbums,
-      com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto popular) {
+  public void setAlbums(List<AlbumDto> rawAlbums, int artistCount) {
 
     List<AlbumDto> albums = rawAlbums != null ? rawAlbums : List.of();
 
@@ -229,10 +228,14 @@ public class HomePanel extends JPanel implements TabNavigator {
     albumsByArtist = sortAlbums(albums, AlbumDto::artistName);
     letterMapByArtist = buildLetterMap(albumsByArtist, AlbumDto::artistName);
 
-    int artistCount = popular != null && popular.artists() != null
-        ? popular.artists().size() : 0;
-    int songCount = popular != null && popular.songs() != null
-        ? popular.songs().size() : 0;
+    // Song count is derived from the full album list (not a search/popularity result, which is
+    // capped at the search page size) so it reflects the entire library, not a truncated slice.
+    // Artist count is passed in from SongLibraryService.getArtists() rather than derived from
+    // albums here, because each AlbumDto's artistId is always its real folder-parent artist --
+    // it doesn't account for ArtistFromSongEntity, the synthetic per-track artists derived from
+    // embedded song-artist names (chiefly so a compilation track's artist is browsable even
+    // though it has no dedicated album folder). Only getArtists() merges both correctly.
+    int songCount = albums.stream().mapToInt(AlbumDto::numSongs).sum();
 
     JPanel gridCard = buildGridCard(artistCount, songCount);
     replaceCard(CARD_GRID, gridCard);
@@ -272,8 +275,8 @@ public class HomePanel extends JPanel implements TabNavigator {
     ImageIcon allAlbumsIcon =
         imageLoader.loadImage("AllAlbumsLogo.png", headerIconSize, headerIconSize);
 
-    String subtitle = artistCount + " artists  •  " + albumsByTitle.size() + " albums  •  "
-        + songCount + " songs";
+    String subtitle = String.format("%,d artists  •  %,d albums  •  %,d songs", artistCount,
+        albumsByTitle.size(), songCount);
 
     DetailHeaderPanel header = new DetailHeaderPanel(null, null, allAlbumsIcon, "♫", "All Albums",
         subtitle, buildSortButtonPanel());

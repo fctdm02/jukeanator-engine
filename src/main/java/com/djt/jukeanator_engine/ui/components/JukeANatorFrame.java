@@ -34,7 +34,6 @@ import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
@@ -1232,14 +1231,14 @@ public class JukeANatorFrame extends JFrame {
   }
 
   // ALBUM LIST (populates HomePanel once data arrives from the background loader)
-  public void setAlbums(List<AlbumDto> albums, SearchResultDto popular) {
+  public void setAlbums(List<AlbumDto> albums, int artistCount) {
 
     // JukeANatorEventListener.handleScanFileSystemForSongsEvent calls this synchronously from
     // whatever thread published ScanFileSystemForSongsEvent (the song-scan thread, not the EDT).
     // HomePanel.setAlbums() rebuilds and repaints Swing components -- doing that off the EDT while
     // the EDT is concurrently painting/laying out the same component tree is what produced the
     // garbled/overlapping album-tile text seen right after a first-run scan completes.
-    SwingUtilities.invokeLater(() -> homePanel.setAlbums(albums, popular));
+    SwingUtilities.invokeLater(() -> homePanel.setAlbums(albums, artistCount));
   }
 
   // GENRE LIST
