@@ -86,7 +86,7 @@ public class JukeANatorUserInterfaceApplication {
       frame.promptForInitialLibraryScan();
     }
 
-    log.info("JukeANator UI launched — fetching library data in background");
+    log.info("JukeANator UI launched: fetching library data in background");
 
     SwingSecurityUtil.runAsync(() -> {
 
@@ -111,7 +111,7 @@ public class JukeANatorUserInterfaceApplication {
         frame.toFront();
         frame.requestFocus();
 
-        log.info("JukeANator UI data load complete");
+        log.info("JukeANator UI: data load complete");
       });
     });
   }
