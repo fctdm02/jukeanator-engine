@@ -333,7 +333,7 @@ public class HomePanel extends JPanel implements TabNavigator {
     row.add(sortLabel);
 
     btnArtist = sortButton("Artist", SortMode.ARTIST);
-    btnTitle = sortButton("Title", SortMode.TITLE);
+    btnTitle = sortButton("Album", SortMode.TITLE);
 
     row.add(btnArtist);
     row.add(btnTitle);
