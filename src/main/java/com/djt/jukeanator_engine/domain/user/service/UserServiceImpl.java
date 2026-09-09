@@ -1,6 +1,8 @@
 package com.djt.jukeanator_engine.domain.user.service;
 
 import static java.util.Objects.requireNonNull;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +29,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
+import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
@@ -39,8 +42,10 @@ import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.user.event.PurchaseCompletedEvent;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
+import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.CreditTransactionType;
@@ -65,12 +70,14 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private final SongLibraryService songLibraryService;
   private final PricingService pricingService;
   private final boolean slaveMode;
+  private final PaymentGateway paymentGateway;
 
   private UserRootEntity userRoot;
 
   public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder,
       JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
-      SongLibraryService songLibraryService, PricingService pricingService, boolean slaveMode) {
+      SongLibraryService songLibraryService, PricingService pricingService, boolean slaveMode,
+      PaymentGateway paymentGateway) {
 
     requireNonNull(userRepository, "userRepository cannot be null");
     requireNonNull(passwordEncoder, "passwordEncoder cannot be null");
@@ -78,6 +85,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
     requireNonNull(pricingService, "pricingService cannot be null");
+    requireNonNull(paymentGateway, "paymentGateway cannot be null");
 
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
@@ -86,6 +94,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     this.songLibraryService = songLibraryService;
     this.pricingService = pricingService;
     this.slaveMode = slaveMode;
+    this.paymentGateway = paymentGateway;
 
     initialize();
 
@@ -139,21 +148,12 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     return new AuthResponse(token, user.getEmailAddress(), user.getRole().name());
   }
 
-  private static final int DEFAULT_CREDITS = 6;
-
   @Override
   public synchronized UserProfileDto getProfile(String emailAddress) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);;
     if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    // Temporary: ensure every user has at least the default credit balance until
-    // the Add Funds workflow is implemented.
-    if (user.getNumCredits() == null || user.getNumCredits() == 0) {
-      user.setNumCredits(DEFAULT_CREDITS);
-      this.userRepository.storeAggregateRoot(this.userRoot);
     }
 
     PricingConfig pricingConfig =
@@ -267,9 +267,50 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public void addFunds(String emailAddress, AddFundsRequest request) {
+  public synchronized AddFundsResponseDto addFunds(String emailAddress, AddFundsRequest request) {
 
-    throw new UserServiceException("Add funds payment not yet implemented");
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    CreditPackageDto pkg = getCreditPackages().stream()
+        .filter(p -> p.id().equals(request.packageId()))
+        .findFirst()
+        .orElseThrow(() -> new PaymentException("Unknown package: " + request.packageId()));
+
+    if (request.paymentMethodNonce() == null || request.paymentMethodNonce().isBlank()) {
+      throw new PaymentException("Missing payment method");
+    }
+
+    PaymentChargeResult chargeResult = paymentGateway.charge(pkg.priceUsd(), request.paymentMethodNonce());
+    if (!chargeResult.success()) {
+      throw new PaymentException(chargeResult.failureMessage());
+    }
+
+    Integer locationId = songLibraryService.getOwnLocationId();
+    int totalCredits = pkg.credits() + pkg.bonusCredits();
+
+    addCredits(user, emailAddress, totalCredits, locationId);
+    this.userRepository.storeAggregateRoot(this.userRoot);
+
+    Instant now = Instant.now();
+
+    eventPublisher.publishEvent(new PurchaseCompletedEvent(emailAddress, user.getFirstName(),
+        pkg.credits(), pkg.bonusCredits(), pkg.priceUsd(), chargeResult.paymentSource(),
+        chargeResult.transactionId(), now, user.getNumCredits()));
+
+    PricingConfig pricingConfig = pricingService.resolvePricingConfig(locationId);
+    BigDecimal balanceUsd = BigDecimal.valueOf(user.getNumCredits())
+        .divide(BigDecimal.valueOf(pricingConfig.creditsPerDollar()), 2, RoundingMode.HALF_UP);
+
+    return new AddFundsResponseDto(user.getNumCredits(), balanceUsd, pkg.credits(),
+        pkg.bonusCredits(), chargeResult.paymentSource(), chargeResult.transactionId(), now);
+  }
+
+  @Override
+  public String generatePaymentClientToken() {
+    return paymentGateway.generateClientToken();
   }
 
   @Override
@@ -621,6 +662,22 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     Integer persistentIdentity = Integer.valueOf(user.getTransactions().size() + 1);
     user.addTransaction(new CreditTransactionEntity(persistentIdentity, locationId, -cost, type,
         Instant.now(), songAlbumId, songId, remaining));
+  }
+
+  /**
+   * Adds {@code amount} credits and appends a PURCHASE ledger entry to the user's own transaction
+   * set. Symmetric with {@link #deductCredits}, but never floors (a purchase only ever increases
+   * the balance). Callers are responsible for persisting the user root afterward.
+   */
+  private void addCredits(UserEntity user, String emailAddress, int amount, Integer locationId) {
+
+    int newBalance = (user.getNumCredits() != null ? user.getNumCredits() : 0) + amount;
+    user.setNumCredits(newBalance);
+    eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, newBalance));
+
+    Integer persistentIdentity = Integer.valueOf(user.getTransactions().size() + 1);
+    user.addTransaction(new CreditTransactionEntity(persistentIdentity, locationId, amount,
+        CreditTransactionType.PURCHASE, Instant.now(), null, null, newBalance));
   }
 
   // Repository methods

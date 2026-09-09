@@ -26,6 +26,11 @@ spring:
     name: JukeANator
   aop:
     proxy-target-class: false   # use JDK interface proxies, not CGLIB
+  mail:
+    host: localhost
+    port: 3025
+    username: ~
+    password: ~
   # MySQL is the only supported local database -- no --spring.profiles.active flag needed. Setting
   # app.repository-type to jpa (see above) now always means "JPA against this MySQL datasource."
   # Points at a dedicated jukeanator_test database instead of application.yml's own jukeanator
@@ -92,6 +97,18 @@ song-player:
 location:   # repository/service beans exist regardless of app.mode; see LocationConfig
   storage-root: ~   # defaults under app.data-dir/locations when unset
   command-timeout-ms: 10000   # master-only: how long to wait for a slave to reply to a command
+
+# https://developer.paypal.com/braintree/docs/
+# https://developer.paypal.com/braintree/docs/reference/general/testing/ruby/
+# test credit card: c378282246310005 American Express
+braintree:
+  environment: sandbox
+  merchant-id: test-merchant-id
+  public-key: test-public-key
+  private-key: test-private-key
+
+receipt:
+  from-address: noreply@jukeanator.com
 
 user-interface:
   always-on-top: false

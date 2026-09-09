@@ -13,6 +13,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
+import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
@@ -46,8 +48,10 @@ import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.user.event.PurchaseCompletedEvent;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
+import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
@@ -83,6 +87,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   private PricingService pricingService;
   private UserRootEntity userRoot;
   private UserServiceImpl userServiceImpl;
+  private PaymentGateway paymentGateway;
 
   @BeforeEach
   void setUp() throws EntityDoesNotExistException {
@@ -97,6 +102,8 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     when(pricingService.resolvePricingConfig(any()))
         .thenReturn(new PricingConfig(2, 3, 3, 10, 2, false));
 
+    paymentGateway = mock(PaymentGateway.class);
+
     userRoot = new UserRootEntity();
     userRoot.addUser(new UserEntity(Integer.valueOf(1), "Jane", "Doe", REGISTERED_EMAIL,
         REGISTERED_PASSWORD_HASH, Integer.valueOf(6), UserRole.ROLE_USER));
@@ -104,7 +111,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     when(userRepository.loadAggregateRoot(anyString())).thenReturn(userRoot);
 
     userServiceImpl = new UserServiceImpl(userRepository, passwordEncoder, jwtUtil, eventPublisher,
-        songLibraryService, pricingService, false);
+        songLibraryService, pricingService, false, paymentGateway);
   }
 
   private UserEntity registeredUser() {
@@ -284,10 +291,69 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   }
 
   @Test
-  void addFunds_throwsNotYetImplemented() {
+  void addFunds_throwsForUnknownPackage() {
 
-    assertThrows(UserServiceException.class,
-        () -> userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-28")));
+    assertThrows(PaymentException.class, () -> userServiceImpl.addFunds(REGISTERED_EMAIL,
+        new AddFundsRequest("nonexistent-pkg", "fake-nonce")));
+
+    verify(userRepository, never()).storeAggregateRoot(userRoot);
+  }
+
+  @Test
+  void addFunds_throwsForMissingNonce() {
+
+    assertThrows(PaymentException.class,
+        () -> userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-7", null)));
+
+    verify(userRepository, never()).storeAggregateRoot(userRoot);
+  }
+
+  @Test
+  void addFunds_throwsAndGrantsNoCreditsWhenDeclined() {
+
+    when(paymentGateway.charge(any(BigDecimal.class), anyString()))
+        .thenReturn(PaymentChargeResult.failure("Payment declined: Do Not Honor"));
+
+    int before = registeredUser().getNumCredits();
+
+    assertThrows(PaymentException.class, () -> userServiceImpl.addFunds(REGISTERED_EMAIL,
+        new AddFundsRequest("pkg-7", "fake-nonce")));
+
+    assertEquals(before, registeredUser().getNumCredits());
+    verify(userRepository, never()).storeAggregateRoot(userRoot);
+    verify(eventPublisher, never()).publishEvent(any(UserCreditsChangedEvent.class));
+    verify(eventPublisher, never()).publishEvent(any(PurchaseCompletedEvent.class));
+  }
+
+  @Test
+  void addFunds_grantsCreditsAndPublishesEventsOnSuccess() {
+
+    when(paymentGateway.charge(any(BigDecimal.class), anyString()))
+        .thenReturn(PaymentChargeResult.success("txn-123", "PayPal"));
+
+    AddFundsResponseDto response =
+        userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-7", "fake-nonce"));
+
+    // pkg-7: 12 credits + 1 bonus = 13, starting balance 6 -> 19
+    assertEquals(19, registeredUser().getNumCredits());
+    assertEquals(Integer.valueOf(19), response.numCredits());
+    assertEquals(12, response.creditsAdded());
+    assertEquals(1, response.bonusCreditsAdded());
+    assertEquals("PayPal", response.paymentSource());
+    assertEquals("txn-123", response.transactionId());
+    assertEquals(0, new BigDecimal("6.33").compareTo(response.balanceUsd()));
+    verify(userRepository).storeAggregateRoot(userRoot);
+    verify(eventPublisher).publishEvent(any(UserCreditsChangedEvent.class));
+    verify(eventPublisher).publishEvent(any(PurchaseCompletedEvent.class));
+    verify(paymentGateway).charge(eq(new BigDecimal("7.00")), eq("fake-nonce"));
+  }
+
+  @Test
+  void generatePaymentClientToken_returnsGeneratedToken() {
+
+    when(paymentGateway.generateClientToken()).thenReturn("fake-client-token");
+
+    assertEquals("fake-client-token", userServiceImpl.generatePaymentClientToken());
   }
 
   @Test

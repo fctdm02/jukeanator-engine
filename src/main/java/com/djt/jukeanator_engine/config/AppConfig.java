@@ -7,9 +7,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
+import com.braintreegateway.BraintreeGateway;
+import com.braintreegateway.Environment;
 import com.djt.jukeanator_engine.domain.backgroundmusic.config.BackgroundMusicProperties;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepository;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepositoryFileSystemImpl;
@@ -55,11 +59,18 @@ import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryJpaImpl;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
+import com.djt.jukeanator_engine.domain.user.config.BraintreeProperties;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryJpaImpl;
+import com.djt.jukeanator_engine.domain.user.service.BraintreePaymentGateway;
+import com.djt.jukeanator_engine.domain.user.service.EmailService;
+import com.djt.jukeanator_engine.domain.user.service.EmailServiceImpl;
+import com.djt.jukeanator_engine.domain.user.service.NoOpPaymentGateway;
+import com.djt.jukeanator_engine.domain.user.service.PaymentGateway;
 import com.djt.jukeanator_engine.domain.user.service.PricingService;
 import com.djt.jukeanator_engine.domain.user.service.PricingServiceImpl;
+import com.djt.jukeanator_engine.domain.user.service.PurchaseReceiptEmailListener;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
@@ -67,6 +78,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManagerFactory;
 
 @Configuration
+@EnableAsync
 public class AppConfig {
 
   @Bean
@@ -338,7 +350,8 @@ public class AppConfig {
       JwtUtil jwtUtil,
       org.springframework.context.ApplicationEventPublisher eventPublisher,
       SongLibraryService songLibraryService,
-      PricingService pricingService) {
+      PricingService pricingService,
+      PaymentGateway paymentGateway) {
 
     return new UserServiceImpl(
         userRepository,
@@ -347,9 +360,53 @@ public class AppConfig {
         eventPublisher,
         songLibraryService,
         pricingService,
-        appProperties.isSlave());
+        appProperties.isSlave(),
+        paymentGateway);
   }
- 
+
+  // ── Payments / email ─────────────────────────────────────────────────────
+  // Payment processing is centralized to one master-mode Braintree merchant account for the
+  // whole multi-location business -- a standalone/slave instance never holds Braintree
+  // credentials and never even constructs a com.braintreegateway.BraintreeGateway. These two
+  // @PaymentGateway beans are mutually exclusive by app.mode, mirroring the existing
+  // BackgroundMusicService/NoOpBackgroundMusicService master-vs-not-master split above.
+
+  @Bean
+  @ConditionalOnProperty(name = "app.mode", havingValue = "master")
+  public BraintreeGateway braintreeGateway(BraintreeProperties braintreeProperties) {
+
+    Environment environment = "production".equalsIgnoreCase(braintreeProperties.getEnvironment())
+        ? Environment.PRODUCTION
+        : Environment.SANDBOX;
+
+    return new BraintreeGateway(environment, braintreeProperties.getMerchantId(),
+        braintreeProperties.getPublicKey(), braintreeProperties.getPrivateKey());
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = "app.mode", havingValue = "master")
+  public PaymentGateway braintreePaymentGateway(BraintreeGateway braintreeGateway) {
+    return new BraintreePaymentGateway(braintreeGateway);
+  }
+
+  @Bean
+  @Conditional(NotMasterModeCondition.class)
+  public PaymentGateway noOpPaymentGateway() {
+    return new NoOpPaymentGateway();
+  }
+
+  @Bean
+  public EmailService emailService(JavaMailSender mailSender,
+      @org.springframework.beans.factory.annotation.Value("${receipt.from-address:noreply@jukeanator.com}") String fromAddress) {
+
+    return new EmailServiceImpl(mailSender, fromAddress);
+  }
+
+  @Bean
+  public PurchaseReceiptEmailListener purchaseReceiptEmailListener(EmailService emailService) {
+    return new PurchaseReceiptEmailListener(emailService);
+  }
+
   @Bean
   @Primary
   @Conditional(NotMasterModeCondition.class)

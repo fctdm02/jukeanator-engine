@@ -23,6 +23,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
+import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
@@ -143,10 +144,15 @@ public class UserController {
   }
 
   @PostMapping("/add-funds")
-  public ResponseEntity<Void> addFunds(@AuthenticationPrincipal String emailAddress,
+  public ResponseEntity<AddFundsResponseDto> addFunds(@AuthenticationPrincipal String emailAddress,
       @RequestBody AddFundsRequest request) {
-    userService.addFunds(emailAddress, request);
-    return ResponseEntity.noContent().build();
+    return ResponseEntity.ok(userService.addFunds(emailAddress, request));
+  }
+
+  /** A payment gateway client token for the web UI's payment-method sheet to initialize its SDK with. */
+  @GetMapping("/payment/client-token")
+  public ResponseEntity<Map<String, String>> getPaymentClientToken() {
+    return ResponseEntity.ok(Map.of("clientToken", userService.generatePaymentClientToken()));
   }
 
   @org.springframework.web.bind.annotation.PutMapping("/me")

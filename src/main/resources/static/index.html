@@ -17,6 +17,21 @@
 
   <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+  <!-- Braintree Web SDK (modular client, NOT the deprecated Drop-in UI) for the Add Funds
+       payment-method sheet: card entry (Hosted Fields) plus PayPal, Venmo, and Google Pay,
+       each feature-detected and initialized in js/app.js. -->
+  <script src="https://js.braintreegateway.com/web/3.145.0/js/client.min.js"></script>
+  <script src="https://js.braintreegateway.com/web/3.145.0/js/hosted-fields.min.js"></script>
+  <script src="https://js.braintreegateway.com/web/3.145.0/js/paypal-checkout.min.js"></script>
+  <script src="https://js.braintreegateway.com/web/3.145.0/js/venmo.min.js"></script>
+  <script src="https://js.braintreegateway.com/web/3.145.0/js/google-payment.min.js"></script>
+  <script src="https://pay.google.com/gp/p/js/pay.js"></script>
+  <!-- Apple Pay is stubbed out (APPLE_PAY_ENABLED = false in app.js) until an Apple Developer
+       account and merchant domain-association file are set up -- not loading its SDK either. -->
+  <!-- PayPal's JS SDK is loaded dynamically in app.js, not here -- it must carry a
+       data-client-token attribute set from our own per-session Braintree client token. -->
+
   <script src="/js/app.js"></script>
 </body>
 </html>

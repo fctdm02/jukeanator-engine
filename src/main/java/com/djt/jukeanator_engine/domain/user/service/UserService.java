@@ -10,6 +10,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
+import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
@@ -104,11 +105,18 @@ public interface UserService {
   void deleteAccount(String emailAddress);
 
   /**
-   * 
+   * Charges the package's price via Braintree using {@code request.paymentMethodNonce()} and, on
+   * success, mints the package's credits (+ bonus) to the user's balance. Never grants credits for
+   * a declined/failed charge.
+   *
    * @param emailAddress
    * @param request
+   * @throws PaymentException if the package is unknown, the nonce is missing, or the charge fails
    */
-  void addFunds(String emailAddress, AddFundsRequest request);
+  AddFundsResponseDto addFunds(String emailAddress, AddFundsRequest request);
+
+  /** A payment gateway client token for the web UI's payment-method sheet to initialize its SDK with. */
+  String generatePaymentClientToken();
 
   /**
    * 

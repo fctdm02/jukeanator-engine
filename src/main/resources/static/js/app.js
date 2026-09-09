@@ -620,16 +620,6 @@
           ${packages.map(packageCardHtml).join('')}
         </div>
 
-        <div class="payment-section-title">Default Payment Method</div>
-        <div class="payment-method-card">
-          <span class="payment-gpay-icon">G Pay</span>
-          <div class="payment-method-info">
-            <div class="payment-method-name">Google Pay</div>
-            <div class="payment-method-number">6325</div>
-          </div>
-          <button class="payment-remove-btn">Remove</button>
-        </div>
-
         <button class="add-funds-action-btn" id="addFundsBtn">Add Funds</button>
       </div>`;
 
@@ -643,17 +633,9 @@
       });
     });
 
-    document.getElementById('addFundsBtn').addEventListener('click', async () => {
-      const btn = document.getElementById('addFundsBtn');
-      btn.disabled = true;
-      btn.textContent = 'Processing…';
-      try {
-        await api('/api/users/add-funds', { method: 'POST', body: JSON.stringify({ packageId: selectedId }) });
-        btn.textContent = 'Done!';
-      } catch (err) {
-        btn.textContent = 'Not yet available';
-        setTimeout(() => { btn.textContent = 'Add Funds'; btn.disabled = false; }, 2000);
-      }
+    document.getElementById('addFundsBtn').addEventListener('click', () => {
+      const pkg = packages.find(p => p.id === selectedId);
+      if (pkg) showPaymentMethodSheet(pkg, (response) => renderTransactionSuccess(response));
     });
   }
 
@@ -2153,6 +2135,296 @@
     if (!overlay) return;
     overlay.classList.remove('song-popup-visible');
     setTimeout(() => overlay.remove(), 300);
+  }
+
+  // ── Add Funds: Select Payment Method sheet ──────────────────────────────
+  // Uses Braintree's modular braintree-web client SDK (Hosted Fields + PayPal Checkout +
+  // Venmo + Google Pay + Apple Pay), NOT the deprecated Drop-in widget -- each method is its
+  // own component, feature-detected and hidden when unsupported in this browser/device.
+
+  // Apple Pay requires an Apple Developer account (paid) plus a merchant domain-association
+  // file hosted on this server -- neither is set up yet, so this stays off regardless of
+  // browser support until that's done. Flip to true once both are in place.
+  const APPLE_PAY_ENABLED = false;
+
+  let _hostedFieldsInstance = null;
+
+  function loadScriptOnce(src, attrs = {}) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[data-src="${src}"]`)) { resolve(); return; }
+      const script = document.createElement('script');
+      script.src = src;
+      script.dataset.src = src;
+      Object.entries(attrs).forEach(([k, v]) => script.setAttribute(k, v));
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(script);
+    });
+  }
+
+  function paymentMethodRowHtml(id, label) {
+    return `
+      <div class="payment-method-row" id="${id}" hidden>
+        <div class="payment-method-row-label">${label}</div>
+        <div class="pmr-mount" id="${id}Mount"></div>
+      </div>`;
+  }
+
+  async function showPaymentMethodSheet(pkg, onSuccess) {
+    const existing = document.getElementById('paymentMethodOverlay');
+    if (existing) existing.remove();
+    _hostedFieldsInstance = null;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'paymentMethodOverlay';
+    overlay.className = 'song-popup-overlay';
+    overlay.innerHTML = `
+      <div class="song-popup payment-method-sheet" id="paymentMethodSheet">
+        <div class="song-popup-handle"></div>
+        <div class="payment-sheet-title">Select Payment Method</div>
+        <div id="paymentMethodStatus" class="stub-placeholder">Loading payment options…</div>
+        <div id="paymentMethodList" hidden>
+          ${paymentMethodRowHtml('pmCard', 'Credit or Debit Card')}
+          ${paymentMethodRowHtml('pmPayPal', 'PayPal')}
+          ${paymentMethodRowHtml('pmVenmo', 'Venmo')}
+          ${paymentMethodRowHtml('pmGooglePay', 'Google Pay')}
+          ${paymentMethodRowHtml('pmApplePay', 'Apple Pay')}
+        </div>
+        <button class="add-funds-action-btn" id="payNowBtn" hidden>Pay $${Number(pkg.priceUsd).toFixed(2)}</button>
+      </div>`;
+
+    document.getElementById('app-shell').appendChild(overlay);
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('song-popup-visible')));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) dismissPaymentMethodSheet(); });
+    overlay.querySelector('.song-popup-handle').addEventListener('click', dismissPaymentMethodSheet);
+
+    async function submitPayment(nonce) {
+      const payBtn = document.getElementById('payNowBtn');
+      if (payBtn) { payBtn.disabled = true; payBtn.textContent = 'Processing…'; }
+      try {
+        const response = await api('/api/users/add-funds', {
+          method: 'POST',
+          body: JSON.stringify({ packageId: pkg.id, paymentMethodNonce: nonce }),
+        });
+        dismissPaymentMethodSheet();
+        onSuccess(response);
+      } catch (err) {
+        if (payBtn) { payBtn.disabled = false; payBtn.textContent = `Pay $${Number(pkg.priceUsd).toFixed(2)}`; }
+        alert('Payment failed: ' + (err.message || err));
+      }
+    }
+
+    try {
+      const { clientToken } = await api('/api/users/payment/client-token');
+      const client = await braintree.client.create({ authorization: clientToken });
+
+      document.getElementById('paymentMethodStatus').hidden = true;
+      document.getElementById('paymentMethodList').hidden = false;
+
+      await Promise.all([
+        initCardField(client),
+        initPayPal(client, clientToken, pkg, submitPayment),
+        initVenmo(client, submitPayment),
+        initGooglePay(client, pkg, submitPayment),
+        initApplePay(client, pkg, submitPayment),
+      ]);
+
+      const payBtn = document.getElementById('payNowBtn');
+      if (_hostedFieldsInstance) {
+        payBtn.hidden = false;
+        payBtn.addEventListener('click', async () => {
+          payBtn.disabled = true;
+          payBtn.textContent = 'Processing…';
+          try {
+            const { nonce } = await _hostedFieldsInstance.tokenize();
+            await submitPayment(nonce);
+          } catch (err) {
+            payBtn.disabled = false;
+            payBtn.textContent = `Pay $${Number(pkg.priceUsd).toFixed(2)}`;
+          }
+        });
+      }
+    } catch (err) {
+      document.getElementById('paymentMethodStatus').textContent = 'Could not load payment options.';
+    }
+  }
+
+  function dismissPaymentMethodSheet() {
+    const overlay = document.getElementById('paymentMethodOverlay');
+    if (!overlay) return;
+    if (_hostedFieldsInstance) {
+      _hostedFieldsInstance.teardown().catch(() => {});
+      _hostedFieldsInstance = null;
+    }
+    overlay.classList.remove('song-popup-visible');
+    setTimeout(() => overlay.remove(), 300);
+  }
+
+  async function initCardField(client) {
+    const row = document.getElementById('pmCard');
+    row.hidden = false;
+    row.querySelector('.pmr-mount').innerHTML = `
+      <div class="card-field" id="cardNumber"></div>
+      <div class="card-field-row">
+        <div class="card-field" id="cardExpiry"></div>
+        <div class="card-field" id="cardCvv"></div>
+      </div>`;
+    try {
+      _hostedFieldsInstance = await braintree.hostedFields.create({
+        client,
+        styles: { input: { color: '#e8e8ee', 'font-size': '15px' } },
+        fields: {
+          number: { selector: '#cardNumber', placeholder: 'Card number' },
+          expirationDate: { selector: '#cardExpiry', placeholder: 'MM/YY' },
+          cvv: { selector: '#cardCvv', placeholder: 'CVV' },
+        },
+      });
+    } catch (err) {
+      row.hidden = true;
+    }
+  }
+
+  async function initPayPal(client, clientToken, pkg, submitPayment) {
+    const row = document.getElementById('pmPayPal');
+    try {
+      const paypalCheckoutInstance = await braintree.paypalCheckout.create({ client });
+      await loadScriptOnce(
+        'https://www.paypal.com/sdk/js?client-id=sb&currency=USD&intent=capture&commit=true',
+        { 'data-client-token': clientToken });
+      if (!window.paypal) { row.hidden = true; return; }
+      row.hidden = false;
+      paypal.Buttons({
+        fundingSource: paypal.FUNDING.PAYPAL,
+        style: { layout: 'horizontal', height: 40, tagline: false },
+        createOrder: () => paypalCheckoutInstance.createPayment({
+          flow: 'checkout',
+          amount: Number(pkg.priceUsd).toFixed(2),
+          currency: 'USD',
+          intent: 'capture',
+        }),
+        onApprove: (data) => paypalCheckoutInstance.tokenizePayment(data)
+          .then((payload) => submitPayment(payload.nonce)),
+        onError: () => { row.hidden = true; },
+      }).render(row.querySelector('.pmr-mount'));
+    } catch (err) {
+      row.hidden = true;
+    }
+  }
+
+  async function initVenmo(client, submitPayment) {
+    const row = document.getElementById('pmVenmo');
+    try {
+      const venmo = await braintree.venmo.create({ client, allowNewBrowserTab: false });
+      if (!venmo.isBrowserSupported()) { row.hidden = true; return; }
+      row.hidden = false;
+      row.querySelector('.pmr-mount').innerHTML =
+        '<button type="button" class="payment-method-row-btn">Pay with Venmo</button>';
+      row.querySelector('.payment-method-row-btn').addEventListener('click', async () => {
+        try {
+          const { nonce } = await venmo.tokenize();
+          submitPayment(nonce);
+        } catch (err) { /* user cancelled or Venmo app unavailable */ }
+      });
+    } catch (err) {
+      row.hidden = true;
+    }
+  }
+
+  async function initGooglePay(client, pkg, submitPayment) {
+    const row = document.getElementById('pmGooglePay');
+    if (!window.google || !google.payments) { row.hidden = true; return; }
+    try {
+      const googlePayment = await braintree.googlePayment.create({ client, googlePayVersion: 2 });
+      const paymentsClient = new google.payments.api.PaymentsClient({ environment: 'TEST' });
+      const baseRequest = googlePayment.createPaymentDataRequest();
+      const isReady = await paymentsClient.isReadyToPay({
+        apiVersion: 2, apiVersionMinor: 0, allowedPaymentMethods: baseRequest.allowedPaymentMethods,
+      });
+      if (!isReady.result) { row.hidden = true; return; }
+      row.hidden = false;
+      row.querySelector('.pmr-mount').innerHTML =
+        '<button type="button" class="payment-method-row-btn">Pay with Google Pay</button>';
+      row.querySelector('.payment-method-row-btn').addEventListener('click', async () => {
+        try {
+          const paymentDataRequest = googlePayment.createPaymentDataRequest({
+            transactionInfo: {
+              currencyCode: 'USD',
+              totalPriceStatus: 'FINAL',
+              totalPrice: Number(pkg.priceUsd).toFixed(2),
+            },
+          });
+          const paymentData = await paymentsClient.loadPaymentData(paymentDataRequest);
+          const result = await googlePayment.parseResponse(paymentData);
+          submitPayment(result.nonce);
+        } catch (err) { /* user cancelled */ }
+      });
+    } catch (err) {
+      row.hidden = true;
+    }
+  }
+
+  async function initApplePay(client, pkg, submitPayment) {
+    const row = document.getElementById('pmApplePay');
+    if (!APPLE_PAY_ENABLED) { row.hidden = true; return; }
+    if (!window.ApplePaySession || !ApplePaySession.canMakePayments()) { row.hidden = true; return; }
+    try {
+      const applePay = await braintree.applePay.create({ client });
+      row.hidden = false;
+      row.querySelector('.pmr-mount').innerHTML =
+        '<button type="button" class="payment-method-row-btn">Pay with Apple Pay</button>';
+      row.querySelector('.payment-method-row-btn').addEventListener('click', () => {
+        const paymentRequest = applePay.createPaymentRequest({
+          total: { label: 'JukeANator', amount: Number(pkg.priceUsd).toFixed(2) },
+        });
+        const session = new ApplePaySession(3, paymentRequest);
+        session.onvalidatemerchant = (event) => {
+          applePay.performValidation({ validationURL: event.validationURL, displayName: 'JukeANator' })
+            .then((merchantSession) => session.completeMerchantValidation(merchantSession))
+            .catch(() => session.abort());
+        };
+        session.onpaymentauthorized = (event) => {
+          applePay.tokenize({ token: event.payment.token })
+            .then((payload) => {
+              session.completePayment(ApplePaySession.STATUS_SUCCESS);
+              submitPayment(payload.nonce);
+            })
+            .catch(() => session.completePayment(ApplePaySession.STATUS_FAILURE));
+        };
+        session.begin();
+      });
+    } catch (err) {
+      row.hidden = true;
+    }
+  }
+
+  // ── Add Funds: Transaction Successful screen ────────────────────────────
+  function renderTransactionSuccess(response) {
+    state.numCredits = response.numCredits;
+
+    contentPanel.innerHTML = `
+      <div class="tx-success-screen">
+        <div class="tx-success-icon">&#10003;</div>
+        <div class="tx-success-title">Transaction Successful!</div>
+        <div class="tx-success-row">
+          <span>Credits Added</span>
+          <span>${response.creditsAdded}${response.bonusCreditsAdded ? ` + ${response.bonusCreditsAdded} bonus` : ''}</span>
+        </div>
+        <div class="tx-success-row">
+          <span>Payment Method</span>
+          <span>${escHtml(response.paymentSource || '')}</span>
+        </div>
+        <div class="tx-success-row">
+          <span>New Balance</span>
+          <span>${escHtml(creditsWidgetText(response.numCredits))}</span>
+        </div>
+        <div class="tx-success-row tx-success-row--muted">
+          <span>Transaction ID</span>
+          <span>${escHtml(response.transactionId || '')}</span>
+        </div>
+        <button class="add-funds-action-btn" id="txSuccessReturnBtn">Return to Music Selection</button>
+      </div>`;
+
+    document.getElementById('txSuccessReturnBtn').addEventListener('click', () => renderMain('music'));
   }
 
   function showCreatePlaylistDialog(opts = {}) {

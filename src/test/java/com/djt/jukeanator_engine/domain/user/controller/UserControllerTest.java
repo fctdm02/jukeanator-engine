@@ -32,6 +32,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
+import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
@@ -42,6 +43,7 @@ import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 
 class UserControllerTest extends AbstractControllerTest {
@@ -353,17 +355,45 @@ class UserControllerTest extends AbstractControllerTest {
   }
 
   @Test
-  void addFunds_delegatesToService() throws Exception {
+  void addFunds_delegatesToServiceAndReturnsResponseBody() throws Exception {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
-    AddFundsRequest request = new AddFundsRequest("small");
+    AddFundsRequest request = new AddFundsRequest("pkg-7", "fake-nonce");
+    AddFundsResponseDto responseDto = new AddFundsResponseDto(19, new BigDecimal("6.33"), 12, 1,
+        "PayPal", "txn-123", java.time.Instant.now());
+    when(userService.addFunds("jane@example.com", request)).thenReturn(responseDto);
 
     mockMvc.perform(post("/api/users/add-funds")
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isNoContent());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.numCredits", is(19)))
+        .andExpect(jsonPath("$.paymentSource", is("PayPal")));
 
     verify(userService).addFunds("jane@example.com", request);
+  }
+
+  @Test
+  void addFunds_returns402WhenPaymentDeclined() throws Exception {
+    SecurityContextHolder.getContext().setAuthentication(
+        new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
+    AddFundsRequest request = new AddFundsRequest("pkg-7", "fake-nonce");
+    when(userService.addFunds("jane@example.com", request))
+        .thenThrow(new PaymentException("Payment declined: Do Not Honor"));
+
+    mockMvc.perform(post("/api/users/add-funds")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().is(402));
+  }
+
+  @Test
+  void getPaymentClientToken_delegatesToService() throws Exception {
+    when(userService.generatePaymentClientToken()).thenReturn("fake-client-token");
+
+    mockMvc.perform(get("/api/users/payment/client-token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.clientToken", is("fake-client-token")));
   }
 
   @Test

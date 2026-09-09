@@ -13,6 +13,7 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.location.exception.LocationOfflineException;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
+import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -61,6 +62,12 @@ public class GlobalExceptionHandler {
     public void handleLocationOffline(LocationOfflineException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
         logExpected(HttpStatus.SERVICE_UNAVAILABLE, ex, request);
         write(HttpStatus.SERVICE_UNAVAILABLE, ex, response);
+    }
+
+    @ExceptionHandler(PaymentException.class)
+    public void handlePayment(PaymentException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logExpected(HttpStatus.PAYMENT_REQUIRED, ex, request);
+        write(HttpStatus.PAYMENT_REQUIRED, ex, response);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
