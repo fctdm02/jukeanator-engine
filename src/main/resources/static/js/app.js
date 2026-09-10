@@ -104,6 +104,23 @@
 
   const contentPanel = document.getElementById('contentPanel');
 
+  // Some screens (e.g. subScreenShell-based ones) have no internally-scrolling container of
+  // their own -- #contentPanel itself is the real scroll region for them, matching how the rest
+  // of the app already works. A screen that wants to do infinite-scroll against #contentPanel
+  // registers a handler here instead of attaching its own 'scroll' listener directly, so only
+  // one is ever active. Cleared explicitly at the top of every navigation entry point (below) --
+  // NOT from the MutationObserver's callback, since MutationObserver callbacks fire as a
+  // microtask (batched until the current synchronous stack empties). A render function that
+  // registers its handler before its own first `await` would have that registration silently
+  // wiped out the moment that `await` yields, by a *stale* reset queued from this same render
+  // pass's earlier `contentPanel.innerHTML = ...` mutation -- resetting synchronously up front
+  // instead avoids that race entirely, regardless of when a screen registers its handler.
+  let activeContentPanelScrollHandler = null;
+  function setContentPanelScrollHandler(handler) {
+    activeContentPanelScrollHandler = handler;
+  }
+  contentPanel.addEventListener('scroll', () => activeContentPanelScrollHandler?.());
+
   // Whenever a screen's top-level markup is replaced (navigation, back, tab
   // switch), snap the scroll position back to the top so the new header is
   // never left hidden above the fold from the previous screen's scroll spot.
@@ -195,6 +212,7 @@
   }
 
   function renderSubScreen(screen, params = {}) {
+    activeContentPanelScrollHandler = null;
     switch (screen) {
       case 'my-account':        renderMyAccount(params);        break;
       case 'manage-account':    renderManageAccount(params);    break;
@@ -238,6 +256,7 @@
 
   // ── Main frame ──────────────────────────────────────────────────────────
   async function renderMain(tab = 'music') {
+    activeContentPanelScrollHandler = null;
     state.currentMainTab = tab;
     state.navStack = [];
 
@@ -462,32 +481,85 @@
     });
   }
 
-  function renderArtistsHotHereAll() {
-    const artists = state.hotHereArtists || [];
-    const rows = artists.length === 0
-      ? '<div class="stub-placeholder">Nothing to show yet</div>'
-      : artists.map(a => artistListRowHtml(a)).join('');
-
-    contentPanel.innerHTML = subScreenShell('Artists Hot Here', `<div class="recent-plays-all">${rows}</div>`);
+  /**
+   * Shared infinite-scroll "View All" screen for one Hot Here category. Unlike the home screen's
+   * teaser row (state.hotHereArtists/hotHereSongs, capped at 10 items), this fetches directly from
+   * the paginated /popular endpoint so the user can keep scrolling arbitrarily deep -- fetching the
+   * next server page and appending whenever the scroll position nears the bottom, and stopping once
+   * a fetch returns no further items.
+   *
+   * @param title screen title
+   * @param pageParam which of artistPage/albumPage/songPage this category advances
+   * @param resultField the SearchResultDto field ('artists' or 'songs') to read from the response
+   * @param rowFn row-HTML renderer for one item
+   * @param onRowClick called with the clicked item
+   */
+  async function renderHotHereAll(title, pageParam, resultField, rowFn, onRowClick) {
+    contentPanel.innerHTML = subScreenShell(title, '<div class="stub-placeholder">Loading…</div>');
     wireBackBtn();
-    contentPanel.querySelectorAll('.result-row').forEach((row, i) => {
-      row.style.cursor = 'pointer';
-      row.addEventListener('click', () => navigateSub('artist-detail', { artistId: artists[i].artistId }));
+
+    let items = [];
+    let nextPage = 0;
+    let exhausted = false;
+    let loading = false;
+
+    async function loadPage() {
+      if (loading || exhausted) return;
+      loading = true;
+      try {
+        const res = await api(`/api/song-library/popular?${pageParam}=${nextPage}`);
+        const newItems = res[resultField] || [];
+        if (newItems.length === 0) {
+          exhausted = true;
+          if (items.length === 0) {
+            container.innerHTML = '<div class="stub-placeholder">Nothing to show yet</div>';
+          }
+        } else {
+          items = items.concat(newItems);
+          nextPage += 1;
+          container.insertAdjacentHTML('beforeend', newItems.map(rowFn).join(''));
+        }
+      } catch {
+        // Transient failure -- leave state as-is, allow the next scroll to retry.
+      } finally {
+        loading = false;
+      }
+    }
+
+    const subContent = contentPanel.querySelector('.sub-content');
+    subContent.innerHTML = '<div class="recent-plays-all"></div>';
+    const container = subContent.querySelector('.recent-plays-all');
+
+    // Delegated click handling so rows appended by later pages don't need their own listeners.
+    container.addEventListener('click', (e) => {
+      const row = e.target.closest('.result-row');
+      if (!row) return;
+      const rows = Array.from(container.querySelectorAll('.result-row'));
+      const idx = rows.indexOf(row);
+      if (idx >= 0 && idx < items.length) onRowClick(items[idx]);
     });
+
+    // .sub-content has no bounded height of its own here -- it just grows to fit all its
+    // content (see subScreenShell/.sub-content in style.css), so #contentPanel is the element
+    // that actually scrolls. Register against that instead of subContent, which would never
+    // fire a 'scroll' event at all.
+    setContentPanelScrollHandler(() => {
+      if (contentPanel.scrollTop + contentPanel.clientHeight >= contentPanel.scrollHeight - 150) {
+        loadPage();
+      }
+    });
+
+    await loadPage();
+  }
+
+  function renderArtistsHotHereAll() {
+    renderHotHereAll('Artists Hot Here', 'artistPage', 'artists', artistListRowHtml,
+      a => navigateSub('artist-detail', { artistId: a.artistId }));
   }
 
   function renderSongsHotHereAll() {
-    const songs = state.hotHereSongs || [];
-    const rows = songs.length === 0
-      ? '<div class="stub-placeholder">Nothing to show yet</div>'
-      : songs.map(s => songListRowHtml(s)).join('');
-
-    contentPanel.innerHTML = subScreenShell('Songs Hot Here', `<div class="recent-plays-all">${rows}</div>`);
-    wireBackBtn();
-    contentPanel.querySelectorAll('.result-row').forEach((row, i) => {
-      row.style.cursor = 'pointer';
-      row.addEventListener('click', () => showSongPopup(songs[i]));
-    });
+    renderHotHereAll('Songs Hot Here', 'songPage', 'songs', songListRowHtml,
+      s => showSongPopup(s));
   }
 
   function songListRowHtml(s) {
@@ -1130,7 +1202,7 @@
     async function executeSearch(query) {
       await saveSearchQuery(query);
       try {
-        const result = await api(`/api/song-library/search?searchFor=${encodeURIComponent(query)}&limit=20`);
+        const result = await api(`/api/song-library/search?searchFor=${encodeURIComponent(query)}`);
         navigateSub('search-results', { query, result });
       } catch {
         navigateSub('search-results', { query, result: { artists: [], albums: [], songs: [] } });
@@ -1191,10 +1263,60 @@
     </div>`;
   }
 
+  // Category keys map to both the SearchResultDto field name and the REST query param that
+  // advances that category's own server page -- artists/albums/songs each scroll (and thus
+  // page) independently, mirroring the JFC/Swing UI's per-category paging buffers.
+  const SEARCH_CATEGORY_PAGE_PARAM = { artists: 'artistPage', albums: 'albumPage', songs: 'songPage' };
+  const SEARCH_CATEGORY_ROW_FN = { artists: artistResultRow, albums: albumResultRow, songs: songResultRow };
+
   function renderSearchResults(query, result) {
     const artists = result.artists || [];
     const albums  = result.albums  || [];
     const songs   = result.songs   || [];
+
+    // Per-category infinite-scroll state -- page 0 is already in hand (the lists above), so the
+    // next fetch for each category starts at page 1. A category starting out empty has nothing
+    // further to fetch.
+    const scrollState = {
+      artists: { nextPage: 1, exhausted: artists.length === 0, loading: false },
+      albums:  { nextPage: 1, exhausted: albums.length === 0,  loading: false },
+      songs:   { nextPage: 1, exhausted: songs.length === 0,   loading: false },
+    };
+
+    async function loadMoreCategory(category) {
+      const st = scrollState[category];
+      if (st.loading || st.exhausted) return;
+      st.loading = true;
+      try {
+        const params = new URLSearchParams({ searchFor: query });
+        params.set(SEARCH_CATEGORY_PAGE_PARAM[category], st.nextPage);
+        const res = await api(`/api/song-library/search?${params.toString()}`);
+        const newItems = res[category] || [];
+        if (newItems.length === 0) {
+          st.exhausted = true;
+        } else {
+          st.nextPage += 1;
+          const panel = document.getElementById('tab-' + category);
+          if (panel) {
+            panel.insertAdjacentHTML('beforeend', newItems.map(SEARCH_CATEGORY_ROW_FN[category]).join(''));
+          }
+        }
+      } catch {
+        // Transient failure -- leave exhausted/nextPage untouched so the next scroll retries.
+      } finally {
+        st.loading = false;
+      }
+    }
+
+    function wireInfiniteScroll(category) {
+      const panel = document.getElementById('tab-' + category);
+      if (!panel) return;
+      panel.addEventListener('scroll', () => {
+        if (panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 150) {
+          loadMoreCategory(category);
+        }
+      });
+    }
 
     const TOP_N = 3;
     const topArtists = artists.slice(0, TOP_N);
@@ -1294,6 +1416,11 @@
         document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
       });
     });
+
+    // Infinite scroll — Artists/Albums/Songs tabs only; "Top" stays a fixed 3-item preview.
+    wireInfiniteScroll('artists');
+    wireInfiniteScroll('albums');
+    wireInfiniteScroll('songs');
   }
 
   // ── Artist detail screen ────────────────────────────────────────────────

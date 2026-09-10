@@ -21,7 +21,7 @@ public class SongLibraryProperties {
   private boolean useGenre;
   private boolean useTopFolderForGenre;
   private Set<String> acceptedSongFileExtensions;
-  private Integer searchResultSize = Integer.valueOf(50);
+  private Integer searchResultPageSize = Integer.valueOf(50);
 
   private Discogs discogs = new Discogs();
 
@@ -95,11 +95,11 @@ public class SongLibraryProperties {
     this.discogs = discogs;
   }
 
-  public Integer getSearchResultSize() {
-    return searchResultSize;
+  public Integer getSearchResultPageSize() {
+    return searchResultPageSize;
   }
 
-  public void setSearchResultSize(Integer searchResultSize) {
-    this.searchResultSize = searchResultSize;
+  public void setSearchResultPageSize(Integer searchResultPageSize) {
+    this.searchResultPageSize = searchResultPageSize;
   }
 }

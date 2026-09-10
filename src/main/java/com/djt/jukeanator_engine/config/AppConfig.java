@@ -253,7 +253,7 @@ public class AppConfig {
         repository,
         locationService,
         songScanner,
-        songLibraryProperties.getSearchResultSize(),
+        songLibraryProperties.getSearchResultPageSize(),
         eventPublisher);
   }
 

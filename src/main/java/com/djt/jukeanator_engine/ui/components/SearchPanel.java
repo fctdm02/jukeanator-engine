@@ -23,7 +23,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
@@ -52,7 +51,10 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private final JPanel rootPanel = new JPanel(cardLayout);
 
   private final StringBuilder searchBuffer = new StringBuilder();
-  private SearchResultDto lastResult;
+  private String currentQuery;
+  private final PagedCategoryBuffer<ArtistDto> artistBuffer;
+  private final PagedCategoryBuffer<AlbumDto> albumBuffer;
+  private final PagedCategoryBuffer<SongDto> songBuffer;
   private int artistsOffset = 0;
   private int albumsOffset = 0;
   private int songsOffset = 0;
@@ -111,6 +113,11 @@ public class SearchPanel extends JPanel implements TabNavigator {
     this.popularityT3 = popularityT3;
     this.enableTypeAheadSearch = enableTypeAheadSearch;
     this.albumGridProfile = albumGridProfile;
+
+    int serverPageSize = songLibraryService.getSearchResultPageSize();
+    this.artistBuffer = new PagedCategoryBuffer<>(serverPageSize);
+    this.albumBuffer = new PagedCategoryBuffer<>(serverPageSize);
+    this.songBuffer = new PagedCategoryBuffer<>(serverPageSize);
 
     setLayout(new BorderLayout());
     setOpaque(false);
@@ -342,7 +349,10 @@ public class SearchPanel extends JPanel implements TabNavigator {
       return;
 
     try {
-      lastResult = songLibraryService.getMusicBySearch(songLibraryService.getOwnLocationId(), query);
+      currentQuery = query;
+      artistBuffer.reset();
+      albumBuffer.reset();
+      songBuffer.reset();
       artistsOffset = 0;
       albumsOffset = 0;
       songsOffset = 0;
@@ -355,7 +365,10 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private void resetSearch() {
     searchBuffer.setLength(0);
     syncSearchLabel();
-    lastResult = null;
+    currentQuery = null;
+    artistBuffer.reset();
+    albumBuffer.reset();
+    songBuffer.reset();
     artistsOffset = 0;
     albumsOffset = 0;
     songsOffset = 0;
@@ -386,9 +399,25 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private void rebuildResultsCard() {
     resultsCard.removeAll();
 
-    List<ArtistDto> artists = safeList(lastResult.artists());
-    List<AlbumDto> albums = safeList(lastResult.albums());
-    List<SongDto> songs = safeList(lastResult.songs());
+    Integer locationId = songLibraryService.getOwnLocationId();
+    int previewCount = LayoutTheme.get().searchPreviewCount;
+
+    // A transient service failure here should not corrupt the buffer's exhausted/next-page
+    // bookkeeping -- just leave it as whatever was already fetched and let the next page-down
+    // attempt retry.
+    try {
+      artistBuffer.ensureWindowAvailable(artistsOffset, previewCount, pageIdx -> songLibraryService
+          .getMusicBySearch(locationId, currentQuery, pageIdx, 0, 0).artists());
+      albumBuffer.ensureWindowAvailable(albumsOffset, previewCount, pageIdx -> songLibraryService
+          .getMusicBySearch(locationId, currentQuery, 0, pageIdx, 0).albums());
+      songBuffer.ensureWindowAvailable(songsOffset, previewCount, pageIdx -> songLibraryService
+          .getMusicBySearch(locationId, currentQuery, 0, 0, pageIdx).songs());
+    } catch (Exception ignored) {
+    }
+
+    List<ArtistDto> artists = artistBuffer.items();
+    List<AlbumDto> albums = albumBuffer.items();
+    List<SongDto> songs = songBuffer.items();
 
     JPanel columnsLayoutContainer = new JPanel(new GridLayout(1, 3, 0, 0));
     columnsLayoutContainer.setOpaque(false);
@@ -402,8 +431,6 @@ public class SearchPanel extends JPanel implements TabNavigator {
     columnsLayoutContainer
         .setBorder(new EmptyBorder(LayoutTheme.get().searchResultsTopPad, unifiedPaddingCalculation,
             LayoutTheme.get().searchResultsTopPad, unifiedPaddingCalculation));
-
-    int previewCount = LayoutTheme.get().searchPreviewCount;
 
     columnsLayoutContainer.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset,
         previewCount, imageLoader, newOffset -> {
@@ -503,10 +530,6 @@ public class SearchPanel extends JPanel implements TabNavigator {
       }
     }
     return CARD_ENTRY;
-  }
-
-  private static <T> List<T> safeList(List<T> list) {
-    return list != null ? list : List.of();
   }
 
   private JPanel placeholder() {

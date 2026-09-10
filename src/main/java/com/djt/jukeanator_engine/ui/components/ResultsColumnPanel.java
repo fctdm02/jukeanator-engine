@@ -67,7 +67,7 @@ public final class ResultsColumnPanel {
     headerPanel.setOpaque(false);
     headerPanel.setBorder(new EmptyBorder(lt.resultHeaderPadV, 4, lt.resultHeaderPadV, 4));
 
-    JLabel headerLabel = new JLabel(displayTitle + " (" + total + ")");
+    JLabel headerLabel = new JLabel(displayTitle);
     headerLabel.setForeground(ColorTheme.get().textPrimary);
     headerLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, lt.fontSizeResultHeader));
     headerPanel.add(headerLabel, BorderLayout.WEST);

@@ -377,7 +377,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void getPublicHomePage_returnsHotHereArtistsAndSongsFromSongLibrary() {
 
     when(songLibraryService.getMusicByPopularity(any()))
-        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0));
+        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
 
     var homePage = userServiceImpl.getPublicHomePage();
 
@@ -390,7 +390,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void getHomePage_returnsPlaylistNamesAndSearchHistoryForRegisteredUser() {
 
     when(songLibraryService.getMusicByPopularity(any()))
-        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0));
+        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
     registeredUser().addToSearchHistory("beatles", 10);
 
     UserHomePageDto homePage = userServiceImpl.getHomePage(REGISTERED_EMAIL);

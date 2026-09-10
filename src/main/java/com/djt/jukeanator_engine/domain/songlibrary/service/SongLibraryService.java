@@ -9,6 +9,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AuthenticateForAdminPanelRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.DownloadAlbumCoverArtRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
@@ -33,6 +34,41 @@ public interface SongLibraryService {
   SearchResultDto getMusicByPopularity(Integer locationId);
 
   /**
+   * The number of items returned per category (artists/albums/songs) by one server page of
+   * {@link #getMusicByPopularity}/{@link #getMusicByTitle}/{@link #getMusicBySearch}/{@link
+   * #getGenreMusicByPopularity}/{@link #getGenreMusicByTitle}. UI callers use this to size their
+   * client-side paging buffers.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   */
+  @PublicServiceMethod
+  Integer getSearchResultPageSize();
+
+  /**
+   * @param artistPageIndex 0-based server page index for the artists category
+   * @param albumPageIndex 0-based server page index for the albums category
+   * @param songPageIndex 0-based server page index for the songs category
+   * @return
+   */
+  SearchResultDto getMusicByPopularity(Integer locationId, int artistPageIndex, int albumPageIndex,
+      int songPageIndex);
+
+  /**
+   *
+   * @return
+   */
+  SearchResultDto getMusicByTitle(Integer locationId);
+
+  /**
+   * @param artistPageIndex 0-based server page index for the artists category
+   * @param albumPageIndex 0-based server page index for the albums category
+   * @param songPageIndex 0-based server page index for the songs category
+   * @return
+   */
+  SearchResultDto getMusicByTitle(Integer locationId, int artistPageIndex, int albumPageIndex,
+      int songPageIndex);
+
+  /**
    * @param searchFor
    * @return
    */
@@ -40,10 +76,13 @@ public interface SongLibraryService {
 
   /**
    * @param searchFor
-   * @param limit maximum number of results per category; defaults to the service-level setting
+   * @param artistPageIndex 0-based server page index for the artists category
+   * @param albumPageIndex 0-based server page index for the albums category
+   * @param songPageIndex 0-based server page index for the songs category
    * @return
    */
-  SearchResultDto getMusicBySearch(Integer locationId, String searchFor, int limit);
+  SearchResultDto getMusicBySearch(Integer locationId, String searchFor, int artistPageIndex,
+      int albumPageIndex, int songPageIndex);
 
   /**
    *
@@ -59,9 +98,39 @@ public interface SongLibraryService {
 
   /**
    * @param genreName
+   * @param artistPageIndex 0-based server page index for the artists category
+   * @param albumPageIndex 0-based server page index for the albums category
+   * @param songPageIndex 0-based server page index for the songs category
+   * @return
+   */
+  SearchResultDto getGenreMusicByPopularity(Integer locationId, String genreName,
+      int artistPageIndex, int albumPageIndex, int songPageIndex);
+
+  /**
+   * @param genreName
    * @return
    */
   SearchResultDto getGenreMusicByTitle(Integer locationId, String genreName);
+
+  /**
+   * @param genreName
+   * @param artistPageIndex 0-based server page index for the artists category
+   * @param albumPageIndex 0-based server page index for the albums category
+   * @param songPageIndex 0-based server page index for the songs category
+   * @return
+   */
+  SearchResultDto getGenreMusicByTitle(Integer locationId, String genreName, int artistPageIndex,
+      int albumPageIndex, int songPageIndex);
+
+  /**
+   * True, unpaginated totals for {@code genreName} -- how many artists/albums/songs it actually
+   * contains, independent of sort order or how much has been paged through so far. Used by the
+   * Genres screen header so the user knows how much there is to scroll through.
+   *
+   * @param genreName
+   * @return
+   */
+  GenreTotalsDto getGenreTotals(Integer locationId, String genreName);
 
   /**
    *

@@ -51,24 +51,25 @@ class SongLibraryControllerTest extends AbstractControllerTest {
 
   @Test
   void getMusicByPopularity_delegatesToService() throws Exception {
-    SearchResultDto result = new SearchResultDto(List.of(aSong()), List.of(), List.of(), 0, 0, 0);
-    when(songLibraryService.getMusicByPopularity(LOCATION_ID)).thenReturn(result);
+    SearchResultDto result = new SearchResultDto(List.of(aSong()), List.of(), List.of());
+    when(songLibraryService.getMusicByPopularity(LOCATION_ID, 0, 0, 0)).thenReturn(result);
 
     mockMvc.perform(get(BASE_PATH + "/popular"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.songs[0].songName", is("Song")));
 
-    verify(songLibraryService).getMusicByPopularity(LOCATION_ID);
+    verify(songLibraryService).getMusicByPopularity(LOCATION_ID, 0, 0, 0);
   }
 
   @Test
   void getMusicBySearch_passesSearchParam() throws Exception {
-    when(songLibraryService.getMusicBySearch(LOCATION_ID, "foo", 20)).thenReturn(new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0));
+    when(songLibraryService.getMusicBySearch(LOCATION_ID, "foo", 0, 0, 0))
+        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
 
     mockMvc.perform(get(BASE_PATH + "/search").param("searchFor", "foo"))
         .andExpect(status().isOk());
 
-    verify(songLibraryService).getMusicBySearch(LOCATION_ID, "foo", 20);
+    verify(songLibraryService).getMusicBySearch(LOCATION_ID, "foo", 0, 0, 0);
   }
 
   @Test
@@ -83,23 +84,24 @@ class SongLibraryControllerTest extends AbstractControllerTest {
 
   @Test
   void getGenreMusicByPopularity_passesGenreName() throws Exception {
-    when(songLibraryService.getGenreMusicByPopularity(LOCATION_ID, "Rock"))
-        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0));
+    when(songLibraryService.getGenreMusicByPopularity(LOCATION_ID, "Rock", 0, 0, 0))
+        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
 
     mockMvc.perform(get(BASE_PATH + "/genres/popular").param("genreName", "Rock"))
         .andExpect(status().isOk());
 
-    verify(songLibraryService).getGenreMusicByPopularity(LOCATION_ID, "Rock");
+    verify(songLibraryService).getGenreMusicByPopularity(LOCATION_ID, "Rock", 0, 0, 0);
   }
 
   @Test
   void getGenreMusicByTitle_passesGenreName() throws Exception {
-    when(songLibraryService.getGenreMusicByTitle(LOCATION_ID, "Rock")).thenReturn(new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0));
+    when(songLibraryService.getGenreMusicByTitle(LOCATION_ID, "Rock", 0, 0, 0))
+        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
 
     mockMvc.perform(get(BASE_PATH + "/genres/title").param("genreName", "Rock"))
         .andExpect(status().isOk());
 
-    verify(songLibraryService).getGenreMusicByTitle(LOCATION_ID, "Rock");
+    verify(songLibraryService).getGenreMusicByTitle(LOCATION_ID, "Rock", 0, 0, 0);
   }
 
   @Test

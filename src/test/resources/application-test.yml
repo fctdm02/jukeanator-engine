@@ -67,7 +67,7 @@ song-library:
     - .mp3
     - .flac
     - .wav
-  search-result-size: 100
+  search-result-page-size: 100
 
 song-queue:
   reset-queue-at-startup: true

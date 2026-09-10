@@ -37,6 +37,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AuthenticateForAdminPanelRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.DownloadAlbumCoverArtRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
@@ -76,7 +77,7 @@ public class SongLibraryServiceImpl
   private final SongLibraryRepository songLibraryRepository;
   private final LocationService locationService;
   private final SongScanner songScanner;
-  private final Integer searchResultSize;
+  private final Integer searchResultPageSize;
   private final boolean isMaster;
   private final boolean jpaRepositoryType;
 
@@ -104,20 +105,21 @@ public class SongLibraryServiceImpl
 
   public SongLibraryServiceImpl(AppProperties appProperties,
       SongLibraryRepository songLibraryRepository, LocationService locationService,
-      SongScanner songScanner, Integer searchResultSize, ApplicationEventPublisher eventPublisher) {
+      SongScanner songScanner, Integer searchResultPageSize,
+      ApplicationEventPublisher eventPublisher) {
 
     requireNonNull(appProperties, "appProperties cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
     requireNonNull(locationService, "locationService cannot be null");
     requireNonNull(songScanner, "songScanner cannot be null");
-    requireNonNull(searchResultSize, "searchResultSize cannot be null");
+    requireNonNull(searchResultPageSize, "searchResultPageSize cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
     this.dataDir = appProperties.getDataDir();
     this.songLibraryRepository = songLibraryRepository;
     this.locationService = locationService;
     this.songScanner = songScanner;
-    this.searchResultSize = searchResultSize;
+    this.searchResultPageSize = searchResultPageSize;
     this.eventPublisher = eventPublisher;
     this.isMaster = appProperties.isMaster();
     this.jpaRepositoryType = "jpa".equals(appProperties.getRepositoryType());
@@ -190,7 +192,7 @@ public class SongLibraryServiceImpl
       log.info("locationName: " + this.ownRoot.getLocationName());
       log.info("rootPath: " + this.ownRoot.getRootPath());
     }
-    log.info("searchResultSize: " + this.searchResultSize);
+    log.info("searchResultPageSize: " + this.searchResultPageSize);
   }
 
   /**
@@ -407,7 +409,34 @@ public class SongLibraryServiceImpl
   @Override
   public SearchResultDto getMusicByPopularity(Integer locationId) {
 
-    return getMusic(getOrLoadRoot(locationId), null, null, SortOrder.POPULARITY);
+    return getMusicByPopularity(locationId, 0, 0, 0);
+  }
+
+  @Override
+  public Integer getSearchResultPageSize() {
+    return searchResultPageSize;
+  }
+
+  @Override
+  public SearchResultDto getMusicByPopularity(Integer locationId, int artistPageIndex,
+      int albumPageIndex, int songPageIndex) {
+
+    return getMusic(getOrLoadRoot(locationId), null, null, SortOrder.POPULARITY, artistPageIndex,
+        albumPageIndex, songPageIndex);
+  }
+
+  @Override
+  public SearchResultDto getMusicByTitle(Integer locationId) {
+
+    return getMusicByTitle(locationId, 0, 0, 0);
+  }
+
+  @Override
+  public SearchResultDto getMusicByTitle(Integer locationId, int artistPageIndex,
+      int albumPageIndex, int songPageIndex) {
+
+    return getMusic(getOrLoadRoot(locationId), null, null, SortOrder.TITLE, artistPageIndex,
+        albumPageIndex, songPageIndex);
   }
 
   /** Controls how results returned from {@link #getMusic} are ordered. */
@@ -434,35 +463,74 @@ public class SongLibraryServiceImpl
 
   @Override
   public SearchResultDto getMusicBySearch(Integer locationId, String searchFor) {
-    return getMusicBySearch(locationId, searchFor, searchResultSize);
+    return getMusicBySearch(locationId, searchFor, 0, 0, 0);
   }
 
   @Override
-  public SearchResultDto getMusicBySearch(Integer locationId, String searchFor, int limit) {
+  public SearchResultDto getMusicBySearch(Integer locationId, String searchFor,
+      int artistPageIndex, int albumPageIndex, int songPageIndex) {
 
     if (!isInitialized) {
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
 
     if (searchFor == null || searchFor.strip().isEmpty()) {
-      return new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
+      return new SearchResultDto(List.of(), List.of(), List.of());
     }
 
     String searchForNormalized = stripNonKeyboardCharacters(searchFor.strip().toLowerCase());
 
-    return getMusic(getOrLoadRoot(locationId), null, searchForNormalized, SortOrder.POPULARITY, limit);
+    return getMusic(getOrLoadRoot(locationId), null, searchForNormalized, SortOrder.POPULARITY,
+        artistPageIndex, albumPageIndex, songPageIndex);
   }
 
   @Override
   public SearchResultDto getGenreMusicByPopularity(Integer locationId, String genreName) {
 
-    return getMusic(getOrLoadRoot(locationId), genreName, null, SortOrder.POPULARITY);
+    return getGenreMusicByPopularity(locationId, genreName, 0, 0, 0);
+  }
+
+  @Override
+  public SearchResultDto getGenreMusicByPopularity(Integer locationId, String genreName,
+      int artistPageIndex, int albumPageIndex, int songPageIndex) {
+
+    return getMusic(getOrLoadRoot(locationId), genreName, null, SortOrder.POPULARITY,
+        artistPageIndex, albumPageIndex, songPageIndex);
   }
 
   @Override
   public SearchResultDto getGenreMusicByTitle(Integer locationId, String genreName) {
 
-    return getMusic(getOrLoadRoot(locationId), genreName, null, SortOrder.TITLE);
+    return getGenreMusicByTitle(locationId, genreName, 0, 0, 0);
+  }
+
+  @Override
+  public SearchResultDto getGenreMusicByTitle(Integer locationId, String genreName,
+      int artistPageIndex, int albumPageIndex, int songPageIndex) {
+
+    return getMusic(getOrLoadRoot(locationId), genreName, null, SortOrder.TITLE, artistPageIndex,
+        albumPageIndex, songPageIndex);
+  }
+
+  @Override
+  public GenreTotalsDto getGenreTotals(Integer locationId, String genreName) {
+
+    if (!isInitialized) {
+      throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
+    }
+
+    RootFolderEntity root = getOrLoadRoot(locationId);
+
+    return new GenreTotalsDto(
+        countInGenre(root.getArtists(), genreName),
+        countInGenre(root.getAlbums(), genreName),
+        countInGenre(root.getSongs(), genreName));
+  }
+
+  private static int countInGenre(java.util.Collection<? extends LibraryItem> items,
+      String genreName) {
+    return (int) items.stream()
+        .filter(item -> genreName.equalsIgnoreCase(item.getParentGenre().getName())).count();
   }
 
   /**
@@ -478,12 +546,7 @@ public class SongLibraryServiceImpl
    * </ul>
    */
   private SearchResultDto getMusic(RootFolderEntity root, String genreName, String searchFor,
-      SortOrder sortOrder) {
-    return getMusic(root, genreName, searchFor, sortOrder, searchResultSize);
-  }
-
-  private SearchResultDto getMusic(RootFolderEntity root, String genreName, String searchFor,
-      SortOrder sortOrder, int limit) {
+      SortOrder sortOrder, int artistPageIndex, int albumPageIndex, int songPageIndex) {
 
     if (!isInitialized) {
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
@@ -530,10 +593,6 @@ public class SongLibraryServiceImpl
 
     // ── Queries ───────────────────────────────────────────────────────────
 
-    // Matched counts are taken from the full filtered set, before the preview limit is applied,
-    // so numArtists/numAlbums/numSongs reflect every match (e.g. every artist/album/song with a
-    // play, or every one in a genre) rather than just however many fit in the returned preview
-    // list.
     List<SongFileEntity> matchedSongs =
         root.getSongs().stream().filter(hasPlays).filter(inGenre).filter(matchesSearch).toList();
 
@@ -543,20 +602,30 @@ public class SongLibraryServiceImpl
     List<AlbumFolderEntity> matchedAlbums =
         root.getAlbums().stream().filter(hasPlays).filter(inGenre).filter(matchesSearch).toList();
 
-    List<SongFileEntity> songs = matchedSongs.stream().sorted(comparator).limit(limit).toList();
-    List<ArtistFolderEntity> artists =
-        matchedArtists.stream().sorted(comparator).limit(limit).toList();
-    List<AlbumFolderEntity> albums = matchedAlbums.stream().sorted(comparator).limit(limit).toList();
+    List<SongFileEntity> sortedSongs = matchedSongs.stream().sorted(comparator).toList();
+    List<ArtistFolderEntity> sortedArtists = matchedArtists.stream().sorted(comparator).toList();
+    List<AlbumFolderEntity> sortedAlbums = matchedAlbums.stream().sorted(comparator).toList();
 
-    SearchResultDto dto = new SearchResultDto(
+    List<SongFileEntity> songs = slicePage(sortedSongs, songPageIndex, searchResultPageSize);
+    List<ArtistFolderEntity> artists =
+        slicePage(sortedArtists, artistPageIndex, searchResultPageSize);
+    List<AlbumFolderEntity> albums = slicePage(sortedAlbums, albumPageIndex, searchResultPageSize);
+
+    return new SearchResultDto(
         SongLibraryMapper.toSongDtoList(songs),
         SongLibraryMapper.toArtistDtoList(artists),
-        SongLibraryMapper.toAlbumDtoList(albums),
-        matchedArtists.size(),
-        matchedAlbums.size(),
-        matchedSongs.size());
+        SongLibraryMapper.toAlbumDtoList(albums));
+  }
 
-    return dto;
+  /**
+   * Slices out one 0-based server page of size {@code pageSize} from an already-sorted list. A
+   * {@code pageIndex} past the end returns an empty list rather than throwing.
+   */
+  private static <T> List<T> slicePage(List<T> sorted, int pageIndex, int pageSize) {
+
+    int from = Math.min(Math.max(pageIndex, 0) * pageSize, sorted.size());
+    int to = Math.min(from + pageSize, sorted.size());
+    return sorted.subList(from, to);
   }
 
   private int calculateSearchResultWeight(String value, String normalizedSearch) {

@@ -11,6 +11,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AuthenticateForAdminPanelRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.DownloadAlbumCoverArtRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
@@ -43,22 +44,49 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
   // USER ROLE METHODS
   @Override
   public SearchResultDto getMusicByPopularity(Integer locationId) {
+    return getMusicByPopularity(locationId, 0, 0, 0);
+  }
 
-    return restClient.get().uri(basePath(locationId) + "/popular").retrieve()
-        .body(SearchResultDto.class);
+  @Override
+  public SearchResultDto getMusicByPopularity(Integer locationId, int artistPageIndex,
+      int albumPageIndex, int songPageIndex) {
+
+    return restClient.get()
+        .uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/popular")
+            .queryParam("artistPage", artistPageIndex).queryParam("albumPage", albumPageIndex)
+            .queryParam("songPage", songPageIndex).build())
+        .retrieve().body(SearchResultDto.class);
+  }
+
+  @Override
+  public SearchResultDto getMusicByTitle(Integer locationId) {
+    return getMusicByTitle(locationId, 0, 0, 0);
+  }
+
+  @Override
+  public SearchResultDto getMusicByTitle(Integer locationId, int artistPageIndex,
+      int albumPageIndex, int songPageIndex) {
+
+    return restClient.get()
+        .uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/title")
+            .queryParam("artistPage", artistPageIndex).queryParam("albumPage", albumPageIndex)
+            .queryParam("songPage", songPageIndex).build())
+        .retrieve().body(SearchResultDto.class);
   }
 
   @Override
   public SearchResultDto getMusicBySearch(Integer locationId, String searchFor) {
-    return getMusicBySearch(locationId, searchFor, 20);
+    return getMusicBySearch(locationId, searchFor, 0, 0, 0);
   }
 
   @Override
-  public SearchResultDto getMusicBySearch(Integer locationId, String searchFor, int limit) {
+  public SearchResultDto getMusicBySearch(Integer locationId, String searchFor,
+      int artistPageIndex, int albumPageIndex, int songPageIndex) {
 
     return restClient.get().uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/search")
-        .queryParam("searchFor", searchFor).queryParam("limit", limit).build()).retrieve()
-        .body(SearchResultDto.class);
+        .queryParam("searchFor", searchFor).queryParam("artistPage", artistPageIndex)
+        .queryParam("albumPage", albumPageIndex).queryParam("songPage", songPageIndex).build())
+        .retrieve().body(SearchResultDto.class);
   }
 
   @Override
@@ -70,20 +98,43 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
 
   @Override
   public SearchResultDto getGenreMusicByPopularity(Integer locationId, String genreName) {
+    return getGenreMusicByPopularity(locationId, genreName, 0, 0, 0);
+  }
+
+  @Override
+  public SearchResultDto getGenreMusicByPopularity(Integer locationId, String genreName,
+      int artistPageIndex, int albumPageIndex, int songPageIndex) {
 
     return restClient.get()
         .uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/genres/popular")
-            .queryParam("genreName", genreName).build())
+            .queryParam("genreName", genreName).queryParam("artistPage", artistPageIndex)
+            .queryParam("albumPage", albumPageIndex).queryParam("songPage", songPageIndex).build())
         .retrieve().body(SearchResultDto.class);
   }
 
   @Override
   public SearchResultDto getGenreMusicByTitle(Integer locationId, String genreName) {
+    return getGenreMusicByTitle(locationId, genreName, 0, 0, 0);
+  }
+
+  @Override
+  public SearchResultDto getGenreMusicByTitle(Integer locationId, String genreName,
+      int artistPageIndex, int albumPageIndex, int songPageIndex) {
 
     return restClient.get()
         .uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/genres/title")
-            .queryParam("genreName", genreName).build())
+            .queryParam("genreName", genreName).queryParam("artistPage", artistPageIndex)
+            .queryParam("albumPage", albumPageIndex).queryParam("songPage", songPageIndex).build())
         .retrieve().body(SearchResultDto.class);
+  }
+
+  @Override
+  public GenreTotalsDto getGenreTotals(Integer locationId, String genreName) {
+
+    return restClient.get()
+        .uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/genres/totals")
+            .queryParam("genreName", genreName).build())
+        .retrieve().body(GenreTotalsDto.class);
   }
 
   @Override
@@ -245,6 +296,11 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
 
   @Override
   public Boolean isLibraryLoadFailedAtStartup() {
+    throw new UnsupportedOperationException("This method cannot be invoked by a user");
+  }
+
+  @Override
+  public Integer getSearchResultPageSize() {
     throw new UnsupportedOperationException("This method cannot be invoked by a user");
   }
 }

@@ -29,6 +29,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AuthenticateForAdminPanelRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.DownloadAlbumCoverArtRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
@@ -63,14 +64,25 @@ public class SongLibraryController {
   // USER ROLE METHODS
 
   @GetMapping("/popular")
-  public SearchResultDto getMusicByPopularity(@PathVariable Integer locationId) {
-    return songLibraryService.getMusicByPopularity(locationId);
+  public SearchResultDto getMusicByPopularity(@PathVariable Integer locationId,
+      @RequestParam(defaultValue = "0") int artistPage, @RequestParam(defaultValue = "0") int albumPage,
+      @RequestParam(defaultValue = "0") int songPage) {
+    return songLibraryService.getMusicByPopularity(locationId, artistPage, albumPage, songPage);
+  }
+
+  @GetMapping("/title")
+  public SearchResultDto getMusicByTitle(@PathVariable Integer locationId,
+      @RequestParam(defaultValue = "0") int artistPage, @RequestParam(defaultValue = "0") int albumPage,
+      @RequestParam(defaultValue = "0") int songPage) {
+    return songLibraryService.getMusicByTitle(locationId, artistPage, albumPage, songPage);
   }
 
   @GetMapping("/search")
   public SearchResultDto getMusicBySearch(@PathVariable Integer locationId,
-      @RequestParam String searchFor, @RequestParam(defaultValue = "20") int limit) {
-    return songLibraryService.getMusicBySearch(locationId, searchFor, limit);
+      @RequestParam String searchFor, @RequestParam(defaultValue = "0") int artistPage,
+      @RequestParam(defaultValue = "0") int albumPage, @RequestParam(defaultValue = "0") int songPage) {
+    return songLibraryService.getMusicBySearch(locationId, searchFor, artistPage, albumPage,
+        songPage);
   }
 
   @GetMapping("/genres")
@@ -80,14 +92,24 @@ public class SongLibraryController {
 
   @GetMapping("/genres/popular")
   public SearchResultDto getGenreMusicByPopularity(@PathVariable Integer locationId,
-      @RequestParam String genreName) {
-    return songLibraryService.getGenreMusicByPopularity(locationId, genreName);
+      @RequestParam String genreName, @RequestParam(defaultValue = "0") int artistPage,
+      @RequestParam(defaultValue = "0") int albumPage, @RequestParam(defaultValue = "0") int songPage) {
+    return songLibraryService.getGenreMusicByPopularity(locationId, genreName, artistPage,
+        albumPage, songPage);
   }
 
   @GetMapping("/genres/title")
   public SearchResultDto getGenreMusicByTitle(@PathVariable Integer locationId,
+      @RequestParam String genreName, @RequestParam(defaultValue = "0") int artistPage,
+      @RequestParam(defaultValue = "0") int albumPage, @RequestParam(defaultValue = "0") int songPage) {
+    return songLibraryService.getGenreMusicByTitle(locationId, genreName, artistPage, albumPage,
+        songPage);
+  }
+
+  @GetMapping("/genres/totals")
+  public GenreTotalsDto getGenreTotals(@PathVariable Integer locationId,
       @RequestParam String genreName) {
-    return songLibraryService.getGenreMusicByTitle(locationId, genreName);
+    return songLibraryService.getGenreTotals(locationId, genreName);
   }
 
   @GetMapping("/artists")

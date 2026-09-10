@@ -987,7 +987,12 @@ input {
 .search-results-screen {
   display: flex;
   flex-direction: column;
-  height: 852px;
+  /* Must match #contentPanel's actual (possibly viewport-clamped, see #app-shell's
+     max-height:100vh/100dvh) height exactly, not a hardcoded reference value -- otherwise on any
+     viewport shorter than 852px this becomes taller than #contentPanel, making #contentPanel
+     itself scrollable too and creating two competing nested scroll regions, which starves
+     .search-tab-panel of the scroll gestures its own infinite-scroll listener depends on. */
+  height: 100%;
 }
 
 .search-tabs-bar {

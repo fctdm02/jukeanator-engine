@@ -20,6 +20,7 @@ import javax.swing.SwingUtilities;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -48,9 +49,9 @@ public class GenreDetailPanel extends JPanel {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   private final GenreDto genre;
-  private List<ArtistDto> artists;
-  private List<AlbumDto> albums;
-  private List<SongDto> songs;
+  private final PagedCategoryBuffer<ArtistDto> artistBuffer;
+  private final PagedCategoryBuffer<AlbumDto> albumBuffer;
+  private final PagedCategoryBuffer<SongDto> songBuffer;
 
   // ── Dependencies needed for row-click handling ────────────────────────────
   private final ImageLoader imageLoader;
@@ -82,10 +83,14 @@ public class GenreDetailPanel extends JPanel {
     this.onArtistClicked = onArtistClicked;
     this.songLibraryService = songLibraryService;
 
-    SearchResultDto safe = results != null ? results : new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
-    this.artists = safeList(safe.artists());
-    this.albums = safeList(safe.albums());
-    this.songs = safeList(safe.songs());
+    SearchResultDto safe = results != null ? results : new SearchResultDto(List.of(), List.of(), List.of());
+    int serverPageSize = songLibraryService.getSearchResultPageSize();
+    this.artistBuffer = new PagedCategoryBuffer<>(serverPageSize);
+    this.albumBuffer = new PagedCategoryBuffer<>(serverPageSize);
+    this.songBuffer = new PagedCategoryBuffer<>(serverPageSize);
+    this.artistBuffer.seedFirstPage(safeList(safe.artists()));
+    this.albumBuffer.seedFirstPage(safeList(safe.albums()));
+    this.songBuffer.seedFirstPage(safeList(safe.songs()));
 
     // ── Header ────────────────────────────────────────────────────────────
     ImageIcon genreImage = null;
@@ -105,10 +110,17 @@ public class GenreDetailPanel extends JPanel {
     } catch (Exception ignored) {
     }
 
-    // numArtists/numAlbums/numSongs reflect every artist/album/song in this genre -- not just
-    // however many fit in the (preview-limited) artists/albums/songs lists above.
-    String subtitle = String.format("%,d artists  •  %,d albums  •  %,d songs", safe.numArtists(),
-        safe.numAlbums(), safe.numSongs());
+    // Totals reflect the true count of everything in this genre, independent of sort order and
+    // of how much has been paged through so far -- fetched once since genre membership doesn't
+    // change when the user toggles Popularity/Album sort.
+    String subtitle = null;
+    try {
+      GenreTotalsDto totals =
+          songLibraryService.getGenreTotals(songLibraryService.getOwnLocationId(), genre.genreName());
+      subtitle = String.format("%,d artists  •  %,d albums  •  %,d songs", totals.numArtists(),
+          totals.numAlbums(), totals.numSongs());
+    } catch (Exception ignored) {
+    }
 
     headerPanel = new DetailHeaderPanel(backLabel, onBack, genreImage, "♪", genre.genreName(),
         subtitle, buildSortButtonPanel());
@@ -235,15 +247,15 @@ public class GenreDetailPanel extends JPanel {
     try {
       SearchResultDto fresh = switch (mode) {
         case POPULARITY -> songLibraryService.getGenreMusicByPopularity(
-            songLibraryService.getOwnLocationId(), genre.genreName());
+            songLibraryService.getOwnLocationId(), genre.genreName(), 0, 0, 0);
         case TITLE -> songLibraryService.getGenreMusicByTitle(songLibraryService.getOwnLocationId(),
-            genre.genreName());
+            genre.genreName(), 0, 0, 0);
       };
       if (fresh == null)
-        fresh = new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
-      artists = safeList(fresh.artists());
-      albums = safeList(fresh.albums());
-      songs = safeList(fresh.songs());
+        fresh = new SearchResultDto(List.of(), List.of(), List.of());
+      artistBuffer.seedFirstPage(safeList(fresh.artists()));
+      albumBuffer.seedFirstPage(safeList(fresh.albums()));
+      songBuffer.seedFirstPage(safeList(fresh.songs()));
     } catch (Exception ignored) {
     }
 
@@ -278,23 +290,49 @@ public class GenreDetailPanel extends JPanel {
     // Now: sourced from LayoutTheme.get().genreDetailPreviewCount so it can be
     // tuned per resolution (more rows fit on a taller / higher-DPI screen).
     final int previewCount = LayoutTheme.get().genreDetailPreviewCount;
+    final Integer locationId = songLibraryService.getOwnLocationId();
+    final String genreName = genre.genreName();
+
+    // A transient service failure here should not corrupt a buffer's exhausted/next-page
+    // bookkeeping -- just leave it as whatever was already fetched and let the next page-down
+    // attempt retry.
+    try {
+      artistBuffer.ensureWindowAvailable(artistsOffset, previewCount,
+          pageIdx -> (currentSort == SortMode.POPULARITY
+              ? songLibraryService.getGenreMusicByPopularity(locationId, genreName, pageIdx, 0, 0)
+              : songLibraryService.getGenreMusicByTitle(locationId, genreName, pageIdx, 0, 0))
+                  .artists());
+
+      albumBuffer.ensureWindowAvailable(albumsOffset, previewCount,
+          pageIdx -> (currentSort == SortMode.POPULARITY
+              ? songLibraryService.getGenreMusicByPopularity(locationId, genreName, 0, pageIdx, 0)
+              : songLibraryService.getGenreMusicByTitle(locationId, genreName, 0, pageIdx, 0))
+                  .albums());
+
+      songBuffer.ensureWindowAvailable(songsOffset, previewCount,
+          pageIdx -> (currentSort == SortMode.POPULARITY
+              ? songLibraryService.getGenreMusicByPopularity(locationId, genreName, 0, 0, pageIdx)
+              : songLibraryService.getGenreMusicByTitle(locationId, genreName, 0, 0, pageIdx))
+                  .songs());
+    } catch (Exception ignored) {
+    }
 
     columnsPanel.removeAll();
 
-    columnsPanel.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, previewCount,
-        imageLoader, newOffset -> {
+    columnsPanel.add(ResultsColumnPanel.build("ARTISTS", artistBuffer.items(), artistsOffset,
+        previewCount, imageLoader, newOffset -> {
           artistsOffset = newOffset;
           rebuildColumns();
         }, item -> handleRowClick("ARTISTS", item)));
 
-    columnsPanel.add(ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, previewCount,
-        imageLoader, newOffset -> {
+    columnsPanel.add(ResultsColumnPanel.build("ALBUMS", albumBuffer.items(), albumsOffset,
+        previewCount, imageLoader, newOffset -> {
           albumsOffset = newOffset;
           rebuildColumns();
         }, item -> handleRowClick("ALBUMS", item)));
 
-    columnsPanel.add(ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount,
-        imageLoader, newOffset -> {
+    columnsPanel.add(ResultsColumnPanel.build("SONGS", songBuffer.items(), songsOffset,
+        previewCount, imageLoader, newOffset -> {
           songsOffset = newOffset;
           rebuildColumns();
         }, item -> handleRowClick("SONGS", item)));

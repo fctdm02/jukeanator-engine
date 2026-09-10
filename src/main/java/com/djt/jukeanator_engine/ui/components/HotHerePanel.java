@@ -11,8 +11,6 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -64,13 +62,16 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // CARD_ARTIST if it was opened from the artist detail panel. ────────────────
   private String detailReturnCard = CARD_CONTENT;
 
-  // ── Popularity data (loaded once at construction, refreshed periodically by
-  // the event-driven popularity update path). A title-sorted view is derived
-  // from it in memory each time it refreshes — switching "Order By" never
-  // re-queries SongLibraryService, it only swaps which of these two views is
-  // shown. ────────────────────────────────────────────────────────────────────
-  private SearchResultDto resultsByPopularity = new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
-  private SearchResultDto resultsByTitle = new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
+  // ── Paged result buffers — one triple per sort mode, since switching "Order
+  // By" queries SongLibraryService independently by popularity or by title.
+  // Only the active mode's buffers are kept populated; the inactive mode's
+  // are reset and lazily refilled the next time it becomes active. ──────────
+  private final PagedCategoryBuffer<ArtistDto> popularityArtistBuffer;
+  private final PagedCategoryBuffer<AlbumDto> popularityAlbumBuffer;
+  private final PagedCategoryBuffer<SongDto> popularitySongBuffer;
+  private final PagedCategoryBuffer<ArtistDto> titleArtistBuffer;
+  private final PagedCategoryBuffer<AlbumDto> titleAlbumBuffer;
+  private final PagedCategoryBuffer<SongDto> titleSongBuffer;
   private SortMode currentSort = SortMode.POPULARITY;
 
   // ── Header (kept to allow rebuilding on data refresh) ─────────────────────
@@ -111,6 +112,14 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     this.popularityT3 = popularityT3;
     this.albumGridProfile = albumGridProfile;
 
+    int serverPageSize = songLibraryService.getSearchResultPageSize();
+    this.popularityArtistBuffer = new PagedCategoryBuffer<>(serverPageSize);
+    this.popularityAlbumBuffer = new PagedCategoryBuffer<>(serverPageSize);
+    this.popularitySongBuffer = new PagedCategoryBuffer<>(serverPageSize);
+    this.titleArtistBuffer = new PagedCategoryBuffer<>(serverPageSize);
+    this.titleAlbumBuffer = new PagedCategoryBuffer<>(serverPageSize);
+    this.titleSongBuffer = new PagedCategoryBuffer<>(serverPageSize);
+
     setLayout(new BorderLayout());
     setOpaque(false);
 
@@ -143,19 +152,27 @@ public class HotHerePanel extends JPanel implements TabNavigator {
 
   public void refreshMusicByPopularityResults() {
 
+    SearchResultDto popularity;
     try {
-      this.resultsByPopularity =
-          songLibraryService.getMusicByPopularity(songLibraryService.getOwnLocationId());
+      popularity =
+          songLibraryService.getMusicByPopularity(songLibraryService.getOwnLocationId(), 0, 0, 0);
     } catch (Exception e) {
       throw new RuntimeException("Could not get music by popularity, error: " + e.getMessage(), e);
     }
-    if (this.resultsByPopularity == null) {
-      this.resultsByPopularity = new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
+    if (popularity == null) {
+      popularity = new SearchResultDto(List.of(), List.of(), List.of());
     }
 
-    // Derive the title-sorted view in memory from the same popularity payload —
-    // no additional SongLibraryService calls are made.
-    this.resultsByTitle = sortByTitle(this.resultsByPopularity);
+    popularityArtistBuffer.seedFirstPage(safeList(popularity.artists()));
+    popularityAlbumBuffer.seedFirstPage(safeList(popularity.albums()));
+    popularitySongBuffer.seedFirstPage(safeList(popularity.songs()));
+
+    // The title-sorted view is now fetched independently from SongLibraryService (see
+    // getMusicByTitle) rather than derived in memory, so it just needs to be reset here --
+    // rebuildColumnsPanel() will lazily re-fetch it from page 0 if title mode is active.
+    titleArtistBuffer.reset();
+    titleAlbumBuffer.reset();
+    titleSongBuffer.reset();
 
     rebuildHeaderPanel();
     rebuildColumnsPanel();
@@ -169,53 +186,13 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     }
   }
 
-  /**
-   * Builds a new {@link SearchResultDto} whose artists/albums/songs are copies of
-   * {@code source}'s lists, sorted alphabetically by name (artist name, album name, song name
-   * respectively). Blank/null names sort to the end.
-   */
-  private SearchResultDto sortByTitle(SearchResultDto source) {
-
-    List<ArtistDto> artists = new ArrayList<>(safeList(source.artists()));
-    artists.sort(Comparator.comparing(a -> titleSortKey(a.artistName())));
-
-    List<AlbumDto> albums = new ArrayList<>(safeList(source.albums()));
-    albums.sort(Comparator.comparing(a -> titleSortKey(a.albumName())));
-
-    List<SongDto> songs = new ArrayList<>(safeList(source.songs()));
-    songs.sort(Comparator.comparing(s -> titleSortKey(s.songName())));
-
-    // Preserve source's numArtists/numAlbums/numSongs -- those are the true totals across the
-    // whole library, whereas artists/albums/songs here are only the (preview-limited) lists.
-    return new SearchResultDto(songs, artists, albums, source.numArtists(), source.numAlbums(),
-        source.numSongs());
-  }
-
-  /**
-   * Returns a sort key for {@code name}: blank/null names sort to the end, letters sort after
-   * symbols/digits (prefixed with '~') so symbol/digit names sort before A–Z naturally.
-   */
-  private static String titleSortKey(String name) {
-    if (name == null || name.isBlank())
-      return "￿";
-    char first = Character.toUpperCase(name.charAt(0));
-    return Character.isLetter(first) ? ("~" + name.toUpperCase()) : name.toUpperCase();
-  }
-
   // ─────────────────────────────────────────────────────────────────────────
-  // HEADER (image art, title, counts, Order By) — mirrors the Genre Results
+  // HEADER (image art, title, Order By) — mirrors the Genre Results
   // screen's DetailHeaderPanel + sort-button layout.
   // ─────────────────────────────────────────────────────────────────────────
 
-  /** (Re)builds the header to reflect the latest counts and current sort state. */
+  /** (Re)builds the header to reflect the current sort state. */
   private void rebuildHeaderPanel() {
-
-    // numArtists/numAlbums/numSongs reflect every artist/album/song with at least one play --
-    // not just however many fit in the (preview-limited) artists()/albums()/songs() lists above.
-    SearchResultDto current = currentSort == SortMode.POPULARITY ? resultsByPopularity : resultsByTitle;
-    int artistCount = current.numArtists();
-    int albumCount = current.numAlbums();
-    int songCount = current.numSongs();
 
     // Icon size/sizing matches the Home screen's "All Albums" header. No dedicated
     // Hot Here artwork exists yet, so the load falls through to the "🔥" fallback
@@ -224,10 +201,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     ImageIcon hotHereIcon =
         imageLoader.loadImage("HotHere_Header_Image.png", headerIconSize, headerIconSize);
 
-    String subtitle = String.format("%,d artists  •  %,d albums  •  %,d songs", artistCount,
-        albumCount, songCount);
-
-    headerPanel = new DetailHeaderPanel(null, null, hotHereIcon, "🔥", "Hot Here", subtitle,
+    headerPanel = new DetailHeaderPanel(null, null, hotHereIcon, "🔥", "Hot Here", null,
         buildSortButtonPanel(), ColorTheme.get().frameTabAccentHotHere);
     headerPanel.setOpaque(false);
     int hbH = LayoutTheme.get().homeHeaderBorderH;
@@ -328,9 +302,8 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   }
 
   /**
-   * Switches between popularity and title ordering. Never re-queries
-   * {@link SongLibraryService} — both views were already built in memory by
-   * {@link #refreshMusicByPopularityResults()}; this only swaps which one is displayed.
+   * Switches between popularity and title ordering. The newly active mode's buffers are reset so
+   * {@link #rebuildColumnsPanel()} fetches fresh data from page 0 via {@code SongLibraryService}.
    */
   private void applySortMode(SortMode mode) {
 
@@ -341,6 +314,16 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     artistsOffset = 0;
     albumsOffset = 0;
     songsOffset = 0;
+
+    if (mode == SortMode.POPULARITY) {
+      popularityArtistBuffer.reset();
+      popularityAlbumBuffer.reset();
+      popularitySongBuffer.reset();
+    } else {
+      titleArtistBuffer.reset();
+      titleAlbumBuffer.reset();
+      titleSongBuffer.reset();
+    }
 
     rebuildHeaderPanel();
     rebuildColumnsPanel();
@@ -402,12 +385,35 @@ public class HotHerePanel extends JPanel implements TabNavigator {
 
     columnsPanel.removeAll();
 
-    SearchResultDto current = currentSort == SortMode.POPULARITY ? resultsByPopularity : resultsByTitle;
-    List<ArtistDto> artists = safeList(current.artists());
-    List<AlbumDto> albums = safeList(current.albums());
-    List<SongDto> songs = safeList(current.songs());
-
     int previewCount = LayoutTheme.get().hotHerePreviewCount;
+    Integer locationId = songLibraryService.getOwnLocationId();
+    boolean popularity = currentSort == SortMode.POPULARITY;
+
+    PagedCategoryBuffer<ArtistDto> artistBuffer = popularity ? popularityArtistBuffer : titleArtistBuffer;
+    PagedCategoryBuffer<AlbumDto> albumBuffer = popularity ? popularityAlbumBuffer : titleAlbumBuffer;
+    PagedCategoryBuffer<SongDto> songBuffer = popularity ? popularitySongBuffer : titleSongBuffer;
+
+    // A transient service failure here should not corrupt a buffer's exhausted/next-page
+    // bookkeeping -- just leave it as whatever was already fetched and let the next page-down
+    // attempt retry.
+    try {
+      artistBuffer.ensureWindowAvailable(artistsOffset, previewCount,
+          pageIdx -> (popularity ? songLibraryService.getMusicByPopularity(locationId, pageIdx, 0, 0)
+              : songLibraryService.getMusicByTitle(locationId, pageIdx, 0, 0)).artists());
+
+      albumBuffer.ensureWindowAvailable(albumsOffset, previewCount,
+          pageIdx -> (popularity ? songLibraryService.getMusicByPopularity(locationId, 0, pageIdx, 0)
+              : songLibraryService.getMusicByTitle(locationId, 0, pageIdx, 0)).albums());
+
+      songBuffer.ensureWindowAvailable(songsOffset, previewCount,
+          pageIdx -> (popularity ? songLibraryService.getMusicByPopularity(locationId, 0, 0, pageIdx)
+              : songLibraryService.getMusicByTitle(locationId, 0, 0, pageIdx)).songs());
+    } catch (Exception ignored) {
+    }
+
+    List<ArtistDto> artists = artistBuffer.items();
+    List<AlbumDto> albums = albumBuffer.items();
+    List<SongDto> songs = songBuffer.items();
 
     columnsPanel.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, previewCount,
         imageLoader, newOffset -> {

@@ -275,11 +275,8 @@ public class HomePanel extends JPanel implements TabNavigator {
     ImageIcon allAlbumsIcon =
         imageLoader.loadImage("AllAlbumsLogo.png", headerIconSize, headerIconSize);
 
-    String subtitle = String.format("%,d artists  •  %,d albums  •  %,d songs", artistCount,
-        albumsByTitle.size(), songCount);
-
     DetailHeaderPanel header = new DetailHeaderPanel(null, null, allAlbumsIcon, "♫", "All Albums",
-        subtitle, buildSortButtonPanel());
+        null, buildSortButtonPanel());
     header.setOpaque(false);
     // Left/right padding matches the album grid's own horizontal border so the header
     // icon/text aligns on the y-axis with the tile columns below it.

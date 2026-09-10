@@ -420,7 +420,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
       results = songLibraryService.getGenreMusicByPopularity(songLibraryService.getOwnLocationId(),
           genre.genreName());
     } catch (Exception e) {
-      results = new SearchResultDto(List.of(), List.of(), List.of(), 0, 0, 0);
+      results = new SearchResultDto(List.of(), List.of(), List.of());
     }
 
     GenreDetailPanel detailPanel = new GenreDetailPanel(genre, results, imageLoader, "← Back",
