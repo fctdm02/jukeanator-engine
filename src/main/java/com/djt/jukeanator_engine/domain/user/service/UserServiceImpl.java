@@ -171,8 +171,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public synchronized HomePageDto getPublicHomePage() {
     var popular = songLibraryService.getMusicByPopularity(songLibraryService.getOwnLocationId());
     var artists = popular.artists().stream().limit(MAX_HOT_HERE).toList();
+    var albums = popular.albums().stream().limit(MAX_HOT_HERE).toList();
     var songs = popular.songs().stream().limit(MAX_HOT_HERE).toList();
-    return new HomePageDto(artists, songs);
+    return new HomePageDto(artists, albums, songs);
   }
 
   @Override
@@ -215,7 +216,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     
     UserHomePageDto userHomePageDto =
         new UserHomePageDto(recentPlays, playlistNames, publicHomePageDto.artistsHotHere(),
-            publicHomePageDto.songsHotHere(), user.getSearchHistory());
+            publicHomePageDto.albumsHotHere(), publicHomePageDto.songsHotHere(),
+            user.getSearchHistory());
 
     return userHomePageDto;
   }

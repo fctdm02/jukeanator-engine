@@ -14,6 +14,7 @@
     searchHistory: null,   // cached from GET /api/users/home; null = not yet loaded
     recentPlays: [],       // cached from GET /api/users/home; updated live via STOMP
     hotHereArtists: [],    // cached from home page API; refreshed on loadHomePage
+    hotHereAlbums: [],     // cached from home page API; refreshed on loadHomePage
     hotHereSongs: [],      // cached from home page API; refreshed on loadHomePage
     numCredits: 0,         // cached credit count; refreshed on loadCredits()
     myPlaylists: [],       // [{name, songCount, firstSongAlbumId}] from GET /api/users/playlists
@@ -226,6 +227,7 @@
       case 'privacy':           renderStub('Privacy Policy');    break;
       case 'recent-plays-all':       renderRecentPlaysAll();          break;
       case 'artists-hot-here-all':   renderArtistsHotHereAll();       break;
+      case 'albums-hot-here-all':    renderAlbumsHotHereAll();        break;
       case 'songs-hot-here-all':     renderSongsHotHereAll();         break;
       case 'my-playlists-all':       renderMyPlaylistsAll();          break;
       case 'playlist-detail':        renderPlaylistDetail(params);    break;
@@ -348,12 +350,14 @@
         state.searchHistory    = homePage.searchHistory    || [];
         state.recentPlays      = homePage.myRecentPlays    || [];
         state.hotHereArtists   = homePage.artistsHotHere   || [];
+        state.hotHereAlbums    = homePage.albumsHotHere    || [];
         state.hotHereSongs     = homePage.songsHotHere     || [];
         state.myPlaylists      = playlists || [];
         state.favoriteSongIds  = new Set((favIds || []).map(si => `${si.albumId}_${si.songId}`));
       } else {
         const publicPage = await api('/api/users/home-public');
         state.hotHereArtists   = publicPage.artistsHotHere || [];
+        state.hotHereAlbums    = publicPage.albumsHotHere  || [];
         state.hotHereSongs     = publicPage.songsHotHere   || [];
         state.myPlaylists      = [];
         state.favoriteSongIds  = new Set();
@@ -407,6 +411,13 @@
       </section>
       <section class="home-section">
         <div class="home-section-header">
+          <h2 class="home-section-title">Albums Hot Here</h2>
+          <button class="home-section-view-all" id="albumsHotHereViewAll">View All</button>
+        </div>
+        <div class="home-section-body" id="albumsHotHereBody">${renderSwipeableAlbumThumbs(state.hotHereAlbums)}</div>
+      </section>
+      <section class="home-section">
+        <div class="home-section-header">
           <h2 class="home-section-title">Songs Hot Here</h2>
           <button class="home-section-view-all" id="songsHotHereViewAll">View All</button>
         </div>
@@ -417,10 +428,14 @@
   function wireHotHereButtons() {
     document.getElementById('artistsHotHereViewAll')
       ?.addEventListener('click', () => navigateSub('artists-hot-here-all'));
+    document.getElementById('albumsHotHereViewAll')
+      ?.addEventListener('click', () => navigateSub('albums-hot-here-all'));
     document.getElementById('songsHotHereViewAll')
       ?.addEventListener('click', () => navigateSub('songs-hot-here-all'));
     wireSwipeableClicks('artistsHotHereBody', state.hotHereArtists,
       a => navigateSub('artist-detail', { artistId: a.artistId }));
+    wireSwipeableClicks('albumsHotHereBody', state.hotHereAlbums,
+      a => navigateSub('album-detail', { albumId: a.albumId }));
     wireSwipeableClicks('songsHotHereBody', state.hotHereSongs, s => showSongPopup(s));
   }
 
@@ -448,6 +463,18 @@
     </div>`;
   }
 
+  function albumThumbHtml(a) {
+    const art = a.albumId != null
+      ? `<img src="/api/locations/${state.locationId}/song-library/albums/${a.albumId}/coverArt" alt=""
+              onerror="this.outerHTML='<div class=\\'rp-thumb-placeholder\\'>&#128191;</div>'">`
+      : `<div class="rp-thumb-placeholder">&#128191;</div>`;
+    return `<div class="rp-thumb-card">
+      <div class="rp-thumb-img">${art}</div>
+      <div class="rp-thumb-song">${escHtml(a.albumName || '')}</div>
+      <div class="rp-thumb-artist">${escHtml(a.artistName || '')}</div>
+    </div>`;
+  }
+
   function renderSwipeableSongThumbs(songs, _prefix) {
     if (!songs || songs.length === 0) return '<div class="stub-placeholder">Nothing to show yet</div>';
     return `<div class="rp-thumb-row">${songs.map(songThumbHtml).join('')}</div>`;
@@ -456,6 +483,11 @@
   function renderSwipeableArtistThumbs(artists) {
     if (!artists || artists.length === 0) return '<div class="stub-placeholder">Nothing to show yet</div>';
     return `<div class="rp-thumb-row">${artists.map(artistThumbHtml).join('')}</div>`;
+  }
+
+  function renderSwipeableAlbumThumbs(albums) {
+    if (!albums || albums.length === 0) return '<div class="stub-placeholder">Nothing to show yet</div>';
+    return `<div class="rp-thumb-row">${albums.map(albumThumbHtml).join('')}</div>`;
   }
 
   function wireSwipeableClicks(containerId, items, onClick) {
@@ -483,14 +515,14 @@
 
   /**
    * Shared infinite-scroll "View All" screen for one Hot Here category. Unlike the home screen's
-   * teaser row (state.hotHereArtists/hotHereSongs, capped at 10 items), this fetches directly from
+   * teaser row (state.hotHereArtists/hotHereAlbums/hotHereSongs, capped at 10 items), this fetches directly from
    * the paginated /popular endpoint so the user can keep scrolling arbitrarily deep -- fetching the
    * next server page and appending whenever the scroll position nears the bottom, and stopping once
    * a fetch returns no further items.
    *
    * @param title screen title
    * @param pageParam which of artistPage/albumPage/songPage this category advances
-   * @param resultField the SearchResultDto field ('artists' or 'songs') to read from the response
+   * @param resultField the SearchResultDto field ('artists', 'albums', or 'songs') to read from the response
    * @param rowFn row-HTML renderer for one item
    * @param onRowClick called with the clicked item
    */
@@ -557,6 +589,11 @@
       a => navigateSub('artist-detail', { artistId: a.artistId }));
   }
 
+  function renderAlbumsHotHereAll() {
+    renderHotHereAll('Albums Hot Here', 'albumPage', 'albums', albumListRowHtml,
+      a => navigateSub('album-detail', { albumId: a.albumId }));
+  }
+
   function renderSongsHotHereAll() {
     renderHotHereAll('Songs Hot Here', 'songPage', 'songs', songListRowHtml,
       s => showSongPopup(s));
@@ -586,6 +623,20 @@
       <div class="result-info">
         <div class="result-title">${escHtml(a.artistName || '')}</div>
         <div class="result-sub">${a.songCount != null ? escHtml(String(a.songCount)) + ' songs' : ''}</div>
+      </div>
+    </div>`;
+  }
+
+  function albumListRowHtml(a) {
+    const art = a.albumId != null
+      ? `<img class="result-thumb" src="/api/locations/${state.locationId}/song-library/albums/${a.albumId}/coverArt" alt=""
+              onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#128191;</div>'">`
+      : `<div class="result-thumb-placeholder">&#128191;</div>`;
+    return `<div class="result-row">
+      ${art}
+      <div class="result-info">
+        <div class="result-title">${escHtml(a.albumName || '')}</div>
+        <div class="result-sub">${escHtml(a.artistName || '')}</div>
       </div>
     </div>`;
   }

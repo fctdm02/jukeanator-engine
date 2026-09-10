@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.user.dto;
 
 import java.util.List;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 
@@ -13,5 +14,6 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
  * @see HomePageDto
  */
 public record UserHomePageDto(List<SongDto> myRecentPlays, List<String> myPlaylists,
-    List<ArtistDto> artistsHotHere, List<SongDto> songsHotHere, List<String> searchHistory) {
+    List<ArtistDto> artistsHotHere, List<AlbumDto> albumsHotHere, List<SongDto> songsHotHere,
+    List<String> searchHistory) {
 }

@@ -25,6 +25,7 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.setup.StandaloneMockMvcBuilder;
 import com.djt.jukeanator_engine.AbstractControllerTest;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
@@ -206,12 +207,16 @@ class UserControllerTest extends AbstractControllerTest {
   @Test
   void getPublicHomePage_returnsHomePageDto() throws Exception {
     ArtistDto artist = new ArtistDto(1, "Artist", "/artist.jpg", 2, 3, 10, List.of());
+    AlbumDto album = new AlbumDto(1, "Genre", 1, "Artist", 2, "Album", false, "Label", "2020",
+        "/cover.jpg", false, 5, List.of());
     SongDto song = new SongDto(1, "Genre", 1, "Artist", 2, "Album", "/cover.jpg", 3, "Song", 1, 5);
-    when(userService.getPublicHomePage()).thenReturn(new HomePageDto(List.of(artist), List.of(song)));
+    when(userService.getPublicHomePage())
+        .thenReturn(new HomePageDto(List.of(artist), List.of(album), List.of(song)));
 
     mockMvc.perform(get("/api/users/home-public"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.artistsHotHere[0].artistName", is("Artist")))
+        .andExpect(jsonPath("$.albumsHotHere[0].albumName", is("Album")))
         .andExpect(jsonPath("$.songsHotHere[0].songName", is("Song")));
   }
 
@@ -242,7 +247,7 @@ class UserControllerTest extends AbstractControllerTest {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     UserHomePageDto homePage = new UserHomePageDto(List.of(), List.of("My Favorites"), List.of(),
-        List.of(), List.of("beatles"));
+        List.of(), List.of(), List.of("beatles"));
     when(userService.getHomePage("jane@example.com")).thenReturn(homePage);
 
     mockMvc.perform(get("/api/users/home"))
