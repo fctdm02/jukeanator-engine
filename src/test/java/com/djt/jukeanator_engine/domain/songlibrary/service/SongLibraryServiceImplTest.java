@@ -16,6 +16,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.ApplicationEventPublisher;
@@ -24,11 +27,15 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsExce
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.FolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
@@ -448,5 +455,169 @@ public class SongLibraryServiceImplTest {
         "JPA mode should still write CDStats.TXT -- it's the persistent record a filesystem-mode "
             + "scan reads back via restoreSongStatisticsForRootPath() to carry num-plays forward "
             + "across a rescan, in case this instance is later switched back to filesystem");
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // getMusicBySearch -- propagating an artist match into that artist's albums/songs
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private SongLibraryServiceImpl newSearchTestService(RootFolderEntity fixtureRoot)
+      throws EntityDoesNotExistException {
+
+    SongLibraryRepository songLibraryRepository = mock(SongLibraryRepository.class);
+    LocationService locationService = mock(LocationService.class);
+    SongScanner songScanner = mock(SongScanner.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    LocationEntity ownLocation = new LocationEntity(1, "Test Location", null, null, "hash");
+
+    when(locationService.getOrCreateOwnLocation(null)).thenReturn(ownLocation);
+    when(songLibraryRepository.loadAggregateRoot(1)).thenReturn(fixtureRoot);
+
+    AppProperties appProperties = new AppProperties();
+    appProperties.setDataDir("unused-for-this-test");
+    appProperties.setMode("standalone");
+
+    return new SongLibraryServiceImpl(appProperties, songLibraryRepository, locationService,
+        songScanner, Integer.valueOf(100), eventPublisher);
+  }
+
+  private AlbumFolderEntity newAlbum(FolderEntity parent, String name, int id)
+      throws EntityAlreadyExistsException {
+
+    AlbumFolderEntity album = new AlbumFolderEntity(parent, name);
+    album.setId(id);
+    parent.addChildFolder(album);
+    album.createCoverArtEntity();
+    album.createMetadataEntity();
+    album.getMetaData().setLoaded(true);
+    return album;
+  }
+
+  private void addSong(AlbumFolderEntity album, String songName, String artistName,
+      int trackNumber, int id) throws EntityAlreadyExistsException {
+
+    SongFileEntity song = new SongFileEntity(album, songName + ".mp3");
+    song.setId(id);
+    song.setArtistName(artistName);
+    song.setSongName(songName);
+    song.setTrackNumber(trackNumber);
+    song.setNumPlays(0);
+    album.addChildSong(song);
+  }
+
+  /**
+   * Builds a small library used to exercise search propagation:
+   * <ul>
+   * <li>"Artist One" directly owns a non-compilation "Solo Album" -- neither song's title matches
+   * the searches below, so it only surfaces via artist propagation.</li>
+   * <li>"Singles (Soundtracks)" and "Mission Impossible 2 (Soundtracks)" are compilations (no
+   * owning artist folder) that each credit one track to "Chris Cornell" among unrelated
+   * artists -- mirrors the real-world example that motivated this feature.</li>
+   * <li>"Totally Unique Title" is a compilation whose own title directly matches a search term, to
+   * verify a direct album match still pulls in its full (unrelated-artist) tracklist.</li>
+   * </ul>
+   */
+  private RootFolderEntity buildSearchPropagationRoot() throws EntityAlreadyExistsException {
+
+    RootFolderEntity root = new RootFolderEntity("/root");
+    root.setId(1);
+
+    GenreFolderEntity genre = new GenreFolderEntity(root, "Rock");
+    genre.setId(2);
+    root.addChildFolder(genre);
+
+    ArtistFolderEntity soloArtist = new ArtistFolderEntity(genre, "Artist One");
+    soloArtist.setId(10);
+    genre.addChildFolder(soloArtist);
+
+    AlbumFolderEntity soloAlbum = newAlbum(soloArtist, "Solo Album", 20);
+    addSong(soloAlbum, "Track A", "Artist One", 1, 30);
+    addSong(soloAlbum, "Track B", "Artist One", 2, 31);
+
+    AlbumFolderEntity singles = newAlbum(genre, "Singles (Soundtracks)", 21);
+    addSong(singles, "Would", "Alice In Chains", 1, 32);
+    addSong(singles, "Seasons", "Chris Cornell", 2, 33);
+    addSong(singles, "Breath", "Pearl Jam", 3, 34);
+
+    AlbumFolderEntity missionImpossible2 = newAlbum(genre, "Mission Impossible 2 (Soundtracks)", 22);
+    addSong(missionImpossible2, "Take A Look Around", "Limp Bizkit", 1, 35);
+    addSong(missionImpossible2, "Mission 2000", "Chris Cornell", 2, 36);
+    addSong(missionImpossible2, "I Disappear", "Metallica", 3, 37);
+
+    AlbumFolderEntity uniqueTitleAlbum = newAlbum(genre, "Totally Unique Title", 23);
+    addSong(uniqueTitleAlbum, "Random Song One", "Artist X", 1, 38);
+    addSong(uniqueTitleAlbum, "Random Song Two", "Artist Y", 2, 39);
+
+    root.initialize();
+    return root;
+  }
+
+  private static Set<String> songNames(List<SongDto> songs) {
+    return songs.stream().map(SongDto::songName).collect(Collectors.toSet());
+  }
+
+  private static Set<String> albumNames(List<AlbumDto> albums) {
+    return albums.stream().map(AlbumDto::albumName).collect(Collectors.toSet());
+  }
+
+  @Test
+  void getMusicBySearch_propagatesCompilationCredits_onlyForMatchingTracks() throws Exception {
+
+    SongLibraryServiceImpl service = newSearchTestService(buildSearchPropagationRoot());
+
+    SearchResultDto result = service.getMusicBySearch(1, "Cornell");
+
+    assertEquals(Set.of("Chris Cornell"),
+        result.artists().stream().map(a -> a.artistName()).collect(Collectors.toSet()));
+
+    assertEquals(Set.of("Singles (Soundtracks)", "Mission Impossible 2 (Soundtracks)"),
+        albumNames(result.albums()),
+        "both of Chris Cornell's compilation credits should be pulled into Albums via Item 1");
+
+    assertEquals(Set.of("Seasons", "Mission 2000"), songNames(result.songs()),
+        "only the tracks actually credited to Chris Cornell should be pulled in from those "
+            + "compilation albums, not their unrelated tracks");
+  }
+
+  @Test
+  void getMusicBySearch_propagatesNonCompilationAlbum_withFullTracklist() throws Exception {
+
+    SongLibraryServiceImpl service = newSearchTestService(buildSearchPropagationRoot());
+
+    SearchResultDto result = service.getMusicBySearch(1, "Artist One");
+
+    assertTrue(albumNames(result.albums()).contains("Solo Album"),
+        "Artist One's own album should be pulled into Albums via Item 1");
+
+    assertEquals(Set.of("Track A", "Track B"), songNames(result.songs()),
+        "a non-compilation album pulled in via artist propagation should contribute its entire "
+            + "tracklist, even though neither song title matches the search term");
+  }
+
+  @Test
+  void getMusicBySearch_directAlbumTitleMatch_pullsInFullTracklistEvenIfCompilation()
+      throws Exception {
+
+    SongLibraryServiceImpl service = newSearchTestService(buildSearchPropagationRoot());
+
+    SearchResultDto result = service.getMusicBySearch(1, "Unique");
+
+    assertTrue(albumNames(result.albums()).contains("Totally Unique Title"));
+    assertEquals(Set.of("Random Song One", "Random Song Two"), songNames(result.songs()),
+        "a direct album title match should pull in its full tracklist regardless of compilation "
+            + "status, unlike an album reached only via artist propagation");
+  }
+
+  @Test
+  void getGenreMusicByPopularity_isUnaffectedByArtistPropagation() throws Exception {
+
+    SongLibraryServiceImpl service = newSearchTestService(buildSearchPropagationRoot());
+
+    SearchResultDto result = service.getGenreMusicByPopularity(1, "Rock");
+
+    assertEquals(4, result.albums().size(),
+        "genre browsing has no search term, so the artist-propagation logic (which only runs "
+            + "when searchFor != null) must not alter its results");
+    assertEquals(10, result.songs().size());
   }
 }

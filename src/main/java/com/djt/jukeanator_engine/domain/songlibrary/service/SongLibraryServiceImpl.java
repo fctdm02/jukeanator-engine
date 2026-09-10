@@ -13,10 +13,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -602,9 +605,52 @@ public class SongLibraryServiceImpl
     List<AlbumFolderEntity> matchedAlbums =
         root.getAlbums().stream().filter(hasPlays).filter(inGenre).filter(matchesSearch).toList();
 
-    List<SongFileEntity> sortedSongs = matchedSongs.stream().sorted(comparator).toList();
+    // A search additionally propagates matches across the artist -> album -> song
+    // relationship: any album belonging to a matched artist is pulled into the album results,
+    // and songs from those albums are pulled into the song results (fully, unless the album is
+    // a compilation the artist is merely credited on -- in which case only that artist's/search
+    // term's matching tracks are pulled in, since a compilation's other tracks are unrelated).
+    List<AlbumFolderEntity> expandedAlbums = matchedAlbums;
+    List<SongFileEntity> expandedSongs = matchedSongs;
+
+    if (searchFor != null) {
+
+      Set<Integer> directAlbumMatchIds =
+          matchedAlbums.stream().map(AlbumFolderEntity::getId).collect(Collectors.toSet());
+
+      Map<Integer, AlbumFolderEntity> albumsById = new LinkedHashMap<>();
+      matchedAlbums.forEach(album -> albumsById.put(album.getId(), album));
+      for (ArtistFolderEntity artist : matchedArtists) {
+        for (AlbumFolderEntity album : artist.getAlbums()) {
+          albumsById.putIfAbsent(album.getId(), album);
+        }
+      }
+      expandedAlbums =
+          albumsById.values().stream().filter(hasPlays).filter(inGenre).toList();
+
+      Map<String, SongFileEntity> songsByKey = new LinkedHashMap<>();
+      matchedSongs.forEach(song -> songsByKey.put(buildExpandedSongKey(song), song));
+      for (AlbumFolderEntity album : expandedAlbums) {
+
+        boolean pullInAllSongs =
+            directAlbumMatchIds.contains(album.getId()) || !album.isCompilation();
+
+        for (SongFileEntity song : album.getChildSongs()) {
+
+          if (pullInAllSongs
+              || calculateSearchResultWeight(song.getSongName(), searchFor) > 0
+              || calculateSearchResultWeight(song.getArtistName(), searchFor) > 0) {
+
+            songsByKey.putIfAbsent(buildExpandedSongKey(song), song);
+          }
+        }
+      }
+      expandedSongs = songsByKey.values().stream().filter(hasPlays).filter(inGenre).toList();
+    }
+
+    List<SongFileEntity> sortedSongs = expandedSongs.stream().sorted(comparator).toList();
     List<ArtistFolderEntity> sortedArtists = matchedArtists.stream().sorted(comparator).toList();
-    List<AlbumFolderEntity> sortedAlbums = matchedAlbums.stream().sorted(comparator).toList();
+    List<AlbumFolderEntity> sortedAlbums = expandedAlbums.stream().sorted(comparator).toList();
 
     List<SongFileEntity> songs = slicePage(sortedSongs, songPageIndex, searchResultPageSize);
     List<ArtistFolderEntity> artists =
@@ -626,6 +672,10 @@ public class SongLibraryServiceImpl
     int from = Math.min(Math.max(pageIndex, 0) * pageSize, sorted.size());
     int to = Math.min(from + pageSize, sorted.size());
     return sorted.subList(from, to);
+  }
+
+  private static String buildExpandedSongKey(SongFileEntity song) {
+    return song.getAlbum().getId() + "__" + song.getId();
   }
 
   private int calculateSearchResultWeight(String value, String normalizedSearch) {
