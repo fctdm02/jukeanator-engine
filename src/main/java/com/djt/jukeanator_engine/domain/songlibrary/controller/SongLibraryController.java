@@ -32,6 +32,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -83,6 +84,12 @@ public class SongLibraryController {
       @RequestParam(defaultValue = "0") int albumPage, @RequestParam(defaultValue = "0") int songPage) {
     return songLibraryService.getMusicBySearch(locationId, searchFor, artistPage, albumPage,
         songPage);
+  }
+
+  @GetMapping("/search/totals")
+  public SearchTotalsDto getSearchTotals(@PathVariable Integer locationId,
+      @RequestParam String searchFor) {
+    return songLibraryService.getSearchTotals(locationId, searchFor);
   }
 
   @GetMapping("/genres")

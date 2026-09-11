@@ -12,6 +12,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
@@ -83,6 +84,17 @@ public interface SongLibraryService {
    */
   SearchResultDto getMusicBySearch(Integer locationId, String searchFor, int artistPageIndex,
       int albumPageIndex, int songPageIndex);
+
+  /**
+   * True, unpaginated totals for {@code searchFor} -- how many artists/albums/songs actually
+   * match, regardless of how much has been fetched/paged through so far via
+   * {@link #getMusicBySearch}. Used by the Search screen's column headers to show the user how
+   * much there is to scroll through.
+   *
+   * @param searchFor
+   * @return
+   */
+  SearchTotalsDto getSearchTotals(Integer locationId, String searchFor);
 
   /**
    *

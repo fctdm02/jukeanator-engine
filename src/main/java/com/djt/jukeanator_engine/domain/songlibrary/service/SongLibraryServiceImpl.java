@@ -43,6 +43,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.SongStatisticsChangedEvent;
@@ -488,6 +489,26 @@ public class SongLibraryServiceImpl
   }
 
   @Override
+  public SearchTotalsDto getSearchTotals(Integer locationId, String searchFor) {
+
+    if (!isInitialized) {
+      throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
+    }
+
+    if (searchFor == null || searchFor.strip().isEmpty()) {
+      return new SearchTotalsDto(0, 0, 0);
+    }
+
+    String searchForNormalized = stripNonKeyboardCharacters(searchFor.strip().toLowerCase());
+
+    MatchedLibraryItems matched =
+        matchLibraryItems(getOrLoadRoot(locationId), null, searchForNormalized);
+
+    return new SearchTotalsDto(matched.artists().size(), matched.albums().size(),
+        matched.songs().size());
+  }
+
+  @Override
   public SearchResultDto getGenreMusicByPopularity(Integer locationId, String genreName) {
 
     return getGenreMusicByPopularity(locationId, genreName, 0, 0, 0);
@@ -555,21 +576,6 @@ public class SongLibraryServiceImpl
       throw new SongLibraryServiceException("SongLibraryService has not been initialized yet!");
     }
 
-    // ── Filters ───────────────────────────────────────────────────────────
-
-    java.util.function.Predicate<LibraryItem> hasPlays =
-        (genreName != null || searchFor != null) ? item -> true
-            : item -> item.getNumPlays() != null && item.getNumPlays() > 0;
-
-    java.util.function.Predicate<LibraryItem> inGenre =
-        item -> genreName == null || genreName.equalsIgnoreCase(item.getParentGenre().getName());
-
-    java.util.function.Predicate<LibraryItem> matchesSearch = item -> {
-      if (searchFor == null)
-        return true;
-      return calculateSearchResultWeight(item.getTitle(), searchFor) > 0;
-    };
-
     // ── Comparators ───────────────────────────────────────────────────────
 
     Comparator<LibraryItem> comparator = switch (sortOrder) {
@@ -592,6 +598,53 @@ public class SongLibraryServiceImpl
         yield Comparator.comparing(LibraryItem::getNumPlays,
             Comparator.nullsLast(Comparator.reverseOrder()));
       }
+    };
+
+    MatchedLibraryItems matched = matchLibraryItems(root, genreName, searchFor);
+
+    List<SongFileEntity> sortedSongs = matched.songs().stream().sorted(comparator).toList();
+    List<ArtistFolderEntity> sortedArtists =
+        matched.artists().stream().sorted(comparator).toList();
+    List<AlbumFolderEntity> sortedAlbums = matched.albums().stream().sorted(comparator).toList();
+
+    List<SongFileEntity> songs = slicePage(sortedSongs, songPageIndex, searchResultPageSize);
+    List<ArtistFolderEntity> artists =
+        slicePage(sortedArtists, artistPageIndex, searchResultPageSize);
+    List<AlbumFolderEntity> albums = slicePage(sortedAlbums, albumPageIndex, searchResultPageSize);
+
+    return new SearchResultDto(
+        SongLibraryMapper.toSongDtoList(songs),
+        SongLibraryMapper.toArtistDtoList(artists),
+        SongLibraryMapper.toAlbumDtoList(albums));
+  }
+
+  /** Unsorted, unpaginated match set produced by {@link #matchLibraryItems}. */
+  private record MatchedLibraryItems(List<ArtistFolderEntity> artists,
+      List<AlbumFolderEntity> albums, List<SongFileEntity> songs) {
+  }
+
+  /**
+   * Filters {@code root}'s artists/albums/songs down to those matching {@code genreName} and/or
+   * {@code searchFor} (either may be null), expanding a search match across the artist -> album
+   * -> song relationship. Shared by {@link #getMusic} (which additionally sorts and paginates the
+   * result) and {@link #getSearchTotals} (which only needs the match-set sizes).
+   */
+  private MatchedLibraryItems matchLibraryItems(RootFolderEntity root, String genreName,
+      String searchFor) {
+
+    // ── Filters ───────────────────────────────────────────────────────────
+
+    java.util.function.Predicate<LibraryItem> hasPlays =
+        (genreName != null || searchFor != null) ? item -> true
+            : item -> item.getNumPlays() != null && item.getNumPlays() > 0;
+
+    java.util.function.Predicate<LibraryItem> inGenre =
+        item -> genreName == null || genreName.equalsIgnoreCase(item.getParentGenre().getName());
+
+    java.util.function.Predicate<LibraryItem> matchesSearch = item -> {
+      if (searchFor == null)
+        return true;
+      return calculateSearchResultWeight(item.getTitle(), searchFor) > 0;
     };
 
     // ── Queries ───────────────────────────────────────────────────────────
@@ -648,19 +701,7 @@ public class SongLibraryServiceImpl
       expandedSongs = songsByKey.values().stream().filter(hasPlays).filter(inGenre).toList();
     }
 
-    List<SongFileEntity> sortedSongs = expandedSongs.stream().sorted(comparator).toList();
-    List<ArtistFolderEntity> sortedArtists = matchedArtists.stream().sorted(comparator).toList();
-    List<AlbumFolderEntity> sortedAlbums = expandedAlbums.stream().sorted(comparator).toList();
-
-    List<SongFileEntity> songs = slicePage(sortedSongs, songPageIndex, searchResultPageSize);
-    List<ArtistFolderEntity> artists =
-        slicePage(sortedArtists, artistPageIndex, searchResultPageSize);
-    List<AlbumFolderEntity> albums = slicePage(sortedAlbums, albumPageIndex, searchResultPageSize);
-
-    return new SearchResultDto(
-        SongLibraryMapper.toSongDtoList(songs),
-        SongLibraryMapper.toArtistDtoList(artists),
-        SongLibraryMapper.toAlbumDtoList(albums));
+    return new MatchedLibraryItems(matchedArtists, expandedAlbums, expandedSongs);
   }
 
   /**

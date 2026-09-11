@@ -417,21 +417,21 @@ public class HotHerePanel extends JPanel implements TabNavigator {
           artistsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("ARTISTS", item), ResultsColumnPanel.ColumnPosition.FIRST,
-        popularityT1, popularityT2, popularityT3);
+        popularityT1, popularityT2, popularityT3, -1);
 
     JPanel albumsColumn = ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, previewCount,
         imageLoader, newOffset -> {
           albumsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("ALBUMS", item), ResultsColumnPanel.ColumnPosition.MIDDLE,
-        popularityT1, popularityT2, popularityT3);
+        popularityT1, popularityT2, popularityT3, -1);
 
     JPanel songsColumn = ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount,
         imageLoader, newOffset -> {
           songsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("SONGS", item), ResultsColumnPanel.ColumnPosition.LAST,
-        popularityT1, popularityT2, popularityT3);
+        popularityT1, popularityT2, popularityT3, -1);
 
     ResultsColumnPanel.layoutThreeColumns(columnsPanel, artistsColumn, albumsColumn, songsColumn);
 

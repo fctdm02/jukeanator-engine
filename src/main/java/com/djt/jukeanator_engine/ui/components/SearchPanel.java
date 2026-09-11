@@ -13,6 +13,7 @@ import java.awt.Graphics2D;
 import java.awt.GridBagLayout;
 import java.awt.RenderingHints;
 import java.util.List;
+import java.util.Objects;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -22,6 +23,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
@@ -57,6 +59,13 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private int artistsOffset = 0;
   private int albumsOffset = 0;
   private int songsOffset = 0;
+
+  // ── True, unpaginated result totals for currentQuery — refetched only when the query changes,
+  // so repeated column-navigation rebuilds don't re-hit the service. ───────────────────────────
+  private String totalsQuery;
+  private int totalArtists = -1;
+  private int totalAlbums = -1;
+  private int totalSongs = -1;
 
   private JLabel entrySearchLabel;
   private JLabel resultsSearchLabel;
@@ -414,6 +423,20 @@ public class SearchPanel extends JPanel implements TabNavigator {
     } catch (Exception ignored) {
     }
 
+    // Totals reflect the true, unpaginated match count for currentQuery -- fetched once per
+    // query (not on every column-navigation rebuild) since it doesn't change as the user pages
+    // through results, only when the search term itself changes.
+    if (!Objects.equals(totalsQuery, currentQuery)) {
+      try {
+        SearchTotalsDto totals = songLibraryService.getSearchTotals(locationId, currentQuery);
+        totalArtists = totals.numArtists();
+        totalAlbums = totals.numAlbums();
+        totalSongs = totals.numSongs();
+        totalsQuery = currentQuery;
+      } catch (Exception ignored) {
+      }
+    }
+
     List<ArtistDto> artists = artistBuffer.items();
     List<AlbumDto> albums = albumBuffer.items();
     List<SongDto> songs = songBuffer.items();
@@ -436,21 +459,21 @@ public class SearchPanel extends JPanel implements TabNavigator {
           artistsOffset = newOffset;
           rebuildResultsCard();
         }, item -> handleRowClick("ARTISTS", item), ResultsColumnPanel.ColumnPosition.FIRST,
-        popularityT1, popularityT2, popularityT3);
+        popularityT1, popularityT2, popularityT3, totalArtists);
 
     JPanel albumsColumn = ResultsColumnPanel.build("ALBUMS", albums, albumsOffset,
         previewCount, imageLoader, newOffset -> {
           albumsOffset = newOffset;
           rebuildResultsCard();
         }, item -> handleRowClick("ALBUMS", item), ResultsColumnPanel.ColumnPosition.MIDDLE,
-        popularityT1, popularityT2, popularityT3);
+        popularityT1, popularityT2, popularityT3, totalAlbums);
 
     JPanel songsColumn = ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount,
         imageLoader, newOffset -> {
           songsOffset = newOffset;
           rebuildResultsCard();
         }, item -> handleRowClick("SONGS", item), ResultsColumnPanel.ColumnPosition.LAST,
-        popularityT1, popularityT2, popularityT3);
+        popularityT1, popularityT2, popularityT3, totalSongs);
 
     ResultsColumnPanel.layoutThreeColumns(columnsLayoutContainer, artistsColumn, albumsColumn,
         songsColumn);

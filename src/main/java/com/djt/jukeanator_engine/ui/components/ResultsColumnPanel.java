@@ -65,10 +65,13 @@ public final class ResultsColumnPanel {
    * @param popularityT1 minimum plays for 1 popularity bar (SONGS rows only)
    * @param popularityT2 minimum plays for 2 popularity bars (SONGS rows only)
    * @param popularityT3 minimum plays for 3 popularity bars (SONGS rows only)
+   * @param totalCount true, unpaginated total item count to display in the header as "(N)", or a
+   *        negative value to omit it (e.g. when the caller has no unpaginated total available)
    */
   public static <T> JPanel build(String header, List<T> items, int offset, int previewCount,
       ImageLoader imageLoader, Consumer<Integer> onOffsetChanged, Consumer<T> onItemClick,
-      ColumnPosition position, int popularityT1, int popularityT2, int popularityT3) {
+      ColumnPosition position, int popularityT1, int popularityT2, int popularityT3,
+      int totalCount) {
 
     // Snapshot the LayoutTheme once per build call so we read a consistent set
     // of values even if the singleton were to change between calls.
@@ -85,6 +88,9 @@ public final class ResultsColumnPanel {
     outerColumn.setBorder(new EmptyBorder(0, leftPad, 0, rightPad));
 
     String displayTitle = header.substring(0, 1).toUpperCase() + header.substring(1).toLowerCase();
+    if (totalCount >= 0) {
+      displayTitle += " (" + totalCount + ")";
+    }
     int total = items.size();
 
     JPanel headerPanel = new JPanel(new BorderLayout());

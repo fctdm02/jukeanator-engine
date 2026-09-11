@@ -14,6 +14,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
@@ -87,6 +88,15 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
         .queryParam("searchFor", searchFor).queryParam("artistPage", artistPageIndex)
         .queryParam("albumPage", albumPageIndex).queryParam("songPage", songPageIndex).build())
         .retrieve().body(SearchResultDto.class);
+  }
+
+  @Override
+  public SearchTotalsDto getSearchTotals(Integer locationId, String searchFor) {
+
+    return restClient.get()
+        .uri(uriBuilder -> uriBuilder.path(basePath(locationId) + "/search/totals")
+            .queryParam("searchFor", searchFor).build())
+        .retrieve().body(SearchTotalsDto.class);
   }
 
   @Override
