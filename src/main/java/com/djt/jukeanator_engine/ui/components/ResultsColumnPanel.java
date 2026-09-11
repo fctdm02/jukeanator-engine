@@ -7,11 +7,14 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.LinearGradientPaint;
 import java.awt.RenderingHints;
 import java.awt.geom.Point2D;
 import java.util.List;
 import java.util.function.Consumer;
+import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -20,7 +23,9 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSeparator;
 import javax.swing.SwingConstants;
+import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.MatteBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
@@ -37,6 +42,15 @@ public final class ResultsColumnPanel {
 
   private ResultsColumnPanel() {}
 
+  /**
+   * Position of a column within the 3-column Artists/Albums/Songs row. Only the side facing the
+   * screen edge gets {@code resultColumnPadH}; the sides facing a neighboring column get none, so
+   * adjacent columns sit flush against each other.
+   */
+  public enum ColumnPosition {
+    FIRST, MIDDLE, LAST
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // FACTORY METHOD
   // ─────────────────────────────────────────────────────────────────────────
@@ -46,9 +60,15 @@ public final class ResultsColumnPanel {
    *
    * @param onOffsetChanged callback accepting the newly calculated integer offset when navigating
    *        pages
+   * @param position this column's position within the Artists/Albums/Songs row, controlling which
+   *        outer edge (if any) gets {@code resultColumnPadH}
+   * @param popularityT1 minimum plays for 1 popularity bar (SONGS rows only)
+   * @param popularityT2 minimum plays for 2 popularity bars (SONGS rows only)
+   * @param popularityT3 minimum plays for 3 popularity bars (SONGS rows only)
    */
   public static <T> JPanel build(String header, List<T> items, int offset, int previewCount,
-      ImageLoader imageLoader, Consumer<Integer> onOffsetChanged, Consumer<T> onItemClick) {
+      ImageLoader imageLoader, Consumer<Integer> onOffsetChanged, Consumer<T> onItemClick,
+      ColumnPosition position, int popularityT1, int popularityT2, int popularityT3) {
 
     // Snapshot the LayoutTheme once per build call so we read a consistent set
     // of values even if the singleton were to change between calls.
@@ -56,9 +76,13 @@ public final class ResultsColumnPanel {
 
     JPanel outerColumn = new JPanel(new BorderLayout());
     outerColumn.setOpaque(false);
-    // Previously: new EmptyBorder(0, 10, 0, 10) — hard-coded 10px.
-    // Now: lt.resultColumnPadH so it scales with the theme.
-    outerColumn.setBorder(new EmptyBorder(0, lt.resultColumnPadH, 0, lt.resultColumnPadH));
+    // Only the outward-facing edge of the first/last column gets resultColumnPadH; the
+    // inward-facing edges get none so adjacent columns sit flush against each other. The
+    // outer-edge cancellation logic in each screen (SearchPanel/HotHerePanel/GenreDetailPanel)
+    // still subtracts exactly resultColumnPadH, so screen-edge margins are unaffected.
+    int leftPad = position == ColumnPosition.FIRST ? lt.resultColumnPadH : 0;
+    int rightPad = position == ColumnPosition.LAST ? lt.resultColumnPadH : 0;
+    outerColumn.setBorder(new EmptyBorder(0, leftPad, 0, rightPad));
 
     String displayTitle = header.substring(0, 1).toUpperCase() + header.substring(1).toLowerCase();
     int total = items.size();
@@ -94,18 +118,35 @@ public final class ResultsColumnPanel {
     JPanel rowsPanel = new JPanel();
     rowsPanel.setOpaque(false);
     rowsPanel.setLayout(new BoxLayout(rowsPanel, BoxLayout.Y_AXIS));
-    rowsPanel.setBorder(new EmptyBorder(4, 0, 4, 0));
+    Border rowsPanelBorder = new EmptyBorder(4, 0, 4, 0);
+    // Right-edge divider between this column and its neighbor -- same thickness/color as the
+    // JSeparator drawn between item rows below, and applied only to rowsPanel (not the header
+    // or the nav bar) so it spans just the item-list height. LAST column has no neighbor to its
+    // right, so it gets no divider.
+    if (position != ColumnPosition.LAST) {
+      Border divider =
+          new MatteBorder(0, 0, 0, lt.resultColumnGapW, ColorTheme.get().colorColumnSeparator);
+      rowsPanelBorder = BorderFactory.createCompoundBorder(rowsPanelBorder, divider);
+    }
+    rowsPanel.setBorder(rowsPanelBorder);
 
     for (int slot = 0; slot < previewCount; slot++) {
       int idx = offset + slot;
       JPanel row = (idx < total)
-          ? buildItemRow(idx + 1, items.get(idx), header, imageLoader, onItemClick, lt)
+          ? buildItemRow(idx + 1, items.get(idx), header, imageLoader, onItemClick, lt,
+              popularityT1, popularityT2, popularityT3)
           : buildEmptyRow(lt);
       rowsPanel.add(row);
       if (slot < previewCount - 1) {
         JSeparator sep = new JSeparator();
         sep.setForeground(ColorTheme.get().colorColumnSeparator);
         sep.setBackground(ColorTheme.get().colorColumnSeparator);
+        // Explicit thickness so this row divider renders at exactly the same pixel
+        // thickness as the resultColumnGapW border drawn between the Artists/Albums/
+        // Songs columns, rather than relying on the current look-and-feel's default
+        // JSeparator thickness (which may not match).
+        sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, lt.resultColumnGapW));
+        sep.setPreferredSize(new Dimension(0, lt.resultColumnGapW));
         rowsPanel.add(sep);
       }
     }
@@ -154,16 +195,58 @@ public final class ResultsColumnPanel {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // THREE-COLUMN CONTAINER LAYOUT
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Lays the three already-built Artists/Albums/Songs columns into {@code container} with
+   * proportional widths (see {@link LayoutTheme#resultColumnWeightArtists},
+   * {@code resultColumnWeightAlbums}, {@code resultColumnWeightSongs}). The right-edge divider
+   * between adjacent columns is drawn by {@link #build} directly on the item-rows area (not here),
+   * so it spans only the row list and not the header or nav bar. Replaces any existing
+   * children/layout of {@code container}, so callers can pass the same container across rebuilds.
+   */
+  public static void layoutThreeColumns(JPanel container, JPanel artistsColumn,
+      JPanel albumsColumn, JPanel songsColumn) {
+
+    final LayoutTheme lt = LayoutTheme.get();
+
+    container.removeAll();
+    container.setLayout(new GridBagLayout());
+
+    GridBagConstraints gbc = new GridBagConstraints();
+    gbc.gridy = 0;
+    gbc.fill = GridBagConstraints.BOTH;
+    gbc.weighty = 1.0;
+
+    gbc.gridx = 0;
+    gbc.weightx = lt.resultColumnWeightArtists;
+    container.add(artistsColumn, gbc);
+
+    gbc.gridx = 1;
+    gbc.weightx = lt.resultColumnWeightAlbums;
+    container.add(albumsColumn, gbc);
+
+    gbc.gridx = 2;
+    gbc.weightx = lt.resultColumnWeightSongs;
+    container.add(songsColumn, gbc);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // ITEM ROW
   // ─────────────────────────────────────────────────────────────────────────
 
   private static <T> JPanel buildItemRow(int rowNum, T item, String category,
-      ImageLoader imageLoader, Consumer<T> onItemClick, LayoutTheme lt) {
+      ImageLoader imageLoader, Consumer<T> onItemClick, LayoutTheme lt, int popularityT1,
+      int popularityT2, int popularityT3) {
 
     JPanel row = new JPanel(new BorderLayout(10, 0));
     row.setOpaque(false);
     row.setBackground(ColorTheme.get().bgRowTransparent);
-    row.setBorder(new EmptyBorder(8, 14, 8, 14));
+    // Left inset (before the index number) reduced 25% from 14 to 11 to free up more room
+    // for the item text; top/bottom (8) and the right inset (14) are unrelated to the index
+    // and left unchanged.
+    row.setBorder(new EmptyBorder(8, 11, 8, 14));
     // Previously: new Dimension(Integer.MAX_VALUE, 72) — hard-coded 72px max height.
     // Now: lt.resultRowMaxH so a scaled theme can increase row height proportionally.
     row.setMaximumSize(new Dimension(Integer.MAX_VALUE, lt.resultRowMaxH));
@@ -187,12 +270,25 @@ public final class ResultsColumnPanel {
 
     JLabel line1 = new JLabel();
     JLabel line2 = new JLabel();
-    line1.setFont(new Font(Font.SANS_SERIF, Font.BOLD, lt.fontSizeResultLine1));
+    // Matches the Home Screen's album tile name size (AlbumGridPanel.fontSizeAlbumLabel)
+    // rather than the larger fontSizeResultLine1 (which is still used, unchanged, by the
+    // song-queue list rows in SongTrackCellRenderer).
+    line1.setFont(new Font(Font.SANS_SERIF, Font.BOLD, lt.fontSizeAlbumLabel));
     line2.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, lt.fontSizeResultLine2));
     line1.setForeground(ColorTheme.get().textPrimary);
     line2.setForeground(ColorTheme.get().textResultsSecondary);
 
     String coverPath = extractFields(item, category, line1, line2);
+
+    // JLabel's minimum size defaults to its full, untruncated-text preferred size. Left
+    // uncapped, the longest artist/album/song name in the visible page would force
+    // GridBagLayout to grow that whole column past its resultColumnWeight* share (since
+    // GridBagLayout can never shrink a column below its children's minimum size), breaking
+    // the Artists/Albums equal-width layout. Capping the width lets the label shrink freely;
+    // actual rendering still clips/ellipsizes normally since that happens against the real
+    // allocated bounds at paint time, not against preferred size.
+    capTextWidth(line1);
+    capTextWidth(line2);
 
     if (coverPath != null && imageLoader != null) {
       try {
@@ -211,9 +307,28 @@ public final class ResultsColumnPanel {
     textPanel.add(Box.createVerticalStrut(3));
     textPanel.add(line2);
 
-    JPanel left = new JPanel(new BorderLayout(8, 0));
+    // Index cluster: the small green popularity indicator (SONGS rows only) sits directly to
+    // the left of the index number, smaller than the one on the Album Details Screen since
+    // screen real estate is at a premium here.
+    JPanel numCluster = new JPanel(new BorderLayout(3, 0));
+    numCluster.setOpaque(false);
+    if ("SONGS".equals(category) && item instanceof SongDto s) {
+      int active =
+          SongTrackCellRenderer.barsForPlays(s.numPlays(), popularityT1, popularityT2, popularityT3);
+      SongTrackCellRenderer.PopularityBarsPanel bars = new SongTrackCellRenderer.PopularityBarsPanel(
+          active, lt.popularityBarWidthSmall, lt.popularityBarGapSmall,
+          SongTrackCellRenderer.computeBarHeights(lt.popularityBarMaxHSmall));
+      bars.setOpaque(false);
+      bars.setPreferredSize(new Dimension(
+          3 * (lt.popularityBarWidthSmall + lt.popularityBarGapSmall), lt.popularityBarMaxHSmall + 4));
+      numCluster.add(bars, BorderLayout.WEST);
+    }
+    numCluster.add(numLabel, BorderLayout.CENTER);
+
+    // Index-to-thumbnail gap reduced 25% from 8 to 6 to free up more room for the item text.
+    JPanel left = new JPanel(new BorderLayout(6, 0));
     left.setOpaque(false);
-    left.add(numLabel, BorderLayout.WEST);
+    left.add(numCluster, BorderLayout.WEST);
     left.add(thumb, BorderLayout.CENTER);
 
     row.add(left, BorderLayout.WEST);
@@ -256,6 +371,18 @@ public final class ResultsColumnPanel {
     });
 
     return row;
+  }
+
+  /**
+   * Zeroes a label's preferred/minimum width while preserving its font-driven height, so it no
+   * longer dictates its container chain's layout width. See the call site in {@link #buildItemRow}
+   * for why this matters for the Artists/Albums/Songs column proportions.
+   */
+  private static void capTextWidth(JLabel label) {
+    int h = label.getPreferredSize().height;
+    Dimension d = new Dimension(0, h);
+    label.setMinimumSize(d);
+    label.setPreferredSize(d);
   }
 
   private static <T> String extractFields(T item, String category, JLabel line1, JLabel line2) {

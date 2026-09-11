@@ -9,7 +9,6 @@ import java.awt.Frame;
 import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.util.List;
 import javax.swing.BorderFactory;
@@ -47,7 +46,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   private final CardLayout cardLayout = new CardLayout();
   private final JPanel rootPanel = new JPanel(cardLayout);
   private final JPanel contentPanel = new JPanel(new BorderLayout());
-  private final JPanel columnsPanel = new JPanel(new GridLayout(1, 3, 2, 0));
+  private final JPanel columnsPanel = new JPanel();
 
   // ── Offset state per column ───────────────────────────────────────────────
   private int artistsOffset = 0;
@@ -383,8 +382,6 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // ─────────────────────────────────────────────────────────────────────────
   private void rebuildColumnsPanel() {
 
-    columnsPanel.removeAll();
-
     int previewCount = LayoutTheme.get().hotHerePreviewCount;
     Integer locationId = songLibraryService.getOwnLocationId();
     boolean popularity = currentSort == SortMode.POPULARITY;
@@ -415,23 +412,28 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     List<AlbumDto> albums = albumBuffer.items();
     List<SongDto> songs = songBuffer.items();
 
-    columnsPanel.add(ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, previewCount,
+    JPanel artistsColumn = ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, previewCount,
         imageLoader, newOffset -> {
           artistsOffset = newOffset;
           rebuildColumnsPanel();
-        }, (item) -> handleRowClick("ARTISTS", item)));
+        }, (item) -> handleRowClick("ARTISTS", item), ResultsColumnPanel.ColumnPosition.FIRST,
+        popularityT1, popularityT2, popularityT3);
 
-    columnsPanel.add(ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, previewCount,
+    JPanel albumsColumn = ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, previewCount,
         imageLoader, newOffset -> {
           albumsOffset = newOffset;
           rebuildColumnsPanel();
-        }, (item) -> handleRowClick("ALBUMS", item)));
+        }, (item) -> handleRowClick("ALBUMS", item), ResultsColumnPanel.ColumnPosition.MIDDLE,
+        popularityT1, popularityT2, popularityT3);
 
-    columnsPanel.add(ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount,
+    JPanel songsColumn = ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount,
         imageLoader, newOffset -> {
           songsOffset = newOffset;
           rebuildColumnsPanel();
-        }, (item) -> handleRowClick("SONGS", item)));
+        }, (item) -> handleRowClick("SONGS", item), ResultsColumnPanel.ColumnPosition.LAST,
+        popularityT1, popularityT2, popularityT3);
+
+    ResultsColumnPanel.layoutThreeColumns(columnsPanel, artistsColumn, albumsColumn, songsColumn);
 
     columnsPanel.revalidate();
     columnsPanel.repaint();

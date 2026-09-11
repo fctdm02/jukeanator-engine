@@ -36,10 +36,18 @@ public class SongTrackCellRenderer extends JPanel
   public static final int BAR_WIDTH = LayoutTheme.get().popularityBarWidth;
   public static final int BAR_GAP = LayoutTheme.get().popularityBarGap;
   public static final int BAR_MAX_H = LayoutTheme.get().popularityBarMaxH;
-  public static final int[] BAR_HEIGHTS = {BAR_MAX_H / 2, // bar 1 — ~half height
-      (int) Math.round(BAR_MAX_H * 0.72), // bar 2 — ~72 % height
-      BAR_MAX_H // bar 3 — full height
-  };
+  public static final int[] BAR_HEIGHTS = computeBarHeights(BAR_MAX_H);
+
+  /**
+   * Computes the {@code {half, ~72%, full}} height ratio shared by every bar-geometry variant
+   * (the default Album Details Screen size and the smaller Search/Hot Here/Genre row size).
+   */
+  public static int[] computeBarHeights(int maxH) {
+    return new int[] {maxH / 2, // bar 1 — ~half height
+        (int) Math.round(maxH * 0.72), // bar 2 — ~72 % height
+        maxH // bar 3 — full height
+    };
+  }
 
   // ── Colours — sourced from ColorTheme.get() ──────────────────────────────
 
@@ -254,9 +262,24 @@ public class SongTrackCellRenderer extends JPanel
 
     private static final long serialVersionUID = 1L;
     private int activeBars;
+    private final int barWidth;
+    private final int barGap;
+    private final int[] barHeights;
 
     public PopularityBarsPanel(int activeBars) {
+      this(activeBars, BAR_WIDTH, BAR_GAP, BAR_HEIGHTS);
+    }
+
+    /**
+     * Sizeable variant — lets callers (e.g. the smaller indicator used on the Search / Hot Here /
+     * Genre song rows) render the same 3-bar widget at a different geometry than the default used
+     * on the Album Details Screen.
+     */
+    public PopularityBarsPanel(int activeBars, int barWidth, int barGap, int[] barHeights) {
       this.activeBars = activeBars;
+      this.barWidth = barWidth;
+      this.barGap = barGap;
+      this.barHeights = barHeights;
       setOpaque(false);
     }
 
@@ -272,8 +295,8 @@ public class SongTrackCellRenderer extends JPanel
 
       int baseline = getHeight() - 2;
       for (int i = 0; i < 3; i++) {
-        int barH = BAR_HEIGHTS[i];
-        int x = i * (BAR_WIDTH + BAR_GAP);
+        int barH = barHeights[i];
+        int x = i * (barWidth + barGap);
         int y = baseline - barH;
 
         if (i < activeBars) {
@@ -284,7 +307,7 @@ public class SongTrackCellRenderer extends JPanel
         } else {
           g2.setColor(ColorTheme.get().popularityBarInactive);
         }
-        g2.fillRoundRect(x, y, BAR_WIDTH, barH, 2, 2);
+        g2.fillRoundRect(x, y, barWidth, barH, 2, 2);
       }
       g2.dispose();
     }

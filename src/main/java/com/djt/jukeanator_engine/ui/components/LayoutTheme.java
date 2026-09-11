@@ -1881,6 +1881,25 @@ public class LayoutTheme {
   /** Result column outer left/right padding. */
   public final int resultColumnPadH;
 
+  /** Fixed-width gap rendered between adjacent result columns (Artists|Albums|Songs). */
+  public final int resultColumnGapW = 1;
+
+  /**
+   * Relative width weight for the Artists column. Narrower than an equal third so the freed
+   * width can go to the Songs column, since the fixed thumbnail/index/popularity-bar chrome
+   * leaves less room needed for artist names than for the longer song titles.
+   */
+  public final double resultColumnWeightArtists = 0.82;
+
+  /** Relative width weight for the Albums column — matches the Artists column exactly. */
+  public final double resultColumnWeightAlbums = 0.82;
+
+  /**
+   * Relative width weight for the Songs column — takes all width freed from Artists and Albums,
+   * since song titles are the longest text and most need the extra room.
+   */
+  public final double resultColumnWeightSongs = 1.36;
+
   /** Nav button preferred size — width (up/down arrows in result columns). */
   public final int resultNavBtnW;
 
@@ -1912,6 +1931,18 @@ public class LayoutTheme {
 
   /** Maximum height of the tallest (3rd) popularity bar. */
   public final int popularityBarMaxH = 18;
+
+  /**
+   * Smaller popularity-bar geometry used on the Search / Hot Here / Genre results Songs rows,
+   * where screen real estate is tighter than on the Album Details Screen.
+   */
+  public final int popularityBarWidthSmall = 3;
+
+  /** Gap between adjacent small popularity bars. */
+  public final int popularityBarGapSmall = 2;
+
+  /** Maximum height of the tallest (3rd) small popularity bar. */
+  public final int popularityBarMaxHSmall = 12;
 
   /** Fixed cell height for the queue/song-track list renderer — matches {@link #resultRowMaxH}. */
   public final int songTrackCellHeight;

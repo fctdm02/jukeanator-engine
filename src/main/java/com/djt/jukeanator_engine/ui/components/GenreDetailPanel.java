@@ -8,7 +8,6 @@ import java.awt.Frame;
 import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.util.List;
 import javax.swing.BorderFactory;
@@ -45,7 +44,7 @@ public class GenreDetailPanel extends JPanel {
   private DetailHeaderPanel headerPanel;
 
   // ── Live column container (rebuilt on nav) ────────────────────────────────
-  private final JPanel columnsPanel = new JPanel(new GridLayout(1, 3, 2, 0));
+  private final JPanel columnsPanel = new JPanel();
 
   // ── Data ──────────────────────────────────────────────────────────────────
   private final GenreDto genre;
@@ -59,6 +58,11 @@ public class GenreDetailPanel extends JPanel {
   private final ArtistClickListener onArtistClicked;
   private final SongLibraryService songLibraryService;
 
+  // ── Popularity thresholds (for the Songs column's popularity indicator) ────
+  private final int popularityT1;
+  private final int popularityT2;
+  private final int popularityT3;
+
   // ── Current sort state ────────────────────────────────────────────────────
   private SortMode currentSort = SortMode.POPULARITY;
 
@@ -71,14 +75,18 @@ public class GenreDetailPanel extends JPanel {
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
   public GenreDetailPanel(GenreDto genre, SearchResultDto results, ImageLoader imageLoader,
-      String backLabel, Runnable onBack, AlbumGridPanel.AlbumClickListener onAlbumClicked,
-      ArtistClickListener onArtistClicked, SongLibraryService songLibraryService) {
+      int popularityT1, int popularityT2, int popularityT3, String backLabel, Runnable onBack,
+      AlbumGridPanel.AlbumClickListener onAlbumClicked, ArtistClickListener onArtistClicked,
+      SongLibraryService songLibraryService) {
 
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
 
     this.genre = genre;
     this.imageLoader = imageLoader;
+    this.popularityT1 = popularityT1;
+    this.popularityT2 = popularityT2;
+    this.popularityT3 = popularityT3;
     this.onAlbumClicked = onAlbumClicked;
     this.onArtistClicked = onArtistClicked;
     this.songLibraryService = songLibraryService;
@@ -317,25 +325,28 @@ public class GenreDetailPanel extends JPanel {
     } catch (Exception ignored) {
     }
 
-    columnsPanel.removeAll();
-
-    columnsPanel.add(ResultsColumnPanel.build("ARTISTS", artistBuffer.items(), artistsOffset,
+    JPanel artistsColumn = ResultsColumnPanel.build("ARTISTS", artistBuffer.items(), artistsOffset,
         previewCount, imageLoader, newOffset -> {
           artistsOffset = newOffset;
           rebuildColumns();
-        }, item -> handleRowClick("ARTISTS", item)));
+        }, item -> handleRowClick("ARTISTS", item), ResultsColumnPanel.ColumnPosition.FIRST,
+        popularityT1, popularityT2, popularityT3);
 
-    columnsPanel.add(ResultsColumnPanel.build("ALBUMS", albumBuffer.items(), albumsOffset,
+    JPanel albumsColumn = ResultsColumnPanel.build("ALBUMS", albumBuffer.items(), albumsOffset,
         previewCount, imageLoader, newOffset -> {
           albumsOffset = newOffset;
           rebuildColumns();
-        }, item -> handleRowClick("ALBUMS", item)));
+        }, item -> handleRowClick("ALBUMS", item), ResultsColumnPanel.ColumnPosition.MIDDLE,
+        popularityT1, popularityT2, popularityT3);
 
-    columnsPanel.add(ResultsColumnPanel.build("SONGS", songBuffer.items(), songsOffset,
+    JPanel songsColumn = ResultsColumnPanel.build("SONGS", songBuffer.items(), songsOffset,
         previewCount, imageLoader, newOffset -> {
           songsOffset = newOffset;
           rebuildColumns();
-        }, item -> handleRowClick("SONGS", item)));
+        }, item -> handleRowClick("SONGS", item), ResultsColumnPanel.ColumnPosition.LAST,
+        popularityT1, popularityT2, popularityT3);
+
+    ResultsColumnPanel.layoutThreeColumns(columnsPanel, artistsColumn, albumsColumn, songsColumn);
 
     columnsPanel.revalidate();
     columnsPanel.repaint();
