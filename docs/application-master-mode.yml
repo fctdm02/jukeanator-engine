@@ -123,6 +123,7 @@ receipt:
   hibernate-end: 9   # In 24 hour/military time  
   # CREDIT CONFIGURATION
   increment-credits-key: a
+  increment-credits-credit-card-reader-key: b
   num-credits: 0
   priority-cost-multiplier: 2
   credits-per-dollar: 3

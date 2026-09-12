@@ -25,6 +25,7 @@ public class JukeANatorUserInterfaceProperties {
   // CREDIT CONFIGURATION
   //
   private char incrementCreditsKey = 'a';
+  private char incrementCreditsCreditCardReaderKey = 'b';
   private int numCredits = 6;
   private int priorityCostMultiplier = 2;
   private int creditsPerDollar = 3;
@@ -91,6 +92,14 @@ public class JukeANatorUserInterfaceProperties {
 
   public void setIncrementCreditsKey(char incrementCreditsKey) {
     this.incrementCreditsKey = incrementCreditsKey;
+  }
+
+  public char getIncrementCreditsCreditCardReaderKey() {
+    return incrementCreditsCreditCardReaderKey;
+  }
+
+  public void setIncrementCreditsCreditCardReaderKey(char incrementCreditsCreditCardReaderKey) {
+    this.incrementCreditsCreditCardReaderKey = incrementCreditsCreditCardReaderKey;
   }
 
   public int getNumCredits() {

@@ -177,6 +177,7 @@ public class JukeANatorFrame extends JFrame {
 
   // SONG CREDITS
   private final char incrementCreditsKey;
+  private final char incrementCreditsCreditCardReaderKey;
   private int numCredits = 0;
   private final int priorityCostMultiplier;
   private final int creditsPerDollar;
@@ -221,6 +222,8 @@ public class JukeANatorFrame extends JFrame {
     this.alwaysOnTop = jukeANatorUserInterfaceProperties.isAlwaysOnTop();
 
     this.incrementCreditsKey = jukeANatorUserInterfaceProperties.getIncrementCreditsKey();
+    this.incrementCreditsCreditCardReaderKey =
+        jukeANatorUserInterfaceProperties.getIncrementCreditsCreditCardReaderKey();
     this.numCredits = jukeANatorUserInterfaceProperties.getNumCredits();
     this.priorityCostMultiplier = jukeANatorUserInterfaceProperties.getPriorityCostMultiplier();
     this.creditsPerDollar = this.jukeANatorUserInterfaceProperties.getCreditsPerDollar();
@@ -342,6 +345,21 @@ public class JukeANatorFrame extends JFrame {
     getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).put(billAcceptorStroke,
         BILL_ACCEPTOR_ACTION);
     getRootPane().getActionMap().put(BILL_ACCEPTOR_ACTION, new javax.swing.AbstractAction() {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      public void actionPerformed(java.awt.event.ActionEvent e) {
+        creditManager.addDollar();
+      }
+    });
+
+    // Hardware Credit Card Reader (e.g. Nayax VPOS Touch, pulse integration) Key Binding
+    javax.swing.KeyStroke creditCardReaderStroke =
+        javax.swing.KeyStroke.getKeyStroke(incrementCreditsCreditCardReaderKey);
+    final String CREDIT_CARD_READER_ACTION = "creditCardReader";
+    getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
+        .put(creditCardReaderStroke, CREDIT_CARD_READER_ACTION);
+    getRootPane().getActionMap().put(CREDIT_CARD_READER_ACTION, new javax.swing.AbstractAction() {
       private static final long serialVersionUID = 1L;
 
       @Override
