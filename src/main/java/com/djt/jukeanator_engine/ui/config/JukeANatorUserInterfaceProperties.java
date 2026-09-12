@@ -26,6 +26,9 @@ public class JukeANatorUserInterfaceProperties {
   //
   private char incrementCreditsKey = 'a';
   private char incrementCreditsCreditCardReaderKey = 'b';
+  // Local hardware toggle (not synced via PricingConfig/LocationEntity) -- the credit-card-reader
+  // key stays inert until an operator opts a given terminal in.
+  private boolean enableCreditCardProcessing = false;
   private int numCredits = 6;
   private int priorityCostMultiplier = 2;
   private int creditsPerDollar = 3;
@@ -100,6 +103,14 @@ public class JukeANatorUserInterfaceProperties {
 
   public void setIncrementCreditsCreditCardReaderKey(char incrementCreditsCreditCardReaderKey) {
     this.incrementCreditsCreditCardReaderKey = incrementCreditsCreditCardReaderKey;
+  }
+
+  public boolean isEnableCreditCardProcessing() {
+    return enableCreditCardProcessing;
+  }
+
+  public void setEnableCreditCardProcessing(boolean enableCreditCardProcessing) {
+    this.enableCreditCardProcessing = enableCreditCardProcessing;
   }
 
   public int getNumCredits() {

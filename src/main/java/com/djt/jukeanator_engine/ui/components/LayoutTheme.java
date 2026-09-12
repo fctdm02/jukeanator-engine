@@ -2149,6 +2149,9 @@ public class LayoutTheme {
   public final int fontSizeAdminSideBtn2 = 10; // AdminPanel side button line 2 (text)
   public final int fontSizeCreditTitle = 18; // JukeANatorFrame credits title
   public final int fontSizeCreditDesc = 15; // JukeANatorFrame credits description
+  public final int fontSizeCreditDescCard = 11; // JukeANatorFrame CASH/CARD lines when credit card
+                                                 // processing is enabled -- smaller so both lines
+                                                 // fit without clipping
   public final int fontSizeCreditDisclaimer = 10; // JukeANatorFrame credits panel disclaimer line
 
   // Login

@@ -3,9 +3,16 @@ package com.djt.jukeanator_engine.ui.model;
 public class CreditManager {
   private int numCredits;
   private int totalDollarsInserted;
+  // Credit-card dollars track their own independent milestone progress -- a session never mixes
+  // cash and card, but keeping the counters separate means the card's divided-down payout formula
+  // never disturbs the bill acceptor's tier math (and vice versa).
+  private int totalCreditCardDollarsInserted;
+  private int rawCreditCardCredits;
+  private int creditCardCreditsAwarded;
   private final int creditsPerDollar;
   private final int fiveDollarBonus;
   private final int tenDollarBonus;
+  private final int webCostMultiplier;
   private final boolean displayCurrencyForCost;
   // The blended credits-per-dollar rate actually achieved by totalDollarsInserted so far this
   // session (base rate plus whatever bonus tiers have been crossed) -- recomputed only when new
@@ -16,11 +23,12 @@ public class CreditManager {
   private final java.util.List<Runnable> listeners = new java.util.ArrayList<>();
 
   public CreditManager(int numCredits, int creditsPerDollar, int fiveDollarBonus,
-      int tenDollarBonus, boolean displayCurrencyForCost) {
+      int tenDollarBonus, int webCostMultiplier, boolean displayCurrencyForCost) {
     this.numCredits = numCredits;
     this.creditsPerDollar = creditsPerDollar;
     this.fiveDollarBonus = fiveDollarBonus;
     this.tenDollarBonus = tenDollarBonus;
+    this.webCostMultiplier = webCostMultiplier;
     this.displayCurrencyForCost = displayCurrencyForCost;
     this.effectiveCreditsPerDollar = creditsPerDollar;
   }
@@ -50,9 +58,52 @@ public class CreditManager {
       }
     }
 
-    effectiveCreditsPerDollar = (double) numCredits / totalDollarsInserted;
+    effectiveCreditsPerDollar =
+        (double) numCredits / (totalDollarsInserted + totalCreditCardDollarsInserted);
 
     notifyListeners();
+  }
+
+  /**
+   * Awards credits for one credit-card dollar (e.g. one Nayax VPOS Touch pulse), at a reduced
+   * rate that offsets the reader's subscription/wireless fees and per-transaction processing cost.
+   * Applies the same tiered bonus schedule as {@link #addDollar()} to the card's own running
+   * total, then divides the result by {@code webCostMultiplier} and rounds up to the nearest whole
+   * credit.
+   */
+  public synchronized void addCreditCardDollar() {
+    totalCreditCardDollarsInserted++;
+    rawCreditCardCredits += creditsPerDollar;
+
+    // Apply tiered bonuses based on exact milestone targets
+    if (totalCreditCardDollarsInserted == 5) {
+      rawCreditCardCredits += fiveDollarBonus;
+    } else if (totalCreditCardDollarsInserted == 10) {
+      rawCreditCardCredits += tenDollarBonus;
+      if (rawCreditCardCredits > creditsPerDollar * 10) {
+        rawCreditCardCredits = (creditsPerDollar * 10) + tenDollarBonus;
+      }
+    } else if (totalCreditCardDollarsInserted == 15) {
+      rawCreditCardCredits += fiveDollarBonus;
+    } else if (totalCreditCardDollarsInserted == 20) {
+      rawCreditCardCredits += tenDollarBonus;
+      if (rawCreditCardCredits > (creditsPerDollar * 20) + (2 * tenDollarBonus)) {
+        rawCreditCardCredits = (creditsPerDollar * 20) + (2 * tenDollarBonus);
+      }
+    }
+
+    int actualCardCredits = ceilDiv(rawCreditCardCredits, webCostMultiplier);
+    numCredits += actualCardCredits - creditCardCreditsAwarded;
+    creditCardCreditsAwarded = actualCardCredits;
+
+    effectiveCreditsPerDollar =
+        (double) numCredits / (totalDollarsInserted + totalCreditCardDollarsInserted);
+
+    notifyListeners();
+  }
+
+  private static int ceilDiv(int numerator, int denominator) {
+    return -Math.floorDiv(-numerator, denominator);
   }
 
   public synchronized boolean deductCredits(int amount) {
@@ -60,6 +111,9 @@ public class CreditManager {
       numCredits -= amount;
       if (numCredits == 0) {
         totalDollarsInserted = 0;
+        totalCreditCardDollarsInserted = 0;
+        rawCreditCardCredits = 0;
+        creditCardCreditsAwarded = 0;
         effectiveCreditsPerDollar = creditsPerDollar;
       }
       notifyListeners();

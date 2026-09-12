@@ -178,11 +178,13 @@ public class JukeANatorFrame extends JFrame {
   // SONG CREDITS
   private final char incrementCreditsKey;
   private final char incrementCreditsCreditCardReaderKey;
+  private final boolean enableCreditCardProcessing;
   private int numCredits = 0;
   private final int priorityCostMultiplier;
   private final int creditsPerDollar;
   private final int fiveDollarBonusCredits;
   private final int tenDollarBonusCredits;
+  private final int webCostMultiplier;
 
 
   // SCREENSAVER
@@ -224,17 +226,21 @@ public class JukeANatorFrame extends JFrame {
     this.incrementCreditsKey = jukeANatorUserInterfaceProperties.getIncrementCreditsKey();
     this.incrementCreditsCreditCardReaderKey =
         jukeANatorUserInterfaceProperties.getIncrementCreditsCreditCardReaderKey();
+    this.enableCreditCardProcessing =
+        jukeANatorUserInterfaceProperties.isEnableCreditCardProcessing();
     this.numCredits = jukeANatorUserInterfaceProperties.getNumCredits();
     this.priorityCostMultiplier = jukeANatorUserInterfaceProperties.getPriorityCostMultiplier();
     this.creditsPerDollar = this.jukeANatorUserInterfaceProperties.getCreditsPerDollar();
     this.fiveDollarBonusCredits =
         this.jukeANatorUserInterfaceProperties.getFiveDollarBonusCredits();
     this.tenDollarBonusCredits = this.jukeANatorUserInterfaceProperties.getTenDollarBonusCredits();
+    this.webCostMultiplier = this.jukeANatorUserInterfaceProperties.getWebCostMultiplier();
 
     this.enableTypeAheadSearch = this.jukeANatorUserInterfaceProperties.isEnableTypeAheadSearch();
 
     this.creditManager = new CreditManager(numCredits, creditsPerDollar, fiveDollarBonusCredits,
-        tenDollarBonusCredits, jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost());
+        tenDollarBonusCredits, webCostMultiplier,
+        jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost());
 
     this.enableScreenSaver = this.jukeANatorUserInterfaceProperties.isEnableScreenSaver();
 
@@ -353,20 +359,25 @@ public class JukeANatorFrame extends JFrame {
       }
     });
 
-    // Hardware Credit Card Reader (e.g. Nayax VPOS Touch, pulse integration) Key Binding
-    javax.swing.KeyStroke creditCardReaderStroke =
-        javax.swing.KeyStroke.getKeyStroke(incrementCreditsCreditCardReaderKey);
-    final String CREDIT_CARD_READER_ACTION = "creditCardReader";
-    getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
-        .put(creditCardReaderStroke, CREDIT_CARD_READER_ACTION);
-    getRootPane().getActionMap().put(CREDIT_CARD_READER_ACTION, new javax.swing.AbstractAction() {
-      private static final long serialVersionUID = 1L;
+    // Hardware Credit Card Reader (e.g. Nayax VPOS Touch, pulse integration) Key Binding.
+    // Only registered when enable-credit-card-processing is true, so the key is a pure no-op
+    // (never falls back to bill-acceptor pricing) on terminals that haven't opted in.
+    if (enableCreditCardProcessing) {
+      javax.swing.KeyStroke creditCardReaderStroke =
+          javax.swing.KeyStroke.getKeyStroke(incrementCreditsCreditCardReaderKey);
+      final String CREDIT_CARD_READER_ACTION = "creditCardReader";
+      getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
+          .put(creditCardReaderStroke, CREDIT_CARD_READER_ACTION);
+      getRootPane().getActionMap().put(CREDIT_CARD_READER_ACTION,
+          new javax.swing.AbstractAction() {
+            private static final long serialVersionUID = 1L;
 
-      @Override
-      public void actionPerformed(java.awt.event.ActionEvent e) {
-        creditManager.addDollar();
-      }
-    });
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+              creditManager.addCreditCardDollar();
+            }
+          });
+    }
 
     // Physical Escape Key Binding to Toggle/Bypass Admin Panel
     javax.swing.KeyStroke escapeStroke =
@@ -988,7 +999,7 @@ public class JukeANatorFrame extends JFrame {
     //
     // LEFT : CREDITS
     //
-    JPanel creditsPanel = new JPanel(new BorderLayout(10, 0));
+    JPanel creditsPanel = new JPanel(new BorderLayout(8, 0)); // hgap between logo and credit text
     creditsPanel.setOpaque(true);
     creditsPanel.setBackground(ColorTheme.get().bgFieldDark);
     creditsPanel
@@ -1058,8 +1069,11 @@ public class JukeANatorFrame extends JFrame {
 
     JLabel creditDescription = new JLabel(buildCreditsDescription());
     creditDescription.setForeground(ColorTheme.get().textPrimary);
-    creditDescription
-        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeCreditDesc));
+    // Shrunk when the CARD: line is also present -- at the normal size, both lines together
+    // clip past the fixed-width credits panel.
+    int creditDescFontSize = enableCreditCardProcessing ? LayoutTheme.get().fontSizeCreditDescCard
+        : LayoutTheme.get().fontSizeCreditDesc;
+    creditDescription.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, creditDescFontSize));
 
     JLabel creditDisclaimer = new JLabel("(Priority plays & queue operations may cost more)");
     creditDisclaimer.setForeground(ColorTheme.get().textSecondary);
@@ -1073,6 +1087,14 @@ public class JukeANatorFrame extends JFrame {
     creditsTextPanel.add(creditsTitle);
     creditsTextPanel.add(Box.createVerticalStrut(5));
     creditsTextPanel.add(creditDescription);
+    if (enableCreditCardProcessing) {
+      JLabel creditCardDescription = new JLabel(buildCreditCardCreditsDescription());
+      creditCardDescription.setForeground(ColorTheme.get().textPrimary);
+      creditCardDescription.setFont(
+          new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeCreditDescCard));
+      creditsTextPanel.add(Box.createVerticalStrut(2));
+      creditsTextPanel.add(creditCardDescription);
+    }
     creditsTextPanel.add(Box.createVerticalStrut(3));
     creditsTextPanel.add(creditDisclaimer);
     creditsTextPanel.add(Box.createVerticalGlue());
@@ -1139,8 +1161,33 @@ public class JukeANatorFrame extends JFrame {
     // "plays" reads as "song plays" when the panel is otherwise showing a dollar balance instead
     // of a raw credit count -- "cr" alongside a $ balance would be a confusing mixed unit.
     String unit = jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost() ? " plays" : "cr";
-    return String.format("1$=%d%s | 5$=%d%s | 10$=%d%s", oneDollarCredits, unit, fiveDollarCredits,
-        unit, tenDollarCredits, unit);
+    // Only labeled "CASH:" once a CARD: line is also shown alongside it -- a cash-only kiosk keeps
+    // today's unprefixed single line.
+    String prefix = enableCreditCardProcessing ? "CASH: " : "";
+    return String.format("%s1$=%d%s | 5$=%d%s | 10$=%d%s", prefix, oneDollarCredits, unit,
+        fiveDollarCredits, unit, tenDollarCredits, unit);
+  }
+
+  /**
+   * Mirrors {@link #buildCreditsDescription()} but at the reduced credit-card rate -- each tier's
+   * bill-acceptor-equivalent credit total is divided by {@code webCostMultiplier} and rounded up
+   * to the nearest whole credit, matching {@link CreditManager#addCreditCardDollar()}.
+   */
+  private String buildCreditCardCreditsDescription() {
+
+    int oneDollarCredits = ceilDiv(creditsPerDollar, webCostMultiplier);
+    int fiveDollarCredits =
+        ceilDiv((5 * creditsPerDollar) + fiveDollarBonusCredits, webCostMultiplier);
+    int tenDollarCredits =
+        ceilDiv((10 * creditsPerDollar) + tenDollarBonusCredits, webCostMultiplier);
+
+    String unit = jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost() ? " plays" : "cr";
+    return String.format("CARD: 1$=%d%s | 5$=%d%s | 10$=%d%s", oneDollarCredits, unit,
+        fiveDollarCredits, unit, tenDollarCredits, unit);
+  }
+
+  private static int ceilDiv(int numerator, int denominator) {
+    return -Math.floorDiv(-numerator, denominator);
   }
 
   // NOW PLAYING PANEL

@@ -118,6 +118,7 @@ user-interface:
   # CREDIT CONFIGURATION
   increment-credits-key: a
   increment-credits-credit-card-reader-key: b
+  enable-credit-card-processing: false # must be true for the credit-card-reader key to award any credits
   num-credits: 0
   priority-cost-multiplier: 2
   credits-per-dollar: 3
