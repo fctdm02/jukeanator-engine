@@ -753,8 +753,17 @@ public class AdminPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   // FINANCIAL LEDGER ACTIONS (FinancialLedgerService)
   // ─────────────────────────────────────────────────────────────────────────
+  // Reused across every open rather than constructed fresh per click (unlike AddLocationForm and
+  // friends) -- IdleMonitor registers a permanent, application-lifetime AWT event listener with
+  // no way to unregister it (see its own class javadoc), so a new FinancialLedgerDialog per click
+  // would leak one more of those listeners every time the operator opens this screen.
+  private FinancialLedgerDialog financialLedgerDialog;
+
   private void doFinancialLedger() {
-    new FinancialLedgerDialog().show();
+    if (financialLedgerDialog == null) {
+      financialLedgerDialog = new FinancialLedgerDialog();
+    }
+    financialLedgerDialog.show();
   }
 
   /**
@@ -772,7 +781,11 @@ public class AdminPanel extends JPanel {
     private final SplitPeriodTableModel tableModel = new SplitPeriodTableModel();
     private final JTable table = new JTable(tableModel);
 
-    private IdleMonitor idleMonitor;
+    // Guards the IdleMonitor's onIdle callback below: since this dialog instance (and its one
+    // IdleMonitor) is reused for the dialog's entire lifetime rather than recreated per open, a
+    // timer tick that lands after the dialog was already closed some other way (e.g. Escape) must
+    // be a no-op instead of hiding whatever unrelated overlay happens to be showing at that moment.
+    private boolean visible;
 
     FinancialLedgerDialog() {
 
@@ -793,23 +806,28 @@ public class AdminPanel extends JPanel {
       statusLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
       content.add(statusLabel, BorderLayout.SOUTH);
 
-      content.registerKeyboardAction(e -> hideOverlay(),
+      content.registerKeyboardAction(e -> close(),
           javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
           JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+      // Constructed once (see the FinancialLedgerDialog field above), not per show() -- its
+      // 60-second inactivity timeout runs for as long as the admin panel itself is open.
+      new IdleMonitor(60_000, () -> SwingUtilities.invokeLater(() -> {
+        if (visible) {
+          close();
+        }
+      }), () -> {});
     }
 
     void show() {
-
+      visible = true;
       showOverlayForm(ColorTheme.get().accentGold, content);
       reload();
-
-      idleMonitor = new IdleMonitor(60_000, () -> SwingUtilities.invokeLater(this::hideAndStop),
-          () -> {});
     }
 
-    private void hideAndStop() {
+    private void close() {
+      visible = false;
       hideOverlay();
-      idleMonitor = null; // no dispose() on IdleMonitor -- let this instance become GC-eligible
     }
 
     private JComponent buildAddSplitRow() {

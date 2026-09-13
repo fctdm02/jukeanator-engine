@@ -58,10 +58,19 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
     localCreditTransactions.add(transaction);
   }
 
-  /** Local credit transactions recorded at or after {@code from} (inclusive). */
+  /**
+   * Local credit transactions recorded strictly after {@code from}. Exclusive (rather than {@code
+   * from}-inclusive) specifically so that a period boundary -- {@code from} is always either a
+   * period's {@code startDate} or, at the moment of a split, the instant shared by the just-closed
+   * period's {@code endDate} and the new period's {@code startDate} -- never double-counts a
+   * transaction whose timestamp happens to tie exactly with it: {@code
+   * FinancialLedgerServiceImpl.computeTotals} already counts a boundary-tied transaction inclusively
+   * into the closing period ({@code timestamp <= to}), so it must be excluded here from also being
+   * counted into the new period that opens at that same instant.
+   */
   public List<LocalCreditTransactionEntity> getLocalCreditTransactionsSince(Instant from) {
     return localCreditTransactions.stream()
-        .filter(t -> !t.getTimestamp().isBefore(from))
+        .filter(t -> t.getTimestamp().isAfter(from))
         .toList();
   }
 }

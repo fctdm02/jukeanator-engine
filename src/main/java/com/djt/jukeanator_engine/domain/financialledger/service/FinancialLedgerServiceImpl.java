@@ -160,8 +160,19 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
       return BigDecimal.ZERO;
     }
 
-    List<CreditTransactionDto> ledger =
-        userService.getCreditLedgerForLocation(ownLocationId, from, to);
+    // UserService.getCreditLedgerForLocation is inclusive at both ends (the right default for its
+    // general-purpose bar-owner-accounting use, e.g. LocationController's REST endpoint), but
+    // `from` here is always either a period's own startDate or, at the moment of a split, the
+    // instant shared by the just-closed period's endDate and the new period's startDate --
+    // sharing that instant means a mobile credit spent at exactly that tie would otherwise be
+    // counted into both periods, mirroring the local cash/card boundary bug fixed in
+    // FinancialLedgerRootEntity.getLocalCreditTransactionsSince. Re-filtering to strictly-after
+    // here (rather than changing the shared method's contract) keeps that fix scoped to the
+    // financial ledger's own period semantics.
+    List<CreditTransactionDto> ledger = userService.getCreditLedgerForLocation(ownLocationId, from, to)
+        .stream()
+        .filter(t -> t.timestamp().isAfter(from))
+        .toList();
 
     int creditsUsed = ledger.stream()
         .filter(t -> t.amount() < 0)

@@ -67,8 +67,8 @@ song-library:
   use-genre: true
   use-top-folder-for-genre: true
   discogs:
-    consumer-key: vBSFEvNtGflHQnULBNnL
-    consumer-secret: AOOYhlvSshYkJieLRrdTCUoLcsWACfWW
+    consumer-key: ${DISCOGS_CONSUMER_KEY:dummy}
+    consumer-secret: ${DISCOGS_CONSUMER_SECRET:dummy}
   accepted-song-file-extensions:
     - .mp3
     - .flac
