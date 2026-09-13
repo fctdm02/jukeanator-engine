@@ -41,6 +41,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
+import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 
@@ -56,6 +57,7 @@ public class JukeANatorFrame extends JFrame {
   private final SongPlayerService songPlayerService;
   private final UserService userService;
   private final LocationService locationService;
+  private final FinancialLedgerService financialLedgerService;
 
   private final ImageLoader imageLoader;
   private static final int POPULARITY_THRESHOLD_1 = 10;
@@ -211,7 +213,8 @@ public class JukeANatorFrame extends JFrame {
   public JukeANatorFrame(JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
       SongLibraryService songLibraryService, SongQueueService songQueueService,
       SongPlayerService songPlayerService, UserService userService,
-      LocationService locationService, String dataDir) {
+      LocationService locationService, FinancialLedgerService financialLedgerService,
+      String dataDir) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
     this.songLibraryService = songLibraryService;
@@ -219,6 +222,7 @@ public class JukeANatorFrame extends JFrame {
     this.songPlayerService = songPlayerService;
     this.userService = userService;
     this.locationService = locationService;
+    this.financialLedgerService = financialLedgerService;
     this.imageLoader = new ImageLoader(dataDir);
 
     this.alwaysOnTop = jukeANatorUserInterfaceProperties.isAlwaysOnTop();
@@ -356,6 +360,7 @@ public class JukeANatorFrame extends JFrame {
       @Override
       public void actionPerformed(java.awt.event.ActionEvent e) {
         creditManager.addDollar();
+        financialLedgerService.recordLocalCashCredit(1);
       }
     });
 
@@ -375,6 +380,7 @@ public class JukeANatorFrame extends JFrame {
             @Override
             public void actionPerformed(java.awt.event.ActionEvent e) {
               creditManager.addCreditCardDollar();
+              financialLedgerService.recordLocalCreditCardCredit(1);
             }
           });
     }
@@ -971,7 +977,7 @@ public class JukeANatorFrame extends JFrame {
   private AdminPanel buildAdminPanel() {
 
     return new AdminPanel(this, songLibraryService, songQueueService, songPlayerService,
-        userService, locationService, creditManager, imageLoader);
+        userService, locationService, financialLedgerService, creditManager, imageLoader);
   }
 
   // ============================================================

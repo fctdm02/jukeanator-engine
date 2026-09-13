@@ -18,6 +18,7 @@ import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
@@ -36,6 +37,7 @@ import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
@@ -50,6 +52,8 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
+import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
 import com.djt.jukeanator_engine.domain.location.dto.UpdateLocationInfoRequest;
@@ -78,6 +82,7 @@ public class AdminPanel extends JPanel {
   private final SongPlayerService songPlayerService;
   private final UserService userService;
   private final LocationService locationService;
+  private final FinancialLedgerService financialLedgerService;
   private final CreditManager creditManager;
   private final Frame ownerFrame;
   private final ImageLoader imageLoader;
@@ -130,7 +135,8 @@ public class AdminPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   public AdminPanel(Frame ownerFrame, SongLibraryService songLibraryService,
       SongQueueService songQueueService, SongPlayerService songPlayerService,
-      UserService userService, LocationService locationService, CreditManager creditManager,
+      UserService userService, LocationService locationService,
+      FinancialLedgerService financialLedgerService, CreditManager creditManager,
       ImageLoader imageLoader) {
 
     this.ownerFrame = ownerFrame;
@@ -139,6 +145,7 @@ public class AdminPanel extends JPanel {
     this.songPlayerService = songPlayerService;
     this.userService = userService;
     this.locationService = locationService;
+    this.financialLedgerService = financialLedgerService;
     this.creditManager = creditManager;
     this.imageLoader = imageLoader;
 
@@ -385,6 +392,9 @@ public class AdminPanel extends JPanel {
   private JPanel buildLibraryButtons() {
 
     JPanel strip = buildButtonStrip();
+
+    strip.add(sideButton("Financial\nLedger", ColorTheme.get().accentGold,
+        e -> doFinancialLedger()));
 
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton("Queue\nAlbum", ColorTheme.get().accentGreen, e -> doAddAlbumToQueue()));
@@ -737,6 +747,258 @@ public class AdminPanel extends JPanel {
               ex.getMessage() != null ? ex.getMessage() : "Could not create admin user."));
         }
       });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FINANCIAL LEDGER ACTIONS (FinancialLedgerService)
+  // ─────────────────────────────────────────────────────────────────────────
+  private void doFinancialLedger() {
+    new FinancialLedgerDialog().show();
+  }
+
+  /**
+   * Shows every jukebox-split period (current period's sub-totals computed live) in a table, with
+   * an "Add Split" button to finalize the current period and start a new one. Shown via
+   * {@link #showOverlayForm} rather than a separate {@code JDialog} window -- see {@link
+   * #overlayCard}. Auto-dismisses after one minute of inactivity via {@link IdleMonitor}, since
+   * this dialog can display real financial figures that shouldn't linger on-screen unattended.
+   */
+  private class FinancialLedgerDialog {
+
+    private final JPanel content = new JPanel(new BorderLayout(0, 12));
+    private final JPanel topRow = new JPanel(new BorderLayout(0, 8));
+    private final JLabel statusLabel = new JLabel(" ");
+    private final SplitPeriodTableModel tableModel = new SplitPeriodTableModel();
+    private final JTable table = new JTable(tableModel);
+
+    private IdleMonitor idleMonitor;
+
+    FinancialLedgerDialog() {
+
+      content.setOpaque(false);
+
+      JLabel title = new JLabel("Financial Ledger");
+      title.setForeground(ColorTheme.get().accentGold);
+      title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+
+      topRow.setOpaque(false);
+      topRow.add(title, BorderLayout.WEST);
+      topRow.add(buildAddSplitRow(), BorderLayout.EAST);
+
+      content.add(topRow, BorderLayout.NORTH);
+      content.add(buildTablePanel(), BorderLayout.CENTER);
+
+      statusLabel.setForeground(ColorTheme.get().textSecondary);
+      statusLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      content.add(statusLabel, BorderLayout.SOUTH);
+
+      content.registerKeyboardAction(e -> hideOverlay(),
+          javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+          JComponent.WHEN_IN_FOCUSED_WINDOW);
+    }
+
+    void show() {
+
+      showOverlayForm(ColorTheme.get().accentGold, content);
+      reload();
+
+      idleMonitor = new IdleMonitor(60_000, () -> SwingUtilities.invokeLater(this::hideAndStop),
+          () -> {});
+    }
+
+    private void hideAndStop() {
+      hideOverlay();
+      idleMonitor = null; // no dispose() on IdleMonitor -- let this instance become GC-eligible
+    }
+
+    private JComponent buildAddSplitRow() {
+
+      JButton addSplitBtn = new JButton("Add Split");
+      styleOverlayButton(addSplitBtn);
+
+      JButton confirmYesBtn = new JButton("Yes, finalize");
+      styleOverlayButton(confirmYesBtn);
+      JButton confirmNoBtn = new JButton("Cancel");
+      styleOverlayButton(confirmNoBtn);
+
+      JLabel confirmLabel = new JLabel("Finalize the current period and start a new one?");
+      confirmLabel.setForeground(ColorTheme.get().accentOrange);
+      confirmLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+
+      JPanel confirmRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 8, 0));
+      confirmRow.setOpaque(false);
+      confirmRow.add(confirmLabel);
+      confirmRow.add(confirmYesBtn);
+      confirmRow.add(confirmNoBtn);
+      confirmRow.setVisible(false);
+
+      JPanel buttonRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 8, 0));
+      buttonRow.setOpaque(false);
+      buttonRow.add(addSplitBtn);
+
+      JPanel container = new JPanel(new BorderLayout());
+      container.setOpaque(false);
+      container.add(buttonRow, BorderLayout.CENTER);
+
+      addSplitBtn.addActionListener(e -> {
+        container.remove(buttonRow);
+        container.add(confirmRow, BorderLayout.CENTER);
+        confirmRow.setVisible(true);
+        container.revalidate();
+        container.repaint();
+      });
+
+      Runnable backToButton = () -> {
+        container.remove(confirmRow);
+        container.add(buttonRow, BorderLayout.CENTER);
+        container.revalidate();
+        container.repaint();
+      };
+
+      confirmNoBtn.addActionListener(e -> backToButton.run());
+      confirmYesBtn.addActionListener(e -> {
+        backToButton.run();
+        statusLabel.setText("Finalizing current period...");
+        SwingSecurityUtil.runAsync(() -> {
+          try {
+            financialLedgerService.addSplit();
+            SwingUtilities.invokeLater(() -> {
+              statusLabel.setText(" ");
+              reload();
+            });
+          } catch (Exception ex) {
+            SwingUtilities.invokeLater(() -> statusLabel.setText(
+                ex.getMessage() != null ? ex.getMessage() : "Could not finalize the split."));
+          }
+        });
+      });
+
+      return container;
+    }
+
+    private JScrollPane buildTablePanel() {
+
+      table.setOpaque(true);
+      table.setBackground(ColorTheme.get().bgList);
+      table.setForeground(ColorTheme.get().textPrimary);
+      table.setGridColor(ColorTheme.get().colorAdminSeparator);
+      table.setSelectionBackground(ColorTheme.get().bgListSelected);
+      table.setSelectionForeground(ColorTheme.get().textPrimary);
+      table.setRowHeight(LayoutTheme.get().adminAlbumCellH);
+      table.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      table.getTableHeader()
+          .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
+      table.setFillsViewportHeight(true);
+      table.setRowSelectionAllowed(false);
+      table.setDefaultRenderer(Object.class, new SplitPeriodCellRenderer());
+
+      // Sized to fit each column's actual content rather than defaulting to equal widths.
+      int[] columnWidths = {170, 80, 80, 80, 90, 100, 100};
+      for (int i = 0; i < columnWidths.length; i++) {
+        table.getColumnModel().getColumn(i).setPreferredWidth(columnWidths[i]);
+      }
+
+      JScrollPane scrollPane = darkScrollPane(table);
+      scrollPane.setPreferredSize(new Dimension(750, 360));
+      return scrollPane;
+    }
+
+    private void reload() {
+
+      statusLabel.setText("Loading...");
+      SwingSecurityUtil.runAsync(() -> {
+        try {
+          List<JukeboxSplitPeriodDto> periods = financialLedgerService.getAllPeriods();
+          SwingUtilities.invokeLater(() -> {
+            tableModel.setPeriods(periods);
+            statusLabel.setText(" ");
+          });
+        } catch (Exception ex) {
+          SwingUtilities.invokeLater(() -> statusLabel.setText(
+              ex.getMessage() != null ? ex.getMessage() : "Could not load the financial ledger."));
+        }
+      });
+    }
+  }
+
+  /** Highlights the (always-first, per {@link SplitPeriodTableModel}) open/current period's row. */
+  private static class SplitPeriodCellRenderer extends javax.swing.table.DefaultTableCellRenderer {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
+        boolean isSelected, boolean hasFocus, int row, int column) {
+
+      JLabel label =
+          (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+      boolean isCurrentRow = row == 0;
+      label.setOpaque(true);
+      label.setBackground(ColorTheme.get().bgList);
+      label.setForeground(isCurrentRow ? ColorTheme.get().accentGold : ColorTheme.get().textPrimary);
+      label.setFont(table.getFont().deriveFont(isCurrentRow ? Font.BOLD : Font.PLAIN));
+      label.setBorder(new EmptyBorder(2, 8, 2, 8));
+      return label;
+    }
+  }
+
+  /** Backs the Financial Ledger dialog's table -- current period (if any) sorted first. */
+  private static class SplitPeriodTableModel extends javax.swing.table.AbstractTableModel {
+    private static final long serialVersionUID = 1L;
+
+    private static final String[] COLUMNS =
+        {"Period", "Cash", "Card", "Mobile", "Total", "Owner Due", "Operator Due"};
+
+    private static final java.time.format.DateTimeFormatter DATE_FORMAT =
+        java.time.format.DateTimeFormatter.ofPattern("M/d/yyyy")
+            .withZone(java.time.ZoneId.systemDefault());
+
+    private List<JukeboxSplitPeriodDto> periods = new ArrayList<>();
+
+    void setPeriods(List<JukeboxSplitPeriodDto> newPeriods) {
+      this.periods = new ArrayList<>(newPeriods);
+      // Current (open) period first, then most-recently-finalized next, etc.
+      Collections.reverse(this.periods);
+      fireTableDataChanged();
+    }
+
+    @Override
+    public int getRowCount() {
+      return periods.size();
+    }
+
+    @Override
+    public int getColumnCount() {
+      return COLUMNS.length;
+    }
+
+    @Override
+    public String getColumnName(int column) {
+      return COLUMNS[column];
+    }
+
+    @Override
+    public Object getValueAt(int rowIndex, int columnIndex) {
+
+      JukeboxSplitPeriodDto period = periods.get(rowIndex);
+      boolean isOpen = period.endDate() == null;
+
+      return switch (columnIndex) {
+        case 0 -> isOpen
+            ? "Current (since " + DATE_FORMAT.format(period.startDate()) + ")"
+            : DATE_FORMAT.format(period.startDate()) + " – " + DATE_FORMAT.format(period.endDate());
+        case 1 -> formatDollars(period.cashTotal());
+        case 2 -> formatDollars(period.cardTotal());
+        case 3 -> formatDollars(period.mobileTotal());
+        case 4 -> formatDollars(period.totalEarned());
+        case 5 -> formatDollars(period.amountDueOwner());
+        case 6 -> formatDollars(period.amountDueOperator());
+        default -> "";
+      };
+    }
+
+    private static String formatDollars(java.math.BigDecimal amount) {
+      return amount == null ? "—" : "$" + amount.toPlainString();
     }
   }
 

@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import com.djt.jukeanator_engine.config.AppProperties;
+import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -34,6 +35,7 @@ public class JukeANatorUserInterfaceApplication {
   private final SongPlayerService songPlayerService;
   private final UserService userService;
   private final LocationService locationService;
+  private final FinancialLedgerService financialLedgerService;
   private final JukeANatorEventListener jukeANatorEventListener;
 
   private JukeANatorFrame frame;
@@ -46,6 +48,7 @@ public class JukeANatorUserInterfaceApplication {
       SongPlayerService songPlayerService,
       UserService userService,
       LocationService locationService,
+      FinancialLedgerService financialLedgerService,
       JukeANatorEventListener jukeANatorEventListener) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
@@ -55,6 +58,7 @@ public class JukeANatorUserInterfaceApplication {
     this.songPlayerService = songPlayerService;
     this.userService = userService;
     this.locationService = locationService;
+    this.financialLedgerService = financialLedgerService;
     this.jukeANatorEventListener = jukeANatorEventListener;
   }
 
@@ -67,6 +71,7 @@ public class JukeANatorUserInterfaceApplication {
         songPlayerService,
         userService,
         locationService,
+        financialLedgerService,
         appProperties.getDataDir());
 
     this.jukeANatorEventListener.setFrame(frame);

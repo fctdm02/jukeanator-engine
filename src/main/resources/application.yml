@@ -114,6 +114,9 @@ braintree:
 receipt:
   from-address: ${MAIL_FROM_ADDRESS:tmyers@jukeanator.com}
 
+financial-ledger:
+  jukebox-split-percentage: 50   # % of each period's total earnings due to the location owner; the operator gets the rest
+
 user-interface:
   always-on-top: false
   enable-screen-saver: false
