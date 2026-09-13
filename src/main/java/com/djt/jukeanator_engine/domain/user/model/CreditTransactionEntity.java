@@ -13,14 +13,19 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
  * One append-only credit spend/purchase record, owned by the {@link UserEntity} it belongs to.
- * {@code locationId} is {@code null} for standalone-mode (non-location-attributed) spends, and
- * for the pre-multi-tenant call sites that don't yet have a location to tag — never
- * retroactively backfilled.
+ * Mobile/web-originated only -- {@code UserServiceImpl.deductCredits} explicitly skips the local
+ * walk-up (JFC/Swing) user, so this table (renamed from {@code credit_transactions} to {@code
+ * mobile_transactions}; see {@code V13__rename_credit_transactions_to_mobile_transactions.sql})
+ * never records local bill-acceptor/credit-card-reader activity -- see {@code
+ * LocalCashTransactionEntity}/{@code LocalCreditTransactionEntity} for those. {@code locationId}
+ * is {@code null} for standalone-mode (non-location-attributed) spends, and for the
+ * pre-multi-tenant call sites that don't yet have a location to tag — never retroactively
+ * backfilled.
  *
  * @author tmyers
  */
 @Entity
-@Table(name = "credit_transactions")
+@Table(name = "mobile_transactions")
 public class CreditTransactionEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;

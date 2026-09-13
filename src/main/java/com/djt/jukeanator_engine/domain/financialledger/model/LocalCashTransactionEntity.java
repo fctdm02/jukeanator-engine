@@ -7,16 +7,16 @@ import jakarta.persistence.Table;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
- * One append-only local credit-card-reader credit-award record, analogous to {@code
- * CreditTransactionEntity} for mobile/web credits. Recorded only for genuine hardware pulses --
- * see the "➕ Credits" admin override in {@code AdminPanel.doIncrementCredits()}, which
- * deliberately does <em>not</em> go through this entity. Cash credits are a separate table --
- * see {@link LocalCashTransactionEntity} -- rather than a {@code source} column here, so the two
- * revenue streams are never ambiguous by table name alone.
+ * One append-only local bill-acceptor credit-award record -- the cash counterpart of {@link
+ * LocalCreditTransactionEntity}, kept in its own table rather than sharing one behind a
+ * {@code source} column, so cash and credit-card-reader revenue are never ambiguous by table name
+ * alone. Recorded only for genuine hardware pulses -- see the "➕ Credits" admin override in
+ * {@code AdminPanel.doIncrementCredits()}, which deliberately does <em>not</em> go through this
+ * entity.
  */
 @Entity
-@Table(name = "local_credit_transactions")
-public class LocalCreditTransactionEntity extends AbstractPersistentEntity {
+@Table(name = "local_cash_transactions")
+public class LocalCashTransactionEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
@@ -29,9 +29,9 @@ public class LocalCreditTransactionEntity extends AbstractPersistentEntity {
   @Column(name = "location_id")
   private Integer locationId;
 
-  protected LocalCreditTransactionEntity() {} // for JPA
+  protected LocalCashTransactionEntity() {} // for JPA
 
-  public LocalCreditTransactionEntity(Integer persistentIdentity, int amountDollars,
+  public LocalCashTransactionEntity(Integer persistentIdentity, int amountDollars,
       Instant timestamp, Integer locationId) {
     super(persistentIdentity);
     this.amountDollars = amountDollars;
@@ -41,7 +41,7 @@ public class LocalCreditTransactionEntity extends AbstractPersistentEntity {
 
   @Override
   public String getNaturalIdentity() {
-    return "LocalCreditTransaction/" + timestamp + "/" + getPersistentIdentity();
+    return "LocalCashTransaction/" + timestamp + "/" + getPersistentIdentity();
   }
 
   public int getAmountDollars() {

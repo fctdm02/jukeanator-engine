@@ -24,7 +24,7 @@ import jakarta.persistence.EntityManagerFactory;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
-import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditSource;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
 
 /**
@@ -36,10 +36,10 @@ import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransac
  *
  * <p>Unlike those tests, {@link FinancialLedgerRootEntity} is a true global singleton -- there is
  * no per-tenant key (such as {@code locationId}) to scope fixtures by, so every test run shares
- * the same two tables. Rather than relying on unique fixture names to avoid collisions, {@link
- * #cleanTables()} truncates both tables before each test; safe here because {@code
- * jukeanator_test} is a disposable, test-only database (never the {@code jukeanator} dev/QA
- * database -- see {@code application-test.yml}'s own javadoc on that separation).
+ * the same three tables. Rather than relying on unique fixture names to avoid collisions, {@link
+ * #cleanTables()} truncates all three before each test; safe here because {@code jukeanator_test}
+ * is a disposable, test-only database (never the {@code jukeanator} dev/QA database -- see
+ * {@code application-test.yml}'s own javadoc on that separation).
  *
  * <p>Placed alongside {@link FinancialLedgerRepositoryFileSystemImplTest} in this domain's own
  * {@code repository} package (unlike {@code SongLibraryRepositoryJpaImplTest}/{@code
@@ -67,6 +67,7 @@ class FinancialLedgerRepositoryJpaImplTest {
 
     try (Connection connection = dataSource.getConnection();
         Statement statement = connection.createStatement()) {
+      statement.executeUpdate("delete from local_cash_transactions");
       statement.executeUpdate("delete from local_credit_transactions");
       statement.executeUpdate("delete from jukebox_split_period");
     }
@@ -79,7 +80,7 @@ class FinancialLedgerRepositoryJpaImplTest {
   // ── round-trip ───────────────────────────────────────────────────────────
 
   @Test
-  void storeAggregateRoot_thenLoadAggregateRoot_roundTripsPeriodsAndLocalCreditTransactions()
+  void storeAggregateRoot_thenLoadAggregateRoot_roundTripsPeriodsAndLocalTransactions()
       throws Exception {
 
     FinancialLedgerRepositoryJpaImpl repository = newRepository();
@@ -99,11 +100,10 @@ class FinancialLedgerRepositoryJpaImplTest {
         new JukeboxSplitPeriodEntity(repository.nextPersistentIdentity(), periodEnd);
     root.addSplitPeriod(openPeriod);
 
-    root.addLocalCreditTransaction(new LocalCreditTransactionEntity(
-        repository.nextPersistentIdentity(), LocalCreditSource.CASH, 1, periodEnd,
-        Integer.valueOf(9)));
-    root.addLocalCreditTransaction(new LocalCreditTransactionEntity(
-        repository.nextPersistentIdentity(), LocalCreditSource.CREDIT_CARD, 1, periodEnd, null));
+    root.addLocalCashTransaction(new LocalCashTransactionEntity(
+        repository.nextPersistentIdentity(), 1, periodEnd, Integer.valueOf(9)));
+    root.addLocalCreditCardTransaction(new LocalCreditTransactionEntity(
+        repository.nextPersistentIdentity(), 1, periodEnd, null));
 
     repository.storeAggregateRoot(root);
 
@@ -127,13 +127,14 @@ class FinancialLedgerRepositoryJpaImplTest {
     assertEquals(reloaded.getCurrentPeriod().getPersistentIdentity(),
         reloadedOpen.getPersistentIdentity());
 
-    assertEquals(2, reloaded.getLocalCreditTransactions().size());
-    LocalCreditTransactionEntity cashTx = reloaded.getLocalCreditTransactions().stream()
-        .filter(t -> t.getSource() == LocalCreditSource.CASH).findFirst().orElseThrow();
+    assertEquals(1, reloaded.getLocalCashTransactions().size());
+    LocalCashTransactionEntity cashTx = reloaded.getLocalCashTransactions().get(0);
     assertEquals(1, cashTx.getAmountDollars());
     assertEquals(Integer.valueOf(9), cashTx.getLocationId());
-    LocalCreditTransactionEntity cardTx = reloaded.getLocalCreditTransactions().stream()
-        .filter(t -> t.getSource() == LocalCreditSource.CREDIT_CARD).findFirst().orElseThrow();
+
+    assertEquals(1, reloaded.getLocalCreditCardTransactions().size());
+    LocalCreditTransactionEntity cardTx = reloaded.getLocalCreditCardTransactions().get(0);
+    assertEquals(1, cardTx.getAmountDollars());
     assertNull(cardTx.getLocationId());
   }
 
@@ -213,6 +214,7 @@ class FinancialLedgerRepositoryJpaImplTest {
     FinancialLedgerRootEntity root = repository.loadAggregateRoot("FinancialLedgerRootEntity");
 
     assertEquals(List.of(), root.getSplitPeriods());
-    assertEquals(List.of(), root.getLocalCreditTransactions());
+    assertEquals(List.of(), root.getLocalCashTransactions());
+    assertEquals(List.of(), root.getLocalCreditCardTransactions());
   }
 }

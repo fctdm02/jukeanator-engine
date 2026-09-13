@@ -17,7 +17,7 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 import com.djt.jukeanator_engine.domain.financialledger.exception.FinancialLedgerException;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
-import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditSource;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
 
 /** Unit tests for {@link FinancialLedgerRepositoryFileSystemImpl}. */
@@ -43,7 +43,7 @@ class FinancialLedgerRepositoryFileSystemImplTest {
   }
 
   @Test
-  void storeAggregateRoot_thenLoadAggregateRoot_roundTripsPeriodsAndLocalCreditTransactions(
+  void storeAggregateRoot_thenLoadAggregateRoot_roundTripsPeriodsAndLocalTransactions(
       @TempDir Path basePath) throws Exception {
 
     FinancialLedgerRepositoryFileSystemImpl repository =
@@ -64,10 +64,10 @@ class FinancialLedgerRepositoryFileSystemImplTest {
         new JukeboxSplitPeriodEntity(Integer.valueOf(2), periodEnd);
     root.addSplitPeriod(openPeriod);
 
-    root.addLocalCreditTransaction(new LocalCreditTransactionEntity(Integer.valueOf(3),
-        LocalCreditSource.CASH, 1, periodEnd, Integer.valueOf(9)));
-    root.addLocalCreditTransaction(new LocalCreditTransactionEntity(Integer.valueOf(4),
-        LocalCreditSource.CREDIT_CARD, 1, periodEnd, null));
+    root.addLocalCashTransaction(
+        new LocalCashTransactionEntity(Integer.valueOf(3), 1, periodEnd, Integer.valueOf(9)));
+    root.addLocalCreditCardTransaction(
+        new LocalCreditTransactionEntity(Integer.valueOf(4), 1, periodEnd, null));
 
     repository.storeAggregateRoot(root);
 
@@ -91,13 +91,14 @@ class FinancialLedgerRepositoryFileSystemImplTest {
     assertTrue(reloadedOpen.isOpen());
     assertEquals(reloaded.getCurrentPeriod(), reloadedOpen);
 
-    assertEquals(2, reloaded.getLocalCreditTransactions().size());
-    LocalCreditTransactionEntity cashTx = reloaded.getLocalCreditTransactions().stream()
-        .filter(t -> t.getSource() == LocalCreditSource.CASH).findFirst().orElseThrow();
+    assertEquals(1, reloaded.getLocalCashTransactions().size());
+    LocalCashTransactionEntity cashTx = reloaded.getLocalCashTransactions().get(0);
     assertEquals(1, cashTx.getAmountDollars());
     assertEquals(Integer.valueOf(9), cashTx.getLocationId());
-    LocalCreditTransactionEntity cardTx = reloaded.getLocalCreditTransactions().stream()
-        .filter(t -> t.getSource() == LocalCreditSource.CREDIT_CARD).findFirst().orElseThrow();
+
+    assertEquals(1, reloaded.getLocalCreditCardTransactions().size());
+    LocalCreditTransactionEntity cardTx = reloaded.getLocalCreditCardTransactions().get(0);
+    assertEquals(1, cardTx.getAmountDollars());
     assertNull(cardTx.getLocationId());
   }
 
@@ -110,12 +111,14 @@ class FinancialLedgerRepositoryFileSystemImplTest {
 
     FinancialLedgerRootEntity root = new FinancialLedgerRootEntity();
     root.addSplitPeriod(new JukeboxSplitPeriodEntity(Integer.valueOf(1), Instant.now()));
-    root.addLocalCreditTransaction(new LocalCreditTransactionEntity(Integer.valueOf(50),
-        LocalCreditSource.CASH, 1, Instant.now(), null));
+    root.addLocalCashTransaction(
+        new LocalCashTransactionEntity(Integer.valueOf(50), 1, Instant.now(), null));
+    root.addLocalCreditCardTransaction(
+        new LocalCreditTransactionEntity(Integer.valueOf(30), 1, Instant.now(), null));
     writer.storeAggregateRoot(root);
 
     // A fresh repository instance (as happens on app restart) must not restart id minting at 1 --
-    // it has to seed its counter from what's already on disk across BOTH child collections.
+    // it has to seed its counter from what's already on disk across ALL THREE child collections.
     FinancialLedgerRepositoryFileSystemImpl reopened =
         new FinancialLedgerRepositoryFileSystemImpl(basePath.toString());
     reopened.loadAggregateRoot("FinancialLedgerRootEntity");

@@ -67,8 +67,10 @@ public final class FinancialLedgerRepositoryFileSystemImpl extends AbstractRepos
 
   private void seedIdentityCounter(FinancialLedgerRootEntity root) {
 
-    seedNextPersistentIdentityFrom(Stream.concat(
-        root.getSplitPeriods().stream().map(p -> p.getPersistentIdentity()),
-        root.getLocalCreditTransactions().stream().map(t -> t.getPersistentIdentity())));
+    seedNextPersistentIdentityFrom(Stream.of(
+            root.getSplitPeriods().stream().map(p -> p.getPersistentIdentity()),
+            root.getLocalCashTransactions().stream().map(t -> t.getPersistentIdentity()),
+            root.getLocalCreditCardTransactions().stream().map(t -> t.getPersistentIdentity()))
+        .flatMap(s -> s));
   }
 }

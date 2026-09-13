@@ -10,9 +10,9 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 /**
  * Singleton in-memory aggregate root holding every jukebox-split period and every local (cash /
  * credit-card-reader) credit transaction. Not itself JPA-mapped -- {@code
- * FinancialLedgerRepositoryJpaImpl} loads {@link JukeboxSplitPeriodEntity} and
- * {@link LocalCreditTransactionEntity} rows directly and assembles this aggregate around them,
- * exactly like {@code LocationRootEntity}.
+ * FinancialLedgerRepositoryJpaImpl} loads {@link JukeboxSplitPeriodEntity}, {@link
+ * LocalCashTransactionEntity}, and {@link LocalCreditTransactionEntity} rows directly and
+ * assembles this aggregate around them, exactly like {@code LocationRootEntity}.
  */
 public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
 
@@ -21,7 +21,8 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
   public static final String FINANCIAL_LEDGER_FILENAME = "JukeANator_FinancialLedger.json";
 
   private final List<JukeboxSplitPeriodEntity> splitPeriods = new ArrayList<>();
-  private final List<LocalCreditTransactionEntity> localCreditTransactions = new ArrayList<>();
+  private final List<LocalCashTransactionEntity> localCashTransactions = new ArrayList<>();
+  private final List<LocalCreditTransactionEntity> localCreditCardTransactions = new ArrayList<>();
 
   public FinancialLedgerRootEntity() {
     super(Integer.valueOf(0));
@@ -50,27 +51,33 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
         .orElse(null);
   }
 
-  public List<LocalCreditTransactionEntity> getLocalCreditTransactions() {
-    return Collections.unmodifiableList(localCreditTransactions);
+  public List<LocalCashTransactionEntity> getLocalCashTransactions() {
+    return Collections.unmodifiableList(localCashTransactions);
   }
 
-  public void addLocalCreditTransaction(LocalCreditTransactionEntity transaction) {
-    localCreditTransactions.add(transaction);
+  public void addLocalCashTransaction(LocalCashTransactionEntity transaction) {
+    localCashTransactions.add(transaction);
   }
 
-  /**
-   * Local credit transactions recorded strictly after {@code from}. Exclusive (rather than {@code
-   * from}-inclusive) specifically so that a period boundary -- {@code from} is always either a
-   * period's {@code startDate} or, at the moment of a split, the instant shared by the just-closed
-   * period's {@code endDate} and the new period's {@code startDate} -- never double-counts a
-   * transaction whose timestamp happens to tie exactly with it: {@code
-   * FinancialLedgerServiceImpl.computeTotals} already counts a boundary-tied transaction inclusively
-   * into the closing period ({@code timestamp <= to}), so it must be excluded here from also being
-   * counted into the new period that opens at that same instant.
-   */
-  public List<LocalCreditTransactionEntity> getLocalCreditTransactionsSince(Instant from) {
-    return localCreditTransactions.stream()
-        .filter(t -> t.getTimestamp().isAfter(from))
+  /** Local cash transactions recorded at or after {@code from} (inclusive). */
+  public List<LocalCashTransactionEntity> getLocalCashTransactionsSince(Instant from) {
+    return localCashTransactions.stream()
+        .filter(t -> !t.getTimestamp().isBefore(from))
+        .toList();
+  }
+
+  public List<LocalCreditTransactionEntity> getLocalCreditCardTransactions() {
+    return Collections.unmodifiableList(localCreditCardTransactions);
+  }
+
+  public void addLocalCreditCardTransaction(LocalCreditTransactionEntity transaction) {
+    localCreditCardTransactions.add(transaction);
+  }
+
+  /** Local credit-card transactions recorded at or after {@code from} (inclusive). */
+  public List<LocalCreditTransactionEntity> getLocalCreditCardTransactionsSince(Instant from) {
+    return localCreditCardTransactions.stream()
+        .filter(t -> !t.getTimestamp().isBefore(from))
         .toList();
   }
 }

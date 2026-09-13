@@ -4,10 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.financialledger.dto.FinancialLedgerRootDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
-import com.djt.jukeanator_engine.domain.financialledger.dto.LocalCreditTransactionDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionDto;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
-import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditSource;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
 
 public final class FinancialLedgerMapper {
@@ -21,12 +21,17 @@ public final class FinancialLedgerMapper {
       periodDtos.add(toDto(period));
     }
 
-    List<LocalCreditTransactionDto> transactionDtos = new ArrayList<>();
-    for (LocalCreditTransactionEntity transaction : root.getLocalCreditTransactions()) {
-      transactionDtos.add(toDto(transaction));
+    List<LocalTransactionDto> cashDtos = new ArrayList<>();
+    for (LocalCashTransactionEntity transaction : root.getLocalCashTransactions()) {
+      cashDtos.add(toDto(transaction));
     }
 
-    return new FinancialLedgerRootDto(periodDtos, transactionDtos);
+    List<LocalTransactionDto> creditCardDtos = new ArrayList<>();
+    for (LocalCreditTransactionEntity transaction : root.getLocalCreditCardTransactions()) {
+      creditCardDtos.add(toDto(transaction));
+    }
+
+    return new FinancialLedgerRootDto(periodDtos, cashDtos, creditCardDtos);
   }
 
   public static JukeboxSplitPeriodDto toDto(JukeboxSplitPeriodEntity entity) {
@@ -44,11 +49,19 @@ public final class FinancialLedgerMapper {
         entity.getAmountDueOperator());
   }
 
-  public static LocalCreditTransactionDto toDto(LocalCreditTransactionEntity entity) {
+  public static LocalTransactionDto toDto(LocalCashTransactionEntity entity) {
 
-    return new LocalCreditTransactionDto(
+    return new LocalTransactionDto(
         entity.getPersistentIdentity(),
-        entity.getSource().name(),
+        entity.getAmountDollars(),
+        entity.getTimestamp(),
+        entity.getLocationId());
+  }
+
+  public static LocalTransactionDto toDto(LocalCreditTransactionEntity entity) {
+
+    return new LocalTransactionDto(
+        entity.getPersistentIdentity(),
         entity.getAmountDollars(),
         entity.getTimestamp(),
         entity.getLocationId());
@@ -61,8 +74,11 @@ public final class FinancialLedgerMapper {
     for (JukeboxSplitPeriodDto periodDto : dto.splitPeriods()) {
       root.addSplitPeriod(toEntity(periodDto));
     }
-    for (LocalCreditTransactionDto transactionDto : dto.localCreditTransactions()) {
-      root.addLocalCreditTransaction(toEntity(transactionDto));
+    for (LocalTransactionDto cashDto : dto.localCashTransactions()) {
+      root.addLocalCashTransaction(toCashEntity(cashDto));
+    }
+    for (LocalTransactionDto creditCardDto : dto.localCreditCardTransactions()) {
+      root.addLocalCreditCardTransaction(toCreditCardEntity(creditCardDto));
     }
 
     return root;
@@ -83,11 +99,19 @@ public final class FinancialLedgerMapper {
         dto.amountDueOperator());
   }
 
-  public static LocalCreditTransactionEntity toEntity(LocalCreditTransactionDto dto) {
+  public static LocalCashTransactionEntity toCashEntity(LocalTransactionDto dto) {
+
+    return new LocalCashTransactionEntity(
+        dto.persistentIdentity(),
+        dto.amountDollars(),
+        dto.timestamp(),
+        dto.locationId());
+  }
+
+  public static LocalCreditTransactionEntity toCreditCardEntity(LocalTransactionDto dto) {
 
     return new LocalCreditTransactionEntity(
         dto.persistentIdentity(),
-        LocalCreditSource.valueOf(dto.source()),
         dto.amountDollars(),
         dto.timestamp(),
         dto.locationId());

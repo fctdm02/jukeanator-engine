@@ -12,7 +12,7 @@ import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDt
 import com.djt.jukeanator_engine.domain.financialledger.mapper.FinancialLedgerMapper;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
-import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditSource;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedgerRepository;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
@@ -63,21 +63,24 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
 
   @Override
   public synchronized void recordLocalCashCredit(int amountDollars) {
-    recordLocalCredit(LocalCreditSource.CASH, amountDollars);
-  }
-
-  @Override
-  public synchronized void recordLocalCreditCardCredit(int amountDollars) {
-    recordLocalCredit(LocalCreditSource.CREDIT_CARD, amountDollars);
-  }
-
-  private void recordLocalCredit(LocalCreditSource source, int amountDollars) {
 
     Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
     Integer ownLocationId = songLibraryService.getOwnLocationId();
 
-    ledgerRoot.addLocalCreditTransaction(new LocalCreditTransactionEntity(persistentIdentity,
-        source, amountDollars, Instant.now(), ownLocationId));
+    ledgerRoot.addLocalCashTransaction(new LocalCashTransactionEntity(persistentIdentity,
+        amountDollars, Instant.now(), ownLocationId));
+
+    financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+  }
+
+  @Override
+  public synchronized void recordLocalCreditCardCredit(int amountDollars) {
+
+    Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
+    Integer ownLocationId = songLibraryService.getOwnLocationId();
+
+    ledgerRoot.addLocalCreditCardTransaction(new LocalCreditTransactionEntity(persistentIdentity,
+        amountDollars, Instant.now(), ownLocationId));
 
     financialLedgerRepository.storeAggregateRoot(ledgerRoot);
   }
@@ -109,7 +112,11 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     currentPeriod.finalizePeriod(now, splitPercentageToOwner, totals.cash(), totals.card(),
         totals.mobile(), totals.total(), amountDueOwner, amountDueOperator);
 
-    openNewPeriod(now);
+    // Strictly after `now` (never equal to it) so the new period's own startDate can never tie
+    // with the just-closed period's endDate -- both boundaries are inclusive-at-from (see
+    // FinancialLedgerRootEntity's local-transaction "Since" methods and computeMobileTotal
+    // below), so a shared instant would otherwise double-count whatever landed exactly on it.
+    openNewPeriod(now.plusNanos(1));
 
     financialLedgerRepository.storeAggregateRoot(ledgerRoot);
   }
@@ -132,17 +139,17 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
   private PeriodTotals computeTotals(Instant from, Instant to) {
 
     BigDecimal cash = BigDecimal.ZERO;
-    BigDecimal card = BigDecimal.ZERO;
-
-    for (LocalCreditTransactionEntity transaction : ledgerRoot.getLocalCreditTransactionsSince(from)) {
-      if (transaction.getTimestamp().isAfter(to)) {
-        continue;
+    for (LocalCashTransactionEntity transaction : ledgerRoot.getLocalCashTransactionsSince(from)) {
+      if (!transaction.getTimestamp().isAfter(to)) {
+        cash = cash.add(BigDecimal.valueOf(transaction.getAmountDollars()));
       }
-      BigDecimal amount = BigDecimal.valueOf(transaction.getAmountDollars());
-      if (transaction.getSource() == LocalCreditSource.CASH) {
-        cash = cash.add(amount);
-      } else {
-        card = card.add(amount);
+    }
+
+    BigDecimal card = BigDecimal.ZERO;
+    for (LocalCreditTransactionEntity transaction :
+        ledgerRoot.getLocalCreditCardTransactionsSince(from)) {
+      if (!transaction.getTimestamp().isAfter(to)) {
+        card = card.add(BigDecimal.valueOf(transaction.getAmountDollars()));
       }
     }
 
@@ -160,19 +167,11 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
       return BigDecimal.ZERO;
     }
 
-    // UserService.getCreditLedgerForLocation is inclusive at both ends (the right default for its
-    // general-purpose bar-owner-accounting use, e.g. LocationController's REST endpoint), but
-    // `from` here is always either a period's own startDate or, at the moment of a split, the
-    // instant shared by the just-closed period's endDate and the new period's startDate --
-    // sharing that instant means a mobile credit spent at exactly that tie would otherwise be
-    // counted into both periods, mirroring the local cash/card boundary bug fixed in
-    // FinancialLedgerRootEntity.getLocalCreditTransactionsSince. Re-filtering to strictly-after
-    // here (rather than changing the shared method's contract) keeps that fix scoped to the
-    // financial ledger's own period semantics.
-    List<CreditTransactionDto> ledger = userService.getCreditLedgerForLocation(ownLocationId, from, to)
-        .stream()
-        .filter(t -> t.timestamp().isAfter(from))
-        .toList();
+    // UserService.getCreditLedgerForLocation is inclusive at both ends -- safe here because
+    // addSplit() guarantees adjacent periods' boundaries never actually coincide (the new
+    // period's startDate is always strictly after the closing period's endDate), so a mobile
+    // credit can never fall within both periods' [from, to] ranges at once.
+    List<CreditTransactionDto> ledger = userService.getCreditLedgerForLocation(ownLocationId, from, to);
 
     int creditsUsed = ledger.stream()
         .filter(t -> t.amount() < 0)

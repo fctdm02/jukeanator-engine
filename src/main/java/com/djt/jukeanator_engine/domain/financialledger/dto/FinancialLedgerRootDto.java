@@ -9,5 +9,6 @@ import java.util.List;
  * {@code FinancialLedgerRootEntity.FINANCIAL_LEDGER_FILENAME}.
  */
 public record FinancialLedgerRootDto(List<JukeboxSplitPeriodDto> splitPeriods,
-    List<LocalCreditTransactionDto> localCreditTransactions) implements Serializable {
+    List<LocalTransactionDto> localCashTransactions,
+    List<LocalTransactionDto> localCreditCardTransactions) implements Serializable {
 }

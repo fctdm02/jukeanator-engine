@@ -145,10 +145,8 @@ class FinancialLedgerServiceTest {
         .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
 
     // Bootstrap the service (and its current period) first, so the fixture timestamps below can
-    // be pinned safely after the period's own startDate -- computeMobileTotal now excludes
-    // anything not strictly after `from` (see FinancialLedgerRootEntity.getLocalCreditTransactions
-    // Since's javadoc on the analogous local-transaction boundary fix), so timestamps taken before
-    // the period even started would otherwise be wrongly excluded here too.
+    // be pinned safely after the period's own startDate -- a timestamp taken before the period
+    // even started wouldn't reflect a real "spent during this period" scenario.
     FinancialLedgerServiceImpl service = newService();
     Instant afterPeriodStart = service.getAllPeriods().get(0).startDate().plusSeconds(1);
 
@@ -186,27 +184,48 @@ class FinancialLedgerServiceTest {
   }
 
   @Test
-  void getAllPeriods_excludesAMobileSpendTiedExactlyAtThePeriodsOwnStartDate() throws Exception {
+  void getAllPeriods_includesAMobileSpendTiedExactlyAtThePeriodsOwnStartDate() throws Exception {
 
     when(financialLedgerRepository.loadAggregateRoot(anyString()))
         .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+    when(pricingService.resolvePricingConfig(OWN_LOCATION_ID))
+        .thenReturn(new PricingConfig(2, 3, 3, 10, 2, false));
 
     FinancialLedgerServiceImpl service = newService();
     Instant periodStart = service.getAllPeriods().get(0).startDate();
 
-    // UserService.getCreditLedgerForLocation is inclusive at `from`, so a mobile spend timestamped
-    // exactly at this period's own startDate (as happens at the instant of a split, where the new
-    // period's startDate equals the closing period's endDate) would otherwise be double-counted
-    // into both periods -- see FinancialLedgerServiceImpl.computeMobileTotal's re-filtering.
+    // UserService.getCreditLedgerForLocation is inclusive at `from`, and nothing prevents a
+    // legitimate spend from landing exactly on a period's own startDate (most obviously its very
+    // first moment) -- addSplit() is what actually prevents double-counting across a split (by
+    // guaranteeing the new period's startDate is always strictly after the old one's endDate), not
+    // this query's own boundary semantics, so a tie here should simply be counted normally.
     when(userService.getCreditLedgerForLocation(org.mockito.ArgumentMatchers.eq(OWN_LOCATION_ID),
         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(new CreditTransactionDto("alice@example.com", OWN_LOCATION_ID, -9,
             CreditTransactionType.QUEUE_ADD, periodStart, null, null, 1)));
 
     JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
-    assertEquals(BigDecimal.ZERO.setScale(2), current.mobileTotal(),
-        "A spend tied exactly to this period's own startDate belongs to whatever period preceded "
-            + "it, not this one");
+    assertEquals(new BigDecimal("3.00"), current.mobileTotal());
+  }
+
+  @Test
+  void addSplit_newPeriodStartsStrictlyAfterTheClosingPeriodsEndDate_soBoundariesNeverTie()
+      throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+
+    FinancialLedgerServiceImpl service = newService();
+    service.addSplit();
+
+    List<JukeboxSplitPeriodDto> periods = service.getAllPeriods();
+    Instant finalizedEndDate = periods.get(0).endDate();
+    Instant newPeriodStartDate = periods.get(1).startDate();
+
+    assertTrue(newPeriodStartDate.isAfter(finalizedEndDate),
+        "A tied boundary would let one transaction be counted into (or excluded from) both "
+            + "periods depending on comparison direction -- see the local-transaction and mobile "
+            + "total computations, both of which assume adjacent periods never share an instant");
   }
 
   // ── addSplit ─────────────────────────────────────────────────────────────

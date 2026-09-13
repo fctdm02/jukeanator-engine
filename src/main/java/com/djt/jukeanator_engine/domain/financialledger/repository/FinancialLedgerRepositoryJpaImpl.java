@@ -12,16 +12,17 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
 
 /**
  * JPA/Hibernate-backed implementation of {@link FinancialLedgerRepository}, following the same
  * shape as {@code LocationRepositoryJpaImpl}: {@link FinancialLedgerRootEntity} is not itself
  * JPA-mapped (no {@code financial_ledger_root} table) -- it's an in-memory aggregate assembled
- * directly from {@link JukeboxSplitPeriodEntity} and {@link LocalCreditTransactionEntity} rows.
- * Neither child type is ever deleted once created, so unlike {@code LocationRepositoryJpaImpl}
- * there is no orphan-removal step -- only merge (existing rows, e.g. finalizing a period) and
- * insert (new rows).
+ * directly from {@link JukeboxSplitPeriodEntity}, {@link LocalCashTransactionEntity}, and {@link
+ * LocalCreditTransactionEntity} rows. None of these child types are ever deleted once created, so
+ * unlike {@code LocationRepositoryJpaImpl} there is no orphan-removal step -- only merge (existing
+ * rows, e.g. finalizing a period) and insert (new rows).
  */
 public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRepository {
 
@@ -80,16 +81,29 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
         }
       }
 
-      Set<Integer> persistedTransactionIds = new HashSet<>(entityManager
+      Set<Integer> persistedCashIds = new HashSet<>(entityManager
+          .createQuery("select t.persistentIdentity from LocalCashTransactionEntity t",
+              Integer.class)
+          .getResultList());
+
+      for (LocalCashTransactionEntity transaction : root.getLocalCashTransactions()) {
+        if (persistedCashIds.contains(transaction.getPersistentIdentity())) {
+          entityManager.merge(transaction);
+        } else {
+          insertNewCashTransaction(transaction);
+        }
+      }
+
+      Set<Integer> persistedCreditCardIds = new HashSet<>(entityManager
           .createQuery("select t.persistentIdentity from LocalCreditTransactionEntity t",
               Integer.class)
           .getResultList());
 
-      for (LocalCreditTransactionEntity transaction : root.getLocalCreditTransactions()) {
-        if (persistedTransactionIds.contains(transaction.getPersistentIdentity())) {
+      for (LocalCreditTransactionEntity transaction : root.getLocalCreditCardTransactions()) {
+        if (persistedCreditCardIds.contains(transaction.getPersistentIdentity())) {
           entityManager.merge(transaction);
         } else {
-          insertNewTransaction(transaction);
+          insertNewCreditCardTransaction(transaction);
         }
       }
     });
@@ -133,14 +147,26 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
         .executeUpdate();
   }
 
-  private void insertNewTransaction(LocalCreditTransactionEntity transaction) {
+  private void insertNewCashTransaction(LocalCashTransactionEntity transaction) {
 
-    entityManager.createNativeQuery("insert into local_credit_transactions "
-        + "(persistent_identity, version, source, amount_dollars, timestamp, location_id) "
-        + "values (:id, :version, :source, :amountDollars, :timestamp, :locationId)")
+    entityManager.createNativeQuery("insert into local_cash_transactions "
+        + "(persistent_identity, version, amount_dollars, timestamp, location_id) "
+        + "values (:id, :version, :amountDollars, :timestamp, :locationId)")
         .setParameter("id", transaction.getPersistentIdentity())
         .setParameter("version", transaction.getVersion())
-        .setParameter("source", transaction.getSource().name())
+        .setParameter("amountDollars", transaction.getAmountDollars())
+        .setParameter("timestamp", transaction.getTimestamp())
+        .setParameter("locationId", transaction.getLocationId())
+        .executeUpdate();
+  }
+
+  private void insertNewCreditCardTransaction(LocalCreditTransactionEntity transaction) {
+
+    entityManager.createNativeQuery("insert into local_credit_transactions "
+        + "(persistent_identity, version, amount_dollars, timestamp, location_id) "
+        + "values (:id, :version, :amountDollars, :timestamp, :locationId)")
+        .setParameter("id", transaction.getPersistentIdentity())
+        .setParameter("version", transaction.getVersion())
         .setParameter("amountDollars", transaction.getAmountDollars())
         .setParameter("timestamp", transaction.getTimestamp())
         .setParameter("locationId", transaction.getLocationId())
@@ -155,13 +181,18 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
           .createQuery("from JukeboxSplitPeriodEntity", JukeboxSplitPeriodEntity.class)
           .getResultList();
 
-      List<LocalCreditTransactionEntity> transactions = entityManager
+      List<LocalCashTransactionEntity> cashTransactions = entityManager
+          .createQuery("from LocalCashTransactionEntity", LocalCashTransactionEntity.class)
+          .getResultList();
+
+      List<LocalCreditTransactionEntity> creditCardTransactions = entityManager
           .createQuery("from LocalCreditTransactionEntity", LocalCreditTransactionEntity.class)
           .getResultList();
 
       FinancialLedgerRootEntity root = new FinancialLedgerRootEntity();
       periods.forEach(root::addSplitPeriod);
-      transactions.forEach(root::addLocalCreditTransaction);
+      cashTransactions.forEach(root::addLocalCashTransaction);
+      creditCardTransactions.forEach(root::addLocalCreditCardTransaction);
       return root;
     });
   }
