@@ -22,6 +22,8 @@ import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
+import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 
 public class AlbumGridPanel extends JPanel {
 
@@ -65,6 +67,10 @@ public class AlbumGridPanel extends JPanel {
   // ── Resolution-aware grid profile for the album sub-grid (artist detail) ──
   private final LayoutTheme.GridProfile albumGridProfile;
 
+  // ── Activity tracking (pagination) ─────────────────────────────────────────
+  private final UserActivityService userActivityService;
+  private final Integer locationId;
+
   // ── Callback ──────────────────────────────────────────────────────────────
   public interface AlbumClickListener {
     void onAlbumClicked(AlbumDto album);
@@ -76,7 +82,8 @@ public class AlbumGridPanel extends JPanel {
   public AlbumGridPanel(List<AlbumDto> albums, Map<String, List<AlbumDto>> letterMap,
       ImageLoader imageLoader, LayoutTheme.GridProfile albumGridProfile,
       AlbumClickListener listener, boolean showLetterNav,
-      Function<AlbumDto, String> letterKeyExtractor) {
+      Function<AlbumDto, String> letterKeyExtractor, UserActivityService userActivityService,
+      Integer locationId) {
 
     this.albums = albums != null ? albums : List.of();
     this.letterMap = letterMap != null ? letterMap : Map.of();
@@ -85,6 +92,8 @@ public class AlbumGridPanel extends JPanel {
     this.listener = listener;
     this.showLetterNav = showLetterNav;
     this.letterKeyExtractor = letterKeyExtractor;
+    this.userActivityService = userActivityService;
+    this.locationId = locationId;
 
     // Pick a random letter from the available buckets at startup (only when letter nav is shown)
     if (showLetterNav && !this.letterMap.isEmpty()) {
@@ -202,6 +211,11 @@ public class AlbumGridPanel extends JPanel {
     refresh();
   }
 
+  private void trackPageNavigation(String direction) {
+    userActivityService.recordSwingActivity(locationId, UserActivityType.PAGE_NAVIGATION,
+        Map.of("category", showLetterNav ? "ALL_ALBUMS" : "ARTIST_ALBUMS", "direction", direction));
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // PAGE RENDERING
   // ─────────────────────────────────────────────────────────────────────────
@@ -243,6 +257,7 @@ public class AlbumGridPanel extends JPanel {
     JButton prevBtn = ButtonFactory.createNavigationButton("❮");
     prevBtn.setVisible(hasPrev);
     prevBtn.addActionListener(e -> {
+      trackPageNavigation("prev");
       startIndex = Math.max(0, startIndex - pageSize);
       selectedLetter = letterForIndex(startIndex);
       refresh();
@@ -251,6 +266,7 @@ public class AlbumGridPanel extends JPanel {
     JButton nextBtn = ButtonFactory.createNavigationButton("❯");
     nextBtn.setVisible(hasNext);
     nextBtn.addActionListener(e -> {
+      trackPageNavigation("next");
       startIndex = Math.min(startIndex + pageSize, total - 1);
       selectedLetter = letterForIndex(startIndex);
       refresh();

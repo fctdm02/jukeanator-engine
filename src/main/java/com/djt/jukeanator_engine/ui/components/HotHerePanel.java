@@ -23,6 +23,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
+import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class HotHerePanel extends JPanel implements TabNavigator {
@@ -83,6 +85,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   private final CreditManager creditManager;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
+  private final UserActivityService userActivityService;
   private final ImageLoader imageLoader;
   private final int priorityCostMultiplier;
   private final int popularityT1;
@@ -97,13 +100,15 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // ─────────────────────────────────────────────────────────────────────────
   public HotHerePanel(char incrementCreditsKey, CreditManager creditManager,
       SongLibraryService songLibraryService, SongQueueService songQueueService,
-      ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
-      int popularityT3, LayoutTheme.GridProfile albumGridProfile) {
+      UserActivityService userActivityService, ImageLoader imageLoader,
+      int priorityCostMultiplier, int popularityT1, int popularityT2, int popularityT3,
+      LayoutTheme.GridProfile albumGridProfile) {
 
     this.incrementCreditsKey = incrementCreditsKey;
     this.creditManager = creditManager;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
+    this.userActivityService = userActivityService;
     this.imageLoader = imageLoader;
     this.priorityCostMultiplier = priorityCostMultiplier;
     this.popularityT1 = popularityT1;
@@ -338,6 +343,10 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
     AlbumDto full = fetchFull(album);
 
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.ALBUM_VIEWED, java.util.Map.of("tab", "HOT_HERE", "albumId",
+            full.albumId(), "albumName", full.albumName()));
+
     // Remember which card was visible before navigating to the detail card so
     // the BACK button can return the user to the correct screen (the result
     // columns or the artist detail panel).
@@ -414,6 +423,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
 
     JPanel artistsColumn = ResultsColumnPanel.build("ARTISTS", artists, artistsOffset, previewCount,
         imageLoader, newOffset -> {
+          trackPageNavigation("ARTISTS", artistsOffset, newOffset);
           artistsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("ARTISTS", item), ResultsColumnPanel.ColumnPosition.FIRST,
@@ -421,6 +431,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
 
     JPanel albumsColumn = ResultsColumnPanel.build("ALBUMS", albums, albumsOffset, previewCount,
         imageLoader, newOffset -> {
+          trackPageNavigation("ALBUMS", albumsOffset, newOffset);
           albumsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("ALBUMS", item), ResultsColumnPanel.ColumnPosition.MIDDLE,
@@ -428,6 +439,7 @@ public class HotHerePanel extends JPanel implements TabNavigator {
 
     JPanel songsColumn = ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount,
         imageLoader, newOffset -> {
+          trackPageNavigation("SONGS", songsOffset, newOffset);
           songsOffset = newOffset;
           rebuildColumnsPanel();
         }, (item) -> handleRowClick("SONGS", item), ResultsColumnPanel.ColumnPosition.LAST,
@@ -439,10 +451,21 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     columnsPanel.repaint();
   }
 
+  private void trackPageNavigation(String category, int currentOffset, int newOffset) {
+
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.PAGE_NAVIGATION, java.util.Map.of("tab", "HOT_HERE", "category", category,
+            "direction", newOffset > currentOffset ? "next" : "prev"));
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // ROW CLICK DISPATCH
   // ─────────────────────────────────────────────────────────────────────────
   private <T> void handleRowClick(String category, T item) {
+
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.SEARCH_RESULT_CLICK,
+        java.util.Map.of("tab", "HOT_HERE", "category", category));
 
     switch (category) {
       case "ARTISTS" -> {
@@ -478,8 +501,13 @@ public class HotHerePanel extends JPanel implements TabNavigator {
       throw new IllegalStateException("Could not get artist: [" + artistName + "]", e);
     }
 
+    Integer locationId = songLibraryService.getOwnLocationId();
+    userActivityService.recordSwingActivity(locationId, UserActivityType.ARTIST_VIEWED,
+        java.util.Map.of("tab", "HOT_HERE", "artistName", artistName));
+
     ArtistDetailPanel panel = new ArtistDetailPanel(full, imageLoader, albumGridProfile, "← Back",
-        () -> cardLayout.show(rootPanel, CARD_CONTENT), album -> pushAlbumDetail(album));
+        () -> cardLayout.show(rootPanel, CARD_CONTENT), album -> pushAlbumDetail(album),
+        userActivityService, locationId);
 
     replaceCard(CARD_ARTIST, panel);
     cardLayout.show(rootPanel, CARD_ARTIST);

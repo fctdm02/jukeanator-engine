@@ -42,6 +42,8 @@ import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
+import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 
@@ -58,6 +60,7 @@ public class JukeANatorFrame extends JFrame {
   private final UserService userService;
   private final LocationService locationService;
   private final FinancialLedgerService financialLedgerService;
+  private final UserActivityService userActivityService;
 
   private final ImageLoader imageLoader;
   private static final int POPULARITY_THRESHOLD_1 = 10;
@@ -214,7 +217,7 @@ public class JukeANatorFrame extends JFrame {
       SongLibraryService songLibraryService, SongQueueService songQueueService,
       SongPlayerService songPlayerService, UserService userService,
       LocationService locationService, FinancialLedgerService financialLedgerService,
-      String dataDir) {
+      UserActivityService userActivityService, String dataDir) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
     this.songLibraryService = songLibraryService;
@@ -223,6 +226,7 @@ public class JukeANatorFrame extends JFrame {
     this.userService = userService;
     this.locationService = locationService;
     this.financialLedgerService = financialLedgerService;
+    this.userActivityService = userActivityService;
     this.imageLoader = new ImageLoader(dataDir);
 
     this.alwaysOnTop = jukeANatorUserInterfaceProperties.isAlwaysOnTop();
@@ -859,7 +863,31 @@ public class JukeANatorFrame extends JFrame {
     // Select HOT HERE (index 3) as the default visible tab
     tabs.setSelectedIndex(3);
 
+    // Fires on both a user click and a programmatic setSelectedIndex(...) (e.g. the ESC-key
+    // handler, the idle-reset handler), so this one listener catches every tab switch regardless
+    // of trigger.
+    tabs.addChangeListener(e -> {
+      int index = tabs.getSelectedIndex();
+      String tabName = tabNameForIndex(index);
+      if (tabName != null) {
+        userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+            UserActivityType.TAB_NAVIGATION, java.util.Map.of("tabIndex", index, "tabName", tabName));
+      }
+    });
+
     return tabs;
+  }
+
+  /** Returns {@code null} for the invisible dummy (0) and admin (6) tabs. */
+  private static String tabNameForIndex(int index) {
+    return switch (index) {
+      case 1 -> "HOME";
+      case 2 -> "SEARCH";
+      case 3 -> "HOT HERE";
+      case 4 -> "GENRES";
+      case 5 -> "QUEUE";
+      default -> null;
+    };
   }
 
   private class JukeboxTabComponent extends JPanel {
@@ -935,8 +963,8 @@ public class JukeANatorFrame extends JFrame {
   private HomePanel buildHomePanel() {
 
     return new HomePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
-        imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3, albumGridProfile);
+        userActivityService, imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1,
+        POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, albumGridProfile);
   }
 
   // ============================================================
@@ -945,8 +973,8 @@ public class JukeANatorFrame extends JFrame {
   private SearchPanel buildSearchPanel() {
 
     return new SearchPanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
-        imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3, enableTypeAheadSearch, albumGridProfile);
+        userActivityService, imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1,
+        POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, enableTypeAheadSearch, albumGridProfile);
   }
 
   // ============================================================
@@ -955,8 +983,8 @@ public class JukeANatorFrame extends JFrame {
   private HotHerePanel buildHotHerePanel() {
 
     return new HotHerePanel(incrementCreditsKey, creditManager, songLibraryService,
-        songQueueService, imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1,
-        POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, albumGridProfile);
+        songQueueService, userActivityService, imageLoader, priorityCostMultiplier,
+        POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, albumGridProfile);
   }
 
   // ============================================================
@@ -965,9 +993,10 @@ public class JukeANatorFrame extends JFrame {
   private GenrePanel buildGenresPanel() {
 
     return new GenrePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
-        imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2,
-        POPULARITY_THRESHOLD_3, albumGridProfile, // album sub-grid (artist detail within Genres
-                                                  // tab)
+        userActivityService, imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1,
+        POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, albumGridProfile, // album sub-grid (artist
+                                                                          // detail within Genres
+                                                                          // tab)
         genreGridProfile); // genre-tile grid (top-level genre picker)
   }
 
@@ -977,7 +1006,8 @@ public class JukeANatorFrame extends JFrame {
   private AdminPanel buildAdminPanel() {
 
     return new AdminPanel(this, songLibraryService, songQueueService, songPlayerService,
-        userService, locationService, financialLedgerService, creditManager, imageLoader);
+        userService, locationService, financialLedgerService, userActivityService, creditManager,
+        imageLoader);
   }
 
   // ============================================================

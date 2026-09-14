@@ -29,6 +29,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
+import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class GenrePanel extends JPanel implements TabNavigator {
@@ -69,6 +71,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
   private final CreditManager creditManager;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
+  private final UserActivityService userActivityService;
   private final ImageLoader imageLoader;
   private final int priorityCostMultiplier;
   private final int popularityT1;
@@ -91,14 +94,15 @@ public class GenrePanel extends JPanel implements TabNavigator {
   // ─────────────────────────────────────────────────────────────────────────
   public GenrePanel(char incrementCreditsKey, CreditManager creditManager,
       SongLibraryService songLibraryService, SongQueueService songQueueService,
-      ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
-      int popularityT3, LayoutTheme.GridProfile albumGridProfile,
-      LayoutTheme.GenreGridProfile genreProfile) {
+      UserActivityService userActivityService, ImageLoader imageLoader,
+      int priorityCostMultiplier, int popularityT1, int popularityT2, int popularityT3,
+      LayoutTheme.GridProfile albumGridProfile, LayoutTheme.GenreGridProfile genreProfile) {
 
     this.incrementCreditsKey = incrementCreditsKey;
     this.creditManager = creditManager;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
+    this.userActivityService = userActivityService;
     this.imageLoader = imageLoader;
     this.priorityCostMultiplier = priorityCostMultiplier;
     this.popularityT1 = popularityT1;
@@ -165,6 +169,10 @@ public class GenrePanel extends JPanel implements TabNavigator {
   public void pushAlbumDetail(AlbumDto album) {
     Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
     AlbumDto full = fetchFull(album);
+
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.ALBUM_VIEWED,
+        Map.of("tab", "GENRES", "albumId", full.albumId(), "albumName", full.albumName()));
 
     // Remember which card was visible before navigating to the detail card so
     // the BACK button can return the user to the correct screen (the genre
@@ -258,6 +266,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     JButton prevBtn = ButtonFactory.createNavigationButton("❮");
     prevBtn.addActionListener(e -> {
       if (currentPage > 0) {
+        trackGenreTilePageNavigation("prev");
         currentPage--;
         refreshGenresUI();
       }
@@ -267,6 +276,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     JButton nextBtn = ButtonFactory.createNavigationButton("❯");
     nextBtn.addActionListener(e -> {
       if (currentPage < totalPages - 1) {
+        trackGenreTilePageNavigation("next");
         currentPage++;
         refreshGenresUI();
       }
@@ -301,6 +311,12 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     genresPaginationPanel.revalidate();
     genresPaginationPanel.repaint();
+  }
+
+  private void trackGenreTilePageNavigation(String direction) {
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.PAGE_NAVIGATION,
+        Map.of("tab", "GENRES", "category", "GENRE_TILES", "direction", direction));
   }
 
   // ── FIXED ENHANCEMENT: CHROME GLASS POP-OUT DESIGN ────────────────────────
@@ -425,7 +441,8 @@ public class GenrePanel extends JPanel implements TabNavigator {
 
     GenreDetailPanel detailPanel = new GenreDetailPanel(genre, results, imageLoader, popularityT1,
         popularityT2, popularityT3, "← Back", () -> cardLayout.show(rootPanel, CARD_GENRES),
-        album -> pushAlbumDetail(album), artist -> pushArtistFromGenre(artist), songLibraryService);
+        album -> pushAlbumDetail(album), artist -> pushArtistFromGenre(artist), songLibraryService,
+        userActivityService);
 
     genreAlbumsSlot.removeAll();
     genreAlbumsSlot.add(detailPanel, BorderLayout.CENTER);
@@ -452,10 +469,15 @@ public class GenrePanel extends JPanel implements TabNavigator {
       throw new IllegalStateException("Could not get artist: [" + artistName + "]", e);
     }
 
+    Integer locationId = songLibraryService.getOwnLocationId();
+    userActivityService.recordSwingActivity(locationId, UserActivityType.ARTIST_VIEWED,
+        Map.of("tab", "GENRES", "artistName", artistName));
+
     // Pass the albumGridProfile directly — ArtistDetailPanel now accepts a GridProfile
     // instead of four raw ints, keeping the call-site clean.
     ArtistDetailPanel panel = new ArtistDetailPanel(full, imageLoader, albumGridProfile, "← Back",
-        () -> cardLayout.show(rootPanel, CARD_ALBUMS), album -> pushAlbumDetail(album));
+        () -> cardLayout.show(rootPanel, CARD_ALBUMS), album -> pushAlbumDetail(album),
+        userActivityService, locationId);
 
     replaceCard(CARD_ARTIST, panel);
     cardLayout.show(rootPanel, CARD_ARTIST);

@@ -27,6 +27,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
+import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class HomePanel extends JPanel implements TabNavigator {
@@ -66,6 +68,7 @@ public class HomePanel extends JPanel implements TabNavigator {
   private final CreditManager creditManager;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
+  private final UserActivityService userActivityService;
   private final ImageLoader imageLoader;
   private final int priorityCostMultiplier;
   private final int popularityT1;
@@ -100,13 +103,15 @@ public class HomePanel extends JPanel implements TabNavigator {
   // ─────────────────────────────────────────────────────────────────────────
   public HomePanel(char incrementCreditsKey, CreditManager creditManager,
       SongLibraryService songLibraryService, SongQueueService songQueueService,
-      ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
-      int popularityT3, LayoutTheme.GridProfile albumGridProfile) {
+      UserActivityService userActivityService, ImageLoader imageLoader,
+      int priorityCostMultiplier, int popularityT1, int popularityT2, int popularityT3,
+      LayoutTheme.GridProfile albumGridProfile) {
 
     this.incrementCreditsKey = incrementCreditsKey;
     this.creditManager = creditManager;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
+    this.userActivityService = userActivityService;
     this.imageLoader = imageLoader;
     this.priorityCostMultiplier = priorityCostMultiplier;
     this.popularityT1 = popularityT1;
@@ -152,6 +157,10 @@ public class HomePanel extends JPanel implements TabNavigator {
     Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
 
     AlbumDto full = fetchFull(album);
+
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.ALBUM_VIEWED, Map.of("tab", "HOME", "albumId", full.albumId(),
+            "albumName", full.albumName()));
 
     // Remember which card was visible before navigating to the detail card so
     // the BACK button can return the user to the correct screen (the album
@@ -199,8 +208,13 @@ public class HomePanel extends JPanel implements TabNavigator {
    */
   public void showArtist(ArtistDto artist) {
 
+    Integer locationId = songLibraryService.getOwnLocationId();
+    userActivityService.recordSwingActivity(locationId, UserActivityType.ARTIST_VIEWED,
+        Map.of("tab", "HOME", "artistName", artist.artistName()));
+
     ArtistDetailPanel artistPanel = new ArtistDetailPanel(artist, imageLoader, albumGridProfile,
-        "← HOME", () -> cardLayout.show(rootPanel, CARD_GRID), album -> pushAlbumDetail(album)); // reuse
+        "← HOME", () -> cardLayout.show(rootPanel, CARD_GRID), album -> pushAlbumDetail(album), // reuse
+        userActivityService, locationId);
 
     replaceCard(CARD_ARTIST, artistPanel);
     cardLayout.show(rootPanel, CARD_ARTIST);
@@ -312,7 +326,8 @@ public class HomePanel extends JPanel implements TabNavigator {
     java.util.function.Function<AlbumDto, String> keyExtractor =
         mode == SortMode.TITLE ? AlbumDto::albumName : AlbumDto::artistName;
     return new AlbumGridPanel(albums, letterMap, imageLoader, albumGridProfile,
-        album -> pushAlbumDetail(album), true, keyExtractor);
+        album -> pushAlbumDetail(album), true, keyExtractor, userActivityService,
+        songLibraryService.getOwnLocationId());
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

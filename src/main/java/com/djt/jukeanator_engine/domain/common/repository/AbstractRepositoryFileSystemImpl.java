@@ -2,8 +2,10 @@ package com.djt.jukeanator_engine.domain.common.repository;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -128,6 +130,29 @@ public class AbstractRepositoryFileSystemImpl {
       getObjectWriter().writeValue(Path.of(filePath).toFile(), item);
     } catch (IOException ioe) {
       throw new UncheckedIOException("Could not write JSON to file: " + filePath, ioe);
+    }
+  }
+
+  /**
+   * Appends {@code item} as one compact JSON line to {@code filePath}, creating the file (and any
+   * missing parent directories) if it doesn't exist yet. Unlike {@link #writeJsonList}, this never
+   * reads or rewrites what's already on disk -- each call is a single {@code O(1)} append, which
+   * matters for high-frequency, ever-growing logs (e.g. user activity tracking) where a whole-file
+   * rewrite per event would not scale. Always compact (one JSON object per line), regardless of
+   * {@link #USE_PRETTY_PRINT}, since pretty-printing would break the one-object-per-line format.
+   */
+  protected <T> void appendJsonLine(String filePath, T item) {
+
+    Path path = Path.of(filePath);
+    try {
+      if (path.getParent() != null) {
+        Files.createDirectories(path.getParent());
+      }
+      String line = OBJECT_WRITER.writeValueAsString(item) + System.lineSeparator();
+      Files.writeString(path, line, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+          StandardOpenOption.APPEND);
+    } catch (IOException ioe) {
+      throw new UncheckedIOException("Could not append JSON line to file: " + filePath, ioe);
     }
   }
 

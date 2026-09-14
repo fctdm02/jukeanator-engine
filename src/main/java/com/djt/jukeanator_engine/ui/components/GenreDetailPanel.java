@@ -23,6 +23,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
+import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 
 public class GenreDetailPanel extends JPanel {
 
@@ -57,6 +59,7 @@ public class GenreDetailPanel extends JPanel {
   private final AlbumGridPanel.AlbumClickListener onAlbumClicked;
   private final ArtistClickListener onArtistClicked;
   private final SongLibraryService songLibraryService;
+  private final UserActivityService userActivityService;
 
   // ── Popularity thresholds (for the Songs column's popularity indicator) ────
   private final int popularityT1;
@@ -77,7 +80,7 @@ public class GenreDetailPanel extends JPanel {
   public GenreDetailPanel(GenreDto genre, SearchResultDto results, ImageLoader imageLoader,
       int popularityT1, int popularityT2, int popularityT3, String backLabel, Runnable onBack,
       AlbumGridPanel.AlbumClickListener onAlbumClicked, ArtistClickListener onArtistClicked,
-      SongLibraryService songLibraryService) {
+      SongLibraryService songLibraryService, UserActivityService userActivityService) {
 
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
@@ -90,6 +93,7 @@ public class GenreDetailPanel extends JPanel {
     this.onAlbumClicked = onAlbumClicked;
     this.onArtistClicked = onArtistClicked;
     this.songLibraryService = songLibraryService;
+    this.userActivityService = userActivityService;
 
     SearchResultDto safe = results != null ? results : new SearchResultDto(List.of(), List.of(), List.of());
     int serverPageSize = songLibraryService.getSearchResultPageSize();
@@ -327,6 +331,7 @@ public class GenreDetailPanel extends JPanel {
 
     JPanel artistsColumn = ResultsColumnPanel.build("ARTISTS", artistBuffer.items(), artistsOffset,
         previewCount, imageLoader, newOffset -> {
+          trackPageNavigation("ARTISTS", artistsOffset, newOffset);
           artistsOffset = newOffset;
           rebuildColumns();
         }, item -> handleRowClick("ARTISTS", item), ResultsColumnPanel.ColumnPosition.FIRST,
@@ -334,6 +339,7 @@ public class GenreDetailPanel extends JPanel {
 
     JPanel albumsColumn = ResultsColumnPanel.build("ALBUMS", albumBuffer.items(), albumsOffset,
         previewCount, imageLoader, newOffset -> {
+          trackPageNavigation("ALBUMS", albumsOffset, newOffset);
           albumsOffset = newOffset;
           rebuildColumns();
         }, item -> handleRowClick("ALBUMS", item), ResultsColumnPanel.ColumnPosition.MIDDLE,
@@ -341,6 +347,7 @@ public class GenreDetailPanel extends JPanel {
 
     JPanel songsColumn = ResultsColumnPanel.build("SONGS", songBuffer.items(), songsOffset,
         previewCount, imageLoader, newOffset -> {
+          trackPageNavigation("SONGS", songsOffset, newOffset);
           songsOffset = newOffset;
           rebuildColumns();
         }, item -> handleRowClick("SONGS", item), ResultsColumnPanel.ColumnPosition.LAST,
@@ -352,10 +359,21 @@ public class GenreDetailPanel extends JPanel {
     columnsPanel.repaint();
   }
 
+  private void trackPageNavigation(String category, int currentOffset, int newOffset) {
+
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.PAGE_NAVIGATION, java.util.Map.of("tab", "GENRES", "category", category,
+            "direction", newOffset > currentOffset ? "next" : "prev"));
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // ROW CLICK DISPATCH
   // ─────────────────────────────────────────────────────────────────────────
   private <T> void handleRowClick(String category, T item) {
+
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.SEARCH_RESULT_CLICK, java.util.Map.of("tab", "GENRES", "category", category));
+
     switch (category) {
       case "ARTISTS" -> {
         if (item instanceof ArtistDto a && onArtistClicked != null)

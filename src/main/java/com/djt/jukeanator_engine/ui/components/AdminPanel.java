@@ -61,6 +61,8 @@ import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityRecord;
+import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 import com.djt.jukeanator_engine.ui.security.SwingSecurityUtil;
 
@@ -83,6 +85,7 @@ public class AdminPanel extends JPanel {
   private final UserService userService;
   private final LocationService locationService;
   private final FinancialLedgerService financialLedgerService;
+  private final UserActivityService userActivityService;
   private final CreditManager creditManager;
   private final Frame ownerFrame;
   private final ImageLoader imageLoader;
@@ -136,8 +139,8 @@ public class AdminPanel extends JPanel {
   public AdminPanel(Frame ownerFrame, SongLibraryService songLibraryService,
       SongQueueService songQueueService, SongPlayerService songPlayerService,
       UserService userService, LocationService locationService,
-      FinancialLedgerService financialLedgerService, CreditManager creditManager,
-      ImageLoader imageLoader) {
+      FinancialLedgerService financialLedgerService, UserActivityService userActivityService,
+      CreditManager creditManager, ImageLoader imageLoader) {
 
     this.ownerFrame = ownerFrame;
     this.songLibraryService = songLibraryService;
@@ -146,6 +149,7 @@ public class AdminPanel extends JPanel {
     this.userService = userService;
     this.locationService = locationService;
     this.financialLedgerService = financialLedgerService;
+    this.userActivityService = userActivityService;
     this.creditManager = creditManager;
     this.imageLoader = imageLoader;
 
@@ -395,6 +399,7 @@ public class AdminPanel extends JPanel {
 
     strip.add(sideButton("Financial\nLedger", ColorTheme.get().accentGold,
         e -> doFinancialLedger()));
+    strip.add(sideButton("View\nActivity", ColorTheme.get().accentGold, e -> doViewActivity()));
 
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton("Queue\nAlbum", ColorTheme.get().accentGreen, e -> doAddAlbumToQueue()));
@@ -937,6 +942,205 @@ public class AdminPanel extends JPanel {
               ex.getMessage() != null ? ex.getMessage() : "Could not load the financial ledger."));
         }
       });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // VIEW ACTIVITY (UserActivityService)
+  // ─────────────────────────────────────────────────────────────────────────
+  // Reused across every open rather than constructed fresh per click -- same rationale as
+  // financialLedgerDialog above.
+  private ActivityDialog activityDialog;
+
+  private void doViewActivity() {
+    if (activityDialog == null) {
+      activityDialog = new ActivityDialog();
+    }
+    activityDialog.show();
+  }
+
+  /**
+   * Shows this location's most recent user-activity records -- Swing tab/page/search/artist/album
+   * navigation plus queue actions from both the Swing UI and mobile/web -- in a scrollable table,
+   * newest first. Shown via {@link #showOverlayForm} rather than a separate {@code JDialog} window
+   * -- see {@link #overlayCard}. Auto-dismisses after one minute of inactivity via
+   * {@link IdleMonitor}, mirroring {@link FinancialLedgerDialog}.
+   */
+  private class ActivityDialog {
+
+    /** Plenty for one scrollable screen's worth of history without an unbounded query. */
+    private static final int ACTIVITY_LIMIT = 500;
+
+    private final JPanel content = new JPanel(new BorderLayout(0, 12));
+    private final JLabel statusLabel = new JLabel(" ");
+    private final ActivityTableModel tableModel = new ActivityTableModel();
+    private final JTable table = new JTable(tableModel);
+
+    // Same reuse-not-recreate rationale as FinancialLedgerDialog.visible above.
+    private boolean visible;
+
+    ActivityDialog() {
+
+      content.setOpaque(false);
+
+      JLabel title = new JLabel("Activity");
+      title.setForeground(ColorTheme.get().accentGold);
+      title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+
+      content.add(title, BorderLayout.NORTH);
+      content.add(buildTablePanel(), BorderLayout.CENTER);
+
+      statusLabel.setForeground(ColorTheme.get().textSecondary);
+      statusLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      content.add(statusLabel, BorderLayout.SOUTH);
+
+      content.registerKeyboardAction(e -> close(),
+          javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+          JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+      // Constructed once (see the activityDialog field above), not per show() -- its 60-second
+      // inactivity timeout runs for as long as the admin panel itself is open.
+      new IdleMonitor(60_000, () -> SwingUtilities.invokeLater(() -> {
+        if (visible) {
+          close();
+        }
+      }), () -> {});
+    }
+
+    void show() {
+      visible = true;
+      showOverlayForm(ColorTheme.get().accentGold, content);
+      reload();
+    }
+
+    private void close() {
+      visible = false;
+      hideOverlay();
+    }
+
+    private JScrollPane buildTablePanel() {
+
+      table.setOpaque(true);
+      table.setBackground(ColorTheme.get().bgList);
+      table.setForeground(ColorTheme.get().textPrimary);
+      table.setGridColor(ColorTheme.get().colorAdminSeparator);
+      table.setSelectionBackground(ColorTheme.get().bgListSelected);
+      table.setSelectionForeground(ColorTheme.get().textPrimary);
+      table.setRowHeight(LayoutTheme.get().adminAlbumCellH);
+      table.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      table.getTableHeader()
+          .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
+      table.setFillsViewportHeight(true);
+      table.setRowSelectionAllowed(false);
+      table.setDefaultRenderer(Object.class, new ActivityCellRenderer());
+      table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
+
+      // Sized to fit each column's actual content; Details (the last column) stretches to fill
+      // whatever width remains, per AUTO_RESIZE_LAST_COLUMN above.
+      int[] columnWidths = {150, 90, 150, 170, 300};
+      for (int i = 0; i < columnWidths.length; i++) {
+        table.getColumnModel().getColumn(i).setPreferredWidth(columnWidths[i]);
+      }
+
+      JScrollPane scrollPane = darkScrollPane(table);
+      scrollPane.setPreferredSize(new Dimension(900, 420));
+      return scrollPane;
+    }
+
+    private void reload() {
+
+      statusLabel.setText("Loading...");
+      SwingSecurityUtil.runAsync(() -> {
+        try {
+          Integer locationId = songLibraryService.getOwnLocationId();
+          List<UserActivityRecord> records =
+              userActivityService.findRecentActivity(locationId, ACTIVITY_LIMIT);
+          SwingUtilities.invokeLater(() -> {
+            tableModel.setRecords(records);
+            statusLabel.setText(" ");
+          });
+        } catch (Exception ex) {
+          SwingUtilities.invokeLater(() -> statusLabel
+              .setText(ex.getMessage() != null ? ex.getMessage() : "Could not load activity."));
+        }
+      });
+    }
+  }
+
+  /** Plain dark-theme cell padding/coloring for the Activity dialog's table. */
+  private static class ActivityCellRenderer extends javax.swing.table.DefaultTableCellRenderer {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public java.awt.Component getTableCellRendererComponent(JTable table, Object value,
+        boolean isSelected, boolean hasFocus, int row, int column) {
+
+      JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected,
+          hasFocus, row, column);
+      label.setOpaque(true);
+      label.setBackground(ColorTheme.get().bgList);
+      label.setForeground(ColorTheme.get().textPrimary);
+      label.setBorder(new EmptyBorder(2, 8, 2, 8));
+      return label;
+    }
+  }
+
+  /**
+   * Backs the Activity dialog's table. Records arrive already newest-first from {@code
+   * UserActivityService#findRecentActivity} (backed by an {@code ORDER BY occurred_at DESC} query
+   * or, for the filesystem backend, newest-day-file-first/newest-line-first reading), so unlike
+   * {@link SplitPeriodTableModel} this never needs to reorder what it's given.
+   */
+  private static class ActivityTableModel extends javax.swing.table.AbstractTableModel {
+    private static final long serialVersionUID = 1L;
+
+    private static final String[] COLUMNS = {"Time", "Source", "User", "Activity", "Details"};
+
+    private static final java.time.format.DateTimeFormatter TIME_FORMAT =
+        java.time.format.DateTimeFormatter.ofPattern("M/d/yyyy h:mm:ss a")
+            .withZone(java.time.ZoneId.systemDefault());
+
+    private List<UserActivityRecord> records = new ArrayList<>();
+
+    void setRecords(List<UserActivityRecord> newRecords) {
+      this.records = new ArrayList<>(newRecords);
+      fireTableDataChanged();
+    }
+
+    @Override
+    public int getRowCount() {
+      return records.size();
+    }
+
+    @Override
+    public int getColumnCount() {
+      return COLUMNS.length;
+    }
+
+    @Override
+    public String getColumnName(int column) {
+      return COLUMNS[column];
+    }
+
+    @Override
+    public Object getValueAt(int rowIndex, int columnIndex) {
+      UserActivityRecord record = records.get(rowIndex);
+      return switch (columnIndex) {
+        case 0 -> TIME_FORMAT.format(record.occurredAt());
+        case 1 -> record.source().name();
+        case 2 -> record.username();
+        case 3 -> record.activityType().name();
+        case 4 -> formatDetails(record.details());
+        default -> "";
+      };
+    }
+
+    private static String formatDetails(java.util.Map<String, Object> details) {
+      if (details == null || details.isEmpty()) {
+        return "";
+      }
+      return details.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue())
+          .collect(java.util.stream.Collectors.joining(", "));
     }
   }
 

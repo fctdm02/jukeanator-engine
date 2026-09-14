@@ -6,6 +6,7 @@ import javax.swing.ImageIcon;
 import javax.swing.JPanel;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
+import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 
 public class ArtistDetailPanel extends JPanel {
 
@@ -16,7 +17,8 @@ public class ArtistDetailPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   public ArtistDetailPanel(ArtistDto artist, ImageLoader imageLoader,
       LayoutTheme.GridProfile albumGridProfile, String backLabel, Runnable onBack,
-      AlbumGridPanel.AlbumClickListener onAlbumClicked) {
+      AlbumGridPanel.AlbumClickListener onAlbumClicked, UserActivityService userActivityService,
+      Integer locationId) {
 
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
@@ -44,7 +46,7 @@ public class ArtistDetailPanel extends JPanel {
 
     // Unpack the profile here — AlbumGridPanel still receives four ints so its
     // own API is unchanged. Only the call-site (ArtistDetailPanel) simplifies.
-    add(new AlbumGridPanel(albums, null, imageLoader, albumGridProfile, onAlbumClicked, false, null),
-        BorderLayout.CENTER);
+    add(new AlbumGridPanel(albums, null, imageLoader, albumGridProfile, onAlbumClicked, false, null,
+        userActivityService, locationId), BorderLayout.CENTER);
   }
 }

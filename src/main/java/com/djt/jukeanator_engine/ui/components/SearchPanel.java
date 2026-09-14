@@ -27,6 +27,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
+import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class SearchPanel extends JPanel implements TabNavigator {
@@ -92,6 +94,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private final CreditManager creditManager;
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
+  private final UserActivityService userActivityService;
   private final ImageLoader imageLoader;
   private final int priorityCostMultiplier;
   private final int popularityT1;
@@ -107,13 +110,15 @@ public class SearchPanel extends JPanel implements TabNavigator {
   // ─────────────────────────────────────────────────────────────────────────
   public SearchPanel(char incrementCreditsKey, CreditManager creditManager,
       SongLibraryService songLibraryService, SongQueueService songQueueService,
-      ImageLoader imageLoader, int priorityCostMultiplier, int popularityT1, int popularityT2,
-      int popularityT3, boolean enableTypeAheadSearch, LayoutTheme.GridProfile albumGridProfile) {
+      UserActivityService userActivityService, ImageLoader imageLoader,
+      int priorityCostMultiplier, int popularityT1, int popularityT2, int popularityT3,
+      boolean enableTypeAheadSearch, LayoutTheme.GridProfile albumGridProfile) {
 
     this.incrementCreditsKey = incrementCreditsKey;
     this.creditManager = creditManager;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
+    this.userActivityService = userActivityService;
     this.imageLoader = imageLoader;
     this.priorityCostMultiplier = priorityCostMultiplier;
     this.popularityT1 = popularityT1;
@@ -158,6 +163,10 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
     Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
     AlbumDto full = fetchFull(album);
+
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.ALBUM_VIEWED, java.util.Map.of("tab", "SEARCH", "albumId",
+            full.albumId(), "albumName", full.albumName()));
 
     // Remember which card was visible before navigating to the detail card so
     // the BACK button can return the user to the correct screen (the search
@@ -366,6 +375,11 @@ public class SearchPanel extends JPanel implements TabNavigator {
       songsOffset = 0;
       rebuildResultsCard();
       cardLayout.show(rootPanel, CARD_RESULTS);
+
+      userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+          UserActivityType.SEARCH_QUERY, java.util.Map.of("tab", "SEARCH", "query", query,
+              "artistResults", totalArtists, "albumResults", totalAlbums, "songResults",
+              totalSongs));
     } catch (Exception ignored) {
     }
   }
@@ -456,6 +470,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
     JPanel artistsColumn = ResultsColumnPanel.build("ARTISTS", artists, artistsOffset,
         previewCount, imageLoader, newOffset -> {
+          trackPageNavigation("ARTISTS", artistsOffset, newOffset);
           artistsOffset = newOffset;
           rebuildResultsCard();
         }, item -> handleRowClick("ARTISTS", item), ResultsColumnPanel.ColumnPosition.FIRST,
@@ -463,6 +478,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
     JPanel albumsColumn = ResultsColumnPanel.build("ALBUMS", albums, albumsOffset,
         previewCount, imageLoader, newOffset -> {
+          trackPageNavigation("ALBUMS", albumsOffset, newOffset);
           albumsOffset = newOffset;
           rebuildResultsCard();
         }, item -> handleRowClick("ALBUMS", item), ResultsColumnPanel.ColumnPosition.MIDDLE,
@@ -470,6 +486,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
     JPanel songsColumn = ResultsColumnPanel.build("SONGS", songs, songsOffset, previewCount,
         imageLoader, newOffset -> {
+          trackPageNavigation("SONGS", songsOffset, newOffset);
           songsOffset = newOffset;
           rebuildResultsCard();
         }, item -> handleRowClick("SONGS", item), ResultsColumnPanel.ColumnPosition.LAST,
@@ -487,7 +504,18 @@ public class SearchPanel extends JPanel implements TabNavigator {
     resultsCard.repaint();
   }
 
+  private void trackPageNavigation(String category, int currentOffset, int newOffset) {
+
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.PAGE_NAVIGATION, java.util.Map.of("tab", "SEARCH", "category", category,
+            "direction", newOffset > currentOffset ? "next" : "prev"));
+  }
+
   private <T> void handleRowClick(String category, T item) {
+
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.SEARCH_RESULT_CLICK, java.util.Map.of("tab", "SEARCH", "category", category));
+
     switch (category) {
       case "ARTISTS" -> {
         if (item instanceof ArtistDto a)
@@ -519,8 +547,12 @@ public class SearchPanel extends JPanel implements TabNavigator {
       throw new IllegalStateException("Could not get artist: [" + artistName + "]", e);
     }
 
+    userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
+        UserActivityType.ARTIST_VIEWED, java.util.Map.of("tab", "SEARCH", "artistName", artistName));
+
     ArtistDetailPanel panel = new ArtistDetailPanel(full, imageLoader, albumGridProfile, "← Back",
-        () -> cardLayout.show(rootPanel, CARD_RESULTS), album -> pushAlbumDetail(album));
+        () -> cardLayout.show(rootPanel, CARD_RESULTS), album -> pushAlbumDetail(album),
+        userActivityService, songLibraryService.getOwnLocationId());
 
     replaceCard(CARD_ARTIST, panel);
     cardLayout.show(rootPanel, CARD_ARTIST);
