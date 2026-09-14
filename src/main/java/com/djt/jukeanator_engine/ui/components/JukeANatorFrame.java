@@ -844,7 +844,7 @@ public class JukeANatorFrame extends JFrame {
         new JukeboxTabComponent("SEARCH", "🔍", ColorTheme.get().frameTabAccentSearch));
     tabs.setTabComponentAt(3,
         new JukeboxTabComponent("HOT HERE", "🔥", ColorTheme.get().frameTabAccentHotHere));
-    tabs.setTabComponentAt(4, new JukeboxTabComponent("GENRES", "▣", ColorTheme.get().textPrimary));
+    tabs.setTabComponentAt(4, new JukeboxTabComponent("GENRES", "🎸", ColorTheme.get().textPrimary));
     tabs.setTabComponentAt(5,
         new JukeboxTabComponent("QUEUE", "♫", ColorTheme.get().frameTabAccentQueue));
 
