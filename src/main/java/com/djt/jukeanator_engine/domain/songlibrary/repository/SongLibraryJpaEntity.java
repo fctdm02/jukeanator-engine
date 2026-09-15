@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.songlibrary.repository;
 
+import java.time.Instant;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -7,6 +8,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 /**
  * Flat JPA persistence row for the single {@code song_library} table -- one table across the
@@ -87,6 +91,14 @@ public class SongLibraryJpaEntity {
   @Column(name = "album_has_explicit")
   private Boolean albumHasExplicit;
 
+  @CreationTimestamp
+  @Column(name = "date_added", nullable = false, updatable = false)
+  private Instant dateAdded;
+
+  @UpdateTimestamp
+  @Column(name = "date_updated", nullable = false)
+  private Instant dateUpdated;
+
   protected SongLibraryJpaEntity() {} // for JPA
 
   public SongLibraryJpaEntity(Integer locationId, Integer id, String name,
@@ -118,12 +130,24 @@ public class SongLibraryJpaEntity {
     return name;
   }
 
+  public void setName(String name) {
+    this.name = name;
+  }
+
   public Integer getParentFolderId() {
     return parentFolderId;
   }
 
+  public void setParentFolderId(Integer parentFolderId) {
+    this.parentFolderId = parentFolderId;
+  }
+
   public LibraryItemType getClassDiscriminator() {
     return classDiscriminator;
+  }
+
+  public void setClassDiscriminator(LibraryItemType classDiscriminator) {
+    this.classDiscriminator = classDiscriminator;
   }
 
   public String getSongArtistName() {
@@ -196,5 +220,13 @@ public class SongLibraryJpaEntity {
 
   public void setAlbumHasExplicit(Boolean albumHasExplicit) {
     this.albumHasExplicit = albumHasExplicit;
+  }
+
+  public Instant getDateAdded() {
+    return dateAdded;
+  }
+
+  public Instant getDateUpdated() {
+    return dateUpdated;
   }
 }

@@ -8,6 +8,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
@@ -50,6 +52,14 @@ public class UserActivityEntity {
   @Column(name = "details", columnDefinition = "json")
   private String details;
 
+  @CreationTimestamp
+  @Column(name = "date_added", nullable = false, updatable = false)
+  private Instant dateAdded;
+
+  @UpdateTimestamp
+  @Column(name = "date_updated", nullable = false)
+  private Instant dateUpdated;
+
   protected UserActivityEntity() {} // for JPA
 
   public UserActivityEntity(Integer locationId, String source, String username,
@@ -88,5 +98,13 @@ public class UserActivityEntity {
 
   public String getDetails() {
     return details;
+  }
+
+  public Instant getDateAdded() {
+    return dateAdded;
+  }
+
+  public Instant getDateUpdated() {
+    return dateUpdated;
   }
 }

@@ -1,13 +1,18 @@
 package com.djt.jukeanator_engine.domain.common.model;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.SequenceGenerator;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
@@ -36,6 +41,14 @@ public abstract class AbstractPersistentEntity extends AbstractEntity {
       sequenceName = PERSISTENT_IDENTITY_SEQUENCE, allocationSize = 1)
   private Integer persistentIdentity;
 
+  @CreationTimestamp
+  @Column(name = "date_added", nullable = false, updatable = false)
+  private Instant dateAdded;
+
+  @UpdateTimestamp
+  @Column(name = "date_updated", nullable = false)
+  private Instant dateUpdated;
+
   public AbstractPersistentEntity() {}
 
   public AbstractPersistentEntity(Integer persistentIdentity) {
@@ -46,10 +59,18 @@ public abstract class AbstractPersistentEntity extends AbstractEntity {
   public Integer getPersistentIdentity() {
     return persistentIdentity;
   }
-  
+
   // Used by the JDBC implementations to know when to INSERT vs UPDATE
   public void setPersistentIdentity(Integer persistentIdentity) {
     this.persistentIdentity = persistentIdentity;
+  }
+
+  public Instant getDateAdded() {
+    return dateAdded;
+  }
+
+  public Instant getDateUpdated() {
+    return dateUpdated;
   }
 
   public String getClassAndPersistentIdentity() {

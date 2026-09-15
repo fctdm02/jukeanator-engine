@@ -1,12 +1,17 @@
 package com.djt.jukeanator_engine.domain.songlibrary.repository;
 
 import static java.util.Objects.requireNonNull;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -34,16 +39,37 @@ import jakarta.persistence.EntityManagerFactory;
  * tree from the flat rows (calling the domain model's own constructors/{@code addChildFolder}/
  * {@code addChildSong}, exactly as {@code SongScanner} would from real files), so every existing
  * browse/search method on {@code RootFolderEntity} works unchanged regardless of which repository
- * loaded it. {@code storeAggregateRoot(root)} does the reverse: delete every row for that
- * location, then walk the tree and re-insert -- simpler and safe here because the tree handed in
- * is always fully materialized already, unlike {@code UserRepositoryJpaImpl}'s diff/orphan-delete
- * approach for a root that's mutated incrementally over its lifetime.
+ * loaded it.
+ *
+ * <p>{@code storeAggregateRoot(root)} does a <b>diff-based upsert</b> against the location's
+ * existing rows rather than a wholesale delete+reinsert: every folder/song in the incoming tree is
+ * matched against an existing row by its <b>natural identity</b> (the filesystem path built from
+ * the name chain -- see {@code AbstractLibraryEntity#getNaturalIdentity()}), not by {@code id}.
+ * That's deliberate: {@code SongScanner} resets its id counter to 1 and reassigns every id in
+ * traversal order on <em>every</em> scan, so the same song's scanner-assigned id is not stable
+ * across two scans, while its path is. A matched row is updated in place (via managed-entity
+ * setters, so Hibernate's dirty checking only emits an {@code UPDATE} when a column actually
+ * changed) and <b>keeps its existing persisted id</b>; an unmatched row is inserted; an existing
+ * row whose path no longer appears in the incoming tree is deleted. Keeping the id stable across a
+ * rescan matters beyond this table: {@code song_queue}, playlists, and play history all persist
+ * raw {@code (locationId, albumId, songId)} triples pointing back into {@code song_library}, which
+ * a full delete+reinsert would silently invalidate for every unchanged song on every rescan.
+ *
+ * <p><b>Caller contract -- ids on the tree you pass in may be mutated</b>: since a matched node
+ * reuses its old persisted id (which can differ from the id the caller set on it) and a genuinely
+ * new node may need renumbering to avoid colliding with a reused id, {@link #storeAggregateRoot}
+ * calls {@code setId(...)} on {@code root} and every descendant as it reconciles them, so after
+ * the call returns the in-memory tree's ids agree with what was actually persisted. {@code
+ * SongLibraryServiceImpl.scanFileSystemForSongs()}'s post-store round-trip check (comparing the
+ * scanned tree against a fresh {@link #loadAggregateRoot}) relies on this.
  *
  * <p><b>id is application-assigned, not Hibernate-generated</b>: {@code SongScanner}'s single
  * shared per-scan counter assigns every folder/file a unique id across the whole location (see
  * {@code AbstractLibraryEntity#getId}) -- root, genres, artists, albums, and songs must all
  * already have a non-null id before {@link #storeAggregateRoot} is called, since {@code id} is
- * part of this table's primary key.
+ * part of this table's primary key. A brand-new node's incoming id is kept as-is when it doesn't
+ * collide with a reused id; only on collision is it renumbered from a counter seeded above the
+ * location's current max id.
  *
  * <p><b>Caller contract for a synthetically-built root</b> (e.g. a master populating this from a
  * synced {@code LibrarySnapshotDto} rather than a real filesystem scan): every {@link
@@ -125,14 +151,49 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
 
     transactionTemplate.executeWithoutResult(status -> {
 
-      entityManager.createQuery("delete from SongLibraryJpaEntity where locationId = :locationId")
+      List<SongLibraryJpaEntity> existingRows = entityManager
+          .createQuery("from SongLibraryJpaEntity where locationId = :locationId",
+              SongLibraryJpaEntity.class)
           .setParameter("locationId", locationId)
-          .executeUpdate();
+          .getResultList();
 
-      entityManager.persist(new SongLibraryJpaEntity(locationId, root.getId(), root.getRootPath(),
-          null, SongLibraryJpaEntity.LibraryItemType.ROOT));
+      Map<Integer, SongLibraryJpaEntity> existingById = new HashMap<>();
+      for (SongLibraryJpaEntity row : existingRows) {
+        existingById.put(row.getId(), row);
+      }
 
-      insertFolderRowsRecursively(root, locationId, root.getId());
+      Map<String, SongLibraryJpaEntity> existingByPath = new HashMap<>();
+      Map<Integer, String> pathCache = new HashMap<>();
+      for (SongLibraryJpaEntity row : existingRows) {
+        existingByPath.put(existingRowPath(row, existingById, pathCache).toLowerCase(), row);
+      }
+
+      // Every id currently occupying a row for this location -- whether it ends up matched-and-
+      // kept or unmatched-and-deleted below -- is off-limits for a brand-new node's insert.
+      // SongScanner restarts its own counter at 1 on every scan, so a genuinely new node can
+      // easily be handed an id some other still-present row already owns; claiming the full
+      // existing id space up front (not just the matched subset) avoids a same-transaction
+      // primary-key collision with a row that hasn't been deleted yet.
+      Set<Integer> claimedIds = new HashSet<>(existingById.keySet());
+
+      int maxExistingId = existingRows.stream().mapToInt(SongLibraryJpaEntity::getId).max().orElse(0);
+      AtomicInteger fallbackId = new AtomicInteger(maxExistingId + 1);
+
+      Set<Integer> survivingIds = new HashSet<>();
+
+      Integer rootId = reconcileRow(SongLibraryJpaEntity.LibraryItemType.ROOT,
+          root.getNaturalIdentity(), locationId, null, root.getRootPath(), root.getId(),
+          existingByPath, claimedIds, fallbackId, row -> {}, survivingIds);
+      root.setId(rootId);
+
+      reconcileFolderRowsRecursively(root, locationId, rootId, existingByPath, claimedIds, fallbackId,
+          survivingIds);
+
+      for (SongLibraryJpaEntity existing : existingRows) {
+        if (!survivingIds.contains(existing.getId())) {
+          entityManager.remove(existing);
+        }
+      }
     });
 
     this.root = root;
@@ -276,15 +337,54 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
     }
   }
 
-  // ── store-side decomposition ────────────────────────────────────────────
+  // ── store-side reconciliation (diff-based upsert) ───────────────────────
 
-  private void insertFolderRowsRecursively(FolderEntity parent, Integer locationId, Integer parentId) {
+  /**
+   * Reconstructs an existing row's natural-identity path purely from the flat rows already loaded
+   * for this location (no domain-object rehydration needed) -- mirrors {@code
+   * AbstractLibraryEntity#getNaturalIdentity()}'s own name-chain-joined-by-{@link
+   * File#separatorChar} composition exactly, so it's directly comparable against the incoming
+   * tree's real {@code getNaturalIdentity()} values. A row whose parent chain is broken (dangling
+   * {@code parentFolderId}, e.g. leftover data from a prior bug) gets a path that can never match
+   * anything real, so it naturally falls out as unmatched -- and therefore deleted -- below.
+   */
+  private String existingRowPath(SongLibraryJpaEntity row, Map<Integer, SongLibraryJpaEntity> existingById,
+      Map<Integer, String> pathCache) {
+
+    String cached = pathCache.get(row.getId());
+    if (cached != null) {
+      return cached;
+    }
+
+    String path;
+    if (row.getClassDiscriminator() == SongLibraryJpaEntity.LibraryItemType.ROOT
+        || row.getParentFolderId() == null) {
+      path = row.getName();
+    } else {
+      SongLibraryJpaEntity parentRow = existingById.get(row.getParentFolderId());
+      path = parentRow == null
+          ? "##ORPHAN-ROW-NO-PARENT##:" + row.getId()
+          : existingRowPath(parentRow, existingById, pathCache) + File.separatorChar + row.getName();
+    }
+
+    pathCache.put(row.getId(), path);
+    return path;
+  }
+
+  private void reconcileFolderRowsRecursively(FolderEntity parent, Integer locationId, Integer parentId,
+      Map<String, SongLibraryJpaEntity> existingByPath, Set<Integer> claimedIds, AtomicInteger fallbackId,
+      Set<Integer> survivingIds) {
 
     for (FolderEntity child : parent.getChildFolders()) {
 
       if (child instanceof AlbumFolderEntity albumFolder) {
-        entityManager.persist(buildAlbumRow(albumFolder, locationId, parentId));
-        insertSongRows(albumFolder, locationId);
+        Integer albumId = reconcileRow(SongLibraryJpaEntity.LibraryItemType.ALBUM,
+            albumFolder.getNaturalIdentity(), locationId, parentId, albumFolder.getName(),
+            albumFolder.getId(), existingByPath, claimedIds, fallbackId,
+            row -> applyAlbumFields(row, albumFolder), survivingIds);
+        albumFolder.setId(albumId);
+        reconcileSongRows(albumFolder, locationId, albumId, existingByPath, claimedIds, fallbackId,
+            survivingIds);
         continue;
       }
 
@@ -298,17 +398,67 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
             "Unexpected folder type while storing song library: " + child.getClass().getSimpleName());
       }
 
-      entityManager.persist(
-          new SongLibraryJpaEntity(locationId, child.getId(), child.getName(), parentId, discriminator));
-      insertFolderRowsRecursively(child, locationId, child.getId());
+      Integer childId = reconcileRow(discriminator, child.getNaturalIdentity(), locationId, parentId,
+          child.getName(), child.getId(), existingByPath, claimedIds, fallbackId, row -> {},
+          survivingIds);
+      child.setId(childId);
+
+      reconcileFolderRowsRecursively(child, locationId, childId, existingByPath, claimedIds, fallbackId,
+          survivingIds);
     }
   }
 
-  private SongLibraryJpaEntity buildAlbumRow(AlbumFolderEntity album, Integer locationId,
-      Integer parentId) {
+  private void reconcileSongRows(AlbumFolderEntity album, Integer locationId, Integer albumId,
+      Map<String, SongLibraryJpaEntity> existingByPath, Set<Integer> claimedIds, AtomicInteger fallbackId,
+      Set<Integer> survivingIds) {
 
-    SongLibraryJpaEntity row = new SongLibraryJpaEntity(locationId, album.getId(), album.getName(),
-        parentId, SongLibraryJpaEntity.LibraryItemType.ALBUM);
+    for (SongFileEntity song : album.getChildSongs()) {
+
+      Integer songId = reconcileRow(SongLibraryJpaEntity.LibraryItemType.SONG,
+          song.getNaturalIdentity(), locationId, albumId, song.getName(), song.getId(), existingByPath,
+          claimedIds, fallbackId, row -> applySongFields(row, song), survivingIds);
+      song.setId(songId);
+    }
+  }
+
+  /**
+   * Matches one incoming node (folder or song) against the location's existing rows by natural
+   * identity. A match is updated in place via managed-entity setters (Hibernate's dirty checking
+   * only issues an {@code UPDATE} for columns that actually changed) and keeps its existing id. No
+   * match means an insert: the node's own incoming id is kept unless it collides with an id
+   * that's already claimed (by a match elsewhere in the tree, or by an earlier new node in this
+   * same store), in which case it's renumbered from {@code fallbackId}.
+   */
+  private Integer reconcileRow(SongLibraryJpaEntity.LibraryItemType type, String naturalIdentity,
+      Integer locationId, Integer parentId, String name, Integer incomingId,
+      Map<String, SongLibraryJpaEntity> existingByPath, Set<Integer> claimedIds, AtomicInteger fallbackId,
+      Consumer<SongLibraryJpaEntity> applyTypeSpecificFields, Set<Integer> survivingIds) {
+
+    SongLibraryJpaEntity existing = existingByPath.get(naturalIdentity.toLowerCase());
+
+    if (existing != null) {
+      existing.setName(name);
+      existing.setParentFolderId(parentId);
+      existing.setClassDiscriminator(type);
+      applyTypeSpecificFields.accept(existing);
+      survivingIds.add(existing.getId());
+      return existing.getId();
+    }
+
+    Integer finalId = incomingId;
+    while (finalId == null || claimedIds.contains(finalId)) {
+      finalId = fallbackId.getAndIncrement();
+    }
+    claimedIds.add(finalId);
+
+    SongLibraryJpaEntity row = new SongLibraryJpaEntity(locationId, finalId, name, parentId, type);
+    applyTypeSpecificFields.accept(row);
+    entityManager.persist(row);
+    survivingIds.add(finalId);
+    return finalId;
+  }
+
+  private void applyAlbumFields(SongLibraryJpaEntity row, AlbumFolderEntity album) {
 
     AlbumMetaDataFileEntity metaData = album.getMetaData();
     if (metaData != null) {
@@ -318,21 +468,14 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
       row.setAlbumReleaseDate(metaData.getReleaseDate());
       row.setAlbumHasExplicit(metaData.hasExplicit());
     }
-    return row;
   }
 
-  private void insertSongRows(AlbumFolderEntity album, Integer locationId) {
+  private void applySongFields(SongLibraryJpaEntity row, SongFileEntity song) {
 
-    for (SongFileEntity song : album.getChildSongs()) {
-
-      SongLibraryJpaEntity row = new SongLibraryJpaEntity(locationId, song.getId(), song.getName(),
-          album.getId(), SongLibraryJpaEntity.LibraryItemType.SONG);
-      row.setSongArtistName(song.getArtistName());
-      row.setSongName(song.getSongName());
-      row.setSongTrackNumber(song.getTrackNumber());
-      row.setSongNumPlays(song.getNumPlays());
-      entityManager.persist(row);
-    }
+    row.setSongArtistName(song.getArtistName());
+    row.setSongName(song.getSongName());
+    row.setSongTrackNumber(song.getTrackNumber());
+    row.setSongNumPlays(song.getNumPlays());
   }
 
   @Override

@@ -9,6 +9,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
@@ -54,6 +56,14 @@ public class SongQueueEntryJpaEntity {
   @Column(name = "queue_order", nullable = false)
   private Integer queueOrder;
 
+  @CreationTimestamp
+  @Column(name = "date_added", nullable = false, updatable = false)
+  private Instant dateAdded;
+
+  @UpdateTimestamp
+  @Column(name = "date_updated", nullable = false)
+  private Instant dateUpdated;
+
   protected SongQueueEntryJpaEntity() {} // for JPA
 
   public SongQueueEntryJpaEntity(SongIdentifier songIdentifier, String username, Integer priority,
@@ -87,5 +97,13 @@ public class SongQueueEntryJpaEntity {
 
   public Integer getQueueOrder() {
     return queueOrder;
+  }
+
+  public Instant getDateAdded() {
+    return dateAdded;
+  }
+
+  public Instant getDateUpdated() {
+    return dateUpdated;
   }
 }
