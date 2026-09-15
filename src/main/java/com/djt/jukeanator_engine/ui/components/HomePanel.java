@@ -310,6 +310,13 @@ public class HomePanel extends JPanel implements TabNavigator {
     }
 
     gridContainer.setOpaque(false);
+    // gridContainer is a persistent field reused across setAlbums() calls (e.g. after a
+    // library rescan). BorderLayout.CENTER only overwrites the layout's constraint mapping —
+    // it does not remove a previously added component from the container — so without this
+    // removeAll(), the stale AlbumGridPanel from the prior call stayed a live child at its old
+    // bounds, painting its old artist/album text underneath the new grid and causing the
+    // overlapping-label ghosting seen after a rescan.
+    gridContainer.removeAll();
     currentGridPanel = buildAlbumGridPanel(currentSort);
     gridContainer.add(currentGridPanel, BorderLayout.CENTER);
     card.add(gridContainer, BorderLayout.CENTER);
