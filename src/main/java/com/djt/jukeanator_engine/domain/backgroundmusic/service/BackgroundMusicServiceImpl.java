@@ -36,6 +36,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 
@@ -234,6 +235,23 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       }
     }
 
+    // Backfill/re-sync each entry's referential songIdentifier against the current library --
+    // covers both rows that never had one (pre-existing data) and rows whose id drifted since a
+    // rescan. Best-effort: if the library root isn't available yet, just skip this pass.
+    try {
+      RootFolderEntity libraryRoot =
+          this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
+      for (BackgroundMusicSongEntity song : allSongs) {
+        SongIdentifier refreshed = resolveSongIdentifier(libraryRoot, normalizedPath(song));
+        if (refreshed != null && !refreshed.equals(song.getSongIdentifier())) {
+          song.setSongIdentifier(refreshed);
+          changed = true;
+        }
+      }
+    } catch (Exception e) {
+      log.debug("loadAndReconcile: could not backfill song identifiers: {}", e.getMessage());
+    }
+
     if (changed) {
       backgroundMusicRepository.storeAll(allSongs);
       rebuildSongsById();
@@ -346,8 +364,9 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       BackgroundMusicSongEntity chosen = songsById.get(chosenId);
 
       try {
-        return this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId())
-            .getSongByPath(normalizedPath(chosen));
+        RootFolderEntity libraryRoot = this.songLibraryService
+            .getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
+        return resolveBackgroundSong(libraryRoot, chosen);
       } catch (EntityDoesNotExistException ednee) {
         log.warn(
             "getNextSong: background music song id {} not found in song library, path: {}, "
@@ -490,14 +509,14 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       Integer chosenId = pickRandom(eligible);
       SmartBackgroundMusicSongEntity chosen = smartSongsById.get(chosenId);
 
-      String normalizedPath = normalizedPath(chosen);
-
       try {
-        return this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId())
-            .getSongByPath(normalizedPath);
+        RootFolderEntity libraryRoot = this.songLibraryService
+            .getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
+        return resolveBackgroundSong(libraryRoot, chosen);
       } catch (EntityDoesNotExistException ednee) {
-        // Path not found in library — fail gracefully so the caller can fall back.
-        log.warn("getNextSmartAdditionSong: could not find song for path: {}", normalizedPath);
+        // Not found in library — fail gracefully so the caller can fall back.
+        log.warn("getNextSmartAdditionSong: could not find song for path: {}",
+            normalizedPath(chosen));
         return null;
       }
 
@@ -589,10 +608,13 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         SmartBackgroundMusicSongEntity existing = existingByPath.get(fresh.getSongFilePath());
         if (existing != null) {
           // Still a valid candidate — preserve persisted identity/play history, refresh only why
-          // it was picked, since a different source may now claim it.
+          // it was picked (and its referential ids, which may have drifted since a rescan), since
+          // a different source may now claim it.
           existing.setSourceSong(fresh.getSourceSong());
           existing.setSourceSongNumPlays(fresh.getSourceSongNumPlays());
           existing.setReason(fresh.getReason());
+          existing.setSongIdentifier(fresh.getSongIdentifier());
+          existing.setSourceSongIdentifier(fresh.getSourceSongIdentifier());
           merged.add(existing);
         } else {
           merged.add(fresh);
@@ -724,8 +746,14 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
           SongFileEntity entity = findSongEntity(s.albumId(), s.songId());
           if (entity != null && !excludedPaths.contains(entity.getNaturalIdentity())) {
             SmartAdditionReason reason = reasonBySongId.get(s.songId());
-            newPool.add(new SmartBackgroundMusicSongEntity(null, entity.getNaturalIdentity(),
-                coreSongPath, coreSong.getNumPlays(), reason));
+            SmartBackgroundMusicSongEntity candidate = new SmartBackgroundMusicSongEntity(null,
+                entity.getNaturalIdentity(), coreSongPath, coreSong.getNumPlays(), reason);
+            candidate.setSongIdentifier(new SongIdentifier(this.songLibraryService.getOwnLocationId(),
+                s.albumId(), s.songId()));
+            candidate.setSourceSongIdentifier(new SongIdentifier(
+                this.songLibraryService.getOwnLocationId(), coreSong.getAlbum().getId(),
+                coreSong.getId()));
+            newPool.add(candidate);
             excludedPaths.add(entity.getNaturalIdentity());
           }
         }
@@ -754,8 +782,15 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
             break;
           SongFileEntity entity = findSongEntity(s.albumId(), s.songId());
           if (entity != null && !excludedPaths.contains(entity.getNaturalIdentity())) {
-            newPool.add(new SmartBackgroundMusicSongEntity(null, entity.getNaturalIdentity(),
-                coreSongPath, coreSong.getNumPlays(), SmartAdditionReason.POPULAR_SONG_FROM_GENRE));
+            SmartBackgroundMusicSongEntity candidate = new SmartBackgroundMusicSongEntity(null,
+                entity.getNaturalIdentity(), coreSongPath, coreSong.getNumPlays(),
+                SmartAdditionReason.POPULAR_SONG_FROM_GENRE);
+            candidate.setSongIdentifier(new SongIdentifier(this.songLibraryService.getOwnLocationId(),
+                s.albumId(), s.songId()));
+            candidate.setSourceSongIdentifier(new SongIdentifier(
+                this.songLibraryService.getOwnLocationId(), coreSong.getAlbum().getId(),
+                coreSong.getId()));
+            newPool.add(candidate);
             excludedPaths.add(entity.getNaturalIdentity());
             added++;
           }
@@ -844,8 +879,11 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
       for (int i = 0; i < Math.min(target, eligibleSongs.size()); i++) {
         SongFileEntity song = eligibleSongs.get(i);
-        result.add(new SmartBackgroundMusicSongEntity(null, song.getNaturalIdentity(), null, null,
-            SmartAdditionReason.SONG_FROM_FAVORITE_ALBUM));
+        SmartBackgroundMusicSongEntity candidate = new SmartBackgroundMusicSongEntity(null,
+            song.getNaturalIdentity(), null, null, SmartAdditionReason.SONG_FROM_FAVORITE_ALBUM);
+        candidate.setSongIdentifier(new SongIdentifier(this.songLibraryService.getOwnLocationId(),
+            song.getAlbum().getId(), song.getId()));
+        result.add(candidate);
         excludedPaths.add(song.getNaturalIdentity());
       }
 
@@ -924,11 +962,132 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     return null;
   }
 
-  // No-op: background-music file locations live under dataDir, independent of the song library's
-  // scan path, so this service has nothing left to track when it changes.
+  /**
+   * Resolves {@code normalizedPath} against {@code libraryRoot} and, on a hit, returns the
+   * {@link SongIdentifier} (own location + album + song id) that referentially links a
+   * background-music row back to {@code song_library}.
+   *
+   * @return the identifier, or {@code null} if the path could not be resolved
+   */
+  private SongIdentifier resolveSongIdentifier(RootFolderEntity libraryRoot,
+      String normalizedPath) {
+
+    try {
+      SongFileEntity song = libraryRoot.getSongByPath(normalizedPath);
+      return new SongIdentifier(this.songLibraryService.getOwnLocationId(), song.getAlbum().getId(),
+          song.getId());
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * Resolves {@code song} to its {@link SongFileEntity} in {@code libraryRoot}, preferring the
+   * fast id-based lookup ({@link RootFolderEntity#getSongById}) when {@code song} already carries
+   * a {@link SongIdentifier}, and falling back to the path-based lookup ({@link
+   * RootFolderEntity#getSongByPath}) when the identifier is absent or stale (e.g. the id no
+   * longer resolves because the library was rescanned since it was captured). Read-only — does
+   * not mutate or persist {@code song}.
+   *
+   * @throws EntityDoesNotExistException if neither lookup resolves
+   */
+  private SongFileEntity resolveBackgroundSong(RootFolderEntity libraryRoot,
+      BackgroundMusicSongEntity song) throws EntityDoesNotExistException {
+
+    SongIdentifier identifier = song.getSongIdentifier();
+    if (identifier != null && identifier.getAlbumId() != null && identifier.getSongId() != null) {
+      try {
+        return libraryRoot.getSongById(identifier.getAlbumId(), identifier.getSongId());
+      } catch (EntityDoesNotExistException idMiss) {
+        // Stale id -- fall through to the path lookup below.
+      }
+    }
+    return libraryRoot.getSongByPath(normalizedPath(song));
+  }
+
+  /**
+   * A rescan is the only reliable signal that a song may have been deleted from the library, so
+   * both {@link #allSongs} and {@link #smartPool} are fully cleared and rebuilt from scratch
+   * against the freshly-rescanned library — not merely reconciled — via {@link
+   * #reinitializeAfterRescan()}. Every surviving row gets a brand-new {@code persistentIdentity}
+   * and resets {@code timeLastPlayed}/{@code numberOfPlays}, even for songs untouched by the
+   * rescan; this is a deliberate simplification over selectively pruning just the deleted ones.
+   *
+   * <p>
+   * Best-effort — if reinitialization fails for any reason, the prior in-memory/persisted state is
+   * left in place rather than left half-updated.
+   */
   @EventListener
   @Override
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
+
+    if (!this.enableBackgroundMusic) {
+      return;
+    }
+
+    try {
+      reinitializeAfterRescan();
+    } catch (Exception e) {
+      log.warn("handleScanFileSystemForSongsEvent: failed to reinitialize background music after "
+          + "rescan, leaving existing state in place: {}", e.getMessage(), e);
+    }
+  }
+
+  private void reinitializeAfterRescan() throws IOException {
+
+    List<String> playlistPaths = backgroundMusicHelper.readBackgroundMusicPlaylist(this.dataDir)
+        .stream()
+        .map(backgroundMusicHelper::normalizeDriveLetterBackslashes)
+        .collect(Collectors.toList());
+    this.currentPlaylistPaths = new HashSet<>(playlistPaths);
+
+    List<String> genreExclusions =
+        backgroundMusicHelper.readSmartBackgroundMusicGenreExclusions(this.dataDir);
+    this.excludedGenres = genreExclusions.stream()
+        .map(String::toLowerCase)
+        .collect(Collectors.toCollection(HashSet::new));
+
+    List<String> albumInclusions =
+        backgroundMusicHelper.readSmartBackgroundMusicAlbumInclusions(this.dataDir);
+    this.favoriteAlbumPaths = albumInclusions.stream()
+        .map(BackgroundMusicServiceImpl::normalizeAlbumInclusionPath)
+        .collect(Collectors.toCollection(HashSet::new));
+
+    RootFolderEntity libraryRoot =
+        this.songLibraryService.getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
+
+    List<BackgroundMusicSongEntity> rebuilt = new ArrayList<>();
+    for (String path : playlistPaths) {
+
+      SongIdentifier identifier = resolveSongIdentifier(libraryRoot, path);
+      if (identifier == null) {
+        // Song no longer exists in the rescanned library -- drop it rather than carry forward an
+        // entry nothing can ever resolve to.
+        continue;
+      }
+
+      BackgroundMusicSongEntity entity = new BackgroundMusicSongEntity(null, path);
+      entity.setSongIdentifier(identifier);
+      rebuilt.add(entity);
+    }
+
+    // Every entity above has a null persistentIdentity, so storeAll's existing diff logic
+    // deletes every previously-persisted row (none of their ids appear in this list) and inserts
+    // the fresh set -- i.e. a full clear-and-reinitialize using the repository's normal write
+    // path, no bespoke "delete all" method needed.
+    backgroundMusicRepository.storeAll(rebuilt);
+    this.allSongs = rebuilt;
+    rebuildSongsById();
+    rebuildNotPlayedCache();
+
+    // Clearing smartPool first forces refreshSmartAdditionPool()'s merge step to treat every
+    // freshly computed candidate as brand-new (no existingByPath match to preserve), giving the
+    // same full clear-and-reinitialize behavior for the smart table via its own storeAll call.
+    this.smartPool = new ArrayList<>();
+    rebuildSmartCaches();
+    if (enableSmartBackgroundMusicAdditions) {
+      refreshSmartAdditionPool();
+    }
   }
 
   /**

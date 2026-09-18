@@ -3,11 +3,13 @@ package com.djt.jukeanator_engine.domain.backgroundmusic.model;
 import static java.util.Objects.requireNonNull;
 import java.time.Instant;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
 import jakarta.persistence.Table;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
 /**
  * {@code TABLE_PER_CLASS} is the root of a two-table inheritance hierarchy shared with {@link
@@ -35,6 +37,13 @@ public class BackgroundMusicSongEntity extends AbstractPersistentEntity {
 
   @Column(name = "number_of_plays", nullable = false)
   private int numberOfPlays;
+
+  // Nullable referential link back to song_library's (locationId, albumId, songId) -- only
+  // durable under the JPA repository-type (the filesystem DTOs never carry it); populated
+  // best-effort by BackgroundMusicServiceImpl whenever it resolves songFilePath against the
+  // library, and preferred over the path lookup at selection time when present.
+  @Embedded
+  private SongIdentifier songIdentifier;
 
   protected BackgroundMusicSongEntity() {} // for JPA
 
@@ -82,6 +91,14 @@ public class BackgroundMusicSongEntity extends AbstractPersistentEntity {
 
   public void setNumberOfPlays(int numberOfPlays) {
     this.numberOfPlays = numberOfPlays;
+  }
+
+  public SongIdentifier getSongIdentifier() {
+    return songIdentifier;
+  }
+
+  public void setSongIdentifier(SongIdentifier songIdentifier) {
+    this.songIdentifier = songIdentifier;
   }
 
   public boolean isNotYetPlayed() {

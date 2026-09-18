@@ -2,11 +2,15 @@ package com.djt.jukeanator_engine.domain.backgroundmusic.model;
 
 import static java.util.Objects.requireNonNull;
 import java.time.Instant;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
 /**
  * A {@link BackgroundMusicSongEntity} that was dynamically selected as a "smart addition" —
@@ -41,6 +45,16 @@ public class SmartBackgroundMusicSongEntity extends BackgroundMusicSongEntity {
   @Enumerated(EnumType.STRING)
   @Column(name = "reason", nullable = false)
   private SmartAdditionReason reason;
+
+  // Referential counterpart to sourceSong -- see BackgroundMusicSongEntity.songIdentifier for the
+  // same treatment of songFilePath. Attribute-overridden so its columns don't collide with the
+  // inherited songIdentifier embedding in this same table.
+  @Embedded
+  @AttributeOverrides({
+      @AttributeOverride(name = "locationId", column = @Column(name = "source_location_id")),
+      @AttributeOverride(name = "albumId", column = @Column(name = "source_album_id")),
+      @AttributeOverride(name = "songId", column = @Column(name = "source_song_id"))})
+  private SongIdentifier sourceSongIdentifier;
 
   protected SmartBackgroundMusicSongEntity() {} // for JPA
 
@@ -85,5 +99,13 @@ public class SmartBackgroundMusicSongEntity extends BackgroundMusicSongEntity {
 
   public void setReason(SmartAdditionReason reason) {
     this.reason = reason;
+  }
+
+  public SongIdentifier getSourceSongIdentifier() {
+    return sourceSongIdentifier;
+  }
+
+  public void setSourceSongIdentifier(SongIdentifier sourceSongIdentifier) {
+    this.sourceSongIdentifier = sourceSongIdentifier;
   }
 }
