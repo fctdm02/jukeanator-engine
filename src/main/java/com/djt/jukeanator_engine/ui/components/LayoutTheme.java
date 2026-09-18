@@ -247,6 +247,8 @@ public class LayoutTheme {
     sortBtnW = 170;
     sortBtnH = 42;
     detailBackBtnH = sortBtnH; // matches the Order By buttons' height
+    toggleSwitchW = 56;
+    toggleSwitchH = 28;
 
     // ── SongQueueCard ─────────────────────────────────────────────────────────
     songQueueMaxVisible = 10; // business invariant — queue never holds more than 10 entries
@@ -421,6 +423,8 @@ public class LayoutTheme {
       sortBtnW = 170;
       sortBtnH = 42;
       detailBackBtnH = sortBtnH; // matches the Order By buttons' height
+      toggleSwitchW = 56;
+      toggleSwitchH = 28;
 
       // SongQueueCard — same as landscape for portrait
       songQueueMaxVisible = 10; // business invariant — queue never holds more than 10 entries
@@ -629,6 +633,8 @@ public class LayoutTheme {
       fontSizeSortBtn = 13; // landscape default: 18 (Item 2.4)
       sortBtnW = 120; // landscape default: 170 (Item 2.4)
       sortBtnH = 32; // landscape default: 42 (Item 2.4)
+      toggleSwitchW = 44; // landscape default: 56
+      toggleSwitchH = 22; // landscape default: 28
       detailBackBtnW = 105; // landscape default: 140 (Item 2.2: −25%)
       detailBackBtnH = sortBtnH; // matches the Order By buttons' height
       fontSizeNavBtn = 14; // landscape default: 18 (Item 2.1: fit "← Back" in btn)
@@ -1098,6 +1104,142 @@ public class LayoutTheme {
   /** Rounds {@code v} to the nearest even integer (keeps image scaling clean). */
   private static int roundEven(int v) {
     return (v % 2 == 0) ? v : v + 1;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LEGACY GRID PROFILE — resolution-aware "Legacy" Home view (HomePanel)
+  //
+  // Unlike GridProfile's small cover+label tiles, each Legacy-view cell is a
+  // full dual-pane card (cover art + scrollable track listing). Only the
+  // small-landscape profile (1024 × 768 and similar, the target kiosk
+  // resolution) is tuned against real chrome measurements; the landscape and
+  // portrait profiles below are simple proportional approximations pending
+  // further tuning against an actual large/portrait display.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Immutable value-object bundling the Legacy-view album-panel grid dimensions.
+   *
+   * <p>
+   * Obtain instances via {@link LayoutTheme#legacyGridProfile(int, int)} rather than constructing
+   * directly.
+   */
+  public record LegacyGridProfile(int cols, int rows, int coverSize, int headerFontSize,
+      int trackFontSize, int trackRowH) {
+
+    /** Total albums visible on one page ({@code cols × rows}). */
+    public int pageSize() {
+      return cols * rows;
+    }
+  }
+
+  /**
+   * Computes a {@link LegacyGridProfile} for the given screen dimensions.
+   *
+   * @param screenW current screen width in pixels
+   * @param screenH current screen height in pixels
+   * @return a {@link LegacyGridProfile} ready to pass to {@link HomePanel} / {@code
+   *         LegacyAlbumGridPanel}
+   */
+  public LegacyGridProfile legacyGridProfile(int screenW, int screenH) {
+
+    boolean portrait = screenH > screenW;
+
+    if (portrait) {
+      return computePortraitLegacyProfile(screenW, screenH);
+    } else if (screenW <= 1366 && screenH <= 1024) {
+      return computeSmallLandscapeLegacyProfile(screenW, screenH);
+    } else {
+      return computeLandscapeLegacyProfile(screenW, screenH);
+    }
+  }
+
+  /**
+   * Legacy grid profile for small-landscape screens (≤ 1366 × 1024, e.g. 1024 × 768) — the
+   * canonical kiosk touch display this view was designed for. Fixed at 2 columns × 2 rows so each
+   * card has enough width for a side-by-side cover + track list, matching the original legacy
+   * screenshot.
+   */
+  private LegacyGridProfile computeSmallLandscapeLegacyProfile(int screenW, int screenH) {
+
+    final int cols = 2;
+    final int rows = 2;
+
+    // Same fixed-chrome deductions as computeSmallLandscapeProfile() — the Legacy grid reuses
+    // the same DetailHeaderPanel (NORTH) and letter-nav strip (SOUTH) as the normal grid.
+    int detailHeaderH = detailHeaderImageH + DETAIL_HEADER_BORDER_V;
+    int gridPanelH = screenH - topPanelHeight - tabHeight - detailHeaderH - LETTER_NAV_H;
+
+    int cellH = (gridPanelH - GRID_BORDER_V - albumGridGapV * (rows - 1)) / rows;
+    int cellW = (screenW - GRID_BORDER_H - albumGridGapH * (cols - 1)) / cols;
+
+    // Each card reserves a compact title line above the cover+tracklist split, plus its own
+    // 2px border (top+bottom) and a little internal padding.
+    final int cardHeaderH = 18;
+    final int cardBorderV = 4;
+    final int cardPadding = 8;
+    int contentH = cellH - cardHeaderH - cardBorderV - cardPadding;
+
+    // Cover art occupies roughly the left 42% of the card's width; use whichever axis is
+    // tighter so it never overflows the card.
+    int coverSize = roundEven(Math.min(contentH, Math.round(cellW * 0.42f)));
+    coverSize = Math.max(coverSize, 80); // safety floor
+
+    return new LegacyGridProfile(cols, rows, coverSize, 11, 11, 20);
+  }
+
+  /**
+   * Legacy grid profile for standard/large landscape screens. Not tuned against a real display —
+   * a proportional first pass (3 columns × 2 rows, cover art scaled from the canonical 1920 × 1080
+   * reference) that keeps the view usable until a large-screen kiosk is available to tune against.
+   */
+  private LegacyGridProfile computeLandscapeLegacyProfile(int screenW, int screenH) {
+
+    final int cols = 3;
+    final int rows = 2;
+
+    int detailHeaderH = detailHeaderImageH + DETAIL_HEADER_BORDER_V;
+    int gridPanelH = screenH - topPanelHeight - tabHeight - detailHeaderH - LETTER_NAV_H;
+
+    int cellH = (gridPanelH - GRID_BORDER_V - albumGridGapV * (rows - 1)) / rows;
+    int cellW = (screenW - GRID_BORDER_H - albumGridGapH * (cols - 1)) / cols;
+
+    final int cardHeaderH = 26;
+    final int cardBorderV = 4;
+    final int cardPadding = 12;
+    int contentH = cellH - cardHeaderH - cardBorderV - cardPadding;
+
+    int coverSize = roundEven(Math.min(contentH, Math.round(cellW * 0.42f)));
+    coverSize = Math.max(coverSize, 100);
+
+    return new LegacyGridProfile(cols, rows, coverSize, 16, 13, 26);
+  }
+
+  /**
+   * Legacy grid profile for portrait screens. Not tuned against a real display — dual-pane cards
+   * need horizontal room, so a single column (stacked cards) is used rather than the 2-column
+   * layout the normal portrait album grid uses.
+   */
+  private LegacyGridProfile computePortraitLegacyProfile(int screenW, int screenH) {
+
+    final int cols = 1;
+    final int rows = 3;
+
+    int detailHeaderH = detailHeaderImageH + DETAIL_HEADER_BORDER_V;
+    int gridPanelH = screenH - topPanelHeight - tabHeight - detailHeaderH - LETTER_NAV_H;
+
+    int cellH = (gridPanelH - GRID_BORDER_V - albumGridGapV * (rows - 1)) / rows;
+    int cellW = screenW - GRID_BORDER_H;
+
+    final int cardHeaderH = 24;
+    final int cardBorderV = 4;
+    final int cardPadding = 10;
+    int contentH = cellH - cardHeaderH - cardBorderV - cardPadding;
+
+    int coverSize = roundEven(Math.min(contentH, Math.round(cellW * 0.35f)));
+    coverSize = Math.max(coverSize, 90);
+
+    return new LegacyGridProfile(cols, rows, coverSize, 15, 12, 24);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1698,6 +1840,12 @@ public class LayoutTheme {
    * Small-landscape: reduced to fit alongside the sort buttons.
    */
   public final int fontSizeSortLabel;
+
+  /** Preferred width of the Home tab's "Legacy" view {@link ToggleSwitch}. */
+  public final int toggleSwitchW;
+
+  /** Preferred height of the Home tab's "Legacy" view {@link ToggleSwitch}. */
+  public final int toggleSwitchH;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HOT HERE PANEL (HotHerePanel)

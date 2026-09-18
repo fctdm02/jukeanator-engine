@@ -15,6 +15,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -25,6 +26,7 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ArtistDto;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
@@ -78,6 +80,13 @@ public class HomePanel extends JPanel implements TabNavigator {
   // ── Resolution-aware grid profile for the album sub-grid (artist detail) ──
   private final LayoutTheme.GridProfile albumGridProfile;
 
+  // ── Resolution-aware grid profile for the Legacy view's dual-pane album panels ──
+  private final LayoutTheme.LegacyGridProfile legacyGridProfile;
+
+  // ── Invoked when a song is tapped directly in the Legacy view, to open the
+  // Add-to-Queue overlay without first navigating into the album detail card. ──
+  private final Consumer<SongDto> onSongQueue;
+
   // ── Albums, fetched ONCE at startup and kept in memory in two sorted views.
   // Switching the "Order By" selection never re-queries SongLibraryService —
   // it only swaps which of these already-sorted lists/letter-maps is shown. ──
@@ -90,13 +99,23 @@ public class HomePanel extends JPanel implements TabNavigator {
   // ── Live grid container (the AlbumGridPanel inside is swapped on sort change) ──
   private final JPanel gridContainer = new JPanel(new BorderLayout());
 
-  // ── The AlbumGridPanel currently shown in gridContainer — tracked so its selected
-  // letter/page can be carried over when the sort order is toggled. ──────────
-  private AlbumGridPanel currentGridPanel;
+  // ── The grid panel currently shown in gridContainer (AlbumGridPanel or, in Legacy
+  // mode, LegacyAlbumGridPanel) — tracked so its selected letter/page can be carried
+  // over when the sort order or Legacy toggle changes. ─────────────────────────────
+  private JPanel currentGridPanel;
 
   // ── Sort toggle buttons — kept to allow repainting active state ──────────
   private JButton btnTitle;
   private JButton btnArtist;
+
+  // ── Legacy view toggle — defaults off; always reset to off by resetToDefaultView() ──
+  private boolean legacyMode = false;
+  private ToggleSwitch legacyToggle;
+
+  // ── Currently-playing song, pushed down from JukeANatorFrame#setNowPlaying/clearNowPlaying.
+  // Passed to a freshly built LegacyAlbumGridPanel so a visible now-playing track is marked with
+  // a play icon instead of its popularity bars. ────────────────────────────────────────────────
+  private SongDto currentNowPlayingSong;
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -105,7 +124,8 @@ public class HomePanel extends JPanel implements TabNavigator {
       SongLibraryService songLibraryService, SongQueueService songQueueService,
       UserActivityService userActivityService, ImageLoader imageLoader,
       int priorityCostMultiplier, int popularityT1, int popularityT2, int popularityT3,
-      LayoutTheme.GridProfile albumGridProfile) {
+      LayoutTheme.GridProfile albumGridProfile, LayoutTheme.LegacyGridProfile legacyGridProfile,
+      Consumer<SongDto> onSongQueue) {
 
     this.incrementCreditsKey = incrementCreditsKey;
     this.creditManager = creditManager;
@@ -118,6 +138,8 @@ public class HomePanel extends JPanel implements TabNavigator {
     this.popularityT2 = popularityT2;
     this.popularityT3 = popularityT3;
     this.albumGridProfile = albumGridProfile;
+    this.legacyGridProfile = legacyGridProfile;
+    this.onSongQueue = onSongQueue;
 
     setLayout(new BorderLayout());
     setOpaque(false);
@@ -195,7 +217,34 @@ public class HomePanel extends JPanel implements TabNavigator {
   public void resetToDefaultView() {
     currentDetailCard = null;
     detailReturnCard = CARD_GRID;
+
+    // Unlike sort order / page / letter (left exactly as the user last had them), the Legacy
+    // toggle always resets to off here so an idle kiosk doesn't stay in Legacy view for the
+    // next user.
+    if (legacyMode) {
+      String selectedLetter = currentSelectedLetter();
+      int pageOffset = currentPageOffset();
+      legacyMode = false;
+      if (legacyToggle != null) {
+        legacyToggle.setOn(false);
+      }
+      rebuildGridPanel(selectedLetter, pageOffset);
+    }
+
     cardLayout.show(rootPanel, CARD_GRID);
+  }
+
+  /**
+   * Called by {@link JukeANatorFrame#setNowPlaying}/{@code clearNowPlaying} whenever the
+   * currently playing song changes. Only the Legacy view reacts to this (it marks the playing
+   * track with a play icon in place of its popularity bars) — the normal album-tile grid has no
+   * per-track row to mark.
+   */
+  public void setNowPlaying(SongDto song) {
+    currentNowPlayingSong = song;
+    if (currentGridPanel instanceof LegacyAlbumGridPanel legacy) {
+      legacy.setNowPlaying(song);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -323,8 +372,12 @@ public class HomePanel extends JPanel implements TabNavigator {
     return card;
   }
 
-  /** Builds an {@link AlbumGridPanel} bound to the already-sorted list/letter-map for {@code mode}. */
-  private AlbumGridPanel buildAlbumGridPanel(SortMode mode) {
+  /**
+   * Builds the grid panel bound to the already-sorted list/letter-map for {@code mode} — an
+   * {@link AlbumGridPanel} normally, or a {@link LegacyAlbumGridPanel} when {@link #legacyMode}
+   * is on. Both read from the same already-sorted in-memory lists; no service calls are made.
+   */
+  private JPanel buildAlbumGridPanel(SortMode mode) {
     List<AlbumDto> albums = mode == SortMode.TITLE ? albumsByTitle : albumsByArtist;
     Map<String, List<AlbumDto>> letterMap =
         mode == SortMode.TITLE ? letterMapByTitle : letterMapByArtist;
@@ -332,6 +385,14 @@ public class HomePanel extends JPanel implements TabNavigator {
     // letterForIndex() highlights the correct letter when ❮/❯ paginate across buckets.
     java.util.function.Function<AlbumDto, String> keyExtractor =
         mode == SortMode.TITLE ? AlbumDto::albumName : AlbumDto::artistName;
+
+    if (legacyMode) {
+      return new LegacyAlbumGridPanel(albums, letterMap, imageLoader, legacyGridProfile,
+          album -> pushAlbumDetail(album), song -> onSongQueue.accept(song), keyExtractor,
+          userActivityService, songLibraryService.getOwnLocationId(), popularityT1, popularityT2,
+          popularityT3, currentNowPlayingSong);
+    }
+
     return new AlbumGridPanel(albums, letterMap, imageLoader, albumGridProfile,
         album -> pushAlbumDetail(album), true, keyExtractor, userActivityService,
         songLibraryService.getOwnLocationId());
@@ -345,6 +406,17 @@ public class HomePanel extends JPanel implements TabNavigator {
     JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
     row.setOpaque(false);
     row.setBorder(BorderFactory.createEmptyBorder(0, 16, 0, 8));
+
+    JLabel legacyLabel = new JLabel("Legacy: ");
+    legacyLabel.setForeground(ColorTheme.get().textPrimary);
+    legacyLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSortLabel));
+    row.add(legacyLabel);
+
+    legacyToggle = new ToggleSwitch(legacyMode);
+    legacyToggle.setToggleListener(this::applyLegacyMode);
+    row.add(legacyToggle);
+
+    row.add(javax.swing.Box.createHorizontalStrut(14));
 
     JLabel sortLabel = new JLabel("Order By: ");
     sortLabel.setForeground(ColorTheme.get().textPrimary);
@@ -433,10 +505,8 @@ public class HomePanel extends JPanel implements TabNavigator {
     if (mode == currentSort)
       return;
 
-    // Capture the currently selected letter/page so the user lands on the same
-    // letter and relative page after the grid is rebuilt under the new sort order.
-    String selectedLetter = currentGridPanel != null ? currentGridPanel.getSelectedLetter() : "#";
-    int pageOffset = currentGridPanel != null ? currentGridPanel.getPageOffsetWithinLetter() : 0;
+    String selectedLetter = currentSelectedLetter();
+    int pageOffset = currentPageOffset();
 
     currentSort = mode;
 
@@ -452,8 +522,47 @@ public class HomePanel extends JPanel implements TabNavigator {
       activeBtn.repaint();
     }
 
-    currentGridPanel = buildAlbumGridPanel(mode);
-    currentGridPanel.selectLetterAtPage(selectedLetter, pageOffset);
+    rebuildGridPanel(selectedLetter, pageOffset);
+  }
+
+  /**
+   * Switches between the normal album-tile grid and the Legacy dual-pane grid. Like
+   * {@link #applySortMode}, this only swaps which panel type is built from the already-sorted
+   * in-memory lists — no service calls are made.
+   */
+  private void applyLegacyMode(boolean on) {
+
+    if (on == legacyMode)
+      return;
+
+    String selectedLetter = currentSelectedLetter();
+    int pageOffset = currentPageOffset();
+
+    legacyMode = on;
+
+    rebuildGridPanel(selectedLetter, pageOffset);
+  }
+
+  /** Returns the selected letter of the currently visible grid panel, or "#" if none is showing. */
+  private String currentSelectedLetter() {
+    return currentGridPanel instanceof AlbumGridView view ? view.getSelectedLetter() : "#";
+  }
+
+  /** Returns the page offset within the selected letter of the currently visible grid panel. */
+  private int currentPageOffset() {
+    return currentGridPanel instanceof AlbumGridView view ? view.getPageOffsetWithinLetter() : 0;
+  }
+
+  /**
+   * Rebuilds {@link #currentGridPanel} for the current {@link #currentSort}/{@link #legacyMode}
+   * combination, restores the given letter/page, and swaps it into {@link #gridContainer}.
+   */
+  private void rebuildGridPanel(String selectedLetter, int pageOffset) {
+
+    currentGridPanel = buildAlbumGridPanel(currentSort);
+    if (currentGridPanel instanceof AlbumGridView view) {
+      view.selectLetterAtPage(selectedLetter, pageOffset);
+    }
 
     gridContainer.removeAll();
     gridContainer.add(currentGridPanel, BorderLayout.CENTER);

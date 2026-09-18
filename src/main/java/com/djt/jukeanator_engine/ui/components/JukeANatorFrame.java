@@ -83,6 +83,7 @@ public class JukeANatorFrame extends JFrame {
    * panel is constructed.
    */
   private LayoutTheme.GridProfile albumGridProfile;
+  private LayoutTheme.LegacyGridProfile legacyGridProfile;
   private LayoutTheme.TopPanelProfile topPanelProfile;
   private HomePanel homePanel;
 
@@ -303,6 +304,7 @@ public class JukeANatorFrame extends JFrame {
     // at field-initialisation time (lines 158-162 in the original).
     LayoutTheme.install(LayoutTheme.forScreen(screenWidth, screenHeight));
     albumGridProfile = LayoutTheme.get().homeGridProfile(screenWidth, screenHeight);
+    legacyGridProfile = LayoutTheme.get().legacyGridProfile(screenWidth, screenHeight);
     genreGridProfile = LayoutTheme.get().genreGridProfile(screenWidth, screenHeight);
     topPanelProfile = LayoutTheme.get().topPanelProfile(screenWidth, screenHeight);
 
@@ -964,7 +966,8 @@ public class JukeANatorFrame extends JFrame {
 
     return new HomePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
         userActivityService, imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1,
-        POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, albumGridProfile);
+        POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, albumGridProfile, legacyGridProfile,
+        song -> showAddSongToQueueCard(song));
   }
 
   // ============================================================
@@ -1375,6 +1378,7 @@ public class JukeANatorFrame extends JFrame {
       albumArtLabel.setIcon(imageLoader.loadFilesystemImage(songDto.coverArtPath(),
           topPanelProfile.iconSize(), topPanelProfile.iconSize()));
       currentNowPlayingSong = songDto;
+      homePanel.setNowPlaying(songDto);
 
       musicPaused = false;
 
@@ -1414,6 +1418,7 @@ public class JukeANatorFrame extends JFrame {
     playStatus.setIcon(null);
     musicPaused = false;
     currentNowPlayingSong = null;
+    homePanel.setNowPlaying(null);
 
     nowPlayingPanel.setVisible(false);
 
