@@ -53,8 +53,7 @@ import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository
  *
  * <p>{@code app.repository-type=jpa} is set so {@code song_queue_entries.location_id}'s
  * {@code NOT NULL} foreign key into {@code location} (see {@code
- * db/migration/mysql/V5__init_song_queue_schema.sql}/{@code
- * V7__rename_locations_to_location_and_add_fields.sql}) has a real row to point at, exactly as
+ * db/migration/mysql/V1__init_schema.sql}) has a real row to point at, exactly as
  * {@code SongLibraryRepositoryJpaImplTest} does for the song-library tables' same FK; it also
  * satisfies {@code JpaDataSourceAutoConfigurationImport} so the JPA datasource/Hibernate/Flyway
  * stack actually comes up.

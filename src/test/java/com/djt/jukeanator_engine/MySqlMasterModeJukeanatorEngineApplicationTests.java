@@ -10,10 +10,10 @@ import org.springframework.test.context.TestPropertySource;
  * app.repository-type} defaults to {@code filesystem} in every other test context, so {@code
  * LocationRepositoryJpaImpl} is never constructed there. Forcing {@code app.mode=master} and
  * {@code app.repository-type=jpa} here is what actually exercises {@code LocationEntity}'s JPA
- * mapping against the {@code db/migration/mysql/V7__rename_locations_to_location_and_add_fields.sql}
- * schema (Hibernate {@code ddl-auto: validate}), the same way
+ * mapping against the {@code db/migration/mysql/V1__init_schema.sql} schema (Hibernate
+ * {@code ddl-auto: validate}), the same way
  * {@link MySqlJukeanatorEngineApplicationTests} already proves out {@code UserEntity} against
- * {@code V1__init_user_schema.sql}. {@code app.mode=master} is still set here so the master-only
+ * that same schema. {@code app.mode=master} is still set here so the master-only
  * beans that depend on {@code LocationService} (e.g. {@code LocationApiKeyAuthenticationFilter})
  * also get exercised.
  *

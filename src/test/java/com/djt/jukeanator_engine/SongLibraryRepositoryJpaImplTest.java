@@ -38,7 +38,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryReposi
  * <p>{@code app.repository-type=jpa} is set so the JPA datasource/Hibernate/Flyway stack actually
  * comes up (see {@code JpaDataSourceAutoConfigurationImport}). It's also put to direct use here:
  * {@code song_library.parent_location_id} is a {@code NOT NULL} foreign key into {@code location}
- * (see {@code db/migration/mysql/V8__consolidate_song_library_folders_and_files.sql}), so every
+ * (see {@code db/migration/mysql/V1__init_schema.sql}), so every
  * fixture root below is built under a real, freshly registered {@link LocationRepository} row
  * rather than an arbitrary int.
  *

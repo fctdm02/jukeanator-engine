@@ -21,9 +21,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import jakarta.persistence.EntityManagerFactory;
+import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityRecord;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivitySource;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Integration tests for {@link UserActivityRepositoryJpaImpl}, run against a live local MySQL
@@ -36,6 +39,8 @@ import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
 @ActiveProfiles("test")
 @TestPropertySource(properties = { "app.repository-type=jpa" })
 class UserActivityRepositoryJpaImplTest {
+
+  private static final ObjectMapper MAPPER = ObjectMappers.create();
 
   @Autowired
   private DataSource dataSource;
@@ -56,6 +61,10 @@ class UserActivityRepositoryJpaImplTest {
 
   private UserActivityRepositoryJpaImpl newRepository() {
     return new UserActivityRepositoryJpaImpl(entityManagerFactory, transactionManager);
+  }
+
+  private static Map<String, Object> readDetails(String json) throws Exception {
+    return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
   }
 
   @Test
@@ -79,7 +88,9 @@ class UserActivityRepositoryJpaImplTest {
       assertEquals("user@example.com", rs.getString("username"));
       assertEquals("QUEUE_SONG_ADDED", rs.getString("activity_type"));
       assertNotNull(rs.getTimestamp("occurred_at"));
-      assertTrue(rs.getString("details").contains("\"albumId\":1"));
+      Map<String, Object> details = readDetails(rs.getString("details"));
+      assertEquals(1, details.get("albumId"));
+      assertEquals(2, details.get("songId"));
       assertTrue(!rs.next(), "Expected only one row");
     }
   }

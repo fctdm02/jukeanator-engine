@@ -39,8 +39,8 @@ spring:
   # Same jukeanator/password credentials; only the database differs. Override via the DB_*
   # environment variables for anything beyond local dev. Setup: sudo apt install mysql-server &&
   # sudo mysql_secure_installation. Requires the schema created by
-  # src/main/resources/db/migration/mysql/V1__init_user_schema.sql and V2__init_location_schema.sql
-  # (run automatically by Flyway on startup).
+  # src/main/resources/db/migration/mysql/V1__init_schema.sql (run automatically by Flyway on
+  # startup).
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/jukeanator_test}
     username: ${DB_USERNAME:jukeanator}
