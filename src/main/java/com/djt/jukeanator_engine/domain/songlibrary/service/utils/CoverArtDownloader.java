@@ -42,16 +42,16 @@ public final class CoverArtDownloader {
       Files.write(path, imageBytes);
 
 
-      BufferedImage image = ImageIO.read(path.toFile());
-      int width = image.getWidth();
-      int height = image.getHeight();
-      if (width > 500 || height > 500) {
-
-        errorMessage = "Could not resize image to 500x500px: " + coverArtPath;
-        BufferedImage original = ImageIO.read(new File(coverArtPath));
-        BufferedImage resized = resizeHighQuality(original, 500, 500);
-        ImageIO.write(resized, "jpg", new File(coverArtPath));
-      }
+      // Downloaded art keeps whatever format the source served (often PNG), but coverArtPath
+      // is always named "cover.jpg" -- always re-encode to JPEG here (even when no resize is
+      // needed) so the file's actual format matches its name/extension, which is what the sync
+      // upload and the coverArt REST endpoints rely on for their Content-Type.
+      errorMessage = "Could not normalize image to JPEG: " + coverArtPath;
+      BufferedImage original = ImageIO.read(path.toFile());
+      int targetWidth = Math.min(original.getWidth(), 500);
+      int targetHeight = Math.min(original.getHeight(), 500);
+      BufferedImage normalized = resizeHighQuality(original, targetWidth, targetHeight);
+      ImageIO.write(normalized, "jpg", new File(coverArtPath));
 
     } catch (IOException ioe) {
       throw new SongLibraryServiceException(errorMessage + ", error: " + ioe.getMessage(), ioe);

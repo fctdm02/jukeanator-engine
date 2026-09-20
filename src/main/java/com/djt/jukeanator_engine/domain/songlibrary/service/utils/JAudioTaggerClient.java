@@ -198,12 +198,6 @@ public final class JAudioTaggerClient {
 
 		try {
 
-			/*
-			 * TODO: TDM: If the image is PNG, then we need to convert it to JPG String
-			 * mimeType = artwork.getMimeType(); String extension =
-			 * mimeType.equals("image/png") ? ".png" : ".jpg";
-			 */
-
 			File file = new File(songFile);
 			if (file.getName().startsWith("._")) {
 			    return false;
@@ -222,16 +216,17 @@ public final class JAudioTaggerClient {
 						fos.write(imageData);
 					}
 
-					BufferedImage image = ImageIO.read(new File(coverArtPath));
-					int width = image.getWidth();
-					int height = image.getHeight();
-					if (width > 500 || height > 500) {
+					// Tag artwork is written to disk in whatever format it's embedded in (often
+					// PNG), but coverArtPath is always named "cover.jpg" -- always re-encode to
+					// JPEG here (even when no resize is needed) so the file's actual format
+					// matches its name/extension, which is what the sync upload and the
+					// coverArt REST endpoints rely on for their Content-Type.
+					BufferedImage original = ImageIO.read(new File(coverArtPath));
+					int targetWidth = Math.min(original.getWidth(), 500);
+					int targetHeight = Math.min(original.getHeight(), 500);
+					BufferedImage normalized = resizeHighQuality(original, targetWidth, targetHeight);
+					ImageIO.write(normalized, "jpg", new File(coverArtPath));
 
-						BufferedImage original = ImageIO.read(new File(coverArtPath));
-						BufferedImage resized = resizeHighQuality(original, 500, 500);
-						ImageIO.write(resized, "jpg", new File(coverArtPath));
-					}
-					
 					return true;
 				}
 			}
