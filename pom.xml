@@ -212,6 +212,14 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Provides TestRestTemplate, used by MasterSlaveLibrarySyncIntegrationTest to drive a
+		     real embedded-servlet-container HTTP request/response cycle; not pulled in
+		     transitively by any of the starters above in this Spring Boot 4 module layout. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-resttestclient</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-websocket-test</artifactId>
