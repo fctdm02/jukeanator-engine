@@ -26,8 +26,8 @@ import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
-import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionDto;
-import com.djt.jukeanator_engine.domain.user.model.CreditTransactionType;
+import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
+import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageType;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 
 /**
@@ -132,8 +132,8 @@ class LocationControllerTest extends AbstractControllerTest {
   void getCreditLedger_returnsTransactionsFromService() throws Exception {
     Instant from = Instant.parse("2026-01-01T00:00:00Z");
     Instant to = Instant.parse("2026-02-01T00:00:00Z");
-    CreditTransactionDto transaction = new CreditTransactionDto("jane@example.com", LOCATION_ID, 5,
-        CreditTransactionType.QUEUE_ADD, Instant.parse("2026-01-15T00:00:00Z"), 3, 4, 12);
+    UserSongCreditUsageDto transaction = new UserSongCreditUsageDto("jane@example.com", LOCATION_ID, 5,
+        UserSongCreditUsageType.QUEUE_ADD, Instant.parse("2026-01-15T00:00:00Z"), 3, 4, 12);
     when(userService.getCreditLedgerForLocation(LOCATION_ID, from, to))
         .thenReturn(List.of(transaction));
 

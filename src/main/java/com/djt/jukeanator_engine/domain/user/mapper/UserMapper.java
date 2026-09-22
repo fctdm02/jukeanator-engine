@@ -4,14 +4,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.common.security.UserRole;
-import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionEntryDto;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistDto;
+import com.djt.jukeanator_engine.domain.user.dto.UserAddFundsTransactionEntryDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserRootDto;
-import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageEntryDto;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
 
 /**
  * @author tmyers
@@ -43,7 +45,8 @@ public final class UserMapper {
         entity.getSongPlayHistory(),
         entity.getSearchHistory(),
         toPlaylistDtos(entity.getPlaylists()),
-        toTransactionDtos(entity.getTransactions()),
+        toUserSongCreditUsageDtos(entity.getUserSongCreditUsages()),
+        toUserAddFundsTransactionDtos(entity.getUserAddFundsTransactions()),
         entity.getRole().name());
   }
 
@@ -59,13 +62,13 @@ public final class UserMapper {
     return dtos;
   }
 
-  public static List<CreditTransactionEntryDto> toTransactionDtos(
-      Collection<CreditTransactionEntity> entities) {
+  public static List<UserSongCreditUsageEntryDto> toUserSongCreditUsageDtos(
+      Collection<UserSongCreditUsageEntity> entities) {
 
-    List<CreditTransactionEntryDto> dtos = new ArrayList<>();
+    List<UserSongCreditUsageEntryDto> dtos = new ArrayList<>();
 
-    for (CreditTransactionEntity entity : entities) {
-      dtos.add(new CreditTransactionEntryDto(
+    for (UserSongCreditUsageEntity entity : entities) {
+      dtos.add(new UserSongCreditUsageEntryDto(
           entity.getPersistentIdentity(),
           entity.getLocationId(),
           entity.getAmount(),
@@ -73,6 +76,27 @@ public final class UserMapper {
           entity.getTimestamp(),
           entity.getSongAlbumId(),
           entity.getSongId(),
+          entity.getResultingBalance()));
+    }
+
+    return dtos;
+  }
+
+  public static List<UserAddFundsTransactionEntryDto> toUserAddFundsTransactionDtos(
+      Collection<UserAddFundsTransactionEntity> entities) {
+
+    List<UserAddFundsTransactionEntryDto> dtos = new ArrayList<>();
+
+    for (UserAddFundsTransactionEntity entity : entities) {
+      dtos.add(new UserAddFundsTransactionEntryDto(
+          entity.getPersistentIdentity(),
+          entity.getPackageId(),
+          entity.getCreditsAwarded(),
+          entity.getBonusCredits(),
+          entity.getAmountUsd(),
+          entity.getPaymentSource(),
+          entity.getPaymentTransactionId(),
+          entity.getTimestamp(),
           entity.getResultingBalance()));
     }
 
@@ -112,16 +136,29 @@ public final class UserMapper {
           playlistDto.owner(), playlistDto.name(), playlistDto.songs()));
     }
 
-    for (CreditTransactionEntryDto transactionDto : dto.transactions()) {
-      user.addTransaction(new CreditTransactionEntity(
-          transactionDto.persistentIdentity(),
-          transactionDto.locationId(),
-          transactionDto.amount(),
-          transactionDto.type(),
-          transactionDto.timestamp(),
-          transactionDto.songAlbumId(),
-          transactionDto.songId(),
-          transactionDto.resultingBalance()));
+    for (UserSongCreditUsageEntryDto usageDto : dto.userSongCreditUsages()) {
+      user.addUserSongCreditUsage(new UserSongCreditUsageEntity(
+          usageDto.persistentIdentity(),
+          usageDto.locationId(),
+          usageDto.amount(),
+          usageDto.type(),
+          usageDto.timestamp(),
+          usageDto.songAlbumId(),
+          usageDto.songId(),
+          usageDto.resultingBalance()));
+    }
+
+    for (UserAddFundsTransactionEntryDto addFundsDto : dto.userAddFundsTransactions()) {
+      user.addUserAddFundsTransaction(new UserAddFundsTransactionEntity(
+          addFundsDto.persistentIdentity(),
+          addFundsDto.packageId(),
+          addFundsDto.creditsAwarded(),
+          addFundsDto.bonusCredits(),
+          addFundsDto.amountUsd(),
+          addFundsDto.paymentSource(),
+          addFundsDto.paymentTransactionId(),
+          addFundsDto.timestamp(),
+          addFundsDto.resultingBalance()));
     }
 
     return user;

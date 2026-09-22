@@ -71,10 +71,20 @@ public class UserEntity extends AbstractPersistentEntity {
 
   // Same "load once, hold in memory" rationale as the other collections above -- see
   // UserServiceImpl, which loads the whole user root once and holds it for the app's lifetime.
+  //
+  // Two genuinely separate ledgers, deliberately never conflated: userSongCreditUsages records a
+  // user spending already-owned song credits (location-attributed); userAddFundsTransactions
+  // records a user obtaining those credits with real money (never location-attributed -- see
+  // UserAddFundsTransactionEntity's javadoc).
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true,
       fetch = FetchType.EAGER)
   @OrderBy("timestamp ASC")
-  private Set<CreditTransactionEntity> transactions = new HashSet<>();
+  private Set<UserSongCreditUsageEntity> userSongCreditUsages = new HashSet<>();
+
+  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true,
+      fetch = FetchType.EAGER)
+  @OrderBy("timestamp ASC")
+  private Set<UserAddFundsTransactionEntity> userAddFundsTransactions = new HashSet<>();
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
@@ -289,19 +299,36 @@ public class UserEntity extends AbstractPersistentEntity {
     return playlist.removeSong(songIdentifier);
   }
 
-  public Set<CreditTransactionEntity> getTransactions() {
+  public Set<UserSongCreditUsageEntity> getUserSongCreditUsages() {
 
-    if (transactions == null) {
-      transactions = new HashSet<>();
+    if (userSongCreditUsages == null) {
+      userSongCreditUsages = new HashSet<>();
     }
 
-    return transactions;
+    return userSongCreditUsages;
   }
 
-  public CreditTransactionEntity addTransaction(CreditTransactionEntity transaction) {
+  public UserSongCreditUsageEntity addUserSongCreditUsage(UserSongCreditUsageEntity usage) {
+
+    usage.setUser(this);
+    this.userSongCreditUsages.add(usage);
+    return usage;
+  }
+
+  public Set<UserAddFundsTransactionEntity> getUserAddFundsTransactions() {
+
+    if (userAddFundsTransactions == null) {
+      userAddFundsTransactions = new HashSet<>();
+    }
+
+    return userAddFundsTransactions;
+  }
+
+  public UserAddFundsTransactionEntity addUserAddFundsTransaction(
+      UserAddFundsTransactionEntity transaction) {
 
     transaction.setUser(this);
-    this.transactions.add(transaction);
+    this.userAddFundsTransactions.add(transaction);
     return transaction;
   }
 

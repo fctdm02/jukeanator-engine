@@ -10,10 +10,11 @@ import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
-import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
 
 /**
  * JPA/Hibernate-backed implementation of {@link UserRepository}. Unlike a hand-written JDBC/SQL
@@ -118,22 +119,35 @@ public final class UserRepositoryJpaImpl implements UserRepository {
         if (persistedIds.contains(user.getPersistentIdentity())) {
 
           // The same placeholder-id problem described above applies just as much to a single new
-          // PlaylistEntity/CreditTransactionEntity added onto an otherwise-already-persisted user
-          // (e.g. UserServiceImpl.deductCredits() assigning getTransactions().size() + 1): merge()
-          // on a non-null id it doesn't recognize issues an UPDATE that matches zero rows instead
-          // of an INSERT, throwing OptimisticLockException. Unlike the brand-new-user persist()
-          // path below, merge() also returns a copy rather than mutating `user` in place, so its
-          // cascade wouldn't write the real generated id back onto our long-lived in-memory
-          // userRoot anyway -- persist() each new child directly first (which does mutate in
-          // place) so it's already a managed, real-id'd entity by the time merge(user) cascades
-          // over the rest of the (unchanged) collection.
-          Set<Integer> persistedTransactionIds = new HashSet<>(entityManager
-              .createQuery("select t.persistentIdentity from CreditTransactionEntity t "
+          // PlaylistEntity/UserSongCreditUsageEntity/UserAddFundsTransactionEntity added onto an
+          // otherwise-already-persisted user (e.g. UserServiceImpl.deductCredits() assigning
+          // getUserSongCreditUsages().size() + 1): merge() on a non-null id it doesn't recognize
+          // issues an UPDATE that matches zero rows instead of an INSERT, throwing
+          // OptimisticLockException. Unlike the brand-new-user persist() path below, merge() also
+          // returns a copy rather than mutating `user` in place, so its cascade wouldn't write the
+          // real generated id back onto our long-lived in-memory userRoot anyway -- persist() each
+          // new child directly first (which does mutate in place) so it's already a managed,
+          // real-id'd entity by the time merge(user) cascades over the rest of the (unchanged)
+          // collection.
+          Set<Integer> persistedUsageIds = new HashSet<>(entityManager
+              .createQuery("select t.persistentIdentity from UserSongCreditUsageEntity t "
                   + "where t.user.persistentIdentity = :userId", Integer.class)
               .setParameter("userId", user.getPersistentIdentity())
               .getResultList());
-          for (CreditTransactionEntity transaction : user.getTransactions()) {
-            if (!persistedTransactionIds.contains(transaction.getPersistentIdentity())) {
+          for (UserSongCreditUsageEntity usage : user.getUserSongCreditUsages()) {
+            if (!persistedUsageIds.contains(usage.getPersistentIdentity())) {
+              usage.setPersistentIdentity(null);
+              entityManager.persist(usage);
+            }
+          }
+
+          Set<Integer> persistedAddFundsIds = new HashSet<>(entityManager
+              .createQuery("select t.persistentIdentity from UserAddFundsTransactionEntity t "
+                  + "where t.user.persistentIdentity = :userId", Integer.class)
+              .setParameter("userId", user.getPersistentIdentity())
+              .getResultList());
+          for (UserAddFundsTransactionEntity transaction : user.getUserAddFundsTransactions()) {
+            if (!persistedAddFundsIds.contains(transaction.getPersistentIdentity())) {
               transaction.setPersistentIdentity(null);
               entityManager.persist(transaction);
             }
@@ -157,7 +171,10 @@ public final class UserRepositoryJpaImpl implements UserRepository {
           for (PlaylistEntity playlist : user.getPlaylists()) {
             playlist.setPersistentIdentity(null);
           }
-          for (CreditTransactionEntity transaction : user.getTransactions()) {
+          for (UserSongCreditUsageEntity usage : user.getUserSongCreditUsages()) {
+            usage.setPersistentIdentity(null);
+          }
+          for (UserAddFundsTransactionEntity transaction : user.getUserAddFundsTransactions()) {
             transaction.setPersistentIdentity(null);
           }
           entityManager.persist(user);

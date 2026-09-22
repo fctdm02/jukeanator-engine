@@ -121,9 +121,11 @@ public class SecurityConfig {
             // ── Master-mode only: bar-owner accounting, admin-only ─────────────
             .requestMatchers(HttpMethod.GET, "/api/locations/*/credit-ledger").hasRole("ADMIN")
 
-            // ── Master-mode only: slave library sync, authenticated via the
-            // location-id/location-api-key headers (LocationApiKeyAuthenticationFilter) ─
-            .requestMatchers(HttpMethod.POST, "/api/locations/*/library-sync/**")
+            // ── Master-mode only: slave library sync + financial-ledger mirror sync,
+            // authenticated via the location-id/location-api-key headers
+            // (LocationApiKeyAuthenticationFilter) ─
+            .requestMatchers(HttpMethod.POST, "/api/locations/*/library-sync/**",
+                "/api/locations/*/financial-ledger/**")
             .hasRole("LOCATION")
 
             // ── Authenticated users: add songs to the queue ───────────────────

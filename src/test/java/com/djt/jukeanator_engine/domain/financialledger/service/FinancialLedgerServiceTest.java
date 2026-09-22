@@ -16,15 +16,17 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.financialledger.config.FinancialLedgerProperties;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
 import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedgerRepository;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
-import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionDto;
-import com.djt.jukeanator_engine.domain.user.model.CreditTransactionType;
+import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
+import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageType;
 import com.djt.jukeanator_engine.domain.user.service.PricingConfig;
 import com.djt.jukeanator_engine.domain.user.service.PricingService;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
@@ -44,6 +46,8 @@ class FinancialLedgerServiceTest {
   private UserService userService;
   private PricingService pricingService;
   private SongLibraryService songLibraryService;
+  private ApplicationEventPublisher eventPublisher;
+  private LocationService locationService;
 
   private final AtomicInteger nextId = new AtomicInteger(1);
 
@@ -55,6 +59,8 @@ class FinancialLedgerServiceTest {
     userService = mock(UserService.class);
     pricingService = mock(PricingService.class);
     songLibraryService = mock(SongLibraryService.class);
+    eventPublisher = mock(ApplicationEventPublisher.class);
+    locationService = mock(LocationService.class);
 
     when(songLibraryService.getOwnLocationId()).thenReturn(OWN_LOCATION_ID);
     when(financialLedgerRepository.nextPersistentIdentity())
@@ -72,7 +78,7 @@ class FinancialLedgerServiceTest {
 
   private FinancialLedgerServiceImpl newService() {
     return new FinancialLedgerServiceImpl(financialLedgerRepository, financialLedgerProperties,
-        userService, pricingService, songLibraryService);
+        userService, pricingService, songLibraryService, eventPublisher, locationService);
   }
 
   // ── bootstrap ────────────────────────────────────────────────────────────
@@ -151,18 +157,17 @@ class FinancialLedgerServiceTest {
     Instant afterPeriodStart = service.getAllPeriods().get(0).startDate().plusSeconds(1);
 
     // 30 credits spent (two QUEUE_ADD/QUEUE_ACTION-style negative entries) at 3 credits/dollar =
-    // $10.00. The +100 PURCHASE entry must be ignored -- only utilization counts toward a
-    // location's mobile sub-total, not funds merely added. (creditsPerDollar=3 comes from
+    // $10.00. Funds merely added (UserAddFundsTransactionEntity) never appear in this ledger at
+    // all now -- getCreditLedgerForLocation only ever returns song-credit-usage entries, so there
+    // is no longer a positive-amount row to filter out here. (creditsPerDollar=3 comes from
     // setUp()'s default PricingConfig stub.)
     when(userService.getCreditLedgerForLocation(org.mockito.ArgumentMatchers.eq(OWN_LOCATION_ID),
         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(
-            new CreditTransactionDto("alice@example.com", OWN_LOCATION_ID, 100,
-                CreditTransactionType.PURCHASE, afterPeriodStart, null, null, 100),
-            new CreditTransactionDto("alice@example.com", OWN_LOCATION_ID, -20,
-                CreditTransactionType.QUEUE_ADD, afterPeriodStart, 1, 2, 80),
-            new CreditTransactionDto("alice@example.com", OWN_LOCATION_ID, -10,
-                CreditTransactionType.QUEUE_ACTION, afterPeriodStart, null, null, 70)));
+            new UserSongCreditUsageDto("alice@example.com", OWN_LOCATION_ID, -20,
+                UserSongCreditUsageType.QUEUE_ADD, afterPeriodStart, 1, 2, 80),
+            new UserSongCreditUsageDto("alice@example.com", OWN_LOCATION_ID, -10,
+                UserSongCreditUsageType.QUEUE_ACTION, afterPeriodStart, null, null, 70)));
 
     JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
     assertEquals(new BigDecimal("10.00"), current.mobileTotal());
@@ -201,8 +206,8 @@ class FinancialLedgerServiceTest {
     // this query's own boundary semantics, so a tie here should simply be counted normally.
     when(userService.getCreditLedgerForLocation(org.mockito.ArgumentMatchers.eq(OWN_LOCATION_ID),
         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-        .thenReturn(List.of(new CreditTransactionDto("alice@example.com", OWN_LOCATION_ID, -9,
-            CreditTransactionType.QUEUE_ADD, periodStart, null, null, 1)));
+        .thenReturn(List.of(new UserSongCreditUsageDto("alice@example.com", OWN_LOCATION_ID, -9,
+            UserSongCreditUsageType.QUEUE_ADD, periodStart, null, null, 1)));
 
     JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
     assertEquals(new BigDecimal("3.00"), current.mobileTotal());

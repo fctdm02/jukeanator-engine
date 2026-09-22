@@ -14,7 +14,6 @@ import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
-import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionDto;
 import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
@@ -23,6 +22,7 @@ import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
 import com.djt.jukeanator_engine.domain.user.dto.PricingConfigDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 
 /**
@@ -264,6 +264,6 @@ public interface UserService {
    * @param from
    * @param to
    */
-  List<CreditTransactionDto> getCreditLedgerForLocation(Integer locationId, Instant from,
+  List<UserSongCreditUsageDto> getCreditLedgerForLocation(Integer locationId, Instant from,
       Instant to);
 }

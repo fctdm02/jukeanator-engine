@@ -2,6 +2,8 @@ package com.djt.jukeanator_engine.domain.financialledger.service;
 
 import java.util.List;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
+import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
 
 public interface FinancialLedgerService {
 
@@ -22,4 +24,18 @@ public interface FinancialLedgerService {
    * and opens a fresh $0 period starting now.
    */
   void addSplit();
+
+  /**
+   * Master-only. Receives one mirrored local cash transaction from a slave (see {@code
+   * FinancialLedgerSyncService}). Idempotent: a retried push carrying the same {@code
+   * (locationId, dto.sourceTransactionId())} is a safe no-op.
+   *
+   * @throws LocationServiceException if {@code locationId}/{@code apiKey} don't verify
+   */
+  void receiveLocalCashSync(Integer locationId, String apiKey, LocalTransactionSyncDto dto)
+      throws LocationServiceException;
+
+  /** Same as {@link #receiveLocalCashSync}, for the credit-card-reader stream. */
+  void receiveLocalCreditCardSync(Integer locationId, String apiKey, LocalTransactionSyncDto dto)
+      throws LocationServiceException;
 }

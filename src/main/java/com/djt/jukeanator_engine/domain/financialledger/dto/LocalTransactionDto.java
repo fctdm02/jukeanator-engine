@@ -10,5 +10,5 @@ import java.time.Instant;
  * field on the DTO itself.
  */
 public record LocalTransactionDto(Integer persistentIdentity, int amountDollars, Instant timestamp,
-    Integer locationId) implements Serializable {
+    Integer locationId, Integer sourceTransactionId) implements Serializable {
 }

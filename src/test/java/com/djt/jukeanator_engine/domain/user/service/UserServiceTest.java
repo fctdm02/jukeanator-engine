@@ -41,7 +41,7 @@ import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
-import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionDto;
+import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
@@ -53,7 +53,7 @@ import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
-import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
@@ -607,7 +607,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, false),
         Integer.valueOf(42));
 
-    CreditTransactionEntity transaction = registeredUser().getTransactions().iterator().next();
+    UserSongCreditUsageEntity transaction = registeredUser().getUserSongCreditUsages().iterator().next();
     assertEquals(Integer.valueOf(42), transaction.getLocationId());
   }
 
@@ -641,7 +641,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, Integer.valueOf(7));
 
-    CreditTransactionEntity transaction = registeredUser().getTransactions().iterator().next();
+    UserSongCreditUsageEntity transaction = registeredUser().getUserSongCreditUsages().iterator().next();
     assertEquals(Integer.valueOf(7), transaction.getLocationId());
   }
 
@@ -654,7 +654,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     Instant from = Instant.now().minusSeconds(60);
     Instant to = Instant.now().plusSeconds(60);
 
-    List<CreditTransactionDto> ledger =
+    List<UserSongCreditUsageDto> ledger =
         userServiceImpl.getCreditLedgerForLocation(Integer.valueOf(101), from, to);
 
     assertEquals(1, ledger.size());

@@ -1013,3 +1013,85 @@ One unrelated bug surfaced along the way (not caused by the DTO refactor, not fi
 
 MASTER IP ADDRESS:
 192.168.1.239
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Before you implement this plan, incorprorate the following, then revise the plan accordingly.  Ask any questions if you have them.
+
+
+CHANGE ITEM 1:
+==============
+For a standalone/slave location, it will have a JFC/Swing user interface and will have two ways that the user can pay for song credits to pick songs to add to the song queue:
+1: Cash via local bill acceptor
+2: Credit Card via local credit card reader
+
+These two are inherently tied to the location. and are currently persisted in local_cash_transactions and local_credit_transactions.
+
+For a slave location, there is a third option with the mobile/web user interface.  That is, the user adds funds to their account using the Braintree payment gateway and then 
+they are awarded a number of song credits that they then can navigate to a location on the mobile/web UI and pick songs to add to the song queue.  Only when they pick/choose a
+song to add to a particular song, is there any kind of coupling of a "song credit" to that location for financial ledger / jukebox split purposes, by way of adding "CreditTransactions"
+as they play songs at a particular location.  The underlying table name is called "mobile_transactions".
+
+
+This picture is incomplete and misleading...  From a data modeling perspective, there are two distinct types of transactional entities here:   
+1: "Financial Transaction": A user spends money via cash/credit card on the JFC/Swing UI to obtain song credits or a user spends money via the "Add Funds" transaction on the
+   Mobile/Web UI to obtain song credits that they can use at any location. 
+
+2: "Song Play Transaction": A user can use the JFC/Swing UI to add songs to the queue via available song credits for the physical jukebox at the location or they can navigate to
+   that same location on the Mobile/Web UI and add songs to the queue via available song credits that are tied/coupled to the USER, not the location (as in local cash/credit card).
+   When a user adds a song to a location's song queue via the mobile/web UI, then, in essence, that song credit (with a real world monetary value), is used to "pay" for the song queue add.
+
+For local cash/credit card transactions, the song credits used are tracked as user activities only.  For mobile/web, the song credits used are tracked via the location used at via
+"CreditTransactions".
+
+ISSUES:
+1: The term "CreditTransaction" is ambiguous and "credit" here means "song credit", but upon first glance, it may appear to be related to "credit card".  Part of this confusion stems
+from the use of this enum:  
+package com.djt.jukeanator_engine.domain.user.model;
+
+public enum CreditTransactionType {
+  PURCHASE,
+  QUEUE_ADD,
+  QUEUE_ACTION,
+  ADMIN_ADJUSTMENT
+}
+
+I want to decouple the financial aspect of User mobile/web "Add Funds" transactions and the act of using those funds/credits to add songs and modify the song queue actions.  Therefore,
+do the following:
+1: Create a UserAddFundsTransactionEntity, that corresponds to the "Add Funds" use case
+2: Rename CreditTransactionType to UserSongCreditUsageType
+3: Rename CreditTransaction to UserSongCreditUsageEntity
+4: Remove the PURCHASE enum value from UserSongCreditTransactionType
+5: In the UserEntity class, rename the "transactions" collection, which is a set of UserSongCreditUsageEntity entities, to "userSongCreditUsages"
+6: In the UserEntity class, add a "userAddFundsTransactions" collection, which is a set of UserAddFundsTransactionEntity entities that correspond to "Add Funds" use cases
+7: Rename the "mobile_transactions" table, which corresponds to UserSongCreditUsageEntity entities, to "user_song_credit_usage"
+8: For the new UserAddFundsTransactionEntity entity, which needs to have repository implementations created, with the DB table being called "user_add_funds_transaction"
+
+
+
+CHANGE ITEM 2:
+===============
+I want to refactor Local cash/credit transactions as follows:    
+1: Abstract the common attributes of LocalCreditTransactionEntity and LocalCashTransactionEntity into an abstract base class called AbstractLocationTransactionEntity
+2: For persistence, store both sub classes of AbstractLocationTransactionEntity to the same repository, with the DB table being called "location_transaction"
+
+The above should dovetail nicely into the "Financial Ledger" table on the JFC/Swing Admin panel at a location, as well as allowing a central DBA to query the master
+database and filter by location if they want to.
+
+NOTE: In general, relational database table names should NOT be plural.  Do your research and you will find out why.
+
+
+
+
+

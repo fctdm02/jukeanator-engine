@@ -1,58 +1,35 @@
 package com.djt.jukeanator_engine.domain.financialledger.model;
 
 import java.time.Instant;
-import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
  * One append-only local credit-card-reader credit-award record, analogous to {@code
- * CreditTransactionEntity} for mobile/web credits. Recorded only for genuine hardware pulses --
+ * UserSongCreditUsageEntity} for mobile/web credits. Recorded only for genuine hardware pulses --
  * see the "➕ Credits" admin override in {@code AdminPanel.doIncrementCredits()}, which
- * deliberately does <em>not</em> go through this entity. Cash credits are a separate table --
- * see {@link LocalCashTransactionEntity} -- rather than a {@code source} column here, so the two
- * revenue streams are never ambiguous by table name alone.
+ * deliberately does <em>not</em> go through this entity.
  */
 @Entity
-@Table(name = "local_credit_transactions")
-public class LocalCreditTransactionEntity extends AbstractPersistentEntity {
+@DiscriminatorValue("CREDIT_CARD")
+public class LocalCreditTransactionEntity extends AbstractLocationTransactionEntity {
 
   private static final long serialVersionUID = 1L;
-
-  @Column(name = "amount_dollars", nullable = false)
-  private int amountDollars;
-
-  @Column(nullable = false)
-  private Instant timestamp;
-
-  @Column(name = "location_id")
-  private Integer locationId;
 
   protected LocalCreditTransactionEntity() {} // for JPA
 
   public LocalCreditTransactionEntity(Integer persistentIdentity, int amountDollars,
       Instant timestamp, Integer locationId) {
-    super(persistentIdentity);
-    this.amountDollars = amountDollars;
-    this.timestamp = timestamp;
-    this.locationId = locationId;
+    this(persistentIdentity, amountDollars, timestamp, locationId, null);
+  }
+
+  public LocalCreditTransactionEntity(Integer persistentIdentity, int amountDollars,
+      Instant timestamp, Integer locationId, Integer sourceTransactionId) {
+    super(persistentIdentity, amountDollars, timestamp, locationId, sourceTransactionId);
   }
 
   @Override
   public String getNaturalIdentity() {
-    return "LocalCreditTransaction/" + timestamp + "/" + getPersistentIdentity();
-  }
-
-  public int getAmountDollars() {
-    return amountDollars;
-  }
-
-  public Instant getTimestamp() {
-    return timestamp;
-  }
-
-  public Integer getLocationId() {
-    return locationId;
+    return "LocalCreditTransaction/" + getTimestamp() + "/" + getPersistentIdentity();
   }
 }

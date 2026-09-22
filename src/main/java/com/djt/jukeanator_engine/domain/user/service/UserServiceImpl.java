@@ -33,7 +33,6 @@ import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
 import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
-import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionDto;
 import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
@@ -42,16 +41,18 @@ import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.domain.user.event.PurchaseCompletedEvent;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
-import com.djt.jukeanator_engine.domain.user.model.CreditTransactionEntity;
-import com.djt.jukeanator_engine.domain.user.model.CreditTransactionType;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageType;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 
 /**
@@ -291,12 +292,10 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     }
 
     Integer locationId = songLibraryService.getOwnLocationId();
-    int totalCredits = pkg.credits() + pkg.bonusCredits();
-
-    addCredits(user, emailAddress, totalCredits, locationId);
-    this.userRepository.storeAggregateRoot(this.userRoot);
-
     Instant now = Instant.now();
+
+    recordAddFundsTransaction(user, emailAddress, pkg, chargeResult, now);
+    this.userRepository.storeAggregateRoot(this.userRoot);
 
     eventPublisher.publishEvent(new PurchaseCompletedEvent(emailAddress, user.getFirstName(),
         pkg.credits(), pkg.bonusCredits(), pkg.priceUsd(), chargeResult.paymentSource(),
@@ -599,7 +598,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
           event.queueEntry().priority() != null ? event.queueEntry().priority() : 1;
       int cost = CreditCostCalculator.webQueueAddCost(pricingService.resolvePricingConfig(locationId),
           priority, event.priorityPlay());
-      deductCredits(user, username, cost, CreditTransactionType.QUEUE_ADD, locationId,
+      deductCredits(user, username, cost, UserSongCreditUsageType.QUEUE_ADD, locationId,
           song.albumId(), song.songId());
     }
 
@@ -628,21 +627,21 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     int cost = CreditCostCalculator.webQueueActionCost(pricingService.resolvePricingConfig(locationId),
         priority != null ? priority : 1);
-    deductCredits(user, emailAddress, cost, CreditTransactionType.QUEUE_ACTION, locationId, null, null);
+    deductCredits(user, emailAddress, cost, UserSongCreditUsageType.QUEUE_ACTION, locationId, null, null);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
   }
 
   @Override
-  public synchronized List<CreditTransactionDto> getCreditLedgerForLocation(Integer locationId, Instant from,
+  public synchronized List<UserSongCreditUsageDto> getCreditLedgerForLocation(Integer locationId, Instant from,
       Instant to) {
 
     return userRoot.getUsers().stream()
-        .flatMap(u -> u.getTransactions().stream())
+        .flatMap(u -> u.getUserSongCreditUsages().stream())
         .filter(t -> locationId.equals(t.getLocationId()))
         .filter(t -> !t.getTimestamp().isBefore(from) && !t.getTimestamp().isAfter(to))
-        .sorted(java.util.Comparator.comparing(CreditTransactionEntity::getTimestamp))
-        .map(t -> new CreditTransactionDto(t.getUserEmail(), t.getLocationId(), t.getAmount(),
+        .sorted(java.util.Comparator.comparing(UserSongCreditUsageEntity::getTimestamp))
+        .map(t -> new UserSongCreditUsageDto(t.getUserEmail(), t.getLocationId(), t.getAmount(),
             t.getType(), t.getTimestamp(), t.getSongAlbumId(), t.getSongId(),
             t.getResultingBalance()))
         .toList();
@@ -650,36 +649,41 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   /**
    * Deducts {@code cost} credits (floored at zero), broadcasts the new balance, and appends a
-   * ledger entry to the user's own transaction set. {@code locationId} is {@code null} for
+   * ledger entry to the user's own song-credit-usage set. {@code locationId} is {@code null} for
    * standalone-mode/non-location-attributed spends. Callers are responsible for persisting the
    * user root afterward.
    */
   private void deductCredits(UserEntity user, String emailAddress, int cost,
-      CreditTransactionType type, Integer locationId, Integer songAlbumId, Integer songId) {
+      UserSongCreditUsageType type, Integer locationId, Integer songAlbumId, Integer songId) {
 
     int remaining = Math.max(0, (user.getNumCredits() != null ? user.getNumCredits() : 0) - cost);
     user.setNumCredits(remaining);
     eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, remaining));
 
-    Integer persistentIdentity = Integer.valueOf(user.getTransactions().size() + 1);
-    user.addTransaction(new CreditTransactionEntity(persistentIdentity, locationId, -cost, type,
-        Instant.now(), songAlbumId, songId, remaining));
+    Integer persistentIdentity = Integer.valueOf(user.getUserSongCreditUsages().size() + 1);
+    user.addUserSongCreditUsage(new UserSongCreditUsageEntity(persistentIdentity, locationId,
+        -cost, type, Instant.now(), songAlbumId, songId, remaining));
   }
 
   /**
-   * Adds {@code amount} credits and appends a PURCHASE ledger entry to the user's own transaction
-   * set. Symmetric with {@link #deductCredits}, but never floors (a purchase only ever increases
-   * the balance). Callers are responsible for persisting the user root afterward.
+   * Adds the package's credits (+ bonus), broadcasts the new balance, and appends an Add-Funds
+   * ledger entry to the user's own set -- never location-attributed, since Add-Funds credits can
+   * be spent at any location (see {@link UserAddFundsTransactionEntity}'s javadoc). Symmetric with
+   * {@link #deductCredits}, but never floors (a purchase only ever increases the balance). Callers
+   * are responsible for persisting the user root afterward.
    */
-  private void addCredits(UserEntity user, String emailAddress, int amount, Integer locationId) {
+  private void recordAddFundsTransaction(UserEntity user, String emailAddress, CreditPackageDto pkg,
+      PaymentChargeResult chargeResult, Instant timestamp) {
 
-    int newBalance = (user.getNumCredits() != null ? user.getNumCredits() : 0) + amount;
+    int totalCredits = pkg.credits() + pkg.bonusCredits();
+    int newBalance = (user.getNumCredits() != null ? user.getNumCredits() : 0) + totalCredits;
     user.setNumCredits(newBalance);
     eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, newBalance));
 
-    Integer persistentIdentity = Integer.valueOf(user.getTransactions().size() + 1);
-    user.addTransaction(new CreditTransactionEntity(persistentIdentity, locationId, amount,
-        CreditTransactionType.PURCHASE, Instant.now(), null, null, newBalance));
+    Integer persistentIdentity = Integer.valueOf(user.getUserAddFundsTransactions().size() + 1);
+    user.addUserAddFundsTransaction(new UserAddFundsTransactionEntity(persistentIdentity,
+        pkg.id(), pkg.credits(), pkg.bonusCredits(), pkg.priceUsd(), chargeResult.paymentSource(),
+        chargeResult.transactionId(), timestamp, newBalance));
   }
 
   // Repository methods

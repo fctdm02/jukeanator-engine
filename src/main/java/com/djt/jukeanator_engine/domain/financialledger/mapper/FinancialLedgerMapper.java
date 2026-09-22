@@ -55,7 +55,8 @@ public final class FinancialLedgerMapper {
         entity.getPersistentIdentity(),
         entity.getAmountDollars(),
         entity.getTimestamp(),
-        entity.getLocationId());
+        entity.getLocationId(),
+        entity.getSourceTransactionId());
   }
 
   public static LocalTransactionDto toDto(LocalCreditTransactionEntity entity) {
@@ -64,7 +65,8 @@ public final class FinancialLedgerMapper {
         entity.getPersistentIdentity(),
         entity.getAmountDollars(),
         entity.getTimestamp(),
-        entity.getLocationId());
+        entity.getLocationId(),
+        entity.getSourceTransactionId());
   }
 
   public static FinancialLedgerRootEntity toEntity(FinancialLedgerRootDto dto) {
@@ -105,7 +107,8 @@ public final class FinancialLedgerMapper {
         dto.persistentIdentity(),
         dto.amountDollars(),
         dto.timestamp(),
-        dto.locationId());
+        dto.locationId(),
+        dto.sourceTransactionId());
   }
 
   public static LocalCreditTransactionEntity toCreditCardEntity(LocalTransactionDto dto) {
@@ -114,6 +117,7 @@ public final class FinancialLedgerMapper {
         dto.persistentIdentity(),
         dto.amountDollars(),
         dto.timestamp(),
-        dto.locationId());
+        dto.locationId(),
+        dto.sourceTransactionId());
   }
 }

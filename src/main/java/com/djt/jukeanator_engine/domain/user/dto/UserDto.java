@@ -12,7 +12,9 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 public record UserDto(Integer persistentIdentity, String firstName, String lastName,
     String emailAddress, String passwordHash, Integer numCredits,
     List<SongIdentifier> songPlayHistory, List<String> searchHistory, List<PlaylistDto> playlists,
-    List<CreditTransactionEntryDto> transactions, String role) implements Serializable {
+    List<UserSongCreditUsageEntryDto> userSongCreditUsages,
+    List<UserAddFundsTransactionEntryDto> userAddFundsTransactions, String role)
+    implements Serializable {
 
   public List<String> searchHistory() {
     return searchHistory == null ? List.of() : searchHistory;

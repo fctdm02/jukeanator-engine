@@ -80,4 +80,26 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
         .filter(t -> !t.getTimestamp().isBefore(from))
         .toList();
   }
+
+  /**
+   * True if a mirrored cash transaction from {@code (locationId, sourceTransactionId)} has
+   * already been received -- makes a retried slave-to-master mirror push a safe no-op. Pure
+   * in-memory check against the already-loaded aggregate; no repository query needed.
+   */
+  public boolean hasLocalCashTransactionFromSource(Integer locationId, Integer sourceTransactionId) {
+    return hasTransactionFromSource(localCashTransactions, locationId, sourceTransactionId);
+  }
+
+  /** Same as {@link #hasLocalCashTransactionFromSource}, for the credit-card stream. */
+  public boolean hasLocalCreditCardTransactionFromSource(Integer locationId,
+      Integer sourceTransactionId) {
+    return hasTransactionFromSource(localCreditCardTransactions, locationId, sourceTransactionId);
+  }
+
+  private static boolean hasTransactionFromSource(
+      List<? extends AbstractLocationTransactionEntity> transactions, Integer locationId,
+      Integer sourceTransactionId) {
+    return transactions.stream().anyMatch(t -> locationId.equals(t.getLocationId())
+        && sourceTransactionId.equals(t.getSourceTransactionId()));
+  }
 }

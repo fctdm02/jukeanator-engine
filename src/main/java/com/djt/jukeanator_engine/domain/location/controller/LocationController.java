@@ -20,7 +20,7 @@ import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
-import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionDto;
+import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 
 /**
@@ -83,7 +83,7 @@ public class LocationController {
 
   /** Admin-only, bar-owner accounting: every credit transaction tagged with this location. */
   @GetMapping("/{locationId}/credit-ledger")
-  public ResponseEntity<List<CreditTransactionDto>> getCreditLedger(
+  public ResponseEntity<List<UserSongCreditUsageDto>> getCreditLedger(
       @PathVariable Integer locationId,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {

@@ -12,27 +12,29 @@ import jakarta.persistence.Table;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
- * One append-only credit spend/purchase record, owned by the {@link UserEntity} it belongs to.
- * Mobile/web-originated only -- {@code UserServiceImpl.deductCredits} explicitly skips the local
- * walk-up (JFC/Swing) user, so this table (renamed from {@code credit_transactions} to {@code
- * mobile_transactions}; see {@code V13__rename_credit_transactions_to_mobile_transactions.sql})
- * never records local bill-acceptor/credit-card-reader activity -- see {@code
- * LocalCashTransactionEntity}/{@code LocalCreditTransactionEntity} for those. {@code locationId}
- * is {@code null} for standalone-mode (non-location-attributed) spends, and for the
- * pre-multi-tenant call sites that don't yet have a location to tag — never retroactively
+ * One append-only record of a user spending already-owned song credits to add a song to (or
+ * otherwise act on) a location's queue via the mobile/web UI, owned by the {@link UserEntity} it
+ * belongs to. Deliberately distinct from {@link UserAddFundsTransactionEntity}, which records the
+ * earlier, separate act of a user obtaining those credits with real money -- see that class's
+ * javadoc. Mobile/web-originated only -- {@code UserServiceImpl.deductCredits} explicitly skips
+ * the local walk-up (JFC/Swing) user, so this table (renamed from {@code mobile_transactions};
+ * see {@code V2__...} migration) never records local bill-acceptor/credit-card-reader activity --
+ * see {@code LocalCashTransactionEntity}/{@code LocalCreditTransactionEntity} for those.
+ * {@code locationId} is {@code null} for standalone-mode (non-location-attributed) spends, and for
+ * the pre-multi-tenant call sites that don't yet have a location to tag — never retroactively
  * backfilled.
  *
  * @author tmyers
  */
 @Entity
-@Table(name = "mobile_transactions")
-public class CreditTransactionEntity extends AbstractPersistentEntity {
+@Table(name = "user_song_credit_usage")
+public class UserSongCreditUsageEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
   // Persistence-only back-reference -- the FK column JPA needs to own the UserEntity <->
-  // transaction relationship. UserEntity.addTransaction() is the single place that keeps this
-  // back-reference in sync (see setUser()).
+  // transaction relationship. UserEntity.addUserSongCreditUsage() is the single place that keeps
+  // this back-reference in sync (see setUser()).
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "user_id")
   private UserEntity user;
@@ -41,11 +43,11 @@ public class CreditTransactionEntity extends AbstractPersistentEntity {
   private Integer locationId;
 
   @Column(nullable = false)
-  private int amount; // negative for spend, positive for purchase
+  private int amount; // always negative -- a spend, never a purchase (see UserAddFundsTransactionEntity)
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
-  private CreditTransactionType type;
+  private UserSongCreditUsageType type;
 
   @Column(nullable = false)
   private Instant timestamp;
@@ -59,10 +61,10 @@ public class CreditTransactionEntity extends AbstractPersistentEntity {
   @Column(name = "resulting_balance", nullable = false)
   private int resultingBalance;
 
-  protected CreditTransactionEntity() {} // for JPA
+  protected UserSongCreditUsageEntity() {} // for JPA
 
-  public CreditTransactionEntity(Integer persistentIdentity, Integer locationId, int amount,
-      CreditTransactionType type, Instant timestamp, Integer songAlbumId, Integer songId,
+  public UserSongCreditUsageEntity(Integer persistentIdentity, Integer locationId, int amount,
+      UserSongCreditUsageType type, Instant timestamp, Integer songAlbumId, Integer songId,
       int resultingBalance) {
     super(persistentIdentity);
     this.locationId = locationId;
@@ -95,7 +97,7 @@ public class CreditTransactionEntity extends AbstractPersistentEntity {
     return amount;
   }
 
-  public CreditTransactionType getType() {
+  public UserSongCreditUsageType getType() {
     return type;
   }
 

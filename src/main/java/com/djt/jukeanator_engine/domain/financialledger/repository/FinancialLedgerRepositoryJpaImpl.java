@@ -10,6 +10,7 @@ import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.financialledger.model.AbstractLocationTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
@@ -90,7 +91,7 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
         if (persistedCashIds.contains(transaction.getPersistentIdentity())) {
           entityManager.merge(transaction);
         } else {
-          insertNewCashTransaction(transaction);
+          insertNewLocationTransaction(transaction, "CASH");
         }
       }
 
@@ -103,7 +104,7 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
         if (persistedCreditCardIds.contains(transaction.getPersistentIdentity())) {
           entityManager.merge(transaction);
         } else {
-          insertNewCreditCardTransaction(transaction);
+          insertNewLocationTransaction(transaction, "CREDIT_CARD");
         }
       }
     });
@@ -147,29 +148,26 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
         .executeUpdate();
   }
 
-  private void insertNewCashTransaction(LocalCashTransactionEntity transaction) {
+  /**
+   * Both {@link LocalCashTransactionEntity} and {@link LocalCreditTransactionEntity} share one
+   * table ({@code location_transaction}) now, differing only by {@code discriminatorValue}
+   * ("CASH"/"CREDIT_CARD") -- see {@link AbstractLocationTransactionEntity}.
+   */
+  private void insertNewLocationTransaction(AbstractLocationTransactionEntity transaction,
+      String discriminatorValue) {
 
-    entityManager.createNativeQuery("insert into local_cash_transactions "
-        + "(persistent_identity, version, amount_dollars, timestamp, location_id) "
-        + "values (:id, :version, :amountDollars, :timestamp, :locationId)")
+    entityManager.createNativeQuery("insert into location_transaction "
+        + "(persistent_identity, version, transaction_type, amount_dollars, timestamp, "
+        + "location_id, source_transaction_id) "
+        + "values (:id, :version, :transactionType, :amountDollars, :timestamp, :locationId, "
+        + ":sourceTransactionId)")
         .setParameter("id", transaction.getPersistentIdentity())
         .setParameter("version", transaction.getVersion())
+        .setParameter("transactionType", discriminatorValue)
         .setParameter("amountDollars", transaction.getAmountDollars())
         .setParameter("timestamp", transaction.getTimestamp())
         .setParameter("locationId", transaction.getLocationId())
-        .executeUpdate();
-  }
-
-  private void insertNewCreditCardTransaction(LocalCreditTransactionEntity transaction) {
-
-    entityManager.createNativeQuery("insert into local_credit_transactions "
-        + "(persistent_identity, version, amount_dollars, timestamp, location_id) "
-        + "values (:id, :version, :amountDollars, :timestamp, :locationId)")
-        .setParameter("id", transaction.getPersistentIdentity())
-        .setParameter("version", transaction.getVersion())
-        .setParameter("amountDollars", transaction.getAmountDollars())
-        .setParameter("timestamp", transaction.getTimestamp())
-        .setParameter("locationId", transaction.getLocationId())
+        .setParameter("sourceTransactionId", transaction.getSourceTransactionId())
         .executeUpdate();
   }
 

@@ -67,8 +67,7 @@ class FinancialLedgerRepositoryJpaImplTest {
 
     try (Connection connection = dataSource.getConnection();
         Statement statement = connection.createStatement()) {
-      statement.executeUpdate("delete from local_cash_transactions");
-      statement.executeUpdate("delete from local_credit_transactions");
+      statement.executeUpdate("delete from location_transaction");
       statement.executeUpdate("delete from jukebox_split_period");
     }
   }

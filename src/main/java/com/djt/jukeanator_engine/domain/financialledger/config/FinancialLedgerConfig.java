@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.financialledger.config;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -11,6 +12,7 @@ import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedg
 import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedgerRepositoryJpaImpl;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerServiceImpl;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.user.service.PricingService;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
@@ -43,9 +45,10 @@ public class FinancialLedgerConfig {
   public FinancialLedgerService financialLedgerService(
       FinancialLedgerRepository financialLedgerRepository,
       FinancialLedgerProperties financialLedgerProperties, UserService userService,
-      PricingService pricingService, SongLibraryService songLibraryService) {
+      PricingService pricingService, SongLibraryService songLibraryService,
+      ApplicationEventPublisher eventPublisher, LocationService locationService) {
 
     return new FinancialLedgerServiceImpl(financialLedgerRepository, financialLedgerProperties,
-        userService, pricingService, songLibraryService);
+        userService, pricingService, songLibraryService, eventPublisher, locationService);
   }
 }

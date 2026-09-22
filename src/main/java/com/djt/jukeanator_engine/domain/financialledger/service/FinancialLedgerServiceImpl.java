@@ -7,8 +7,11 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import com.djt.jukeanator_engine.domain.financialledger.config.FinancialLedgerProperties;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.event.LocalFinancialTransactionRecordedEvent;
 import com.djt.jukeanator_engine.domain.financialledger.mapper.FinancialLedgerMapper;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
@@ -16,8 +19,10 @@ import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransacti
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedgerRepository;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
-import com.djt.jukeanator_engine.domain.user.dto.CreditTransactionDto;
+import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.domain.user.service.PricingService;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 
@@ -30,18 +35,23 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
   private final UserService userService;
   private final PricingService pricingService;
   private final SongLibraryService songLibraryService;
+  private final ApplicationEventPublisher eventPublisher;
+  private final LocationService locationService;
 
   private FinancialLedgerRootEntity ledgerRoot;
 
   public FinancialLedgerServiceImpl(FinancialLedgerRepository financialLedgerRepository,
       FinancialLedgerProperties financialLedgerProperties, UserService userService,
-      PricingService pricingService, SongLibraryService songLibraryService) {
+      PricingService pricingService, SongLibraryService songLibraryService,
+      ApplicationEventPublisher eventPublisher, LocationService locationService) {
 
     this.financialLedgerRepository = financialLedgerRepository;
     this.financialLedgerProperties = financialLedgerProperties;
     this.userService = userService;
     this.pricingService = pricingService;
     this.songLibraryService = songLibraryService;
+    this.eventPublisher = eventPublisher;
+    this.locationService = locationService;
 
     initialize();
   }
@@ -66,11 +76,17 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
 
     Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
     Integer ownLocationId = songLibraryService.getOwnLocationId();
+    Instant timestamp = Instant.now();
 
     ledgerRoot.addLocalCashTransaction(new LocalCashTransactionEntity(persistentIdentity,
-        amountDollars, Instant.now(), ownLocationId));
+        amountDollars, timestamp, ownLocationId));
 
     financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+
+    // Harmless on standalone/master -- only a slave's FinancialLedgerSyncService listens.
+    eventPublisher.publishEvent(new LocalFinancialTransactionRecordedEvent(
+        LocalFinancialTransactionRecordedEvent.Kind.CASH, ownLocationId, persistentIdentity,
+        amountDollars, timestamp));
   }
 
   @Override
@@ -78,11 +94,60 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
 
     Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
     Integer ownLocationId = songLibraryService.getOwnLocationId();
+    Instant timestamp = Instant.now();
 
     ledgerRoot.addLocalCreditCardTransaction(new LocalCreditTransactionEntity(persistentIdentity,
-        amountDollars, Instant.now(), ownLocationId));
+        amountDollars, timestamp, ownLocationId));
 
     financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+
+    eventPublisher.publishEvent(new LocalFinancialTransactionRecordedEvent(
+        LocalFinancialTransactionRecordedEvent.Kind.CREDIT_CARD, ownLocationId, persistentIdentity,
+        amountDollars, timestamp));
+  }
+
+  @Override
+  public synchronized void receiveLocalCashSync(Integer locationId, String apiKey,
+      LocalTransactionSyncDto dto) throws LocationServiceException {
+
+    requireValidLocation(locationId, apiKey);
+
+    if (ledgerRoot.hasLocalCashTransactionFromSource(locationId, dto.sourceTransactionId())) {
+      return; // already mirrored -- safe no-op on a retried push
+    }
+
+    Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
+    ledgerRoot.addLocalCashTransaction(new LocalCashTransactionEntity(persistentIdentity,
+        dto.amountDollars(), dto.timestamp(), locationId, dto.sourceTransactionId()));
+
+    financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+  }
+
+  @Override
+  public synchronized void receiveLocalCreditCardSync(Integer locationId, String apiKey,
+      LocalTransactionSyncDto dto) throws LocationServiceException {
+
+    requireValidLocation(locationId, apiKey);
+
+    if (ledgerRoot.hasLocalCreditCardTransactionFromSource(locationId, dto.sourceTransactionId())) {
+      return; // already mirrored -- safe no-op on a retried push
+    }
+
+    Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
+    ledgerRoot.addLocalCreditCardTransaction(new LocalCreditTransactionEntity(persistentIdentity,
+        dto.amountDollars(), dto.timestamp(), locationId, dto.sourceTransactionId()));
+
+    financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+  }
+
+  // Re-verifies locationId+apiKey even though the security filter chain already authenticated
+  // *some* location's credentials -- it never confirms those credentials belong to *this* path's
+  // locationId. Mirrors LocationServiceImpl.requireValidLocation exactly.
+  private void requireValidLocation(Integer locationId, String apiKey) {
+
+    if (!locationService.verifyApiKey(locationId, apiKey)) {
+      throw new LocationServiceException("Invalid locationId/apiKey for locationId: " + locationId);
+    }
   }
 
   @Override
@@ -171,7 +236,7 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     // addSplit() guarantees adjacent periods' boundaries never actually coincide (the new
     // period's startDate is always strictly after the closing period's endDate), so a mobile
     // credit can never fall within both periods' [from, to] ranges at once.
-    List<CreditTransactionDto> ledger = userService.getCreditLedgerForLocation(ownLocationId, from, to);
+    List<UserSongCreditUsageDto> ledger = userService.getCreditLedgerForLocation(ownLocationId, from, to);
 
     int creditsUsed = ledger.stream()
         .filter(t -> t.amount() < 0)
