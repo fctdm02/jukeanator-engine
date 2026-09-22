@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
 import com.djt.jukeanator_engine.domain.financialledger.event.LocalFinancialTransactionRecordedEvent;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -58,7 +59,8 @@ class FinancialLedgerSyncServiceTest {
       capturedMethod.set(exchange.getRequestMethod());
       capturedLocationIdHeader.set(exchange.getRequestHeaders().getFirst("location-id"));
       capturedApiKeyHeader.set(exchange.getRequestHeaders().getFirst("location-api-key"));
-      capturedBody.set(MAPPER.readValue(exchange.getRequestBody().readAllBytes(), Map.class));
+      capturedBody.set(MAPPER.readValue(exchange.getRequestBody().readAllBytes(),
+          new TypeReference<Map<String, Object>>() {}));
       exchange.sendResponseHeaders(204, -1);
       exchange.close();
       requestReceived.countDown();
