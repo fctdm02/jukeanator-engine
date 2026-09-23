@@ -1,5 +1,6 @@
 -- Consolidated baseline schema. This project has not been deployed to production, so the prior
--- V1-V17 migration history (renames, drops, incremental column adds) has been collapsed into this
+-- V1-V17 migration history (renames, drops, incremental column adds) -- and the later financial
+-- ledger refactor that had briefly lived in its own V2 migration -- have been collapsed into this
 -- single creation script reflecting the current, final schema shape. Add seed-data INSERT
 -- statements below the DDL as needed before the initial production deployment.
 
@@ -91,9 +92,10 @@ CREATE TABLE playlist_songs (
     CONSTRAINT fk_playlist_songs_playlist FOREIGN KEY (playlist_id) REFERENCES playlists (persistent_identity)
 ) ENGINE=InnoDB;
 
--- Append-only mobile/web-originated credit transaction history (Braintree purchases, web-UI queue
--- spends), owned by the user it belongs to. Never written to by the local walk-up (JFC/Swing) user.
-CREATE TABLE mobile_transactions (
+-- Append-only user-spend credit history: a user spending already-owned song credits to queue a
+-- song at a location (mobile/web queue spends), owned by the user it belongs to. Never written to
+-- by the local walk-up (JFC/Swing) user.
+CREATE TABLE user_song_credit_usage (
     persistent_identity INT PRIMARY KEY,
     user_id              INT,
     location_id            INT,
@@ -106,7 +108,26 @@ CREATE TABLE mobile_transactions (
     version                             INT NOT NULL DEFAULT 1,
     date_added                           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_credit_transactions_user FOREIGN KEY (user_id) REFERENCES users (persistent_identity)
+    CONSTRAINT fk_user_song_credit_usage_user FOREIGN KEY (user_id) REFERENCES users (persistent_identity)
+) ENGINE=InnoDB;
+
+-- Append-only record of a user obtaining song credits with real money (via PaymentGateway, e.g.
+-- Braintree) -- never location-attributed, unlike user_song_credit_usage above.
+CREATE TABLE user_add_funds_transaction (
+    persistent_identity INT PRIMARY KEY,
+    user_id              INT,
+    package_id             VARCHAR(64),
+    credits_awarded          INT NOT NULL,
+    bonus_credits              INT NOT NULL,
+    amount_usd                   DECIMAL(12,2) NOT NULL,
+    payment_source                 VARCHAR(64),
+    payment_transaction_id           VARCHAR(255),
+    timestamp                          TIMESTAMP NOT NULL,
+    resulting_balance                    INT NOT NULL,
+    version                                INT NOT NULL DEFAULT 1,
+    date_added                               TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_updated                               TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user_add_funds_transaction_user FOREIGN KEY (user_id) REFERENCES users (persistent_identity)
 ) ENGINE=InnoDB;
 
 -- Multi-tenant song library storage: every location's catalog lives in this one table,
@@ -215,28 +236,30 @@ CREATE TABLE jukebox_split_period (
     date_updated                                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- Append-only local (bill-acceptor) cash-award history.
-CREATE TABLE local_cash_transactions (
+-- Local (bill-acceptor / credit-card-reader) cash-award history, merged into one table
+-- discriminated by transaction_type (CASH | CREDIT_CARD -- see
+-- AbstractLocationTransactionEntity's single-table JPA inheritance) so a central DBA can see both
+-- streams together and filter by location. source_transaction_id is the slave-to-master mirror's
+-- idempotency key: NULL for every transaction recorded directly on the instance that owns it (the
+-- normal case on a slave/standalone instance); only master-received mirrored rows ever populate
+-- it, carrying the slave's own local persistent_identity for that transaction. The composite
+-- unique key only meaningfully constrains mirrored rows -- MySQL treats any row containing a NULL
+-- indexed column as distinct from every other row in a unique index, so genuinely local
+-- transactions never collide with each other.
+CREATE TABLE location_transaction (
     persistent_identity INT PRIMARY KEY,
-    version               INT NOT NULL DEFAULT 1,
-    amount_dollars          INT NOT NULL,
-    timestamp                 TIMESTAMP NOT NULL,
-    location_id                 INT NULL,
-    date_added                    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    date_updated                    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    transaction_type      VARCHAR(20) NOT NULL,
+    version                 INT NOT NULL DEFAULT 1,
+    amount_dollars            INT NOT NULL,
+    timestamp                   TIMESTAMP NOT NULL,
+    location_id                   INT NULL,
+    source_transaction_id           INT NULL,
+    date_added                        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_updated                        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_location_transaction_source UNIQUE (location_id, source_transaction_id)
 ) ENGINE=InnoDB;
 
--- Append-only local (credit-card-reader) credit-award history, analogous to mobile_transactions
--- for mobile/web credits.
-CREATE TABLE local_credit_transactions (
-    persistent_identity INT PRIMARY KEY,
-    version               INT NOT NULL DEFAULT 1,
-    amount_dollars          INT NOT NULL,
-    timestamp                 TIMESTAMP NOT NULL,
-    location_id                 INT NULL,
-    date_added                    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    date_updated                    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+CREATE INDEX ix_location_transaction_location ON location_transaction (location_id);
 
 -- Append-only user-activity log (Swing/JFC desktop UI navigation + queue actions, mobile/web queue
 -- actions). No update/delete path -- UserActivityRepositoryJpaImpl only ever inserts.

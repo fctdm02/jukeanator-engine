@@ -44,10 +44,13 @@ the corrected model.
    sweep renaming every existing plural table (`local_cash_transactions`, `song_queue_entries`,
    `playlists`, etc.), which would be a large, separately-scoped, higher-risk change.
 5. **Pre-production schema convention is reused**: like the earlier "consolidate 17 migrations
-   into V1" commit, there's no live production data to preserve, so the new `V2` migration simply
-   drops `local_cash_transactions`/`local_credit_transactions`/`mobile_transactions` and creates
-   their replacements directly, rather than writing data-migrating `ALTER`/`INSERT SELECT`
-   statements.
+   into V1" commit, there's no live production data to preserve, so this shipped first as its own
+   `V2` migration dropping `local_cash_transactions`/`local_credit_transactions`/
+   `mobile_transactions` and creating their replacements directly, rather than writing
+   data-migrating `ALTER`/`INSERT SELECT` statements. That `V2` was subsequently folded back into
+   the `V1` baseline (same rationale: no production data means no need to preserve migration
+   history as separate steps), so the schema now reflects Parts A and B as part of a single
+   `V1__init_schema.sql`.
 
 ## Part A — User transaction model refactor
 
@@ -115,11 +118,11 @@ These become two genuinely separate entities:
   `insertNewCreditCardTransaction`), byte-for-byte identical apart from table/column literals,
   collapse into one `insertNewLocationTransaction(AbstractLocationTransactionEntity, String
   discriminatorValue)` helper, called twice.
-- Migration drops `local_cash_transactions`/`local_credit_transactions`, creates
-  `location_transaction` (singular; `id` PK, `transaction_type`, `amount_dollars`, `timestamp`,
-  `location_id`, `source_transaction_id`, audit columns, `CREATE INDEX
-  ix_location_transaction_location ON location_transaction (location_id)` so a central DBA can
-  filter by location).
+- The `V1` baseline creates `location_transaction` directly (singular; `id` PK, `transaction_type`,
+  `amount_dollars`, `timestamp`, `location_id`, `source_transaction_id`, audit columns, `CREATE
+  INDEX ix_location_transaction_location ON location_transaction (location_id)` so a central DBA
+  can filter by location) — no `local_cash_transactions`/`local_credit_transactions` tables ever
+  exist in the baseline schema.
 - Tests needing updates for the new table/discriminator:
   `FinancialLedgerRepositoryJpaImplTest.java`, `FinancialLedgerRepositoryFileSystemImplTest.java`.
 - `AdminPanel.java`'s Financial Ledger table only ever touches `FinancialLedgerService`'s DTOs
