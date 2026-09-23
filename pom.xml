@@ -240,6 +240,13 @@
 			<artifactId>testcontainers-mysql</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Compile-time API for TestDataDirResetListener (a LauncherSessionListener); the version is
+		     managed by the Spring Boot BOM so it always matches the JUnit Platform in use. -->
+		<dependency>
+			<groupId>org.junit.platform</groupId>
+			<artifactId>junit-platform-launcher</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
