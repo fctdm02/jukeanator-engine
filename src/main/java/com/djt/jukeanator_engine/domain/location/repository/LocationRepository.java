@@ -16,4 +16,15 @@ public interface LocationRepository extends AggregateRootRepository<LocationRoot
    * falls back to count+1 in that case.
    */
   Integer nextPersistentIdentity();
+
+  /**
+   * Re-keys the persisted location {@code oldLocationId} to {@code newLocationId} in place,
+   * carrying every row that references it along -- called by {@code
+   * LocationServiceImpl.reconcileOwnLocationId} before it stores the re-keyed root. A no-op by
+   * default -- the filesystem-backed implementation keys nothing else by location id, so the
+   * subsequent {@link #storeAggregateRoot} alone is sufficient there.
+   */
+  default void changeLocationId(Integer oldLocationId, Integer newLocationId) {
+    // no-op by default
+  }
 }

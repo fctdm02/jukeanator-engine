@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.useractivity.event.UserActivityRecordedEvent;
 import com.djt.jukeanator_engine.domain.useractivity.repository.UserActivityRepository;
 
@@ -31,6 +32,20 @@ public class UserActivityEventListener {
       userActivityRepository.record(event.getRecord());
     } catch (Exception e) {
       log.warn("Failed to persist user activity record: {}", event.getRecord(), e);
+    }
+  }
+
+  // Synchronous (not @Async), so activity is already filed under the confirmed id before the
+  // reconciliation that published this event returns. Logged, not rethrown, for the same reason
+  // as above -- activity tracking must never fail the location-id correction itself.
+  @EventListener
+  public void onOwnLocationIdChanged(OwnLocationIdChangedEvent event) {
+    try {
+      userActivityRepository.changeLocationId(event.previousLocationId(),
+          event.confirmedLocationId());
+    } catch (Exception e) {
+      log.warn("Failed to move user activity from locationId {} to {}",
+          event.previousLocationId(), event.confirmedLocationId(), e);
     }
   }
 }

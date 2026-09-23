@@ -1,8 +1,10 @@
 package com.djt.jukeanator_engine.domain.financialledger.service;
 
 import java.util.List;
+import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
 
 public interface FinancialLedgerService {
@@ -34,6 +36,15 @@ public interface FinancialLedgerService {
    */
   void receiveLocalCashSync(Integer locationId, String apiKey, LocalTransactionSyncDto dto)
       throws LocationServiceException;
+
+  /**
+   * NOTE: System method, not to be invoked on behalf of a user. Re-tags this instance's in-memory
+   * local transactions after its own location id is corrected post-handshake.
+   *
+   * @param event
+   */
+  @PublicServiceMethod
+  void handleOwnLocationIdChangedEvent(OwnLocationIdChangedEvent event);
 
   /** Same as {@link #receiveLocalCashSync}, for the credit-card-reader stream. */
   void receiveLocalCreditCardSync(Integer locationId, String apiKey, LocalTransactionSyncDto dto)

@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.backgroundmusic.service;
 
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
@@ -72,6 +73,15 @@ public interface BackgroundMusicService {
    */
   @PublicServiceMethod
   void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event);
+
+  /**
+   * NOTE: System method, not to be invoked on behalf of a user. Re-tags in-memory song
+   * identifiers after this instance's own location id is corrected post-handshake.
+   *
+   * @param event
+   */
+  @PublicServiceMethod
+  void handleOwnLocationIdChangedEvent(OwnLocationIdChangedEvent event);
 
   /**
    * NOTE: System method, not to be invoked on behalf of a user. Keeps track of what is currently

@@ -84,6 +84,13 @@ public class PlaylistEntity extends AbstractPersistentEntity {
     return this.songs.remove(songIdentifier);
   }
 
+  // Package-private: only UserEntity.changeLocationId re-tags a playlist.
+  void changeLocationId(Integer oldLocationId, Integer newLocationId) {
+    if (this.songs != null) {
+      this.songs.replaceAll(s -> s.withLocationIdChanged(oldLocationId, newLocationId));
+    }
+  }
+
   @Override
   public String getNaturalIdentity() {
     return new StringBuilder().append(this.owner).append(this.name).toString();

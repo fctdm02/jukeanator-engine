@@ -44,6 +44,19 @@ public class SongIdentifier implements Serializable {
     return songId;
   }
 
+  /**
+   * This identifier re-tagged to {@code newLocationId} if it is currently tagged with {@code
+   * oldLocationId}, otherwise this same identifier -- used when this instance's own location id
+   * is corrected post-handshake (see {@code OwnLocationIdChangedEvent}). {@code oldLocationId}
+   * must not be {@code null} -- otherwise every identifier with no location would be re-tagged.
+   */
+  public SongIdentifier withLocationIdChanged(Integer oldLocationId, Integer newLocationId) {
+    Objects.requireNonNull(oldLocationId, "oldLocationId cannot be null");
+    return oldLocationId.equals(locationId)
+        ? new SongIdentifier(newLocationId, albumId, songId)
+        : this;
+  }
+
   @Override
   public int hashCode() {
     return Objects.hash(locationId, albumId, songId);

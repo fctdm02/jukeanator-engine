@@ -26,6 +26,7 @@ import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRoo
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
 /**
  * Integration tests for {@link FinancialLedgerRepositoryJpaImpl}, run against a live local MySQL
@@ -62,6 +63,9 @@ class FinancialLedgerRepositoryJpaImplTest {
   @Autowired
   private PlatformTransactionManager transactionManager;
 
+  @Autowired
+  private SongLibraryService songLibraryService;
+
   @BeforeEach
   void cleanTables() throws SQLException {
 
@@ -74,6 +78,18 @@ class FinancialLedgerRepositoryJpaImplTest {
 
   private FinancialLedgerRepositoryJpaImpl newRepository() {
     return new FinancialLedgerRepositoryJpaImpl(entityManagerFactory, transactionManager);
+  }
+
+  // location_jukebox_split.parent_location_id is a NOT NULL foreign key to location, so every
+  // period needs a real location row as its parent -- the standalone context's own location
+  // (created by SongLibraryServiceImpl at startup) serves.
+  private JukeboxSplitPeriodEntity newPeriod(FinancialLedgerRepositoryJpaImpl repository,
+      Instant startDate) {
+
+    JukeboxSplitPeriodEntity period =
+        new JukeboxSplitPeriodEntity(repository.nextPersistentIdentity(), startDate);
+    period.setParentLocation(songLibraryService.getOwnLocation());
+    return period;
   }
 
   // ── round-trip ───────────────────────────────────────────────────────────
@@ -89,14 +105,14 @@ class FinancialLedgerRepositoryJpaImplTest {
     Instant periodStart = Instant.now().minus(30, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
     Instant periodEnd = Instant.now().truncatedTo(ChronoUnit.SECONDS);
     JukeboxSplitPeriodEntity finalizedPeriod =
-        new JukeboxSplitPeriodEntity(repository.nextPersistentIdentity(), periodStart);
+        newPeriod(repository, periodStart);
     finalizedPeriod.finalizePeriod(periodEnd, 50, new BigDecimal("12.00"), new BigDecimal("8.00"),
         new BigDecimal("5.00"), new BigDecimal("25.00"), new BigDecimal("12.50"),
         new BigDecimal("12.50"));
     root.addSplitPeriod(finalizedPeriod);
 
     JukeboxSplitPeriodEntity openPeriod =
-        new JukeboxSplitPeriodEntity(repository.nextPersistentIdentity(), periodEnd);
+        newPeriod(repository, periodEnd);
     root.addSplitPeriod(openPeriod);
 
     root.addLocalCashTransaction(new LocalCashTransactionEntity(
@@ -147,7 +163,7 @@ class FinancialLedgerRepositoryJpaImplTest {
     Instant start = Instant.now().truncatedTo(ChronoUnit.SECONDS);
     FinancialLedgerRootEntity root = new FinancialLedgerRootEntity();
     JukeboxSplitPeriodEntity openPeriod =
-        new JukeboxSplitPeriodEntity(repository.nextPersistentIdentity(), start);
+        newPeriod(repository, start);
     root.addSplitPeriod(openPeriod);
     repository.storeAggregateRoot(root);
 
@@ -189,8 +205,7 @@ class FinancialLedgerRepositoryJpaImplTest {
 
     FinancialLedgerRepositoryJpaImpl repository = newRepository();
     FinancialLedgerRootEntity root = new FinancialLedgerRootEntity();
-    root.addSplitPeriod(new JukeboxSplitPeriodEntity(repository.nextPersistentIdentity(),
-        Instant.now().truncatedTo(ChronoUnit.SECONDS)));
+    root.addSplitPeriod(newPeriod(repository, Instant.now().truncatedTo(ChronoUnit.SECONDS)));
     repository.storeAggregateRoot(root);
 
     FinancialLedgerRootEntity reloaded = repository.loadAggregateRoot(0);

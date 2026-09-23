@@ -96,6 +96,24 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
     return hasTransactionFromSource(localCreditCardTransactions, locationId, sourceTransactionId);
   }
 
+  /**
+   * Re-tags every local transaction recorded under {@code oldLocationId} with {@code
+   * newLocationId} -- the in-memory counterpart of {@code
+   * LocationRepositoryJpaImpl.changeLocationId}'s location_transaction update.
+   */
+  public void changeLocationId(Integer oldLocationId, Integer newLocationId) {
+    changeLocationId(localCashTransactions, oldLocationId, newLocationId);
+    changeLocationId(localCreditCardTransactions, oldLocationId, newLocationId);
+  }
+
+  private static void changeLocationId(
+      List<? extends AbstractLocationTransactionEntity> transactions, Integer oldLocationId,
+      Integer newLocationId) {
+    transactions.stream()
+        .filter(t -> oldLocationId.equals(t.getLocationId()))
+        .forEach(t -> t.changeLocationId(newLocationId));
+  }
+
   private static boolean hasTransactionFromSource(
       List<? extends AbstractLocationTransactionEntity> transactions, Integer locationId,
       Integer sourceTransactionId) {

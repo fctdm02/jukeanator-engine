@@ -156,7 +156,8 @@ CREATE TABLE song_library (
     date_added                                          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                                          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (parent_location_id, id),
-    CONSTRAINT fk_song_library_location FOREIGN KEY (parent_location_id) REFERENCES location (id),
+    CONSTRAINT fk_song_library_location FOREIGN KEY (parent_location_id) REFERENCES location (id)
+        ON UPDATE CASCADE,
     CONSTRAINT fk_song_library_parent FOREIGN KEY (parent_location_id, parent_folder_id)
         REFERENCES song_library (parent_location_id, id) ON DELETE CASCADE,
     CONSTRAINT uq_song_library UNIQUE (parent_location_id, parent_folder_id, name)
@@ -219,10 +220,13 @@ CREATE TABLE smart_background_music_songs (
     source_song_id                                   INT NULL
 ) ENGINE=InnoDB;
 
--- Financial Ledger / jukebox-split feature. Freestanding (not owned by another aggregate).
+-- Financial Ledger / jukebox-split feature. Freestanding (not owned by another aggregate), but
+-- tenant-separated by parent_location_id (like song_library) so a slave's splits can later be
+-- synced into master's database alongside every other location's.
 CREATE TABLE location_jukebox_split (
     persistent_identity INT PRIMARY KEY,
     version               INT NOT NULL DEFAULT 1,
+    parent_location_id      INT NOT NULL,
     start_date              TIMESTAMP NOT NULL,
     end_date                  TIMESTAMP NULL,
     split_percentage_to_owner   INT NULL,
@@ -233,8 +237,12 @@ CREATE TABLE location_jukebox_split (
     amount_due_owner                      DECIMAL(12,2) NULL,
     amount_due_operator                     DECIMAL(12,2) NULL,
     date_added                                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    date_updated                                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    date_updated                                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_location_jukebox_split_location FOREIGN KEY (parent_location_id) REFERENCES location (id)
+        ON UPDATE CASCADE
 ) ENGINE=InnoDB;
+
+CREATE INDEX ix_location_jukebox_split_location ON location_jukebox_split (parent_location_id);
 
 -- Local (bill-acceptor / credit-card-reader) cash-award history, merged into one table
 -- discriminated by transaction_type (CASH | CREDIT_CARD -- see

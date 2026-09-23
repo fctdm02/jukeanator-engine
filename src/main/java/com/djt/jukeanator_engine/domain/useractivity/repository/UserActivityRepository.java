@@ -24,4 +24,14 @@ public interface UserActivityRepository {
    * that keeps activity data bounded to a rolling window instead of growing forever.
    */
   void purgeOlderThan(Instant cutoff);
+
+  /**
+   * Re-tags every activity record stored under {@code oldLocationId} with {@code newLocationId}
+   * -- called (via {@code UserActivityEventListener}) when this instance's own location id is
+   * corrected post-handshake. A no-op by default -- under JPA the {@code user_activity} rows are
+   * already re-pointed by {@code LocationRepositoryJpaImpl.changeLocationId}.
+   */
+  default void changeLocationId(Integer oldLocationId, Integer newLocationId) {
+    // no-op by default
+  }
 }

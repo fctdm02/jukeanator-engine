@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -18,6 +19,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.InOrder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
@@ -30,6 +32,7 @@ import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
 import com.djt.jukeanator_engine.domain.location.event.LocationLibrarySyncedEvent;
 import com.djt.jukeanator_engine.domain.location.event.LocationRegisteredEvent;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
@@ -89,6 +92,40 @@ public class LocationServiceTest {
 
   private LocationEntity registeredLocation() {
     return locationRoot.getLocationByIdNullIfNotExists(REGISTERED_LOCATION_ID);
+  }
+
+  // ── reconcileOwnLocationId ──────────────────────────────────────────────
+
+  @Test
+  void reconcileOwnLocationId_rekeysPersistedRowBeforeStoringTheRekeyedRoot() {
+
+    LocationEntity ownLocation = registeredLocation();
+    Integer confirmedLocationId = Integer.valueOf(42);
+
+    locationServiceImpl.reconcileOwnLocationId(confirmedLocationId);
+
+    InOrder inOrder = inOrder(locationRepository);
+    inOrder.verify(locationRepository).changeLocationId(REGISTERED_LOCATION_ID,
+        confirmedLocationId);
+    inOrder.verify(locationRepository).storeAggregateRoot(locationRoot);
+    verify(eventPublisher).publishEvent(
+        new OwnLocationIdChangedEvent(REGISTERED_LOCATION_ID, confirmedLocationId));
+
+    assertEquals(confirmedLocationId, ownLocation.getPersistentIdentity(),
+        "The same LocationEntity instance is re-keyed in place, so transient parentLocation "
+            + "references follow it");
+    assertNull(locationRoot.getLocationByIdNullIfNotExists(REGISTERED_LOCATION_ID));
+    assertEquals(ownLocation, locationRoot.getLocationByIdNullIfNotExists(confirmedLocationId));
+  }
+
+  @Test
+  void reconcileOwnLocationId_isANoOp_whenIdAlreadyMatches() {
+
+    locationServiceImpl.reconcileOwnLocationId(REGISTERED_LOCATION_ID);
+
+    verify(locationRepository, never()).changeLocationId(any(), any());
+    verify(locationRepository, never()).storeAggregateRoot(any());
+    verify(eventPublisher, never()).publishEvent(any(OwnLocationIdChangedEvent.class));
   }
 
   @Test

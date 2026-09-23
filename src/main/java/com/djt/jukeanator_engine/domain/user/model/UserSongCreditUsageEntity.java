@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.user.model;
 
 import java.time.Instant;
+import java.util.Objects;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -91,6 +92,13 @@ public class UserSongCreditUsageEntity extends AbstractPersistentEntity {
 
   public Integer getLocationId() {
     return locationId;
+  }
+
+  // Package-private: only UserEntity.changeLocationId re-tags a usage.
+  void changeLocationId(Integer oldLocationId, Integer newLocationId) {
+    if (Objects.equals(oldLocationId, this.locationId)) {
+      this.locationId = newLocationId;
+    }
   }
 
   public int getAmount() {

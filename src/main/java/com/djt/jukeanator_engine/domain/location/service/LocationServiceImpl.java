@@ -27,6 +27,7 @@ import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
 import com.djt.jukeanator_engine.domain.location.dto.UpdateLocationInfoRequest;
 import com.djt.jukeanator_engine.domain.location.event.LocationLibrarySyncedEvent;
 import com.djt.jukeanator_engine.domain.location.event.LocationRegisteredEvent;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
@@ -392,12 +393,23 @@ public class LocationServiceImpl implements LocationService {
     }
 
     // persistentIdentity is this entity's actual DB/JSON key, so re-keying it also requires
-    // re-keying LocationRootEntity's own id-keyed map -- storeAggregateRoot's delete/merge diff
-    // then correctly deletes the old row and inserts the new one on the next call below.
+    // re-keying LocationRootEntity's own id-keyed map. changeLocationId() re-keys the persisted
+    // row in place (plus every row referencing it) first, so storeAggregateRoot's delete/merge
+    // diff below finds the row already under its new id and merely merges it, instead of trying
+    // to delete the old row out from under its foreign keys. Every transient parentLocation
+    // reference (RootFolderEntity, JukeboxSplitPeriodEntity) holds this same LocationEntity
+    // instance, so they follow the new id automatically.
+    this.locationRepository.changeLocationId(currentLocationId, confirmedLocationId);
     this.locationRoot.removeLocation(currentLocationId);
     location.setPersistentIdentity(confirmedLocationId);
     this.locationRoot.addLocation(location);
     this.locationRepository.storeAggregateRoot(this.locationRoot);
+
+    // Services holding location-tagged rows in memory (user, background music, financial ledger)
+    // re-tag them on this event -- otherwise their next store would write the previous id back
+    // over the rows changeLocationId() just re-pointed.
+    this.eventPublisher.publishEvent(
+        new OwnLocationIdChangedEvent(currentLocationId, confirmedLocationId));
   }
 
   @Override

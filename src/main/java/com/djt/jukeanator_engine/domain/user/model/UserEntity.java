@@ -163,6 +163,21 @@ public class UserEntity extends AbstractPersistentEntity {
     return this.songPlayHistory.add(songIdentifier);
   }
 
+  // Package-private: only UserRootEntity.changeLocationId re-tags a user, when this instance's own
+  // location id is corrected post-handshake.
+  void changeLocationId(Integer oldLocationId, Integer newLocationId) {
+
+    if (this.songPlayHistory != null) {
+      this.songPlayHistory.replaceAll(s -> s.withLocationIdChanged(oldLocationId, newLocationId));
+    }
+    for (PlaylistEntity playlist : this.playlists) {
+      playlist.changeLocationId(oldLocationId, newLocationId);
+    }
+    for (UserSongCreditUsageEntity usage : getUserSongCreditUsages()) {
+      usage.changeLocationId(oldLocationId, newLocationId);
+    }
+  }
+
   public List<String> getSearchHistory() {
     if (searchHistory == null)
       searchHistory = new ArrayList<>();

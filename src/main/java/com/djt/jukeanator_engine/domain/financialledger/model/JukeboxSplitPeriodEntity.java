@@ -6,6 +6,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 
 /**
  * One jukebox-split reconciliation period between the operator and a location owner. The period
@@ -18,6 +19,12 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 public class JukeboxSplitPeriodEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
+
+  // Not a mapped column and not written by the filesystem repository -- reconstructed uniformly by
+  // FinancialLedgerServiceImpl right after any repository load, regardless of backend, exactly like
+  // RootFolderEntity's parentLocation. FinancialLedgerRepositoryJpaImpl sources
+  // parent_location_id from it when inserting a new period, so it must be set before storing.
+  private transient LocationEntity parentLocation;
 
   @Column(name = "start_date", nullable = false)
   private Instant startDate;
@@ -74,6 +81,14 @@ public class JukeboxSplitPeriodEntity extends AbstractPersistentEntity {
   @Override
   public String getNaturalIdentity() {
     return "JukeboxSplitPeriod/" + startDate;
+  }
+
+  public LocationEntity getParentLocation() {
+    return parentLocation;
+  }
+
+  public void setParentLocation(LocationEntity parentLocation) {
+    this.parentLocation = parentLocation;
   }
 
   public boolean isOpen() {

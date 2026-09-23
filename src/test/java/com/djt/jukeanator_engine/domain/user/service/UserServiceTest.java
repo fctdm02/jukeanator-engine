@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -28,6 +29,7 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.security.UserRole;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
@@ -659,5 +661,45 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     assertEquals(1, ledger.size());
     assertEquals(Integer.valueOf(101), ledger.get(0).locationId());
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // OWN LOCATION ID CORRECTION
+  // ─────────────────────────────────────────────────────────────────────────
+
+  @Test
+  void handleOwnLocationIdChangedEvent_retagsOnlyStateUnderThePreviousId_andPersists() {
+
+    Integer previousLocationId = Integer.valueOf(7);
+    Integer confirmedLocationId = Integer.valueOf(42);
+    Integer otherLocationId = Integer.valueOf(99);
+
+    UserEntity user = registeredUser();
+    user.addSongToSongPlayHistory(new SongIdentifier(previousLocationId, 1, 2));
+    user.addSongToSongPlayHistory(new SongIdentifier(otherLocationId, 3, 4));
+
+    PlaylistEntity favorites = user.createMyFavoritesPlaylist();
+    favorites.addSong(new SongIdentifier(previousLocationId, 5, 6));
+    favorites.addSong(new SongIdentifier(otherLocationId, 7, 8));
+
+    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, previousLocationId);
+    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, otherLocationId);
+    clearInvocations(userRepository);
+
+    userServiceImpl.handleOwnLocationIdChangedEvent(
+        new OwnLocationIdChangedEvent(previousLocationId, confirmedLocationId));
+
+    assertEquals(List.of(new SongIdentifier(confirmedLocationId, 1, 2),
+        new SongIdentifier(otherLocationId, 3, 4)), user.getSongPlayHistory());
+    assertEquals(List.of(new SongIdentifier(confirmedLocationId, 5, 6),
+        new SongIdentifier(otherLocationId, 7, 8)), favorites.getSongs());
+
+    List<Integer> usageLocationIds = user.getUserSongCreditUsages().stream()
+        .map(UserSongCreditUsageEntity::getLocationId)
+        .sorted()
+        .toList();
+    assertEquals(List.of(confirmedLocationId, otherLocationId), usageLocationIds);
+
+    verify(userRepository).storeAggregateRoot(userRoot);
   }
 }

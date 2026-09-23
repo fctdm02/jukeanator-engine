@@ -23,6 +23,7 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -546,6 +547,20 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       return new ArrayList<>();
     }
     return new ArrayList<>(favs.getSongs());
+  }
+
+  /**
+   * Re-tags every user's in-memory play history, playlist songs and song-credit usages from the
+   * previous own location id to the confirmed one, then persists them -- under JPA the rows were
+   * already re-pointed by {@code LocationRepositoryJpaImpl.changeLocationId}, so without this the
+   * next store would write the previous id back over them.
+   */
+  @EventListener
+  @Override
+  public synchronized void handleOwnLocationIdChangedEvent(OwnLocationIdChangedEvent event) {
+
+    this.userRoot.changeLocationId(event.previousLocationId(), event.confirmedLocationId());
+    this.userRepository.storeAggregateRoot(this.userRoot);
   }
 
   @EventListener

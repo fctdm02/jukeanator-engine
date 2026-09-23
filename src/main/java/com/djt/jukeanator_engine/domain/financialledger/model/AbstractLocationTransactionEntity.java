@@ -70,4 +70,10 @@ public abstract class AbstractLocationTransactionEntity extends AbstractPersiste
   public Integer getSourceTransactionId() {
     return sourceTransactionId;
   }
+
+  // Package-private: only FinancialLedgerRootEntity.changeLocationId re-keys a transaction, when
+  // this instance's own location id is corrected post-handshake.
+  void changeLocationId(Integer locationId) {
+    this.locationId = locationId;
+  }
 }

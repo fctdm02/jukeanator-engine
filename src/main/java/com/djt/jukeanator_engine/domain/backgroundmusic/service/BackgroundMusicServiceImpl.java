@@ -28,6 +28,7 @@ import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgrou
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.utils.BackgroundMusicHelper;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
@@ -1031,6 +1032,76 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       log.warn("handleScanFileSystemForSongsEvent: failed to reinitialize background music after "
           + "rescan, leaving existing state in place: {}", e.getMessage(), e);
     }
+  }
+
+  /**
+   * Re-tags every in-memory background-music and smart-pool song's referential song identifiers
+   * from the previous own location id to the confirmed one, then persists whichever list changed
+   * -- under JPA the rows were already re-pointed by {@code
+   * LocationRepositoryJpaImpl.changeLocationId}, so without this the next {@code storeAll} would
+   * write the previous id back over them.
+   *
+   * <p>
+   * Best-effort, like {@link #handleScanFileSystemForSongsEvent}: the ids are purely referential
+   * and are re-resolved against the library on the next load anyway (see loadAndReconcile).
+   */
+  @EventListener
+  @Override
+  public void handleOwnLocationIdChangedEvent(OwnLocationIdChangedEvent event) {
+
+    if (!this.enableBackgroundMusic) {
+      return;
+    }
+
+    Integer previousLocationId = event.previousLocationId();
+    Integer confirmedLocationId = event.confirmedLocationId();
+
+    try {
+      boolean changed = false;
+      for (BackgroundMusicSongEntity song : allSongs) {
+        changed |= changeSongIdentifierLocationId(song, previousLocationId, confirmedLocationId);
+      }
+      if (changed) {
+        backgroundMusicRepository.storeAll(allSongs);
+      }
+
+      boolean smartChanged = false;
+      for (SmartBackgroundMusicSongEntity song : smartPool) {
+        smartChanged |=
+            changeSongIdentifierLocationId(song, previousLocationId, confirmedLocationId);
+        SongIdentifier source = song.getSourceSongIdentifier();
+        if (source != null) {
+          SongIdentifier rekeyed =
+              source.withLocationIdChanged(previousLocationId, confirmedLocationId);
+          if (rekeyed != source) {
+            song.setSourceSongIdentifier(rekeyed);
+            smartChanged = true;
+          }
+        }
+      }
+      if (smartChanged) {
+        smartBackgroundMusicRepository.storeAll(smartPool);
+      }
+    } catch (Exception e) {
+      log.warn("handleOwnLocationIdChangedEvent: failed to re-tag background music from "
+          + "locationId {} to {}: {}", previousLocationId, confirmedLocationId, e.getMessage(), e);
+    }
+  }
+
+  private static boolean changeSongIdentifierLocationId(BackgroundMusicSongEntity song,
+      Integer previousLocationId, Integer confirmedLocationId) {
+
+    SongIdentifier songIdentifier = song.getSongIdentifier();
+    if (songIdentifier == null) {
+      return false;
+    }
+    SongIdentifier rekeyed =
+        songIdentifier.withLocationIdChanged(previousLocationId, confirmedLocationId);
+    if (rekeyed == songIdentifier) {
+      return false;
+    }
+    song.setSongIdentifier(rekeyed);
+    return true;
   }
 
   private void reinitializeAfterRescan() throws IOException {

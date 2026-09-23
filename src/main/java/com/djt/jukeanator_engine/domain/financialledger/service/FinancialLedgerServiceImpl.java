@@ -8,10 +8,12 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import com.djt.jukeanator_engine.domain.financialledger.config.FinancialLedgerProperties;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
 import com.djt.jukeanator_engine.domain.financialledger.event.LocalFinancialTransactionRecordedEvent;
+import com.djt.jukeanator_engine.domain.financialledger.exception.FinancialLedgerException;
 import com.djt.jukeanator_engine.domain.financialledger.mapper.FinancialLedgerMapper;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
@@ -19,7 +21,9 @@ import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransacti
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedgerRepository;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
@@ -63,6 +67,21 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     } catch (EntityDoesNotExistException ednee) {
       log.info("No existing financial ledger found -- starting a fresh one");
       this.ledgerRoot = new FinancialLedgerRootEntity();
+    }
+
+    // Master is location-agnostic and has no jukebox of its own (see SongLibraryServiceImpl's
+    // initialize()), so it never opens a split period of its own either.
+    LocationEntity ownLocation = songLibraryService.getOwnLocation();
+    if (ownLocation == null) {
+      log.info("Master instance -- no own location; no jukebox-split period opened.");
+      return;
+    }
+
+    // Not persisted by either repository -- reconstructed here after any load, same as
+    // SongLibraryServiceImpl wiring RootFolderEntity's parentLocation. Every period in this
+    // instance's own ledger belongs to its own location.
+    for (JukeboxSplitPeriodEntity period : ledgerRoot.getSplitPeriods()) {
+      period.setParentLocation(ownLocation);
     }
 
     if (ledgerRoot.getCurrentPeriod() == null) {
@@ -140,6 +159,22 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     financialLedgerRepository.storeAggregateRoot(ledgerRoot);
   }
 
+  /**
+   * Re-tags this instance's in-memory local transactions from the previous own location id to the
+   * confirmed one and persists them -- under JPA the rows were already re-pointed by {@code
+   * LocationRepositoryJpaImpl.changeLocationId}, so without this the next store would merge the
+   * previous id back over them (and under the filesystem repository, nothing else re-tags them).
+   * Split periods need no re-tagging -- their transient parentLocation is the very LocationEntity
+   * instance LocationService just re-keyed in place.
+   */
+  @EventListener
+  @Override
+  public synchronized void handleOwnLocationIdChangedEvent(OwnLocationIdChangedEvent event) {
+
+    ledgerRoot.changeLocationId(event.previousLocationId(), event.confirmedLocationId());
+    financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+  }
+
   // Re-verifies locationId+apiKey even though the security filter chain already authenticated
   // *some* location's credentials -- it never confirms those credentials belong to *this* path's
   // locationId. Mirrors LocationServiceImpl.requireValidLocation exactly.
@@ -164,6 +199,10 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
   public synchronized void addSplit() {
 
     JukeboxSplitPeriodEntity currentPeriod = ledgerRoot.getCurrentPeriod();
+    if (currentPeriod == null) {
+      throw new FinancialLedgerException(
+          "No open jukebox-split period -- addSplit() is not supported on a master instance");
+    }
     Instant now = Instant.now();
 
     PeriodTotals totals = computeTotals(currentPeriod.getStartDate(), now);
@@ -189,7 +228,9 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
   private void openNewPeriod(Instant startDate) {
 
     Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
-    ledgerRoot.addSplitPeriod(new JukeboxSplitPeriodEntity(persistentIdentity, startDate));
+    JukeboxSplitPeriodEntity period = new JukeboxSplitPeriodEntity(persistentIdentity, startDate);
+    period.setParentLocation(songLibraryService.getOwnLocation());
+    ledgerRoot.addSplitPeriod(period);
   }
 
   private JukeboxSplitPeriodDto liveSummaryOf(JukeboxSplitPeriodEntity openPeriod) {

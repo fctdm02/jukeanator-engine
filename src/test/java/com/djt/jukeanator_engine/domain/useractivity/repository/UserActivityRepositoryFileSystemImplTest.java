@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.useractivity.repository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -219,6 +220,69 @@ class UserActivityRepositoryFileSystemImplTest {
 
     // Must not throw even though the "activity" directory doesn't exist yet.
     repository.purgeOlderThan(Instant.now());
+  }
+
+  // ── changeLocationId ─────────────────────────────────────────────────────
+
+  @Test
+  void changeLocationId_movesDayFilesToNewDirectory_andRewritesEachLinesLocationId(
+      @TempDir Path basePath) throws Exception {
+
+    UserActivityRepositoryFileSystemImpl repository =
+        new UserActivityRepositoryFileSystemImpl(basePath.toString());
+
+    Instant today = Instant.now();
+    Instant yesterday = today.minusSeconds(86_400);
+    repository.record(recordAt(yesterday, "first"));
+    repository.record(recordAt(today, "second"));
+    repository.record(recordAt(today, "third"));
+
+    repository.changeLocationId(Integer.valueOf(1), Integer.valueOf(42));
+
+    Path activityDir = basePath.resolve("activity");
+    assertFalse(Files.exists(activityDir.resolve("location-1")),
+        "The old location directory should be removed once emptied");
+
+    List<UserActivityRecord> moved =
+        repository.findRecentActivity(Integer.valueOf(42), 10);
+    assertEquals(3, moved.size());
+    assertEquals("third", moved.get(0).details().get("label"));
+    assertEquals("second", moved.get(1).details().get("label"));
+    assertEquals("first", moved.get(2).details().get("label"));
+    for (UserActivityRecord record : moved) {
+      assertEquals(Integer.valueOf(42), record.locationId());
+    }
+    assertTrue(repository.findRecentActivity(Integer.valueOf(1), 10).isEmpty());
+  }
+
+  @Test
+  void changeLocationId_appendsToAnExistingDayFileUnderTheNewId_insteadOfOverwritingIt(
+      @TempDir Path basePath) throws Exception {
+
+    UserActivityRepositoryFileSystemImpl repository =
+        new UserActivityRepositoryFileSystemImpl(basePath.toString());
+
+    Instant occurredAt = Instant.now();
+    repository.record(recordAt(occurredAt, "old"));
+    repository.record(new UserActivityRecord(Integer.valueOf(42), UserActivitySource.SWING_UI,
+        "LOCAL", UserActivityType.TAB_NAVIGATION, occurredAt, Map.of("label", "new")));
+
+    repository.changeLocationId(Integer.valueOf(1), Integer.valueOf(42));
+
+    Path dayFile = basePath.resolve("activity").resolve("location-42")
+        .resolve(DAY_FORMATTER.format(occurredAt) + ".jsonl");
+    assertEquals(2, Files.readAllLines(dayFile).size());
+  }
+
+  @Test
+  void changeLocationId_isANoOp_whenNoActivityExistsUnderTheOldId(@TempDir Path basePath) {
+
+    UserActivityRepositoryFileSystemImpl repository =
+        new UserActivityRepositoryFileSystemImpl(basePath.toString());
+
+    repository.changeLocationId(Integer.valueOf(1), Integer.valueOf(42));
+
+    assertFalse(Files.exists(basePath.resolve("activity").resolve("location-42")));
   }
 
   private static UserActivityRecord recordAt(Instant occurredAt, String label) {

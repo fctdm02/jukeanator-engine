@@ -126,16 +126,24 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
     });
   }
 
+  // parent_location_id is sourced from the period's transient parentLocation (see
+  // JukeboxSplitPeriodEntity), same as SongLibraryRepositoryJpaImpl sourcing it from
+  // RootFolderEntity's. It never changes after insert, so merge() of an existing row leaves it be.
   private void insertNewPeriod(JukeboxSplitPeriodEntity period) {
 
+    requireNonNull(period.getParentLocation(),
+        "period.getParentLocation() cannot be null when storing via FinancialLedgerRepositoryJpaImpl");
+
     entityManager.createNativeQuery("insert into location_jukebox_split "
-        + "(persistent_identity, version, start_date, end_date, split_percentage_to_owner, "
-        + "cash_total, card_total, mobile_total, total_earned, amount_due_owner, "
-        + "amount_due_operator) "
-        + "values (:id, :version, :startDate, :endDate, :splitPercentageToOwner, :cashTotal, "
-        + ":cardTotal, :mobileTotal, :totalEarned, :amountDueOwner, :amountDueOperator)")
+        + "(persistent_identity, version, parent_location_id, start_date, end_date, "
+        + "split_percentage_to_owner, cash_total, card_total, mobile_total, total_earned, "
+        + "amount_due_owner, amount_due_operator) "
+        + "values (:id, :version, :parentLocationId, :startDate, :endDate, "
+        + ":splitPercentageToOwner, :cashTotal, :cardTotal, :mobileTotal, :totalEarned, "
+        + ":amountDueOwner, :amountDueOperator)")
         .setParameter("id", period.getPersistentIdentity())
         .setParameter("version", period.getVersion())
+        .setParameter("parentLocationId", period.getParentLocation().getPersistentIdentity())
         .setParameter("startDate", period.getStartDate())
         .setParameter("endDate", period.getEndDate())
         .setParameter("splitPercentageToOwner", period.getSplitPercentageToOwner())

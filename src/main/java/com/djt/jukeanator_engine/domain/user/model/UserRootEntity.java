@@ -50,5 +50,17 @@ public class UserRootEntity extends AbstractPersistentEntity {
 
     return this.users.remove(emailAddress);
   }
+
+  /**
+   * Re-tags every user's location-tagged state from {@code oldLocationId} to {@code newLocationId}
+   * -- the in-memory counterpart of {@code LocationRepositoryJpaImpl.changeLocationId}'s user
+   * table updates.
+   */
+  public void changeLocationId(Integer oldLocationId, Integer newLocationId) {
+
+    for (UserEntity user : this.users.values()) {
+      user.changeLocationId(oldLocationId, newLocationId);
+    }
+  }
 }
 

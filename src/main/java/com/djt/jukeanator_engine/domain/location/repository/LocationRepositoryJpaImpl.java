@@ -1,11 +1,13 @@
 package com.djt.jukeanator_engine.domain.location.repository;
 
 import static java.util.Objects.requireNonNull;
+import java.sql.Statement;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.Session;
 import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -127,6 +129,81 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
           .createNativeQuery("select next_val from persistent_identity_seq").getSingleResult();
       return Integer.valueOf(nextVal.intValue() - 1);
     });
+  }
+
+  /**
+   * storeAggregateRoot() alone would persist a re-keyed location as a delete of the old row plus an
+   * insert of the new one, and that delete is blocked by every foreign key referencing it. Instead
+   * this updates the primary key in place and re-points each referencing table explicitly, all in
+   * one transaction with foreign-key checks briefly disabled. That's required for song_library:
+   * its self-referencing fk_song_library_parent includes parent_location_id, so no row-by-row
+   * update order can satisfy it, and MySQL treats a cascade back into the same table as RESTRICT.
+   * With checks disabled MySQL performs no ON UPDATE CASCADE actions either, so every referencing
+   * table is updated explicitly here rather than relying on them.
+   */
+  @Override
+  public void changeLocationId(Integer oldLocationId, Integer newLocationId) {
+
+    requireNonNull(oldLocationId, "oldLocationId cannot be null");
+    requireNonNull(newLocationId, "newLocationId cannot be null");
+
+    if (oldLocationId.equals(newLocationId)) {
+      return;
+    }
+
+    transactionTemplate.executeWithoutResult(status -> {
+
+      // FOREIGN_KEY_CHECKS is session-scoped, and every native query in this transaction runs on
+      // the same connection -- restore it in finally so the pooled connection is never returned
+      // with checks still off. Both toggles go through plain JDBC on that connection (see
+      // setForeignKeyChecks), since Hibernate may refuse further queries once one of the updates
+      // below has failed.
+      setForeignKeyChecks(false);
+      try {
+        rekey("update location set id = :newId where id = :oldId", oldLocationId,
+            newLocationId);
+        rekey("update song_library set parent_location_id = :newId "
+            + "where parent_location_id = :oldId", oldLocationId, newLocationId);
+        rekey("update location_jukebox_split set parent_location_id = :newId "
+            + "where parent_location_id = :oldId", oldLocationId, newLocationId);
+        rekey("update song_queue_entries set location_id = :newId where location_id = :oldId",
+            oldLocationId, newLocationId);
+        // The remaining tables have no foreign key to location, but their rows are still tagged
+        // with this instance's own location id, so they must follow it too. Services holding
+        // copies of these rows in memory re-tag them on OwnLocationIdChangedEvent, so their next
+        // store doesn't write the previous id back over these updates.
+        for (String table : List.of("location_transaction", "user_song_play_history",
+            "user_playlist_song", "user_song_credit_usage", "user_activity",
+            "background_music_songs", "smart_background_music_songs")) {
+          rekey("update " + table + " set location_id = :newId where location_id = :oldId",
+              oldLocationId, newLocationId);
+        }
+        rekey("update smart_background_music_songs set source_location_id = :newId "
+            + "where source_location_id = :oldId", oldLocationId, newLocationId);
+      } finally {
+        setForeignKeyChecks(true);
+      }
+    });
+  }
+
+  // Runs directly on the JDBC connection bound to the current transaction (Session.doWork), so it
+  // always hits the same session the re-keying updates run on, and still works after one of them
+  // has failed.
+  private void setForeignKeyChecks(boolean enabled) {
+
+    entityManager.unwrap(Session.class).doWork(connection -> {
+      try (Statement statement = connection.createStatement()) {
+        statement.execute("set foreign_key_checks = " + (enabled ? 1 : 0));
+      }
+    });
+  }
+
+  private void rekey(String sql, Integer oldLocationId, Integer newLocationId) {
+
+    entityManager.createNativeQuery(sql)
+        .setParameter("oldId", oldLocationId)
+        .setParameter("newId", newLocationId)
+        .executeUpdate();
   }
 
   private void insertNewLocation(LocationEntity location) {

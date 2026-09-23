@@ -4,8 +4,10 @@ import static java.util.Objects.requireNonNull;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -47,8 +49,10 @@ public final class UserActivityRepositoryFileSystemImpl extends AbstractReposito
     this.activityDir = basePath + File.separator + "activity";
   }
 
+  // synchronized (like changeLocationId below) so an @Async append from UserActivityEventListener
+  // can never land in a location directory while that directory is being moved.
   @Override
-  public void record(UserActivityRecord record) {
+  public synchronized void record(UserActivityRecord record) {
 
     requireNonNull(record, "record cannot be null");
 
@@ -135,6 +139,79 @@ public final class UserActivityRepositoryFileSystemImpl extends AbstractReposito
 
     for (Path locationDir : locationDirs) {
       purgeExpiredDayFiles(locationDir, cutoffDay);
+    }
+  }
+
+  /**
+   * Moves every day-file from {@code location-<oldLocationId>} into {@code
+   * location-<newLocationId>}, rewriting each line's {@code locationId} along the way (the
+   * filesystem counterpart of the JPA {@code user_activity.location_id} update), then removes the
+   * old directory. A day-file that already exists under the new id (e.g. one appended to between
+   * the id change and this event) is appended to rather than overwritten, so nothing is lost --
+   * at worst that one day's lines end up out of chronological order. A malformed line is carried
+   * over verbatim, matching findRecentActivity's skip-don't-fail handling of one.
+   */
+  @Override
+  public synchronized void changeLocationId(Integer oldLocationId, Integer newLocationId) {
+
+    requireNonNull(oldLocationId, "oldLocationId cannot be null");
+    requireNonNull(newLocationId, "newLocationId cannot be null");
+
+    if (oldLocationId.equals(newLocationId)) {
+      return;
+    }
+
+    Path oldDir = Path.of(activityDir, "location-" + oldLocationId);
+    if (!Files.isDirectory(oldDir)) {
+      return;
+    }
+    Path newDir = Path.of(activityDir, "location-" + newLocationId);
+
+    List<Path> dayFiles;
+    try (Stream<Path> listing = Files.list(oldDir)) {
+      dayFiles = listing.filter(p -> p.getFileName().toString().endsWith(".jsonl"))
+          .sorted(Comparator.comparing((Path p) -> p.getFileName().toString()))
+          .toList();
+    } catch (IOException ioe) {
+      throw new UncheckedIOException("Could not list activity directory: " + oldDir, ioe);
+    }
+
+    try {
+      Files.createDirectories(newDir);
+
+      for (Path dayFile : dayFiles) {
+        List<String> rewritten = new ArrayList<>();
+        for (String line : Files.readAllLines(dayFile, StandardCharsets.UTF_8)) {
+          if (!line.isBlank()) {
+            rewritten.add(withLocationId(line, newLocationId));
+          }
+        }
+        Files.write(newDir.resolve(dayFile.getFileName()), rewritten, StandardCharsets.UTF_8,
+            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        Files.delete(dayFile);
+      }
+    } catch (IOException ioe) {
+      throw new UncheckedIOException(
+          "Could not move activity directory: " + oldDir + " to: " + newDir, ioe);
+    }
+
+    try {
+      Files.deleteIfExists(oldDir);
+    } catch (IOException ioe) {
+      // Something other than a day-file was left behind -- harmless, since only .jsonl files are
+      // ever read from a location directory.
+    }
+  }
+
+  private static String withLocationId(String line, Integer newLocationId) {
+
+    try {
+      UserActivityRecord record = MAPPER.readValue(line, UserActivityRecord.class);
+      return OBJECT_WRITER.writeValueAsString(new UserActivityRecord(newLocationId,
+          record.source(), record.username(), record.activityType(), record.occurredAt(),
+          record.details()));
+    } catch (IOException ioe) {
+      return line;
     }
   }
 

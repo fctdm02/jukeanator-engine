@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.backgroundmusic.service;
 
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
@@ -49,6 +50,11 @@ public class NoOpBackgroundMusicService implements BackgroundMusicService {
 
   @Override
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
+    // no-op
+  }
+
+  @Override
+  public void handleOwnLocationIdChangedEvent(OwnLocationIdChangedEvent event) {
     // no-op
   }
 

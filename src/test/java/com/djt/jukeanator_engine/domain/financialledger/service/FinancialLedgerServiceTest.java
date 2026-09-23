@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.financialledger.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -20,9 +21,14 @@ import org.springframework.context.ApplicationEventPublisher;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.financialledger.config.FinancialLedgerProperties;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
+import com.djt.jukeanator_engine.domain.financialledger.exception.FinancialLedgerException;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedgerRepository;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
@@ -63,6 +69,8 @@ class FinancialLedgerServiceTest {
     locationService = mock(LocationService.class);
 
     when(songLibraryService.getOwnLocationId()).thenReturn(OWN_LOCATION_ID);
+    when(songLibraryService.getOwnLocation()).thenReturn(
+        new LocationEntity(OWN_LOCATION_ID, "Own Location", null, null, "test-api-key-hash"));
     when(financialLedgerRepository.nextPersistentIdentity())
         .thenAnswer(invocation -> Integer.valueOf(nextId.getAndIncrement()));
 
@@ -97,15 +105,81 @@ class FinancialLedgerServiceTest {
   }
 
   @Test
+  void constructor_bootstrapsOpenPeriodWithOwnLocationAsParent() throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+
+    newService();
+
+    verify(financialLedgerRepository, times(1)).storeAggregateRoot(
+        org.mockito.ArgumentMatchers.argThat(root -> root.getCurrentPeriod() != null
+            && root.getCurrentPeriod().getParentLocation() != null
+            && OWN_LOCATION_ID.equals(
+                root.getCurrentPeriod().getParentLocation().getPersistentIdentity())));
+  }
+
+  @Test
   void constructor_doesNotOpenAnotherPeriod_whenLoadedRootAlreadyHasAnOpenOne() throws Exception {
 
     FinancialLedgerRootEntity existingRoot = new FinancialLedgerRootEntity();
-    existingRoot.addSplitPeriod(new JukeboxSplitPeriodEntity(Integer.valueOf(1), Instant.now()));
+    JukeboxSplitPeriodEntity existingPeriod =
+        new JukeboxSplitPeriodEntity(Integer.valueOf(1), Instant.now());
+    existingRoot.addSplitPeriod(existingPeriod);
     when(financialLedgerRepository.loadAggregateRoot(anyString())).thenReturn(existingRoot);
 
     newService();
 
     verify(financialLedgerRepository, never()).storeAggregateRoot(org.mockito.ArgumentMatchers.any());
+    assertEquals(OWN_LOCATION_ID, existingPeriod.getParentLocation().getPersistentIdentity(),
+        "A loaded period's transient parentLocation should be rewired to the own location");
+  }
+
+  @Test
+  void constructor_opensNoPeriod_onMasterWithNoOwnLocation() throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+    when(songLibraryService.getOwnLocationId()).thenReturn(null);
+    when(songLibraryService.getOwnLocation()).thenReturn(null);
+
+    FinancialLedgerServiceImpl service = newService();
+
+    verify(financialLedgerRepository, never()).storeAggregateRoot(org.mockito.ArgumentMatchers.any());
+    assertTrue(service.getAllPeriods().isEmpty());
+    assertThrows(FinancialLedgerException.class, service::addSplit);
+  }
+
+  // ── handleOwnLocationIdChangedEvent ─────────────────────────────────────
+
+  @Test
+  void handleOwnLocationIdChangedEvent_retagsOnlyTransactionsUnderThePreviousIdAndPersists()
+      throws Exception {
+
+    Integer otherLocationId = Integer.valueOf(99);
+    Integer confirmedLocationId = Integer.valueOf(42);
+
+    FinancialLedgerRootEntity existingRoot = new FinancialLedgerRootEntity();
+    existingRoot.addSplitPeriod(new JukeboxSplitPeriodEntity(Integer.valueOf(1), Instant.now()));
+    LocalCashTransactionEntity ownCash =
+        new LocalCashTransactionEntity(Integer.valueOf(2), 1, Instant.now(), OWN_LOCATION_ID);
+    LocalCashTransactionEntity otherCash =
+        new LocalCashTransactionEntity(Integer.valueOf(3), 1, Instant.now(), otherLocationId);
+    LocalCreditTransactionEntity ownCard =
+        new LocalCreditTransactionEntity(Integer.valueOf(4), 1, Instant.now(), OWN_LOCATION_ID);
+    existingRoot.addLocalCashTransaction(ownCash);
+    existingRoot.addLocalCashTransaction(otherCash);
+    existingRoot.addLocalCreditCardTransaction(ownCard);
+    when(financialLedgerRepository.loadAggregateRoot(anyString())).thenReturn(existingRoot);
+
+    FinancialLedgerServiceImpl service = newService();
+    service.handleOwnLocationIdChangedEvent(
+        new OwnLocationIdChangedEvent(OWN_LOCATION_ID, confirmedLocationId));
+
+    assertEquals(confirmedLocationId, ownCash.getLocationId());
+    assertEquals(confirmedLocationId, ownCard.getLocationId());
+    assertEquals(otherLocationId, otherCash.getLocationId());
+    verify(financialLedgerRepository, times(1)).storeAggregateRoot(existingRoot);
   }
 
   // ── recordLocalCashCredit / recordLocalCreditCardCredit ─────────────────
@@ -173,19 +247,6 @@ class FinancialLedgerServiceTest {
     assertEquals(new BigDecimal("10.00"), current.mobileTotal());
     assertEquals(new BigDecimal("10.00"), current.totalEarned());
     assertNull(current.amountDueOwner(), "Open period's owner/operator amounts stay unset until finalized");
-  }
-
-  @Test
-  void getAllPeriods_mobileTotalIsZero_whenOwnLocationIdUnknown() throws Exception {
-
-    when(financialLedgerRepository.loadAggregateRoot(anyString()))
-        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
-    when(songLibraryService.getOwnLocationId()).thenReturn(null);
-
-    FinancialLedgerServiceImpl service = newService();
-
-    JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
-    assertEquals(BigDecimal.ZERO.setScale(2), current.mobileTotal());
   }
 
   @Test

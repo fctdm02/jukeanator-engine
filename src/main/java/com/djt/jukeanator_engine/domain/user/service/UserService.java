@@ -7,6 +7,7 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsExce
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
@@ -224,6 +225,15 @@ public interface UserService {
    * @param event
    */
   void handleSongAddedToQueueEvent(SongAddedToQueueEvent event);
+
+  /**
+   * NOTE: System method, not to be invoked on behalf of a user. Re-tags every user's in-memory
+   * location-tagged state after this instance's own location id is corrected post-handshake.
+   *
+   * @param event
+   */
+  @PublicServiceMethod
+  void handleOwnLocationIdChangedEvent(OwnLocationIdChangedEvent event);
 
   /**
    * Same as {@link #handleSongAddedToQueueEvent(SongAddedToQueueEvent)}, but tags the resulting
