@@ -57,9 +57,8 @@ class LocationRepositoryJpaImplTest {
       { "user_playlist_song", "location_id" },
       { "user_song_credit_usage", "location_id" },
       { "user_activity", "location_id" },
-      { "background_music_songs", "location_id" },
-      { "smart_background_music_songs", "location_id" },
-      { "smart_background_music_songs", "source_location_id" } };
+      { "song_background_music", "location_id" },
+      { "song_background_music", "source_location_id" } };
 
   @Autowired
   private DataSource dataSource;
@@ -86,8 +85,7 @@ class LocationRepositoryJpaImplTest {
       execute("delete from location_jukebox_split where parent_location_id = ?", locationId);
       execute("delete from location_transaction where location_id = ?", locationId);
       execute("delete from user_activity where location_id = ?", locationId);
-      execute("delete from background_music_songs where location_id = ?", locationId);
-      execute("delete from smart_background_music_songs where location_id = ?", locationId);
+      execute("delete from song_background_music where location_id = ?", locationId);
     }
     execute("delete from user_song_play_history where user_id = ?", USER_ID);
     execute("delete from user_song_credit_usage where user_id = ?", USER_ID);
@@ -121,9 +119,9 @@ class LocationRepositoryJpaImplTest {
       String column = tableColumn[1];
       String sql = "select count(*) from " + table + " where " + column + " = ?";
       assertEquals(0, count(sql, OLD_LOCATION_ID), table + "." + column + " still has old id");
-      assertEquals(expectedRowsPerLocation(table), count(sql, NEW_LOCATION_ID),
+      assertEquals(expectedRowsPerLocation(table, column), count(sql, NEW_LOCATION_ID),
           table + "." + column + " rows were not re-pointed to the new id");
-      assertEquals(expectedRowsPerLocation(table), count(sql, OTHER_LOCATION_ID),
+      assertEquals(expectedRowsPerLocation(table, column), count(sql, OTHER_LOCATION_ID),
           table + "." + column + " rows under an unrelated location should be untouched");
     }
 
@@ -165,7 +163,7 @@ class LocationRepositoryJpaImplTest {
     for (String[] tableColumn : LOCATION_TAGGED_COLUMNS) {
       String table = tableColumn[0];
       String column = tableColumn[1];
-      assertEquals(expectedRowsPerLocation(table),
+      assertEquals(expectedRowsPerLocation(table, column),
           count("select count(*) from " + table + " where " + column + " = ?", OLD_LOCATION_ID),
           table + "." + column + " should be unchanged after a failed re-key");
     }
@@ -175,10 +173,17 @@ class LocationRepositoryJpaImplTest {
 
   // ── fixtures ─────────────────────────────────────────────────────────────
 
-  // song_library gets a parent/child pair per location (to exercise the self-referencing FK);
-  // every other table gets exactly one row.
-  private static int expectedRowsPerLocation(String table) {
-    return "song_library".equals(table) ? 2 : 1;
+  // song_library gets a parent/child pair per location (to exercise the self-referencing FK), and
+  // song_background_music a REGULAR and a SMART row (only the SMART row carries a
+  // source_location_id); every other table gets exactly one row.
+  private static int expectedRowsPerLocation(String table, String column) {
+    if ("song_library".equals(table)) {
+      return 2;
+    }
+    if ("song_background_music".equals(table) && "location_id".equals(column)) {
+      return 2;
+    }
+    return 1;
   }
 
   private void insertLocation(int locationId, String name) throws SQLException {
@@ -227,14 +232,15 @@ class LocationRepositoryJpaImplTest {
     execute("insert into user_activity (persistent_identity, location_id, source, username, "
         + "activity_type, occurred_at) values (?, ?, 'SWING_UI', 'LOCAL', 'TAB_NAVIGATION', ?)",
         id, locationId, now);
-    execute("insert into background_music_songs (persistent_identity, song_file_path, "
-        + "number_of_plays, location_id, album_id, song_id) values (?, 'rekey.mp3', 0, ?, 1, 1)",
-        id, locationId);
-    execute("insert into smart_background_music_songs (persistent_identity, song_file_path, "
+    execute("insert into song_background_music (persistent_identity, type, song_file_path, "
+        + "number_of_plays, location_id, album_id, song_id) "
+        + "values (?, 'REGULAR', 'rekey.mp3', 0, ?, 1, 1)", id, locationId);
+    // Shares song_background_music's primary-key space with the REGULAR row above.
+    execute("insert into song_background_music (persistent_identity, type, song_file_path, "
         + "number_of_plays, reason, location_id, album_id, song_id, source_location_id, "
         + "source_album_id, source_song_id) "
-        + "values (?, 'rekey-smart.mp3', 0, 'SAME_ARTIST', ?, 1, 1, ?, 1, 2)",
-        id, locationId, locationId);
+        + "values (?, 'SMART', 'rekey-smart.mp3', 0, 'SAME_ARTIST', ?, 1, 1, ?, 1, 2)",
+        id + 1000, locationId, locationId);
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────

@@ -13,18 +13,17 @@ import com.djt.jukeanator_engine.domain.backgroundmusic.model.SmartBackgroundMus
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 
 /**
- * JPA/Hibernate-backed implementation of {@link SmartBackgroundMusicRepository}, mapped to its
- * own {@code smart_background_music_songs} table -- see {@link
- * BackgroundMusicRepositoryJpaImpl}'s class javadoc for how the {@code TABLE_PER_CLASS} split
- * with {@link
- * com.djt.jukeanator_engine.domain.backgroundmusic.model.BackgroundMusicSongEntity} works.
- * {@link SmartBackgroundMusicSongEntity} has no subtypes of its own, so unlike the base-class
- * queries there, no {@code TYPE(...)} restriction is needed here -- every row in this table
- * belongs to this repository.
+ * JPA/Hibernate-backed implementation of {@link SmartBackgroundMusicRepository}, mapped to the
+ * {@code SMART} rows of the shared {@code song_background_music} table -- see {@link
+ * BackgroundMusicRepositoryJpaImpl}'s class javadoc for how the {@code SINGLE_TABLE} mapping with
+ * {@link com.djt.jukeanator_engine.domain.backgroundmusic.model.BackgroundMusicSongEntity} works.
+ * {@link SmartBackgroundMusicSongEntity} has no subtypes of its own, and Hibernate automatically
+ * restricts every subclass query and bulk update here to {@code type = 'SMART'}, so unlike the
+ * base-class queries there, no explicit {@code TYPE(...)} restriction is needed.
  *
  * <p>{@link #storeAll(List)} uses the same diff/orphan-delete shape {@code UserRepositoryJpaImpl}
- * uses for {@code storeAggregateRoot}. {@link #exists()} answers "has this table ever been
- * populated" the same way {@code SmartBackgroundMusicRepositoryFileSystemImpl.exists()} answers
+ * uses for {@code storeAggregateRoot}. {@link #exists()} answers "has any smart row ever been
+ * persisted" the same way {@code SmartBackgroundMusicRepositoryFileSystemImpl.exists()} answers
  * "does the persisted file exist" -- used by {@code BackgroundMusicServiceImpl} to decide whether
  * the smart-additions pool needs to be generated from scratch.
  *

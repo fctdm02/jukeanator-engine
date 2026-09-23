@@ -32,8 +32,10 @@ the corrected model.
    credits aren't location-coupled; a user can spend them at any location.
 3. **`AbstractLocationTransactionEntity` uses real JPA `@Inheritance(strategy = SINGLE_TABLE)`**
    with a `transaction_type` discriminator column. This is the first use of that pattern in the
-   codebase (the only existing `@Inheritance` use, on `BackgroundMusicSongEntity`, is deliberately
-   `TABLE_PER_CLASS` — no shared table, no discriminator — and `song_library`'s multi-type-
+   codebase (the only other `@Inheritance` use at the time, on `BackgroundMusicSongEntity`, was
+   `TABLE_PER_CLASS` — no shared table, no discriminator; it has since been moved to the same
+   `SINGLE_TABLE` pattern, in `song_background_music` with a `type` discriminator of `REGULAR` /
+   `SMART` — and `song_library`'s multi-type-
    single-table needs are handled by an entirely separate flat-mapping-class pattern, not JPA
    inheritance, for reasons specific to its tree structure). Standard single-table inheritance is
    the right fit here because `LocalCashTransactionEntity`/`LocalCreditTransactionEntity` are flat
@@ -42,7 +44,7 @@ the corrected model.
 4. **Table-name singularization is scoped to only the tables this change creates or renames**
    (`user_add_funds_transaction`, `user_song_credit_usage`, `location_transaction`) — not a
    sweep renaming every existing plural table (`local_cash_transactions`, `song_queue_entries`,
-   `background_music_songs`, etc.), which would be a large, separately-scoped, higher-risk change.
+   `background_music_songs` (since consolidated into `song_background_music`), etc.), which would be a large, separately-scoped, higher-risk change.
 5. **Pre-production schema convention is reused**: like the earlier "consolidate 17 migrations
    into V1" commit, there's no live production data to preserve, so this shipped first as its own
    `V2` migration dropping `local_cash_transactions`/`local_credit_transactions`/

@@ -5,11 +5,11 @@ import java.time.Instant;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
 /**
@@ -25,13 +25,15 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
  * included by virtue of their album, not because some other song seeded the pick.
  *
  * <p>
- * Own complete table ({@code smart_background_music_songs}) under {@link BackgroundMusicSongEntity}'s
- * {@code TABLE_PER_CLASS} inheritance -- see that class's javadoc.
+ * Shares {@link BackgroundMusicSongEntity}'s {@code song_background_music} table under its
+ * {@code SINGLE_TABLE} inheritance, discriminated by {@code type = 'SMART'} -- see that class's
+ * javadoc. {@code reason} is a nullable column (it is {@code NULL} on {@code REGULAR} rows); a
+ * table-level CHECK constraint requires it on every {@code SMART} row.
  *
  * @author tmyers
  */
 @Entity
-@Table(name = "smart_background_music_songs")
+@DiscriminatorValue("SMART")
 public class SmartBackgroundMusicSongEntity extends BackgroundMusicSongEntity {
 
   private static final long serialVersionUID = 1L;
@@ -43,12 +45,12 @@ public class SmartBackgroundMusicSongEntity extends BackgroundMusicSongEntity {
   private Integer sourceSongNumPlays; // sourceSong's play count as of when this pick was made
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "reason", nullable = false)
+  @Column(name = "reason")
   private SmartAdditionReason reason;
 
   // Referential counterpart to sourceSong -- see BackgroundMusicSongEntity.songIdentifier for the
   // same treatment of songFilePath. Attribute-overridden so its columns don't collide with the
-  // inherited songIdentifier embedding in this same table.
+  // inherited songIdentifier embedding in the shared table.
   @Embedded
   @AttributeOverrides({
       @AttributeOverride(name = "locationId", column = @Column(name = "source_location_id")),

@@ -174,11 +174,11 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
         // store doesn't write the previous id back over these updates.
         for (String table : List.of("location_transaction", "user_song_play_history",
             "user_playlist_song", "user_song_credit_usage", "user_activity",
-            "background_music_songs", "smart_background_music_songs")) {
+            "song_background_music")) {
           rekey("update " + table + " set location_id = :newId where location_id = :oldId",
               oldLocationId, newLocationId);
         }
-        rekey("update smart_background_music_songs set source_location_id = :newId "
+        rekey("update song_background_music set source_location_id = :newId "
             + "where source_location_id = :oldId", oldLocationId, newLocationId);
       } finally {
         setForeignKeyChecks(true);

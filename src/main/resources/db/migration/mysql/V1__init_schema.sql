@@ -183,41 +183,33 @@ CREATE TABLE song_queue_entries (
 
 CREATE INDEX ix_song_queue_entries_location_order ON song_queue_entries (location_id, queue_order);
 
--- Background-music storage, TABLE_PER_CLASS-mapped from BackgroundMusicSongEntity /
--- SmartBackgroundMusicSongEntity -- each table is a complete standalone schema (no shared parent
--- table, no discriminator column). location_id/album_id/song_id give JPA installs an ad-hoc,
--- unconstrained (no FK) reference back to song_library alongside the existing song_file_path,
+-- Background-music storage, SINGLE_TABLE-mapped from BackgroundMusicSongEntity /
+-- SmartBackgroundMusicSongEntity (like location_transaction), discriminated by type: 'REGULAR' for
+-- configured background-music songs, 'SMART' for dynamically selected smart additions. The
+-- smart-only columns (source_song, source_song_num_plays, reason, source_*_id) are NULL on REGULAR
+-- rows; the CHECK constraint still requires a reason on every SMART row. location_id/album_id/
+-- song_id (and source_location_id/source_album_id/source_song_id) give JPA installs an ad-hoc,
+-- unconstrained (no FK) reference back to song_library alongside song_file_path (and source_song),
 -- lazily backfilled by BackgroundMusicServiceImpl as it resolves songs.
-CREATE TABLE background_music_songs (
+CREATE TABLE song_background_music (
     persistent_identity INT PRIMARY KEY,
-    song_file_path        VARCHAR(1000) NOT NULL,
-    time_last_played        TIMESTAMP NULL,
-    number_of_plays           INT NOT NULL,
-    version                     INT NOT NULL DEFAULT 1,
-    date_added                   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    date_updated                   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    location_id                      INT NULL,
-    album_id                           INT NULL,
-    song_id                              INT NULL
-) ENGINE=InnoDB;
-
-CREATE TABLE smart_background_music_songs (
-    persistent_identity INT PRIMARY KEY,
-    song_file_path        VARCHAR(1000) NOT NULL,
-    time_last_played        TIMESTAMP NULL,
-    number_of_plays           INT NOT NULL,
-    source_song                 VARCHAR(1000),
-    source_song_num_plays         INT,
-    reason                          VARCHAR(255) NOT NULL,
-    version                           INT NOT NULL DEFAULT 1,
-    date_added                         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    date_updated                         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    location_id                            INT NULL,
-    album_id                                 INT NULL,
-    song_id                                    INT NULL,
-    source_location_id                           INT NULL,
-    source_album_id                                INT NULL,
-    source_song_id                                   INT NULL
+    type                  VARCHAR(20) NOT NULL,
+    song_file_path          VARCHAR(1000) NOT NULL,
+    time_last_played          TIMESTAMP NULL,
+    number_of_plays             INT NOT NULL,
+    source_song                   VARCHAR(1000) NULL,
+    source_song_num_plays           INT NULL,
+    reason                            VARCHAR(255) NULL,
+    version                             INT NOT NULL DEFAULT 1,
+    date_added                           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_updated                           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    location_id                              INT NULL,
+    album_id                                   INT NULL,
+    song_id                                      INT NULL,
+    source_location_id                             INT NULL,
+    source_album_id                                  INT NULL,
+    source_song_id                                     INT NULL,
+    CONSTRAINT ck_song_background_music_smart_reason CHECK (type <> 'SMART' OR reason IS NOT NULL)
 ) ENGINE=InnoDB;
 
 -- Financial Ledger / jukebox-split feature. Freestanding (not owned by another aggregate), but

@@ -19,21 +19,20 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
  *
  * <p>Unlike {@code UserRepository}, {@link BackgroundMusicRepository} has no root aggregate --
  * it already deals directly in {@code List<BackgroundMusicSongEntity>}, so {@link #loadAll()}/
- * {@link #storeAll(List)} map straight onto JPA queries against the {@code
- * background_music_songs} table, using the same diff/orphan-delete {@code storeAll} shape {@code
- * UserRepositoryJpaImpl} uses for {@code storeAggregateRoot}: every song still in the list is
- * merged, and any previously-persisted row that dropped out of it is explicitly deleted.
+ * {@link #storeAll(List)} map straight onto JPA queries against the {@code REGULAR} rows of the
+ * {@code song_background_music} table, using the same diff/orphan-delete {@code storeAll} shape
+ * {@code UserRepositoryJpaImpl} uses for {@code storeAggregateRoot}: every song still in the list
+ * is merged, and any previously-persisted row that dropped out of it is explicitly deleted.
  *
- * <p>{@link BackgroundMusicSongEntity} is the root of a {@code TABLE_PER_CLASS} inheritance
- * hierarchy shared with {@link
- * com.djt.jukeanator_engine.domain.backgroundmusic.model.SmartBackgroundMusicSongEntity} (own
- * table: {@code smart_background_music_songs}) -- each concrete subtype gets its own complete
- * table, mirroring the pre-existing split between {@code BackgroundMusicSongs.json} and {@code
- * SmartBackgroundMusicSongs.json}. Because {@code SmartBackgroundMusicSongEntity} is-a {@code
+ * <p>{@link BackgroundMusicSongEntity} is the root of a {@code SINGLE_TABLE} inheritance hierarchy
+ * shared with {@link
+ * com.djt.jukeanator_engine.domain.backgroundmusic.model.SmartBackgroundMusicSongEntity}: both
+ * persist to {@code song_background_music}, discriminated by {@code type} ({@code REGULAR} /
+ * {@code SMART}). Because {@code SmartBackgroundMusicSongEntity} is-a {@code
  * BackgroundMusicSongEntity}, a plain {@code from BackgroundMusicSongEntity} query would
- * polymorphically union in {@code smart_background_music_songs} rows too -- every query here is
- * explicitly restricted with {@code TYPE(s) = BackgroundMusicSongEntity} to avoid that.
- * {@link SmartBackgroundMusicRepositoryJpaImpl} owns the smart table exclusively.
+ * polymorphically include {@code SMART} rows too -- every query here is explicitly restricted with
+ * {@code TYPE(s) = BackgroundMusicSongEntity} (translated to {@code type = 'REGULAR'}) to avoid
+ * that. {@link SmartBackgroundMusicRepositoryJpaImpl} owns the {@code SMART} rows exclusively.
  *
  * <p>{@link #updatePlayStats(List, BackgroundMusicSongEntity)}/{@link
  * #resetAllPlayedTimestamps(List)} are targeted {@code UPDATE} statements for the common cases
