@@ -242,7 +242,7 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(
             "select f.package_id, f.credits_awarded, f.bonus_credits "
-                + "from user_add_funds_transaction f join users u on u.persistent_identity = f.user_id "
+                + "from user_add_funds_transaction f join user_account u on u.persistent_identity = f.user_id "
                 + "where u.email_address = ?")) {
 
       statement.setString(1, email);

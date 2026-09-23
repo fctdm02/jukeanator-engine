@@ -13,7 +13,7 @@ CREATE TABLE persistent_identity_seq (
 
 INSERT INTO persistent_identity_seq (next_val) VALUES (1);
 
-CREATE TABLE users (
+CREATE TABLE user_account (
     persistent_identity INT PRIMARY KEY,
     first_name          VARCHAR(255) NOT NULL,
     last_name            VARCHAR(255) NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE location (
     CONSTRAINT uq_location_name UNIQUE (name)
 ) ENGINE=InnoDB;
 
-CREATE TABLE playlists (
+CREATE TABLE user_playlist (
     persistent_identity INT PRIMARY KEY,
     user_id              INT,
     owner                  VARCHAR(255) NOT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE playlists (
     version                    INT NOT NULL DEFAULT 1,
     date_added                  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_playlists_user FOREIGN KEY (user_id) REFERENCES users (persistent_identity)
+    CONSTRAINT fk_user_playlist_user_account FOREIGN KEY (user_id) REFERENCES user_account (persistent_identity)
 ) ENGINE=InnoDB;
 
 -- @ElementCollection tables (UserEntity.songPlayHistory / .searchHistory, PlaylistEntity.songs)
@@ -73,23 +73,23 @@ CREATE TABLE user_song_play_history (
     album_id     INT,
     song_id       INT,
     location_id    INT,
-    CONSTRAINT fk_song_play_history_user FOREIGN KEY (user_id) REFERENCES users (persistent_identity)
+    CONSTRAINT fk_song_play_history_user_account FOREIGN KEY (user_id) REFERENCES user_account (persistent_identity)
 ) ENGINE=InnoDB;
 
 CREATE TABLE user_search_history (
     user_id      INT NOT NULL,
     search_order  INT NOT NULL,
     search_query   VARCHAR(500),
-    CONSTRAINT fk_search_history_user FOREIGN KEY (user_id) REFERENCES users (persistent_identity)
+    CONSTRAINT fk_search_history_user_account FOREIGN KEY (user_id) REFERENCES user_account (persistent_identity)
 ) ENGINE=InnoDB;
 
-CREATE TABLE playlist_songs (
+CREATE TABLE user_playlist_song (
     playlist_id INT NOT NULL,
     song_order   INT NOT NULL,
     album_id      INT,
     song_id        INT,
     location_id     INT,
-    CONSTRAINT fk_playlist_songs_playlist FOREIGN KEY (playlist_id) REFERENCES playlists (persistent_identity)
+    CONSTRAINT fk_user_playlist_song_playlist FOREIGN KEY (playlist_id) REFERENCES user_playlist (persistent_identity)
 ) ENGINE=InnoDB;
 
 -- Append-only user-spend credit history: a user spending already-owned song credits to queue a
@@ -108,7 +108,7 @@ CREATE TABLE user_song_credit_usage (
     version                             INT NOT NULL DEFAULT 1,
     date_added                           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_user_song_credit_usage_user FOREIGN KEY (user_id) REFERENCES users (persistent_identity)
+    CONSTRAINT fk_user_song_credit_usage_user_account FOREIGN KEY (user_id) REFERENCES user_account (persistent_identity)
 ) ENGINE=InnoDB;
 
 -- Append-only record of a user obtaining song credits with real money (via PaymentGateway, e.g.
@@ -127,7 +127,7 @@ CREATE TABLE user_add_funds_transaction (
     version                                INT NOT NULL DEFAULT 1,
     date_added                               TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                               TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_user_add_funds_transaction_user FOREIGN KEY (user_id) REFERENCES users (persistent_identity)
+    CONSTRAINT fk_user_add_funds_transaction_user_account FOREIGN KEY (user_id) REFERENCES user_account (persistent_identity)
 ) ENGINE=InnoDB;
 
 -- Multi-tenant song library storage: every location's catalog lives in this one table,

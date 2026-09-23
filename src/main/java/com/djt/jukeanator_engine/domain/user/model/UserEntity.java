@@ -27,7 +27,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
 @Entity
-@Table(name = "users")
+@Table(name = "user_account")
 public class UserEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;

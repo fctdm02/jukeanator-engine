@@ -29,7 +29,7 @@ import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
  * <p>{@link UserRootEntity} is <strong>not</strong> JPA-mapped -- there is no {@code user_root}
  * table. It exists purely as an in-memory aggregate, exactly like {@link
  * UserRepositoryFileSystemImpl} treats it, so relational storage isn't saddled with a singleton
- * "root" row whose only job is to own the {@code users} table. {@link #loadOrCreateRoot()} loads
+ * "root" row whose only job is to own the {@code user_account} table. {@link #loadOrCreateRoot()} loads
  * every {@link UserEntity} row directly and assembles the root around them; {@link
  * #storeAggregateRoot(UserRootEntity)} persists every user still in the root and explicitly
  * deletes any row that dropped out of it (e.g. {@code UserServiceImpl.deleteAccount()}), since
@@ -105,7 +105,7 @@ public final class UserRepositoryJpaImpl implements UserRepository {
       // A brand-new UserEntity still carries the placeholder persistentIdentity that
       // UserServiceImpl/UserEntity assign for the filesystem-repository's benefit (there's no DB
       // there to generate one) -- e.g. userRoot.getUsers().size() + 1. That placeholder is
-      // meaningless here: merge()-ing an entity whose id doesn't yet exist in `users` makes
+      // meaningless here: merge()-ing an entity whose id doesn't yet exist in `user_account` makes
       // Hibernate assume the row must already exist and issue an UPDATE instead of an INSERT,
       // which matches zero rows and throws OptimisticLockException ("...or unsaved-value mapping
       // was incorrect"). persist() instead lets the real @GeneratedValue(SEQUENCE) on

@@ -6,7 +6,6 @@ The following was discovered as part of building this project:
 # Building/Running the Application
 ```
 mvn clean package -DskipTests
-./mvnw clean package -DskipTests
 java --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar jukeanator-engine-0.0.1-SNAPSHOT.war
 ```
 
@@ -38,6 +37,22 @@ sudo systemctl start docker
 Setting up MySQL database for first time use:
 
 ```
+DROP DATABASE IF EXISTS jukeanator;
+
+CREATE DATABASE jukeanator CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+DROP DATABASE IF EXISTS jukeanator_test;
+
+CREATE DATABASE jukeanator_test CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+GRANT ALL PRIVILEGES ON jukeanator.* TO 'jukeanator'@'localhost';
+
+GRANT ALL PRIVILEGES ON jukeanator_test.* TO 'jukeanator'@'localhost';
+
+FLUSH PRIVILEGES;
+
+
+
 CREATE DATABASE IF NOT EXISTS jukeanator;
 
 CREATE USER IF NOT EXISTS 'jukeanator'@'%' IDENTIFIED BY 'password';

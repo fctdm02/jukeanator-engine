@@ -15,7 +15,7 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
 @Entity
-@Table(name = "playlists")
+@Table(name = "user_playlist")
 public class PlaylistEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
@@ -37,7 +37,7 @@ public class PlaylistEntity extends AbstractPersistentEntity {
   private String name;
 
   @ElementCollection(fetch = FetchType.EAGER)
-  @CollectionTable(name = "playlist_songs", joinColumns = @JoinColumn(name = "playlist_id"))
+  @CollectionTable(name = "user_playlist_song", joinColumns = @JoinColumn(name = "playlist_id"))
   @OrderColumn(name = "song_order")
   private List<SongIdentifier> songs;
 
