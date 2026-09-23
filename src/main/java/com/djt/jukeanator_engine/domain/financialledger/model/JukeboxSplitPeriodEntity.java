@@ -14,7 +14,7 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
  * {@code null} here until {@link #finalizePeriod} locks them in.
  */
 @Entity
-@Table(name = "jukebox_split_period")
+@Table(name = "location_jukebox_split")
 public class JukeboxSplitPeriodEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;

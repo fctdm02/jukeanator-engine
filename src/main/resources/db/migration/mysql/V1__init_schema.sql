@@ -220,7 +220,7 @@ CREATE TABLE smart_background_music_songs (
 ) ENGINE=InnoDB;
 
 -- Financial Ledger / jukebox-split feature. Freestanding (not owned by another aggregate).
-CREATE TABLE jukebox_split_period (
+CREATE TABLE location_jukebox_split (
     persistent_identity INT PRIMARY KEY,
     version               INT NOT NULL DEFAULT 1,
     start_date              TIMESTAMP NOT NULL,

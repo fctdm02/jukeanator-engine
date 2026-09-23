@@ -128,7 +128,7 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
 
   private void insertNewPeriod(JukeboxSplitPeriodEntity period) {
 
-    entityManager.createNativeQuery("insert into jukebox_split_period "
+    entityManager.createNativeQuery("insert into location_jukebox_split "
         + "(persistent_identity, version, start_date, end_date, split_percentage_to_owner, "
         + "cash_total, card_total, mobile_total, total_earned, amount_due_owner, "
         + "amount_due_operator) "
