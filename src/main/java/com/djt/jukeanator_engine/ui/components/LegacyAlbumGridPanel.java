@@ -305,16 +305,23 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
     }
 
     JScrollPane scroll = new JScrollPane(trackList, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-        JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
     scroll.setOpaque(true);
     scroll.setBackground(Color.BLACK);
     scroll.getViewport().setOpaque(true);
     scroll.getViewport().setBackground(Color.BLACK);
     scroll.setBorder(null);
     scroll.getVerticalScrollBar().setUnitIncrement(profile.trackRowH());
+    scroll.getHorizontalScrollBar().setUnitIncrement(profile.trackRowH());
     // Touch screens need a much wider, easier-to-grab scroll bar than the look and feel's
     // mouse-sized default.
     scroll.getVerticalScrollBar().setUI(new TouchScrollBarUI());
+    scroll.getHorizontalScrollBar().setUI(new TouchScrollBarUI());
+    // Fill the bottom-right gap left when both scroll bars are showing, so it matches the black
+    // tracks rather than the look and feel's default corner color.
+    JPanel corner = new JPanel();
+    corner.setBackground(Color.BLACK);
+    scroll.setCorner(JScrollPane.LOWER_RIGHT_CORNER, corner);
 
     JPanel content = new JPanel(new BorderLayout(0, 0));
     content.setOpaque(false);
@@ -382,14 +389,21 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
   /** One clickable "NN. Song Title" row — tapping it queues the song directly. */
   private JPanel buildTrackRow(SongDto song) {
 
+    // Preferred width is the row's natural content width (indicator + full track text), not
+    // Integer.MAX_VALUE, so the enclosing scroll pane can show a horizontal scroll bar only when a
+    // long track name doesn't fit. The maximum width stays unbounded so BoxLayout still stretches
+    // every row to the full viewport width (keeping the hover highlight edge-to-edge).
     JPanel row = new JPanel(new BorderLayout(4, 0)) {
       private static final long serialVersionUID = 1L;
+
+      @Override
+      public Dimension getPreferredSize() {
+        return new Dimension(super.getPreferredSize().width, profile.trackRowH());
+      }
     };
     row.setOpaque(false);
     row.setBorder(new EmptyBorder(1, 4, 1, 4));
-    Dimension rowSize = new Dimension(Integer.MAX_VALUE, profile.trackRowH());
-    row.setPreferredSize(rowSize);
-    row.setMaximumSize(rowSize);
+    row.setMaximumSize(new Dimension(Integer.MAX_VALUE, profile.trackRowH()));
     row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     // ── Indicator (WEST), directly to the left of the track text: a red play icon when this

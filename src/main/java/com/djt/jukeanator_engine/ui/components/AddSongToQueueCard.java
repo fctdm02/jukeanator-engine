@@ -261,7 +261,7 @@ public class AddSongToQueueCard extends JPanel {
 
     JLabel songName = new JLabel(song.songName() != null ? song.songName() : "");
     songName.setForeground(ColorTheme.get().textPrimary);
-    songName.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongTitle));
+    songName.setFont(fitTitleFont(songName, songName.getText(), infoTextWidth()));
 
     JLabel artistName = new JLabel(song.artistName() != null ? song.artistName() : "");
     artistName.setForeground(ColorTheme.get().textPrimary);
@@ -286,6 +286,32 @@ public class AddSongToQueueCard extends JPanel {
     row.add(text, BorderLayout.CENTER);
 
     return row;
+  }
+
+  /**
+   * Width available to the info row's text column: the card width minus the outer border panel's
+   * 2px inset, the main panel's 28px side padding, the cover art, and the 24px cover/text gap.
+   */
+  private static int infoTextWidth() {
+    LayoutTheme lt = LayoutTheme.get();
+    return lt.addSongCardW - 2 * 2 - 2 * 28 - lt.addSongCoverSize - 24;
+  }
+
+  /**
+   * Returns the largest bold title font, from {@link LayoutTheme#fontSizeAddSongTitle} down to
+   * {@link LayoutTheme#fontSizeAddSongTitleMin}, at which {@code text} fits within
+   * {@code maxWidth}. Titles still too long at the minimum size fall back to the label's own "..."
+   * truncation rather than shrinking further.
+   */
+  private static Font fitTitleFont(JLabel label, String text, int maxWidth) {
+    LayoutTheme lt = LayoutTheme.get();
+    for (int size = lt.fontSizeAddSongTitle; size > lt.fontSizeAddSongTitleMin; size--) {
+      Font font = new Font(Font.SANS_SERIF, Font.BOLD, size);
+      if (label.getFontMetrics(font).stringWidth(text) <= maxWidth) {
+        return font;
+      }
+    }
+    return new Font(Font.SANS_SERIF, Font.BOLD, lt.fontSizeAddSongTitleMin);
   }
 
   private JPanel buildDivider() {

@@ -2282,6 +2282,7 @@ public class LayoutTheme {
 
   // Queue / overlay cards
   public final int fontSizeAddSongTitle = 32; // AddSongToQueueCard song title
+  public final int fontSizeAddSongTitleMin = 22; // floor when shrinking a long title to fit
   public final int fontSizeAddSongArtist = 22; // AddSongToQueueCard artist / album
   public final int fontSizeQueueBtn; // SongQueueCard action buttons
   public final int fontSizeQueueCancelBtn; // SongQueueCard cancel button
