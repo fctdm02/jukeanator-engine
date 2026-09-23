@@ -98,8 +98,15 @@ public final class BackgroundMusicRepositoryJpaImpl implements BackgroundMusicRe
         }
       }
 
+      // New songs are persisted (not merged) so the generated persistentIdentity is assigned to
+      // the caller's own instance -- merge() would only assign it to a managed copy, leaving the
+      // service's in-memory entity with a null id and its later play-stat updates silently lost.
       for (BackgroundMusicSongEntity song : songs) {
-        entityManager.merge(song);
+        if (song.getPersistentIdentity() == null) {
+          entityManager.persist(song);
+        } else {
+          entityManager.merge(song);
+        }
       }
     });
   }

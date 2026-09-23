@@ -89,8 +89,14 @@ public final class SmartBackgroundMusicRepositoryJpaImpl implements SmartBackgro
         }
       }
 
+      // New songs are persisted (not merged) so the generated persistentIdentity is assigned to
+      // the caller's own instance -- see BackgroundMusicRepositoryJpaImpl.storeAll.
       for (SmartBackgroundMusicSongEntity song : songs) {
-        entityManager.merge(song);
+        if (song.getPersistentIdentity() == null) {
+          entityManager.persist(song);
+        } else {
+          entityManager.merge(song);
+        }
       }
     });
   }
