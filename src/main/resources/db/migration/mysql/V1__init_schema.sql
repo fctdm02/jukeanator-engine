@@ -167,7 +167,7 @@ CREATE INDEX ix_song_library_location_name ON song_library (parent_location_id, 
 
 -- Holds every location's live queue -- there is no separate "song queue root" row;
 -- SongQueueRootEntity is reassembled in memory from these rows ordered by queue_order.
-CREATE TABLE song_queue_entries (
+CREATE TABLE song_queue (
     persistent_identity INT PRIMARY KEY,
     location_id          INT NOT NULL,
     album_id                INT NOT NULL,
@@ -178,10 +178,10 @@ CREATE TABLE song_queue_entries (
     queued_at_time                    TIMESTAMP NOT NULL,
     date_added                          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_song_queue_entries_location FOREIGN KEY (location_id) REFERENCES location (id)
+    CONSTRAINT fk_song_queue_location FOREIGN KEY (location_id) REFERENCES location (id)
 ) ENGINE=InnoDB;
 
-CREATE INDEX ix_song_queue_entries_location_order ON song_queue_entries (location_id, queue_order);
+CREATE INDEX ix_song_queue_location_order ON song_queue (location_id, queue_order);
 
 -- Background-music storage, SINGLE_TABLE-mapped from BackgroundMusicSongEntity /
 -- SmartBackgroundMusicSongEntity (like location_transaction), discriminated by type: 'REGULAR' for

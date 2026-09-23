@@ -50,7 +50,7 @@ class LocationRepositoryJpaImplTest {
   // Every non-FK location-tagged column changeLocationId() re-points, as {table, column}.
   private static final String[][] LOCATION_TAGGED_COLUMNS = {
       { "song_library", "parent_location_id" },
-      { "song_queue_entries", "location_id" },
+      { "song_queue", "location_id" },
       { "location_jukebox_split", "parent_location_id" },
       { "location_transaction", "location_id" },
       { "user_song_play_history", "location_id" },
@@ -81,7 +81,7 @@ class LocationRepositoryJpaImplTest {
     for (Integer locationId : locationIds) {
       // Children before parents; song_library's own self-reference cascades on delete.
       execute("delete from song_library where parent_location_id = ?", locationId);
-      execute("delete from song_queue_entries where location_id = ?", locationId);
+      execute("delete from song_queue where location_id = ?", locationId);
       execute("delete from location_jukebox_split where parent_location_id = ?", locationId);
       execute("delete from location_transaction where location_id = ?", locationId);
       execute("delete from user_activity where location_id = ?", locationId);
@@ -214,7 +214,7 @@ class LocationRepositoryJpaImplTest {
         + "class_discriminator) values (1, 'C:\\\\Music', ?, null, 'ROOT')", locationId);
     execute("insert into song_library (id, name, parent_location_id, parent_folder_id, "
         + "class_discriminator) values (2, 'Rock', ?, 1, 'FOLDER')", locationId);
-    execute("insert into song_queue_entries (persistent_identity, location_id, album_id, "
+    execute("insert into song_queue (persistent_identity, location_id, album_id, "
         + "song_id, queue_order, username, priority, queued_at_time) "
         + "values (?, ?, 1, 1, 0, 'LOCAL', 0, ?)", id, locationId, now);
     execute("insert into location_jukebox_split (persistent_identity, parent_location_id, "

@@ -15,7 +15,7 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
 /**
- * Flat JPA persistence row for the {@code song_queue_entries} table -- see {@link
+ * Flat JPA persistence row for the {@code song_queue} table -- see {@link
  * SongQueueRepositoryJpaImpl}'s class javadoc for why {@link
  * com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity} isn't JPA-mapped
  * directly. Reuses {@link SongIdentifier} (already {@code @Embeddable}, and already used by {@code
@@ -25,7 +25,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
  * @author tmyers
  */
 @Entity
-@Table(name = "song_queue_entries")
+@Table(name = "song_queue")
 public class SongQueueEntryJpaEntity {
 
   @Id

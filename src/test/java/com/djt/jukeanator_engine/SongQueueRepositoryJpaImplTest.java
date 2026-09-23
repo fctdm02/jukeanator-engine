@@ -51,7 +51,7 @@ import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository
  * context) against a mocked {@link SongLibraryService}, letting each test pin down exactly which
  * locationId and library fixture it's exercising without needing a real filesystem scan.
  *
- * <p>{@code app.repository-type=jpa} is set so {@code song_queue_entries.location_id}'s
+ * <p>{@code app.repository-type=jpa} is set so {@code song_queue.location_id}'s
  * {@code NOT NULL} foreign key into {@code location} (see {@code
  * db/migration/mysql/V1__init_schema.sql}) has a real row to point at, exactly as
  * {@code SongLibraryRepositoryJpaImplTest} does for the song-library tables' same FK; it also
@@ -402,7 +402,7 @@ class SongQueueRepositoryJpaImplTest {
     java.util.Set<Integer> ids = new java.util.HashSet<>();
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(
-            "select persistent_identity from song_queue_entries where location_id = ?")) {
+            "select persistent_identity from song_queue where location_id = ?")) {
 
       statement.setInt(1, locationId);
       try (ResultSet resultSet = statement.executeQuery()) {

@@ -43,7 +43,7 @@ the corrected model.
    doesn't exist for these two.
 4. **Table-name singularization is scoped to only the tables this change creates or renames**
    (`user_add_funds_transaction`, `user_song_credit_usage`, `location_transaction`) — not a
-   sweep renaming every existing plural table (`local_cash_transactions`, `song_queue_entries`,
+   sweep renaming every existing plural table (`local_cash_transactions`, `song_queue_entries` (since renamed to `song_queue`),
    `background_music_songs` (since consolidated into `song_background_music`), etc.), which would be a large, separately-scoped, higher-risk change.
 5. **Pre-production schema convention is reused**: like the earlier "consolidate 17 migrations
    into V1" commit, there's no live production data to preserve, so this shipped first as its own

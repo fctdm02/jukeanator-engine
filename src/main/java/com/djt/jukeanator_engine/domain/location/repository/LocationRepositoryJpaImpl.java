@@ -166,7 +166,7 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
             + "where parent_location_id = :oldId", oldLocationId, newLocationId);
         rekey("update location_jukebox_split set parent_location_id = :newId "
             + "where parent_location_id = :oldId", oldLocationId, newLocationId);
-        rekey("update song_queue_entries set location_id = :newId where location_id = :oldId",
+        rekey("update song_queue set location_id = :newId where location_id = :oldId",
             oldLocationId, newLocationId);
         // The remaining tables have no foreign key to location, but their rows are still tagged
         // with this instance's own location id, so they must follow it too. Services holding
