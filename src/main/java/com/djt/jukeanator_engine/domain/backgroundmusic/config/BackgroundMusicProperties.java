@@ -26,7 +26,9 @@ public class BackgroundMusicProperties {
   private int smartBackgroundMusicMinPlays = 0; // minimum number of song plays a candidate must
                                                   // have to be eligible as a smart addition
   private double smartBackgroundMusicFavoriteAlbumsPercentage = 20; // target % of the smart pool
-                                                                     // made up of songs from
+                                                                     // (BackgroundMusic.TXT song
+                                                                     // count x factor) made up of
+                                                                     // songs from
                                                                      // SmartBackgroundMusicAlbumInclusions.TXT
 
   public boolean isEnableBackgroundMusic() {

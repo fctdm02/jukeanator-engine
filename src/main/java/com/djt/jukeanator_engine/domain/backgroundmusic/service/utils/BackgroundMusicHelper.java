@@ -53,8 +53,10 @@ public class BackgroundMusicHelper extends FileSystemHelper {
    * {@code SmartAdditionReason.SONG_FROM_FAVORITE_ALBUM}). Each line is matched against the
    * library by path <em>suffix</em> (see {@code BackgroundMusicServiceImpl#isFavoriteAlbum}), so
    * it need not be the album's full absolute filesystem path — anything from a bare
-   * {@code Genre/Artist/Album} up to the full path works. The file is optional: if it does not
-   * exist, an empty list is returned (no favorite albums).
+   * {@code Genre/Artist/Album} up to the full path works. An album whose genre is listed in
+   * {@value #SMART_BACKGROUND_MUSIC_GENRE_EXCLUSIONS_FILENAME} is ignored — the genre exclusion
+   * takes precedence. The file is optional: if it does not exist, an empty list is returned (no
+   * favorite albums).
    */
   public List<String> readSmartBackgroundMusicAlbumInclusions(String rootPath) throws IOException {
 
