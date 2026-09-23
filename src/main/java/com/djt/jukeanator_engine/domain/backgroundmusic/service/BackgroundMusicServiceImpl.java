@@ -203,6 +203,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     List<String> playlistPaths = backgroundMusicHelper.readBackgroundMusicPlaylist(this.dataDir)
         .stream()
         .map(backgroundMusicHelper::normalizeDriveLetterBackslashes)
+        .distinct()
         .collect(Collectors.toList());
     this.currentPlaylistPaths = new HashSet<>(playlistPaths);
 
@@ -1143,9 +1144,13 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
   private void reinitializeAfterRescan() throws IOException {
 
+    // distinct(): a path listed more than once in BackgroundMusic.TXT must still yield a single
+    // entity -- otherwise only the last duplicate is reachable via normalizedPathToId, and the
+    // earlier one can never be marked played, so the not-played pool never empties.
     List<String> playlistPaths = backgroundMusicHelper.readBackgroundMusicPlaylist(this.dataDir)
         .stream()
         .map(backgroundMusicHelper::normalizeDriveLetterBackslashes)
+        .distinct()
         .collect(Collectors.toList());
     this.currentPlaylistPaths = new HashSet<>(playlistPaths);
 
