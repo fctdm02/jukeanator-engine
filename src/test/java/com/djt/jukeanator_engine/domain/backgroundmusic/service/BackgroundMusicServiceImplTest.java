@@ -2,7 +2,9 @@ package com.djt.jukeanator_engine.domain.backgroundmusic.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.clearInvocations;
@@ -28,11 +30,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import com.djt.jukeanator_engine.domain.backgroundmusic.config.BackgroundMusicProperties;
+import com.djt.jukeanator_engine.domain.backgroundmusic.exception.BackgroundMusicServiceException;
 import com.djt.jukeanator_engine.domain.backgroundmusic.model.BackgroundMusicSongEntity;
 import com.djt.jukeanator_engine.domain.backgroundmusic.model.SmartAdditionReason;
 import com.djt.jukeanator_engine.domain.backgroundmusic.model.SmartBackgroundMusicSongEntity;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.BackgroundMusicRepository;
 import com.djt.jukeanator_engine.domain.backgroundmusic.repository.SmartBackgroundMusicRepository;
+import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
@@ -55,6 +59,10 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
  *
  * <p>The smart-addition pool sizing tests instead stub {@code exists()} false and a mocked library
  * root, so startup builds the smart pool, and assert on what it stores.
+ *
+ * <p>The play-cycle tests stub the library root only after construction (so selection resolves
+ * songs by path) and drive {@code getNextSong()}/{@code getNextSmartAdditionSong()} followed by
+ * {@code markSongQueued()}, the same sequence {@code SongQueueServiceImpl.autoPopulateQueue} uses.
  *
  * @author tmyers
  */
@@ -537,5 +545,183 @@ class BackgroundMusicServiceImplTest {
         "number of regular songs contributing smart additions");
     assertTrue(countBySource.values().stream().allMatch(count -> count <= factor),
         "no regular song contributes more than factor smart additions");
+  }
+
+  // ── play cycles ──────────────────────────────────────────────────────────
+
+  private static final String UNRESOLVABLE_PATH = "/music/Gone/Deleted.mp3";
+
+  private static List<String> cyclePaths(String prefix, int count) {
+
+    List<String> paths = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      paths.add("/music/" + prefix + "/song" + i + ".mp3");
+    }
+    return paths;
+  }
+
+  /**
+   * Stubs the song library root so every path in {@code resolvablePaths} resolves to a song whose
+   * natural identity is that path, and every path in {@code unresolvablePaths} throws. Done after
+   * construction, so startup's identifier backfill is skipped and resolution stays path-based.
+   */
+  private void stubLibrary(List<String> resolvablePaths, List<String> unresolvablePaths)
+      throws Exception {
+
+    RootFolderEntity root = mock(RootFolderEntity.class);
+    for (String path : resolvablePaths) {
+      SongFileEntity song = mock(SongFileEntity.class);
+      when(song.getNaturalIdentity()).thenReturn(path);
+      when(root.getSongByPath(path)).thenReturn(song);
+    }
+    for (String path : unresolvablePaths) {
+      when(root.getSongByPath(path))
+          .thenThrow(new EntityDoesNotExistException("No song at " + path));
+    }
+    when(songLibraryService.getSongLibraryRoot(PREVIOUS_LOCATION_ID)).thenReturn(root);
+  }
+
+  private BackgroundMusicServiceImpl newRegularCycleService(List<String> paths)
+      throws Exception {
+
+    Files.write(dataDir.resolve("BackgroundMusic.TXT"), paths);
+    List<BackgroundMusicSongEntity> songs = new ArrayList<>();
+    for (int i = 0; i < paths.size(); i++) {
+      songs.add(song(i + 1, paths.get(i), null));
+    }
+    when(backgroundMusicRepository.loadAll()).thenReturn(songs);
+    return newService();
+  }
+
+  private BackgroundMusicServiceImpl newSmartCycleService(List<String> paths) throws Exception {
+
+    Files.write(dataDir.resolve("BackgroundMusic.TXT"), List.of());
+    List<SmartBackgroundMusicSongEntity> songs = new ArrayList<>();
+    for (int i = 0; i < paths.size(); i++) {
+      songs.add(smartSong(i + 1, paths.get(i), null, null));
+    }
+    when(smartBackgroundMusicRepository.loadAll()).thenReturn(songs);
+    return newService();
+  }
+
+  @Test
+  void regularCycle_picksEverySongOnceBeforeResetting() throws Exception {
+
+    List<String> paths = cyclePaths("Regular", 5);
+    BackgroundMusicServiceImpl service = newRegularCycleService(paths);
+    stubLibrary(paths, List.of());
+
+    for (int cycle = 0; cycle < 3; cycle++) {
+
+      Set<String> picked = new HashSet<>();
+      for (int i = 0; i < paths.size(); i++) {
+        SongFileEntity song = service.getNextSong();
+        assertTrue(picked.add(song.getNaturalIdentity()),
+            "a song already played this cycle must not be picked again: "
+                + song.getNaturalIdentity());
+        service.markSongQueued(song);
+      }
+      assertEquals(new HashSet<>(paths), picked, "every song is picked once per cycle");
+      verify(backgroundMusicRepository, times(cycle)).resetAllPlayedTimestamps(anyList());
+    }
+  }
+
+  @Test
+  void regularCycle_resets_whenOnlyUnresolvableSongsRemain() throws Exception {
+
+    List<String> resolvable = cyclePaths("Regular", 2);
+    List<String> paths = new ArrayList<>(resolvable);
+    paths.add(UNRESOLVABLE_PATH);
+    BackgroundMusicServiceImpl service = newRegularCycleService(paths);
+    stubLibrary(resolvable, List.of(UNRESOLVABLE_PATH));
+
+    Set<String> picked = new HashSet<>();
+    for (int i = 0; i < resolvable.size(); i++) {
+      SongFileEntity song = service.getNextSong();
+      assertTrue(picked.add(song.getNaturalIdentity()));
+      service.markSongQueued(song);
+    }
+    assertEquals(new HashSet<>(resolvable), picked);
+    verify(backgroundMusicRepository, never()).resetAllPlayedTimestamps(anyList());
+
+    // Only the unresolvable song is left: it is skipped, the cycle resets, and a resolvable song
+    // is returned instead of the call failing.
+    SongFileEntity next = service.getNextSong();
+
+    assertTrue(resolvable.contains(next.getNaturalIdentity()));
+    verify(backgroundMusicRepository, times(1)).resetAllPlayedTimestamps(anyList());
+  }
+
+  @Test
+  void regularCycle_stillFails_whenEverySongIsUnresolvable() throws Exception {
+
+    List<String> paths = cyclePaths("Regular", 3);
+    BackgroundMusicServiceImpl service = newRegularCycleService(paths);
+    stubLibrary(List.of(), paths);
+
+    assertThrows(BackgroundMusicServiceException.class, service::getNextSong);
+  }
+
+  @Test
+  void smartCycle_picksEverySongOnceBeforeResetting() throws Exception {
+
+    List<String> paths = cyclePaths("Smart", 5);
+    BackgroundMusicServiceImpl service = newSmartCycleService(paths);
+    stubLibrary(paths, List.of());
+    SongFileEntity coreSong = mock(SongFileEntity.class);
+
+    for (int cycle = 0; cycle < 3; cycle++) {
+
+      Set<String> picked = new HashSet<>();
+      for (int i = 0; i < paths.size(); i++) {
+        SongFileEntity song = service.getNextSmartAdditionSong(coreSong);
+        assertNotNull(song);
+        assertTrue(picked.add(song.getNaturalIdentity()),
+            "a smart song already played this cycle must not be picked again: "
+                + song.getNaturalIdentity());
+        service.markSongQueued(song);
+      }
+      assertEquals(new HashSet<>(paths), picked, "every smart song is picked once per cycle");
+      verify(smartBackgroundMusicRepository, times(cycle)).resetAllPlayedTimestamps(anyList());
+    }
+  }
+
+  @Test
+  void smartCycle_skipsUnresolvableSongs_andResetsWhenOnlyTheyRemain() throws Exception {
+
+    List<String> resolvable = cyclePaths("Smart", 2);
+    List<String> paths = new ArrayList<>(resolvable);
+    paths.add(UNRESOLVABLE_PATH);
+    BackgroundMusicServiceImpl service = newSmartCycleService(paths);
+    stubLibrary(resolvable, List.of(UNRESOLVABLE_PATH));
+    SongFileEntity coreSong = mock(SongFileEntity.class);
+
+    // Whenever the unresolvable song is drawn, it is skipped in favor of another candidate rather
+    // than ending the call with no song.
+    Set<String> picked = new HashSet<>();
+    for (int i = 0; i < resolvable.size(); i++) {
+      SongFileEntity song = service.getNextSmartAdditionSong(coreSong);
+      assertNotNull(song);
+      assertTrue(picked.add(song.getNaturalIdentity()));
+      service.markSongQueued(song);
+    }
+    assertEquals(new HashSet<>(resolvable), picked);
+    verify(smartBackgroundMusicRepository, never()).resetAllPlayedTimestamps(anyList());
+
+    SongFileEntity next = service.getNextSmartAdditionSong(coreSong);
+
+    assertNotNull(next);
+    assertTrue(resolvable.contains(next.getNaturalIdentity()));
+    verify(smartBackgroundMusicRepository, times(1)).resetAllPlayedTimestamps(anyList());
+  }
+
+  @Test
+  void smartCycle_returnsNull_whenEverySongIsUnresolvable() throws Exception {
+
+    List<String> paths = cyclePaths("Smart", 3);
+    BackgroundMusicServiceImpl service = newSmartCycleService(paths);
+    stubLibrary(List.of(), paths);
+
+    assertNull(service.getNextSmartAdditionSong(mock(SongFileEntity.class)));
   }
 }

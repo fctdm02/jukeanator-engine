@@ -339,7 +339,9 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * (e.g. the library was rescanned/reloaded and is stale relative to {@code BackgroundMusic.TXT}).
    * Such candidates are skipped rather than allowed to fail the whole call — one bad path should
    * not prevent every other eligible song from being selected, and previously this crashed
-   * application startup via {@code SongQueueServiceImpl}'s cold-start queue seeding.
+   * application startup via {@code SongQueueServiceImpl}'s cold-start queue seeding. A skipped
+   * candidate is also dropped from the not-played pool for the rest of the current cycle, so a
+   * cycle whose only remaining songs are unresolvable still resets.
    */
   @Override
   public SongFileEntity getNextSong() {
@@ -373,6 +375,10 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
                 + "skipping and trying another candidate",
             chosenId, chosen.getSongFilePath());
         triedIds.add(chosenId);
+        // Count it as used for this cycle (its timeLastPlayed stays null, so it is back in the pool
+        // after the next reset or restart) -- otherwise, once only unresolvable songs remain, the
+        // not-played pool never empties and the cycle never resets.
+        notPlayedIds.remove(chosenId);
         lastNotFoundFailure = new BackgroundMusicServiceException(
             "Cannot get next background music song, error: " + ednee.getMessage(), ednee);
       } catch (Exception e) {
@@ -392,7 +398,8 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * candidate happens to already be queued.
    *
    * <p>
-   * When the pool is empty — i.e. every song has actually been played this cycle — resets every
+   * When the pool is empty — i.e. every song has been played (or skipped as unresolvable, see
+   * {@link #getNextSong()}) this cycle — resets every
    * song's {@code timeLastPlayed} back to {@code null} and persists that reset immediately, so it
    * survives a restart even if none of the reset songs happen to be replayed before then. Since
    * song popularity may have shifted over a full cycle, the smart-additions pool is refreshed at
@@ -481,43 +488,55 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * {@code BackgroundMusic.TXT} — see {@link #refreshSmartAdditionPool()}), not just candidates
    * seeded from {@code coreSong}. When every smart song has been played this cycle, their
    * {@code timeLastPlayed} is simply reset (mirroring {@link #pickNextEligibleBackgroundId(Set)}) —
-   * a full recompute only happens when the core background-music list itself cycles.
+   * a full recompute only happens when the core background-music list itself cycles. A candidate
+   * that can no longer be found in the song library is skipped for the rest of the current cycle
+   * and another is tried, so unresolvable songs can neither end the call early nor stop the cycle
+   * from resetting.
    */
   @Override
   public SongFileEntity getNextSmartAdditionSong(SongFileEntity coreSong) {
 
     try {
 
-      if (smartNotPlayedIds.isEmpty() && !smartPool.isEmpty()) {
-        for (SmartBackgroundMusicSongEntity song : smartPool) {
-          song.setTimeLastPlayed(null);
+      Set<Integer> triedIds = new HashSet<>();
+
+      while (true) {
+
+        if (smartNotPlayedIds.isEmpty() && !smartPool.isEmpty()) {
+          for (SmartBackgroundMusicSongEntity song : smartPool) {
+            song.setTimeLastPlayed(null);
+          }
+          smartBackgroundMusicRepository.resetAllPlayedTimestamps(smartPool);
+          rebuildSmartCaches();
         }
-        smartBackgroundMusicRepository.resetAllPlayedTimestamps(smartPool);
-        rebuildSmartCaches();
-      }
 
-      List<Integer> eligible = smartNotPlayedIds.stream()
-          .filter(id -> !isCurrentlyQueued(smartSongsById.get(id)))
-          .collect(Collectors.toList());
+        List<Integer> eligible = smartNotPlayedIds.stream()
+            .filter(id -> !triedIds.contains(id))
+            .filter(id -> !isCurrentlyQueued(smartSongsById.get(id)))
+            .collect(Collectors.toList());
 
-      if (eligible.isEmpty()) {
-        // Pool exhausted/empty, or every remaining candidate is already queued; caller should
-        // treat this as a miss and fall back to the core playlist.
-        return null;
-      }
+        if (eligible.isEmpty()) {
+          // Pool exhausted/empty, every remaining candidate is already queued, or every candidate
+          // was unresolvable; caller should treat this as a miss and fall back to the core
+          // playlist.
+          return null;
+        }
 
-      Integer chosenId = pickRandom(eligible);
-      SmartBackgroundMusicSongEntity chosen = smartSongsById.get(chosenId);
+        Integer chosenId = pickRandom(eligible);
+        SmartBackgroundMusicSongEntity chosen = smartSongsById.get(chosenId);
 
-      try {
-        RootFolderEntity libraryRoot = this.songLibraryService
-            .getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
-        return resolveBackgroundSong(libraryRoot, chosen);
-      } catch (EntityDoesNotExistException ednee) {
-        // Not found in library — fail gracefully so the caller can fall back.
-        log.warn("getNextSmartAdditionSong: could not find song for path: {}",
-            normalizedPath(chosen));
-        return null;
+        try {
+          RootFolderEntity libraryRoot = this.songLibraryService
+              .getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
+          return resolveBackgroundSong(libraryRoot, chosen);
+        } catch (EntityDoesNotExistException ednee) {
+          // Not found in library — skip it for the rest of this cycle (mirroring getNextSong()),
+          // so a cycle whose only remaining songs are unresolvable still resets, and try another.
+          log.warn("getNextSmartAdditionSong: could not find song for path: {}, skipping",
+              normalizedPath(chosen));
+          triedIds.add(chosenId);
+          smartNotPlayedIds.remove(chosenId);
+        }
       }
 
     } catch (Exception e) {
