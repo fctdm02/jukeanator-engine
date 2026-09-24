@@ -22,6 +22,7 @@ import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
+import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
@@ -40,6 +41,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -77,6 +79,7 @@ public class SlaveConnectionManager {
   private final LocationService locationService;
   private final ObjectMapper objectMapper;
   private final JukeANatorUserInterfaceProperties userInterfaceProperties;
+  private final FinancialLedgerService financialLedgerService;
 
   private final WebSocketStompClient stompClient;
   private final ScheduledExecutorService reconnectExecutor =
@@ -92,9 +95,11 @@ public class SlaveConnectionManager {
   public SlaveConnectionManager(AppProperties appProperties, SongQueueService songQueueService,
       SongPlayerService songPlayerService, SongLibraryService songLibraryService,
       LocationService locationService, ObjectMapper objectMapper,
-      JukeANatorUserInterfaceProperties userInterfaceProperties) {
+      JukeANatorUserInterfaceProperties userInterfaceProperties,
+      FinancialLedgerService financialLedgerService) {
 
     this.appProperties = appProperties;
+    this.financialLedgerService = financialLedgerService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
     this.songLibraryService = songLibraryService;
@@ -415,6 +420,10 @@ public class SlaveConnectionManager {
         return null;
       case "unlockQueue":
         songPlayerService.unlockQueue(ownLocationId);
+        return null;
+      case "recordMobileCreditUsage":
+        financialLedgerService.receiveMobileCreditUsage(
+            convert(payload, UserSongCreditUsageDto.class));
         return null;
       default:
         throw new IllegalArgumentException("Unknown commandType: " + commandType);

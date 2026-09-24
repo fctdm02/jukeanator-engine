@@ -21,6 +21,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.financialledger.config.FinancialLedgerProperties;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.MasterSyncOutboxEntry;
+import com.djt.jukeanator_engine.domain.financialledger.event.JukeboxSplitFinalizedEvent;
 import com.djt.jukeanator_engine.domain.financialledger.exception.FinancialLedgerException;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
@@ -28,6 +32,7 @@ import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransacti
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedgerRepository;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
+import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -85,8 +90,13 @@ class FinancialLedgerServiceTest {
   }
 
   private FinancialLedgerServiceImpl newService() {
+    return newService(false);
+  }
+
+  private FinancialLedgerServiceImpl newService(boolean slaveMode) {
     return new FinancialLedgerServiceImpl(financialLedgerRepository, financialLedgerProperties,
-        userService, pricingService, songLibraryService, eventPublisher, locationService);
+        userService, pricingService, songLibraryService, eventPublisher, locationService,
+        slaveMode);
   }
 
   // ── bootstrap ────────────────────────────────────────────────────────────
@@ -239,9 +249,9 @@ class FinancialLedgerServiceTest {
         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(
             new UserSongCreditUsageDto("alice@example.com", OWN_LOCATION_ID, -20,
-                UserSongCreditUsageType.QUEUE_ADD, afterPeriodStart, 1, 2, 80),
+                UserSongCreditUsageType.QUEUE_ADD, afterPeriodStart, 1, 2, 80, "sync-1"),
             new UserSongCreditUsageDto("alice@example.com", OWN_LOCATION_ID, -10,
-                UserSongCreditUsageType.QUEUE_ACTION, afterPeriodStart, null, null, 70)));
+                UserSongCreditUsageType.QUEUE_ACTION, afterPeriodStart, null, null, 70, "sync-2")));
 
     JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
     assertEquals(new BigDecimal("10.00"), current.mobileTotal());
@@ -268,7 +278,7 @@ class FinancialLedgerServiceTest {
     when(userService.getCreditLedgerForLocation(org.mockito.ArgumentMatchers.eq(OWN_LOCATION_ID),
         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(new UserSongCreditUsageDto("alice@example.com", OWN_LOCATION_ID, -9,
-            UserSongCreditUsageType.QUEUE_ADD, periodStart, null, null, 1)));
+            UserSongCreditUsageType.QUEUE_ADD, periodStart, null, null, 1, "sync-1")));
 
     JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
     assertEquals(new BigDecimal("3.00"), current.mobileTotal());
@@ -351,5 +361,228 @@ class FinancialLedgerServiceTest {
     assertEquals(new BigDecimal("0.67"), finalized.amountDueOperator());
     assertTrue(finalized.amountDueOwner().add(finalized.amountDueOperator())
         .compareTo(finalized.totalEarned()) == 0);
+  }
+
+  @Test
+  void addSplit_publishesJukeboxSplitFinalizedEvent_forTheFinalizedPeriod() throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+
+    FinancialLedgerServiceImpl service = newService();
+    Integer finalizedPeriodId = service.getAllPeriods().get(0).persistentIdentity();
+
+    service.addSplit();
+
+    verify(eventPublisher).publishEvent(
+        new JukeboxSplitFinalizedEvent(OWN_LOCATION_ID, finalizedPeriodId));
+  }
+
+  // ── slave-to-master outbox ───────────────────────────────────────────────
+
+  @Test
+  void getPendingMasterSync_returnsUnsyncedTransactionsAndFinalizedPeriods_butNeverTheOpenPeriod()
+      throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+
+    FinancialLedgerServiceImpl service = newService(true);
+    service.recordLocalCashCredit(1);
+    service.recordLocalCreditCardCredit(1);
+
+    List<MasterSyncOutboxEntry> beforeSplit = service.getPendingMasterSync();
+    assertEquals(List.of(MasterSyncOutboxEntry.Kind.CASH, MasterSyncOutboxEntry.Kind.CREDIT_CARD),
+        beforeSplit.stream().map(MasterSyncOutboxEntry::kind).toList(),
+        "The open period has no totals yet, so it must never be mirrored");
+
+    service.addSplit();
+
+    List<MasterSyncOutboxEntry> afterSplit = service.getPendingMasterSync();
+    assertEquals(3, afterSplit.size());
+    MasterSyncOutboxEntry periodEntry = afterSplit.get(2);
+    assertEquals(MasterSyncOutboxEntry.Kind.SPLIT_PERIOD, periodEntry.kind());
+    assertEquals(OWN_LOCATION_ID, periodEntry.locationId());
+    JukeboxSplitPeriodSyncDto periodPayload = (JukeboxSplitPeriodSyncDto) periodEntry.payload();
+    assertEquals(periodEntry.persistentIdentity(), periodPayload.sourcePeriodId());
+    assertEquals(new BigDecimal("2.00"), periodPayload.totalEarned());
+    assertEquals(OWN_LOCATION_ID, afterSplit.get(0).locationId());
+    assertEquals(afterSplit.get(0).persistentIdentity(),
+        ((LocalTransactionSyncDto) afterSplit.get(0).payload()).sourceTransactionId());
+  }
+
+  @Test
+  void markSyncedToMaster_removesOnlyTheAcknowledgedEntriesFromTheOutbox_andPersists()
+      throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+
+    FinancialLedgerServiceImpl service = newService(true);
+    service.recordLocalCashCredit(1);
+    service.recordLocalCreditCardCredit(1);
+    service.addSplit();
+
+    List<MasterSyncOutboxEntry> pending = service.getPendingMasterSync();
+    // Acknowledge the cash transaction and the finalized period, but not the card transaction --
+    // e.g. its push failed mid-sweep.
+    service.markSyncedToMaster(List.of(pending.get(0), pending.get(2)));
+
+    List<MasterSyncOutboxEntry> stillPending = service.getPendingMasterSync();
+    assertEquals(1, stillPending.size());
+    assertEquals(MasterSyncOutboxEntry.Kind.CREDIT_CARD, stillPending.get(0).kind());
+    verify(financialLedgerRepository, org.mockito.Mockito.atLeastOnce()).storeAggregateRoot(
+        org.mockito.ArgumentMatchers.argThat(root -> root.getLocalCashTransactions().get(0)
+            .getSyncedToMasterAt() != null));
+  }
+
+  @Test
+  void getPendingMasterSync_attributesATransactionRecordedWithNoLocationToTheNowKnownOwnLocation()
+      throws Exception {
+
+    FinancialLedgerRootEntity existingRoot = new FinancialLedgerRootEntity();
+    existingRoot.addLocalCashTransaction(
+        new LocalCashTransactionEntity(Integer.valueOf(900), 1, Instant.now(), null));
+    when(financialLedgerRepository.loadAggregateRoot(anyString())).thenReturn(existingRoot);
+
+    List<MasterSyncOutboxEntry> pending = newService(true).getPendingMasterSync();
+
+    assertEquals(1, pending.size());
+    assertEquals(OWN_LOCATION_ID, pending.get(0).locationId());
+  }
+
+  // ── master-side split-period mirror intake ───────────────────────────────
+
+  @Test
+  void receiveSplitPeriodSync_storesTheMirroredPeriodTaggedWithItsLocation_andIsIdempotent()
+      throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+    when(songLibraryService.getOwnLocation()).thenReturn(null); // master
+    when(locationService.verifyApiKey(Integer.valueOf(42), "key")).thenReturn(true);
+
+    FinancialLedgerServiceImpl service = newService();
+    JukeboxSplitPeriodSyncDto dto = new JukeboxSplitPeriodSyncDto(Integer.valueOf(5),
+        Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-02-01T00:00:00Z"), 50,
+        new BigDecimal("10.00"), new BigDecimal("4.00"), new BigDecimal("6.00"),
+        new BigDecimal("20.00"), new BigDecimal("10.00"), new BigDecimal("10.00"));
+
+    service.receiveSplitPeriodSync(Integer.valueOf(42), "key", dto);
+    service.receiveSplitPeriodSync(Integer.valueOf(42), "key", dto);
+
+    List<JukeboxSplitPeriodDto> periods = service.getAllPeriods();
+    assertEquals(1, periods.size(), "A retried push must never duplicate the mirrored period");
+    assertEquals(Integer.valueOf(42), periods.get(0).locationId());
+    assertEquals(Integer.valueOf(5), periods.get(0).sourcePeriodId());
+    assertEquals(new BigDecimal("20.00"), periods.get(0).totalEarned());
+    verify(financialLedgerRepository, times(1)).storeAggregateRoot(
+        org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void receiveSplitPeriodSync_rejectsWrongApiKey_andAnOpenPeriod() throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+    when(songLibraryService.getOwnLocation()).thenReturn(null); // master
+    when(locationService.verifyApiKey(Integer.valueOf(42), "key")).thenReturn(true);
+
+    FinancialLedgerServiceImpl service = newService();
+    JukeboxSplitPeriodSyncDto finalized = new JukeboxSplitPeriodSyncDto(Integer.valueOf(5),
+        Instant.now().minusSeconds(60), Instant.now(), 50, BigDecimal.ONE, BigDecimal.ZERO,
+        BigDecimal.ZERO, BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ONE);
+    JukeboxSplitPeriodSyncDto open = new JukeboxSplitPeriodSyncDto(Integer.valueOf(6),
+        Instant.now(), null, null, null, null, null, null, null, null);
+
+    assertThrows(LocationServiceException.class,
+        () -> service.receiveSplitPeriodSync(Integer.valueOf(42), "wrong-key", finalized));
+    assertThrows(FinancialLedgerException.class,
+        () -> service.receiveSplitPeriodSync(Integer.valueOf(42), "key", open));
+    assertTrue(service.getAllPeriods().isEmpty());
+  }
+
+  // ── master-to-slave mobile credit usage mirror ───────────────────────────
+
+  @Test
+  void receiveMobileCreditUsage_isIdempotentOnSyncId_andCountsTowardTheSlavesMobileTotal()
+      throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+
+    FinancialLedgerServiceImpl service = newService(true);
+    // Pinned at the open period's own startDate (inclusive) -- anything later would still be in the
+    // future relative to the live summary's "now" upper bound.
+    Instant afterPeriodStart = service.getOpenPeriodStartDate();
+
+    // 30 credits at setUp()'s 3 credits/dollar = $10.00; the duplicate must not double-count.
+    service.receiveMobileCreditUsage(new UserSongCreditUsageDto("alice@example.com",
+        OWN_LOCATION_ID, -20, UserSongCreditUsageType.QUEUE_ADD, afterPeriodStart, 1, 2, 80,
+        "sync-a"));
+    service.receiveMobileCreditUsage(new UserSongCreditUsageDto("alice@example.com",
+        OWN_LOCATION_ID, -10, UserSongCreditUsageType.QUEUE_ACTION, afterPeriodStart, null,
+        null, 70, "sync-b"));
+    service.receiveMobileCreditUsage(new UserSongCreditUsageDto("alice@example.com",
+        OWN_LOCATION_ID, -20, UserSongCreditUsageType.QUEUE_ADD, afterPeriodStart, 1, 2, 80,
+        "sync-a"));
+
+    JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
+    assertEquals(new BigDecimal("10.00"), current.mobileTotal());
+    assertEquals(afterPeriodStart, service.getLatestMobileCreditUsageTimestamp());
+    // In slave mode the mirrored copy is the source of truth -- the slave's own user store never
+    // holds mobile/web spends.
+    verify(userService, never()).getCreditLedgerForLocation(org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void receiveMobileCreditUsage_ignoresAnotherLocationsSpend_andOneWithNoSyncId()
+      throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+
+    FinancialLedgerServiceImpl service = newService(true);
+    // Pinned at the open period's own startDate (inclusive) -- anything later would still be in the
+    // future relative to the live summary's "now" upper bound.
+    Instant afterPeriodStart = service.getOpenPeriodStartDate();
+
+    service.receiveMobileCreditUsage(new UserSongCreditUsageDto("alice@example.com",
+        Integer.valueOf(999), -20, UserSongCreditUsageType.QUEUE_ADD, afterPeriodStart, 1, 2, 80,
+        "sync-other-location"));
+    service.receiveMobileCreditUsage(new UserSongCreditUsageDto("alice@example.com",
+        OWN_LOCATION_ID, -20, UserSongCreditUsageType.QUEUE_ADD, afterPeriodStart, 1, 2, 80,
+        null));
+
+    assertEquals(BigDecimal.ZERO.setScale(2), service.getAllPeriods().get(0).mobileTotal());
+    assertNull(service.getLatestMobileCreditUsageTimestamp());
+  }
+
+  @Test
+  void getMobileCreditUsageForSync_verifiesApiKey_andOmitsSpendsWithNoSyncId() throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+    when(songLibraryService.getOwnLocation()).thenReturn(null); // master
+    when(locationService.verifyApiKey(Integer.valueOf(42), "key")).thenReturn(true);
+    Instant since = Instant.parse("2026-01-01T00:00:00Z");
+    when(userService.getCreditLedgerForLocation(org.mockito.ArgumentMatchers.eq(Integer.valueOf(42)),
+        org.mockito.ArgumentMatchers.eq(since), org.mockito.ArgumentMatchers.any()))
+        .thenReturn(List.of(
+            new UserSongCreditUsageDto("alice@example.com", Integer.valueOf(42), -2,
+                UserSongCreditUsageType.QUEUE_ADD, since.plusSeconds(1), 1, 2, 8, "sync-a"),
+            new UserSongCreditUsageDto("bob@example.com", Integer.valueOf(42), -2,
+                UserSongCreditUsageType.QUEUE_ADD, since.plusSeconds(2), 1, 2, 8, null)));
+
+    FinancialLedgerServiceImpl service = newService();
+
+    List<UserSongCreditUsageDto> result =
+        service.getMobileCreditUsageForSync(Integer.valueOf(42), "key", since);
+    assertEquals(1, result.size());
+    assertEquals("sync-a", result.get(0).syncId());
+
+    assertThrows(LocationServiceException.class,
+        () -> service.getMobileCreditUsageForSync(Integer.valueOf(42), "wrong-key", since));
   }
 }

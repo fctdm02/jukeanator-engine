@@ -12,7 +12,7 @@ import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageType;
  */
 public record UserSongCreditUsageEntryDto(Integer persistentIdentity, Integer locationId,
     int amount, UserSongCreditUsageType type, Instant timestamp, Integer songAlbumId,
-    Integer songId, int resultingBalance) implements Serializable {
+    Integer songId, int resultingBalance, String syncId) implements Serializable {
 
   @Override
   public boolean equals(Object obj) {

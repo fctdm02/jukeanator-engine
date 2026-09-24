@@ -23,6 +23,10 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
  * slave/standalone instance); only master-received mirrored rows ever populate it, carrying the
  * slave's own local {@code persistentIdentity} for that transaction so a retried mirror push is a
  * safe no-op rather than a duplicate row.
+ *
+ * <p>{@code syncedToMasterAt} is the slave-side outbox marker: {@code null} until master has
+ * acknowledged the mirror push, so {@code FinancialLedgerSyncService} keeps retrying every
+ * not-yet-acknowledged transaction until it lands. Always {@code null} on master's mirrored copy.
  */
 @Entity
 @Table(name = "location_transaction")
@@ -43,6 +47,9 @@ public abstract class AbstractLocationTransactionEntity extends AbstractPersiste
 
   @Column(name = "source_transaction_id")
   private Integer sourceTransactionId;
+
+  @Column(name = "synced_to_master_at")
+  private Instant syncedToMasterAt;
 
   protected AbstractLocationTransactionEntity() {} // for JPA
 
@@ -69,6 +76,22 @@ public abstract class AbstractLocationTransactionEntity extends AbstractPersiste
 
   public Integer getSourceTransactionId() {
     return sourceTransactionId;
+  }
+
+  public Instant getSyncedToMasterAt() {
+    return syncedToMasterAt;
+  }
+
+  /**
+   * True for a transaction this instance recorded itself (not a master-received mirrored copy)
+   * that master has not yet acknowledged.
+   */
+  public boolean isPendingMasterSync() {
+    return sourceTransactionId == null && syncedToMasterAt == null;
+  }
+
+  public void markSyncedToMaster(Instant syncedToMasterAt) {
+    this.syncedToMasterAt = syncedToMasterAt;
   }
 
   // Package-private: only FinancialLedgerRootEntity.changeLocationId re-keys a transaction, when

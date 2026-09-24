@@ -19,6 +19,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.useractivity.event.UserActivityRecordedEvent;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityRecord;
@@ -110,5 +112,64 @@ class UserActivityServiceImplTest {
     Instant cutoff = cutoffCaptor.getValue();
     assertTrue(!cutoff.isBefore(before) && !cutoff.isAfter(after),
         "Expected cutoff to be ~30 days before now, was: " + cutoff);
+  }
+
+  @Test
+  void record_mintsADistinctActivityId_perCapturedActivity() {
+
+    userActivityService.record(Integer.valueOf(1), UserActivitySource.SWING_UI, "LOCAL",
+        UserActivityType.TAB_NAVIGATION, null);
+    userActivityService.record(Integer.valueOf(1), UserActivitySource.SWING_UI, "LOCAL",
+        UserActivityType.TAB_NAVIGATION, null);
+
+    verify(eventPublisher, org.mockito.Mockito.times(2)).publishEvent(eventCaptor.capture());
+    String first = eventCaptor.getAllValues().get(0).getRecord().activityId();
+    String second = eventCaptor.getAllValues().get(1).getRecord().activityId();
+    assertNotNull(first);
+    assertTrue(!first.equals(second), "Every activity needs its own mirror idempotency key");
+  }
+
+  // ── master-side mirror intake ────────────────────────────────────────────
+
+  @Test
+  void receiveUserActivitySync_attributesEveryRecordToThePathsLocation_andSkipsIncompleteOnes() {
+
+    LocationService locationService = org.mockito.Mockito.mock(LocationService.class);
+    when(locationService.verifyApiKey(Integer.valueOf(42), "key")).thenReturn(true);
+    UserActivityServiceImpl service = new UserActivityServiceImpl(userActivityRepository,
+        eventPublisher, () -> locationService);
+    when(userActivityRepository.recordIfAbsent(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(true, false);
+
+    Instant occurredAt = Instant.now();
+    int stored = service.receiveUserActivitySync(Integer.valueOf(42), "key", List.of(
+        // Claims another location -- the authenticated path's location always wins.
+        new UserActivityRecord(Integer.valueOf(999), UserActivitySource.SWING_UI, "LOCAL",
+            UserActivityType.TAB_NAVIGATION, occurredAt, null, "a"),
+        new UserActivityRecord(Integer.valueOf(42), UserActivitySource.SWING_UI, "LOCAL",
+            UserActivityType.TAB_NAVIGATION, occurredAt, Map.of(), "b"),
+        new UserActivityRecord(Integer.valueOf(42), UserActivitySource.SWING_UI, "LOCAL",
+            UserActivityType.TAB_NAVIGATION, occurredAt, Map.of(), null)));
+
+    assertEquals(1, stored, "The second record was already stored; the third has no activityId");
+    verify(userActivityRepository).recordIfAbsent(new UserActivityRecord(Integer.valueOf(42),
+        UserActivitySource.SWING_UI, "LOCAL", UserActivityType.TAB_NAVIGATION, occurredAt,
+        Map.of(), "a"));
+    verify(userActivityRepository, org.mockito.Mockito.times(2))
+        .recordIfAbsent(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void receiveUserActivitySync_rejectsAWrongApiKey_andStoresNothing() {
+
+    LocationService locationService = org.mockito.Mockito.mock(LocationService.class);
+    UserActivityServiceImpl service = new UserActivityServiceImpl(userActivityRepository,
+        eventPublisher, () -> locationService);
+
+    org.junit.jupiter.api.Assertions.assertThrows(LocationServiceException.class,
+        () -> service.receiveUserActivitySync(Integer.valueOf(42), "wrong-key", List.of(
+            new UserActivityRecord(Integer.valueOf(42), UserActivitySource.SWING_UI, "LOCAL",
+                UserActivityType.TAB_NAVIGATION, Instant.now(), Map.of(), "a"))));
+    org.mockito.Mockito.verifyNoInteractions(userActivityRepository);
   }
 }

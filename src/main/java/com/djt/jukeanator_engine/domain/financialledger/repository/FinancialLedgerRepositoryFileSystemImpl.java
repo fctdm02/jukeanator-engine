@@ -70,7 +70,8 @@ public final class FinancialLedgerRepositoryFileSystemImpl extends AbstractRepos
     seedNextPersistentIdentityFrom(Stream.of(
             root.getSplitPeriods().stream().map(p -> p.getPersistentIdentity()),
             root.getLocalCashTransactions().stream().map(t -> t.getPersistentIdentity()),
-            root.getLocalCreditCardTransactions().stream().map(t -> t.getPersistentIdentity()))
+            root.getLocalCreditCardTransactions().stream().map(t -> t.getPersistentIdentity()),
+            root.getMobileCreditUsages().stream().map(u -> u.getPersistentIdentity()))
         .flatMap(s -> s));
   }
 }

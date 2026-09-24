@@ -19,7 +19,24 @@ import java.util.Map;
  * @param details activity-specific attributes (e.g. tab name, search query, artist/album/song id)
  *        -- shape varies by {@code activityType}, never {@code null} (empty map when there's
  *        nothing further to capture)
+ * @param activityId a UUID minted by {@code UserActivityServiceImpl} when the activity is
+ *        captured -- the slave-to-master mirror's idempotency key. {@code null} only for records
+ *        written before it existed (the mirror derives a stable stand-in for those; see {@code
+ *        UserActivityRepository#findPendingMasterSync}).
  */
 public record UserActivityRecord(Integer locationId, UserActivitySource source, String username,
-    UserActivityType activityType, Instant occurredAt, Map<String, Object> details) {
+    UserActivityType activityType, Instant occurredAt, Map<String, Object> details,
+    String activityId) {
+
+  /** A record with no {@code activityId} yet. */
+  public UserActivityRecord(Integer locationId, UserActivitySource source, String username,
+      UserActivityType activityType, Instant occurredAt, Map<String, Object> details) {
+    this(locationId, source, username, activityType, occurredAt, details, null);
+  }
+
+  /** This same record, attributed to {@code newLocationId} and carrying {@code newActivityId}. */
+  public UserActivityRecord with(Integer newLocationId, String newActivityId) {
+    return new UserActivityRecord(newLocationId, source, username, activityType, occurredAt,
+        details, newActivityId);
+  }
 }

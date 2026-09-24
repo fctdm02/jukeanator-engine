@@ -6,6 +6,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,6 +44,7 @@ import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
+import com.djt.jukeanator_engine.domain.user.event.LocationSongCreditUsageRecordedEvent;
 import com.djt.jukeanator_engine.domain.user.event.PurchaseCompletedEvent;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
@@ -121,7 +123,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new UserServiceException("Email already registered: " + request.emailAddress());
     }
 
-    Integer persistentIdentity = Integer.valueOf(this.userRoot.getUsers().size() + 1);
+    Integer persistentIdentity = this.userRoot.nextUserPersistentIdentity();
 
     UserEntity user = new UserEntity(persistentIdentity, request.firstName(), request.lastName(),
         request.emailAddress(), passwordEncoder.encode(request.password()), Integer.valueOf(6),
@@ -608,16 +610,20 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     // Deduct Web UI credits for non-local (web) users -- see CreditCostCalculator for the
     // swingCost * webCostMultiplier formula.
+    UserSongCreditUsageEntity usage = null;
     if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
       int priority =
           event.queueEntry().priority() != null ? event.queueEntry().priority() : 1;
       int cost = CreditCostCalculator.webQueueAddCost(pricingService.resolvePricingConfig(locationId),
           priority, event.priorityPlay());
-      deductCredits(user, username, cost, UserSongCreditUsageType.QUEUE_ADD, locationId,
+      usage = deductCredits(user, username, cost, UserSongCreditUsageType.QUEUE_ADD, locationId,
           song.albumId(), song.songId());
     }
 
     this.userRepository.storeAggregateRoot(this.userRoot);
+    if (usage != null) {
+      announceLocationCreditUsage(usage);
+    }
   }
 
   @Override
@@ -642,9 +648,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     int cost = CreditCostCalculator.webQueueActionCost(pricingService.resolvePricingConfig(locationId),
         priority != null ? priority : 1);
-    deductCredits(user, emailAddress, cost, UserSongCreditUsageType.QUEUE_ACTION, locationId, null, null);
+    UserSongCreditUsageEntity usage = deductCredits(user, emailAddress, cost,
+        UserSongCreditUsageType.QUEUE_ACTION, locationId, null, null);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
+    announceLocationCreditUsage(usage);
   }
 
   @Override
@@ -656,28 +664,48 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
         .filter(t -> locationId.equals(t.getLocationId()))
         .filter(t -> !t.getTimestamp().isBefore(from) && !t.getTimestamp().isAfter(to))
         .sorted(java.util.Comparator.comparing(UserSongCreditUsageEntity::getTimestamp))
-        .map(t -> new UserSongCreditUsageDto(t.getUserEmail(), t.getLocationId(), t.getAmount(),
-            t.getType(), t.getTimestamp(), t.getSongAlbumId(), t.getSongId(),
-            t.getResultingBalance()))
+        .map(UserServiceImpl::toDto)
         .toList();
+  }
+
+  private static UserSongCreditUsageDto toDto(UserSongCreditUsageEntity usage) {
+    return new UserSongCreditUsageDto(usage.getUserEmail(), usage.getLocationId(),
+        usage.getAmount(), usage.getType(), usage.getTimestamp(), usage.getSongAlbumId(),
+        usage.getSongId(), usage.getResultingBalance(), usage.getSyncId());
   }
 
   /**
    * Deducts {@code cost} credits (floored at zero), broadcasts the new balance, and appends a
    * ledger entry to the user's own song-credit-usage set. {@code locationId} is {@code null} for
    * standalone-mode/non-location-attributed spends. Callers are responsible for persisting the
-   * user root afterward.
+   * user root afterward, and then for passing the returned entry to {@link
+   * #announceLocationCreditUsage}.
    */
-  private void deductCredits(UserEntity user, String emailAddress, int cost,
+  private UserSongCreditUsageEntity deductCredits(UserEntity user, String emailAddress, int cost,
       UserSongCreditUsageType type, Integer locationId, Integer songAlbumId, Integer songId) {
 
     int remaining = Math.max(0, (user.getNumCredits() != null ? user.getNumCredits() : 0) - cost);
     user.setNumCredits(remaining);
     eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, remaining));
 
-    Integer persistentIdentity = Integer.valueOf(user.getUserSongCreditUsages().size() + 1);
-    user.addUserSongCreditUsage(new UserSongCreditUsageEntity(persistentIdentity, locationId,
-        -cost, type, Instant.now(), songAlbumId, songId, remaining));
+    Integer persistentIdentity = user.nextUserSongCreditUsageIdentity();
+    UserSongCreditUsageEntity usage = new UserSongCreditUsageEntity(persistentIdentity,
+        locationId, -cost, type, Instant.now(), songAlbumId, songId, remaining,
+        UUID.randomUUID().toString());
+    return user.addUserSongCreditUsage(usage);
+  }
+
+  /**
+   * Announces a location-attributed spend via {@link LocationSongCreditUsageRecordedEvent} so
+   * master can mirror it to that location's slave. Called only once the spend has been stored, so
+   * a slave can never end up holding a spend master itself failed to record.
+   */
+  private void announceLocationCreditUsage(UserSongCreditUsageEntity usage) {
+
+    if (usage.getLocationId() != null) {
+      // Harmless on standalone -- only master's MobileCreditUsageSlaveNotifier listens.
+      eventPublisher.publishEvent(new LocationSongCreditUsageRecordedEvent(toDto(usage)));
+    }
   }
 
   /**
@@ -695,7 +723,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     user.setNumCredits(newBalance);
     eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, newBalance));
 
-    Integer persistentIdentity = Integer.valueOf(user.getUserAddFundsTransactions().size() + 1);
+    Integer persistentIdentity = user.nextUserAddFundsTransactionIdentity();
     user.addUserAddFundsTransaction(new UserAddFundsTransactionEntity(persistentIdentity,
         pkg.id(), pkg.credits(), pkg.bonusCredits(), pkg.priceUsd(), chargeResult.paymentSource(),
         chargeResult.transactionId(), timestamp, newBalance));

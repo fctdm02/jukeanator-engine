@@ -22,6 +22,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import jakarta.persistence.EntityManagerFactory;
 import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
+import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityRecord;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivitySource;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
@@ -189,5 +190,76 @@ class UserActivityRepositoryJpaImplTest {
       assertEquals(1, rs.getInt("c"),
           "A record recorded exactly at the cutoff instant is not strictly before it, so it must survive");
     }
+  }
+
+  // ── slave-to-master outbox ───────────────────────────────────────────────
+
+  @Test
+  void findPendingMasterSync_returnsUnacknowledgedRecordsOldestFirst_neverSystemOnes()
+      throws Exception {
+
+    UserActivityRepositoryJpaImpl repository = newRepository();
+    Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    repository.record(new UserActivityRecord(Integer.valueOf(1), UserActivitySource.SWING_UI,
+        "LOCAL", UserActivityType.TAB_NAVIGATION, now, Map.of(), "a"));
+    repository.record(new UserActivityRecord(Integer.valueOf(1), UserActivitySource.MOBILE_WEB,
+        SystemPrincipal.SYSTEM_USERNAME, UserActivityType.QUEUE_SONG_ADDED, now, Map.of(),
+        "relayed"));
+    repository.record(new UserActivityRecord(Integer.valueOf(1), UserActivitySource.SWING_UI,
+        "LOCAL", UserActivityType.TAB_NAVIGATION, now, Map.of(), "b"));
+
+    assertEquals(List.of("a", "b"), repository.findPendingMasterSync(10).stream()
+        .map(p -> p.record().activityId()).toList(),
+        "A master-relayed (SYSTEM) record is already on master under the real user's email");
+    assertEquals(1, repository.findPendingMasterSync(1).size());
+  }
+
+  @Test
+  void markSyncedToMaster_removesOnlyTheAcknowledgedRecordsFromTheOutbox() throws Exception {
+
+    UserActivityRepositoryJpaImpl repository = newRepository();
+    Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    repository.record(new UserActivityRecord(Integer.valueOf(1), UserActivitySource.SWING_UI,
+        "LOCAL", UserActivityType.TAB_NAVIGATION, now, Map.of(), "a"));
+    repository.record(new UserActivityRecord(Integer.valueOf(1), UserActivitySource.SWING_UI,
+        "LOCAL", UserActivityType.TAB_NAVIGATION, now, Map.of(), "b"));
+
+    repository.markSyncedToMaster(repository.findPendingMasterSync(1));
+
+    assertEquals(List.of("b"), repository.findPendingMasterSync(10).stream()
+        .map(p -> p.record().activityId()).toList());
+  }
+
+  @Test
+  void findPendingMasterSync_givesARowWithNoActivityIdAStableStandIn() throws Exception {
+
+    UserActivityRepositoryJpaImpl repository = newRepository();
+    repository.record(new UserActivityRecord(Integer.valueOf(1), UserActivitySource.SWING_UI,
+        "LOCAL", UserActivityType.TAB_NAVIGATION, Instant.now(), Map.of()));
+
+    String first = repository.findPendingMasterSync(10).get(0).record().activityId();
+    String second = repository.findPendingMasterSync(10).get(0).record().activityId();
+
+    assertNotNull(first);
+    assertEquals(first, second,
+        "A re-push of a legacy row must carry the same id, or master would duplicate it");
+  }
+
+  @Test
+  void recordIfAbsent_storesOnce_perLocationAndActivityId() throws Exception {
+
+    UserActivityRepositoryJpaImpl repository = newRepository();
+    Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    UserActivityRecord atLocationOne = new UserActivityRecord(Integer.valueOf(1),
+        UserActivitySource.SWING_UI, "LOCAL", UserActivityType.TAB_NAVIGATION, now, Map.of(),
+        "same-id");
+
+    assertTrue(repository.recordIfAbsent(atLocationOne));
+    assertTrue(!repository.recordIfAbsent(atLocationOne), "A retried push must be a no-op");
+    assertTrue(repository.recordIfAbsent(atLocationOne.with(Integer.valueOf(2), "same-id")),
+        "The same activity id at a different location is a different record");
+
+    assertEquals(1, repository.findRecentActivity(Integer.valueOf(1), 10).size());
+    assertEquals(1, repository.findRecentActivity(Integer.valueOf(2), 10).size());
   }
 }

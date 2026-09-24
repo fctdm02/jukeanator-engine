@@ -14,6 +14,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
+import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
+import com.djt.jukeanator_engine.domain.useractivity.model.PendingUserActivity;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityRecord;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivitySource;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
@@ -283,6 +285,96 @@ class UserActivityRepositoryFileSystemImplTest {
     repository.changeLocationId(Integer.valueOf(1), Integer.valueOf(42));
 
     assertFalse(Files.exists(basePath.resolve("activity").resolve("location-42")));
+  }
+
+  // ── slave-to-master outbox ───────────────────────────────────────────────
+
+  @Test
+  void findPendingMasterSync_returnsEveryUnacknowledgedRecordOldestFirst_upToTheLimit(
+      @TempDir Path basePath) {
+
+    UserActivityRepositoryFileSystemImpl repository =
+        new UserActivityRepositoryFileSystemImpl(basePath.toString());
+    Instant today = Instant.now();
+    repository.record(recordAt(today.minusSeconds(86_400 * 2), "two-days-ago").with(1, "a"));
+    repository.record(recordAt(today, "today-1").with(1, "b"));
+    repository.record(recordAt(today, "today-2").with(1, "c"));
+
+    List<PendingUserActivity> pending = repository.findPendingMasterSync(10);
+    assertEquals(List.of("a", "b", "c"),
+        pending.stream().map(p -> p.record().activityId()).toList());
+    assertEquals(2, repository.findPendingMasterSync(2).size());
+  }
+
+  @Test
+  void markSyncedToMaster_removesOnlyTheAcknowledgedRecords_andLaterAppendsBecomePending(
+      @TempDir Path basePath) {
+
+    UserActivityRepositoryFileSystemImpl repository =
+        new UserActivityRepositoryFileSystemImpl(basePath.toString());
+    Instant now = Instant.now();
+    repository.record(recordAt(now, "first").with(1, "a"));
+    repository.record(recordAt(now, "second").with(1, "b"));
+
+    repository.markSyncedToMaster(repository.findPendingMasterSync(1));
+    assertEquals(List.of("b"), repository.findPendingMasterSync(10).stream()
+        .map(p -> p.record().activityId()).toList());
+
+    repository.markSyncedToMaster(repository.findPendingMasterSync(10));
+    assertTrue(repository.findPendingMasterSync(10).isEmpty());
+
+    repository.record(recordAt(now, "third").with(1, "c"));
+    assertEquals(List.of("c"), repository.findPendingMasterSync(10).stream()
+        .map(p -> p.record().activityId()).toList());
+
+    // The acknowledged position survives a restart -- it lives in the cursor file, not memory.
+    assertEquals(List.of("c"),
+        new UserActivityRepositoryFileSystemImpl(basePath.toString()).findPendingMasterSync(10)
+            .stream().map(p -> p.record().activityId()).toList());
+  }
+
+  @Test
+  void findPendingMasterSync_neverReturnsMasterRelayedSystemRecords(@TempDir Path basePath) {
+
+    UserActivityRepositoryFileSystemImpl repository =
+        new UserActivityRepositoryFileSystemImpl(basePath.toString());
+    repository.record(new UserActivityRecord(Integer.valueOf(1), UserActivitySource.MOBILE_WEB,
+        SystemPrincipal.SYSTEM_USERNAME, UserActivityType.QUEUE_SONG_ADDED, Instant.now(),
+        Map.of(), "relayed"));
+    repository.record(recordAt(Instant.now(), "local").with(1, "local"));
+
+    assertEquals(List.of("local"), repository.findPendingMasterSync(10).stream()
+        .map(p -> p.record().activityId()).toList());
+  }
+
+  @Test
+  void findPendingMasterSync_givesARecordWithNoActivityIdAStableStandIn(@TempDir Path basePath) {
+
+    UserActivityRepositoryFileSystemImpl repository =
+        new UserActivityRepositoryFileSystemImpl(basePath.toString());
+    repository.record(recordAt(Instant.now(), "legacy")); // written with no activityId
+
+    String first = repository.findPendingMasterSync(10).get(0).record().activityId();
+    String second = repository.findPendingMasterSync(10).get(0).record().activityId();
+
+    assertTrue(first != null && first.equals(second),
+        "A re-push of a legacy record must carry the same id, or master would duplicate it");
+  }
+
+  @Test
+  void recordIfAbsent_storesOnce_perLocationAndActivityId(@TempDir Path basePath) {
+
+    UserActivityRepositoryFileSystemImpl repository =
+        new UserActivityRepositoryFileSystemImpl(basePath.toString());
+    Instant now = Instant.now();
+
+    assertTrue(repository.recordIfAbsent(recordAt(now, "x").with(1, "same-id")));
+    assertFalse(repository.recordIfAbsent(recordAt(now, "x").with(1, "same-id")));
+    assertTrue(repository.recordIfAbsent(recordAt(now, "x").with(2, "same-id")),
+        "The same activity id at a different location is a different record");
+
+    assertEquals(1, repository.findRecentActivity(Integer.valueOf(1), 10).size());
+    assertEquals(1, repository.findRecentActivity(Integer.valueOf(2), 10).size());
   }
 
   private static UserActivityRecord recordAt(Instant occurredAt, String label) {

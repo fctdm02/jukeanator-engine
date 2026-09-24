@@ -30,8 +30,9 @@ import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
  *
  * <p>The failure isn't actually a concurrency race (an earlier hypothesis, disproven by
  * reproducing it with a single, purely sequential call): {@code UserServiceImpl.registerWithRole}
- * assigns a brand-new {@code UserEntity} a placeholder id ({@code userRoot.getUsers().size() + 1}
- * -- needed only so the filesystem-backed repository, which has no DB/sequence of its own, has an
+ * assigns a brand-new {@code UserEntity} a placeholder id ({@code
+ * userRoot.nextUserPersistentIdentity()}, originally {@code userRoot.getUsers().size() + 1} --
+ * needed only so the filesystem-backed repository, which has no DB/sequence of its own, has an
  * id to write), and the very first user ever registered under JPA gets id {@code 1}. {@link
  * com.djt.jukeanator_engine.domain.user.repository.UserRepositoryJpaImpl#storeAggregateRoot}
  * used to {@code merge()} every user unconditionally; merging an entity that already carries a

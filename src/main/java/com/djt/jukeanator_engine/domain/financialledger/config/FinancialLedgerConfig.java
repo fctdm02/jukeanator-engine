@@ -46,9 +46,11 @@ public class FinancialLedgerConfig {
       FinancialLedgerRepository financialLedgerRepository,
       FinancialLedgerProperties financialLedgerProperties, UserService userService,
       PricingService pricingService, SongLibraryService songLibraryService,
-      ApplicationEventPublisher eventPublisher, LocationService locationService) {
+      ApplicationEventPublisher eventPublisher, LocationService locationService,
+      AppProperties appProperties) {
 
     return new FinancialLedgerServiceImpl(financialLedgerRepository, financialLedgerProperties,
-        userService, pricingService, songLibraryService, eventPublisher, locationService);
+        userService, pricingService, songLibraryService, eventPublisher, locationService,
+        appProperties.isSlave());
   }
 }

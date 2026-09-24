@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.useractivity.config;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -7,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import jakarta.persistence.EntityManagerFactory;
 import com.djt.jukeanator_engine.config.AppProperties;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.useractivity.repository.UserActivityRepository;
 import com.djt.jukeanator_engine.domain.useractivity.repository.UserActivityRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.useractivity.repository.UserActivityRepositoryJpaImpl;
@@ -39,8 +41,9 @@ public class UserActivityConfig {
 
   @Bean
   public UserActivityService userActivityService(UserActivityRepository userActivityRepository,
-      ApplicationEventPublisher eventPublisher) {
-    return new UserActivityServiceImpl(userActivityRepository, eventPublisher);
+      ApplicationEventPublisher eventPublisher, ObjectProvider<LocationService> locationService) {
+    return new UserActivityServiceImpl(userActivityRepository, eventPublisher,
+        locationService::getObject);
   }
 
   @Bean

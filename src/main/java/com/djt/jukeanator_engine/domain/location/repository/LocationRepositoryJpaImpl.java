@@ -172,9 +172,9 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
         // with this instance's own location id, so they must follow it too. Services holding
         // copies of these rows in memory re-tag them on OwnLocationIdChangedEvent, so their next
         // store doesn't write the previous id back over these updates.
-        for (String table : List.of("location_transaction", "user_song_play_history",
-            "user_playlist_song", "user_song_credit_usage", "user_activity",
-            "song_background_music")) {
+        for (String table : List.of("location_transaction", "location_mobile_credit_usage",
+            "user_song_play_history", "user_playlist_song", "user_song_credit_usage",
+            "user_activity", "song_background_music")) {
           rekey("update " + table + " set location_id = :newId where location_id = :oldId",
               oldLocationId, newLocationId);
         }

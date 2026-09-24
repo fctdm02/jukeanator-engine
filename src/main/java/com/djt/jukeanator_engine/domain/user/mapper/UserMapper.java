@@ -76,7 +76,8 @@ public final class UserMapper {
           entity.getTimestamp(),
           entity.getSongAlbumId(),
           entity.getSongId(),
-          entity.getResultingBalance()));
+          entity.getResultingBalance(),
+          entity.getSyncId()));
     }
 
     return dtos;
@@ -145,7 +146,8 @@ public final class UserMapper {
           usageDto.timestamp(),
           usageDto.songAlbumId(),
           usageDto.songId(),
-          usageDto.resultingBalance()));
+          usageDto.resultingBalance(),
+          usageDto.syncId()));
     }
 
     for (UserAddFundsTransactionEntryDto addFundsDto : dto.userAddFundsTransactions()) {

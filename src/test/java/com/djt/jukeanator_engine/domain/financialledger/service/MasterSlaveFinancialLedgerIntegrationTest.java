@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
@@ -22,9 +23,12 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
@@ -34,6 +38,7 @@ import com.djt.jukeanator_engine.domain.location.controller.LocationController;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
+import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodSyncDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
@@ -42,6 +47,9 @@ import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.domain.user.service.PaymentChargeResult;
 import com.djt.jukeanator_engine.domain.user.service.PaymentGateway;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityRecord;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivitySource;
+import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
 
 /**
  * End-to-end coverage of the financial ledger across a master/slave pair, run against a live local
@@ -49,7 +57,7 @@ import com.djt.jukeanator_engine.domain.user.service.UserService;
  * shape as {@code MasterSlaveLibrarySyncIntegrationTest}, extended to the financial side documented
  * in {@code docs/financial-ledger-refactor-and-sync.md}.
  *
- * <p>Covers three things "rock solid" actually requires:
+ * <p>Covers what "rock solid" actually requires:
  * <ol>
  * <li>Local cash/credit-card transactions genuinely mirror from a slave to master over real HTTP
  * (the {@code location-id}/{@code location-api-key}-authenticated {@code
@@ -62,6 +70,12 @@ import com.djt.jukeanator_engine.domain.user.service.UserService;
  * no {@code location_id} at all (see {@code UserAddFundsTransactionEntity}'s javadoc), the latter
  * is correctly isolated per location via {@code UserService.getCreditLedgerForLocation} -- the
  * reconciliation the user asked for.
+ * <li>Finalized jukebox-split periods mirror from a slave into {@code location_jukebox_split},
+ * tagged by {@code parent_location_id} and idempotent on {@code source_period_id}.
+ * <li>A slave's catch-up pull of mobile/web spends sees only its own location's, each carrying the
+ * {@code sync_id} its slave-side copy is keyed on.
+ * <li>A slave's user-activity batch lands in {@code user_activity} under the authenticated path's
+ * location, idempotent on {@code activity_id}.
  * </ol>
  *
  * <p>{@code app.mode=master} wires the real {@code BraintreePaymentGateway} (see {@code
@@ -177,7 +191,146 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     assertAddFundsTransactionRow(email, "pkg-7", 12, 1);
   }
 
+  @Test
+  void finalizedSplitPeriods_mirroredOverHttp_landInLocationJukeboxSplitTaggedByLocation_andAreIdempotent()
+      throws Exception {
+
+    ProvisionedLocationDto locationA = locationService
+        .registerLocation(new RegisterLocationRequest(uniqueName("Split Tavern"), 42.33, -83.04));
+    ProvisionedLocationDto locationB = locationService
+        .registerLocation(new RegisterLocationRequest(uniqueName("Split Lounge"), 40.0, -105.0));
+
+    postSplitPeriod(locationA, 501, new BigDecimal("20.00"));
+    // Same sourcePeriodId at a genuinely different location -- uniqueness is per-location.
+    postSplitPeriod(locationB, 501, new BigDecimal("7.00"));
+    // A retried push must be a safe no-op, not a duplicate row.
+    postSplitPeriod(locationA, 501, new BigDecimal("20.00"));
+
+    assertSplitPeriodRow(locationA.locationId(), 501, new BigDecimal("20.00"));
+    assertSplitPeriodRow(locationB.locationId(), 501, new BigDecimal("7.00"));
+  }
+
+  @Test
+  void mobileCreditUsagePull_overHttp_returnsOnlyThatLocationsSpends_eachWithASyncId()
+      throws Exception {
+
+    ProvisionedLocationDto locationA = locationService
+        .registerLocation(new RegisterLocationRequest(uniqueName("Pull Bar"), 41.0, -87.0));
+    ProvisionedLocationDto locationB = locationService
+        .registerLocation(new RegisterLocationRequest(uniqueName("Other Bar"), 41.9, -87.6));
+
+    String email = uniqueName("puller") + "@example.com";
+    userService.register(new RegisterRequest("Pul", "Ler", email, "password123"));
+
+    Instant since = Instant.now().minusSeconds(60);
+    userService.chargeCreditsForQueueAction(email, Integer.valueOf(1), locationA.locationId());
+    userService.chargeCreditsForQueueAction(email, Integer.valueOf(1), locationB.locationId());
+
+    List<UserSongCreditUsageDto> pulled = getMobileCreditUsage(locationA, locationA, since);
+
+    List<UserSongCreditUsageDto> mine =
+        pulled.stream().filter(u -> email.equals(u.userEmail())).toList();
+    assertEquals(1, mine.size(), "Location A's pull must never see location B's spend");
+    assertEquals(locationA.locationId(), mine.get(0).locationId());
+    assertNotNull(mine.get(0).syncId(), "Every new spend needs a cross-instance sync id");
+    assertSyncIdPersisted(mine.get(0).syncId(), locationA.locationId());
+
+    // Location B's credentials must never read location A's spends.
+    HttpHeaders headers = locationHeaders(locationB);
+    ResponseEntity<String> response = restTemplate.exchange(
+        "/api/locations/{locationId}/financial-ledger/mobile-credit-usage?since={since}",
+        HttpMethod.GET, new HttpEntity<>(headers), String.class, locationA.locationId(),
+        since.toString());
+    assertTrue(response.getStatusCode().is4xxClientError() || response.getStatusCode().is5xxServerError(),
+        "A pull for another location's id must be rejected -- got " + response.getStatusCode());
+  }
+
+  // Lives here rather than in its own class so it shares this class's master-mode Spring context
+  // (and its Braintree override) instead of starting another one.
+  @Test
+  void userActivity_mirroredOverHttp_landsInUserActivityUnderThePathsLocation_andIsIdempotent()
+      throws Exception {
+
+    ProvisionedLocationDto location = locationService
+        .registerLocation(new RegisterLocationRequest(uniqueName("Activity Bar"), 41.0, -87.0));
+    ProvisionedLocationDto other = locationService
+        .registerLocation(new RegisterLocationRequest(uniqueName("Other Pub"), 41.5, -87.5));
+
+    String firstId = UUID.randomUUID().toString();
+    String secondId = UUID.randomUUID().toString();
+    List<UserActivityRecord> batch = List.of(
+        new UserActivityRecord(location.locationId(), UserActivitySource.SWING_UI, "LOCAL",
+            UserActivityType.TAB_NAVIGATION, Instant.now(), Map.of("tabName", "GENRES"), firstId),
+        // Claims another location -- the authenticated path's location must win.
+        new UserActivityRecord(Integer.valueOf(999_999), UserActivitySource.SWING_UI, "LOCAL",
+            UserActivityType.ARTIST_VIEWED, Instant.now(), Map.of(), secondId));
+
+    assertEquals(HttpStatus.NO_CONTENT, postUserActivity(location, location, batch));
+    // A retried batch (e.g. the acknowledgement was lost) must never duplicate a row.
+    assertEquals(HttpStatus.NO_CONTENT, postUserActivity(location, location, batch));
+
+    assertUserActivityRowCount(location.locationId(), firstId, 1);
+    assertUserActivityRowCount(location.locationId(), secondId, 1);
+
+    // Another location's credentials must never write into this location's activity.
+    String thirdId = UUID.randomUUID().toString();
+    HttpStatusCode rejected = postUserActivity(other, location, List.of(new UserActivityRecord(
+        location.locationId(), UserActivitySource.SWING_UI, "LOCAL",
+        UserActivityType.TAB_NAVIGATION, Instant.now(), Map.of(), thirdId)));
+    assertTrue(rejected.is4xxClientError() || rejected.is5xxServerError(),
+        "A push for another location's id must be rejected -- got " + rejected);
+    assertUserActivityRowCount(location.locationId(), thirdId, 0);
+  }
+
   // ── HTTP calls, exactly as FinancialLedgerSyncService (the slave) makes them ───────────
+
+  private HttpStatusCode postUserActivity(ProvisionedLocationDto credentials,
+      ProvisionedLocationDto location, List<UserActivityRecord> records) {
+
+    HttpHeaders headers = locationHeaders(credentials);
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    return restTemplate.postForEntity("/api/locations/{locationId}/user-activity/sync",
+        new HttpEntity<>(records, headers), String.class, location.locationId()).getStatusCode();
+  }
+
+  private static HttpHeaders locationHeaders(ProvisionedLocationDto location) {
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.set(LocationController.LOCATION_ID_HEADER, String.valueOf(location.locationId()));
+    headers.set(LocationController.LOCATION_API_KEY_HEADER, location.apiKey());
+    return headers;
+  }
+
+  private void postSplitPeriod(ProvisionedLocationDto location, int sourcePeriodId,
+      BigDecimal totalEarned) {
+
+    HttpHeaders headers = locationHeaders(location);
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    BigDecimal half = totalEarned.divide(BigDecimal.valueOf(2));
+    HttpEntity<JukeboxSplitPeriodSyncDto> request = new HttpEntity<>(new JukeboxSplitPeriodSyncDto(
+        sourcePeriodId, Instant.parse("2026-01-01T00:00:00Z"),
+        Instant.parse("2026-02-01T00:00:00Z"), 50, totalEarned, BigDecimal.ZERO, BigDecimal.ZERO,
+        totalEarned, half, totalEarned.subtract(half)), headers);
+
+    ResponseEntity<Void> response = restTemplate.postForEntity(
+        "/api/locations/{locationId}/financial-ledger/split-period", request, Void.class,
+        location.locationId());
+
+    assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+  }
+
+  private List<UserSongCreditUsageDto> getMobileCreditUsage(ProvisionedLocationDto credentials,
+      ProvisionedLocationDto location, Instant since) {
+
+    ResponseEntity<List<UserSongCreditUsageDto>> response = restTemplate.exchange(
+        "/api/locations/{locationId}/financial-ledger/mobile-credit-usage?since={since}",
+        HttpMethod.GET, new HttpEntity<>(locationHeaders(credentials)),
+        new ParameterizedTypeReference<List<UserSongCreditUsageDto>>() {}, location.locationId(),
+        since.toString());
+
+    assertEquals(HttpStatus.OK, response.getStatusCode());
+    return response.getBody();
+  }
 
   private void postLocalTransaction(ProvisionedLocationDto location, String pathSegment,
       int sourceTransactionId, int amountDollars, Instant timestamp) {
@@ -232,6 +385,56 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
       try (ResultSet rs = statement.executeQuery()) {
         assertTrue(rs.next());
         assertEquals(expectedCount, rs.getInt(1));
+      }
+    }
+  }
+
+  private void assertSplitPeriodRow(Integer locationId, int sourcePeriodId,
+      BigDecimal expectedTotalEarned) throws SQLException {
+
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = connection.prepareStatement(
+            "select total_earned, end_date from location_jukebox_split "
+                + "where parent_location_id = ? and source_period_id = ?")) {
+
+      statement.setInt(1, locationId);
+      statement.setInt(2, sourcePeriodId);
+      try (ResultSet rs = statement.executeQuery()) {
+        assertTrue(rs.next(), "Expected a mirrored split period for locationId " + locationId);
+        assertEquals(0, expectedTotalEarned.compareTo(rs.getBigDecimal("total_earned")));
+        assertNotNull(rs.getTimestamp("end_date"));
+        assertTrue(!rs.next(), "Expected exactly one mirrored split period per source id");
+      }
+    }
+  }
+
+  private void assertUserActivityRowCount(Integer locationId, String activityId,
+      int expectedCount) throws SQLException {
+
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = connection.prepareStatement(
+            "select count(*) from user_activity where location_id = ? and activity_id = ?")) {
+
+      statement.setInt(1, locationId);
+      statement.setString(2, activityId);
+      try (ResultSet rs = statement.executeQuery()) {
+        assertTrue(rs.next());
+        assertEquals(expectedCount, rs.getInt(1));
+      }
+    }
+  }
+
+  private void assertSyncIdPersisted(String syncId, Integer expectedLocationId)
+      throws SQLException {
+
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = connection.prepareStatement(
+            "select location_id from user_song_credit_usage where sync_id = ?")) {
+
+      statement.setString(1, syncId);
+      try (ResultSet rs = statement.executeQuery()) {
+        assertTrue(rs.next(), "Expected user_song_credit_usage to persist sync_id " + syncId);
+        assertEquals(expectedLocationId.intValue(), rs.getInt("location_id"));
       }
     }
   }

@@ -1,8 +1,10 @@
 package com.djt.jukeanator_engine.domain.user.model;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
@@ -265,8 +267,8 @@ public class UserEntity extends AbstractPersistentEntity {
       this.playlists = new ArrayList<>();
     }
 
-    int index = this.playlists.size();
-    PlaylistEntity playlist = new PlaylistEntity(index, this.emailAddress, playlistName);
+    PlaylistEntity playlist = new PlaylistEntity(nextIdentity(this.playlists, 0),
+        this.emailAddress, playlistName);
     playlist.setUser(this);
     this.playlists.add(playlist);
     return playlist;
@@ -326,8 +328,63 @@ public class UserEntity extends AbstractPersistentEntity {
   public UserSongCreditUsageEntity addUserSongCreditUsage(UserSongCreditUsageEntity usage) {
 
     usage.setUser(this);
-    this.userSongCreditUsages.add(usage);
+    requireAdded(getUserSongCreditUsages().add(usage), usage);
     return usage;
+  }
+
+  /** The placeholder id for this user's next new {@link UserSongCreditUsageEntity}. */
+  public Integer nextUserSongCreditUsageIdentity() {
+    return nextIdentity(getUserSongCreditUsages(), 1);
+  }
+
+  /** The placeholder id for this user's next new {@link UserAddFundsTransactionEntity}. */
+  public Integer nextUserAddFundsTransactionIdentity() {
+    return nextIdentity(getUserAddFundsTransactions(), 1);
+  }
+
+  /**
+   * One past the highest id currently held in {@code children} ({@code firstId} if there are
+   * none). Every new child's placeholder id is minted this way rather than from the collection's
+   * size: under JPA, persisted children carry real ids from the shared persistent_identity_seq, and
+   * a size-derived placeholder can equal one of them -- UserRepositoryJpaImpl would then treat the
+   * new child as that existing row (merge() over it), and a HashSet keyed by id would silently drop
+   * it. One past the highest id can never equal an existing one, and under the filesystem
+   * repository it also stays unique after deletions, which a size-derived id does not.
+   */
+  static Integer nextIdentity(Collection<? extends AbstractPersistentEntity> children,
+      int firstId) {
+    return Integer.valueOf(children.stream()
+        .map(AbstractPersistentEntity::getPersistentIdentity)
+        .filter(Objects::nonNull)
+        .mapToInt(Integer::intValue)
+        .max()
+        .orElse(firstId - 1) + 1);
+  }
+
+  // A child equal to one already held (i.e. the same persistentIdentity) would otherwise be
+  // silently dropped by the HashSet -- fail loudly instead.
+  private static void requireAdded(boolean added, AbstractPersistentEntity child) {
+    if (!added) {
+      throw new IllegalStateException("Duplicate persistentIdentity " + child.getPersistentIdentity()
+          + " for new " + child.getClass().getSimpleName());
+    }
+  }
+
+  /**
+   * Re-buckets the id-hashed child sets after their members' persistentIdentity changed in place
+   * (UserRepositoryJpaImpl replacing placeholder ids with real ones on persist()) -- otherwise
+   * contains()/remove() can no longer find them. Clears and refills the same set instance rather
+   * than replacing it, so JPA's orphan-removal bookkeeping on the collection is unaffected.
+   */
+  public void rehashChildCollections() {
+    rehash(getUserSongCreditUsages());
+    rehash(getUserAddFundsTransactions());
+  }
+
+  private static <T> void rehash(Set<T> set) {
+    List<T> members = new ArrayList<>(set);
+    set.clear();
+    set.addAll(members);
   }
 
   public Set<UserAddFundsTransactionEntity> getUserAddFundsTransactions() {
@@ -343,7 +400,7 @@ public class UserEntity extends AbstractPersistentEntity {
       UserAddFundsTransactionEntity transaction) {
 
     transaction.setUser(this);
-    this.userAddFundsTransactions.add(transaction);
+    requireAdded(getUserAddFundsTransactions().add(transaction), transaction);
     return transaction;
   }
 

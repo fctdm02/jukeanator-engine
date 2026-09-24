@@ -94,7 +94,9 @@ CREATE TABLE user_playlist_song (
 
 -- Append-only user-spend credit history: a user spending already-owned song credits to queue a
 -- song at a location (mobile/web queue spends), owned by the user it belongs to. Never written to
--- by the local walk-up (JFC/Swing) user.
+-- by the local walk-up (JFC/Swing) user. sync_id is a master-minted UUID identifying the spend
+-- across instances -- the master-to-slave mirror's idempotency key (see
+-- location_mobile_credit_usage below).
 CREATE TABLE user_song_credit_usage (
     persistent_identity INT PRIMARY KEY,
     user_id              INT,
@@ -105,11 +107,15 @@ CREATE TABLE user_song_credit_usage (
     song_album_id                 INT,
     song_id                         INT,
     resulting_balance                 INT NOT NULL,
+    sync_id                             VARCHAR(36) NULL,
     version                             INT NOT NULL DEFAULT 1,
     date_added                           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_user_song_credit_usage_user_account FOREIGN KEY (user_id) REFERENCES user_account (persistent_identity)
+    CONSTRAINT fk_user_song_credit_usage_user_account FOREIGN KEY (user_id) REFERENCES user_account (persistent_identity),
+    CONSTRAINT uq_user_song_credit_usage_sync_id UNIQUE (sync_id)
 ) ENGINE=InnoDB;
+
+CREATE INDEX ix_user_song_credit_usage_location_timestamp ON user_song_credit_usage (location_id, timestamp);
 
 -- Append-only record of a user obtaining song credits with real money (via PaymentGateway, e.g.
 -- Braintree) -- never location-attributed, unlike user_song_credit_usage above.
@@ -213,8 +219,12 @@ CREATE TABLE song_background_music (
 ) ENGINE=InnoDB;
 
 -- Financial Ledger / jukebox-split feature. Freestanding (not owned by another aggregate), but
--- tenant-separated by parent_location_id (like song_library) so a slave's splits can later be
--- synced into master's database alongside every other location's.
+-- tenant-separated by parent_location_id (like song_library) so a slave's finalized splits are
+-- mirrored into master's database alongside every other location's. source_period_id is the
+-- slave-to-master mirror's idempotency key (same role as location_transaction's
+-- source_transaction_id): NULL on the slave's own rows, the slave's own persistent_identity on
+-- master's mirrored copy. synced_to_master_at is the slave-side outbox marker: NULL until master
+-- has acknowledged the mirror push (always NULL on master's own copy).
 CREATE TABLE location_jukebox_split (
     persistent_identity INT PRIMARY KEY,
     version               INT NOT NULL DEFAULT 1,
@@ -228,10 +238,13 @@ CREATE TABLE location_jukebox_split (
     total_earned                        DECIMAL(12,2) NULL,
     amount_due_owner                      DECIMAL(12,2) NULL,
     amount_due_operator                     DECIMAL(12,2) NULL,
+    source_period_id                          INT NULL,
+    synced_to_master_at                         TIMESTAMP NULL,
     date_added                                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_location_jukebox_split_location FOREIGN KEY (parent_location_id) REFERENCES location (id)
-        ON UPDATE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT uq_location_jukebox_split_source UNIQUE (parent_location_id, source_period_id)
 ) ENGINE=InnoDB;
 
 CREATE INDEX ix_location_jukebox_split_location ON location_jukebox_split (parent_location_id);
@@ -245,7 +258,8 @@ CREATE INDEX ix_location_jukebox_split_location ON location_jukebox_split (paren
 -- it, carrying the slave's own local persistent_identity for that transaction. The composite
 -- unique key only meaningfully constrains mirrored rows -- MySQL treats any row containing a NULL
 -- indexed column as distinct from every other row in a unique index, so genuinely local
--- transactions never collide with each other.
+-- transactions never collide with each other. synced_to_master_at is the slave-side outbox
+-- marker: NULL until master has acknowledged the mirror push (always NULL on master's own copy).
 CREATE TABLE location_transaction (
     persistent_identity INT PRIMARY KEY,
     transaction_type      VARCHAR(20) NOT NULL,
@@ -254,6 +268,7 @@ CREATE TABLE location_transaction (
     timestamp                   TIMESTAMP NOT NULL,
     location_id                   INT NULL,
     source_transaction_id           INT NULL,
+    synced_to_master_at               TIMESTAMP NULL,
     date_added                        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_location_transaction_source UNIQUE (location_id, source_transaction_id)
@@ -261,8 +276,37 @@ CREATE TABLE location_transaction (
 
 CREATE INDEX ix_location_transaction_location ON location_transaction (location_id);
 
+-- Slave-only copy of the mobile/web song-credit spends master recorded against this location
+-- (master's authoritative copy is user_song_credit_usage, which a slave never populates for
+-- mobile/web users -- see UserServiceImpl.handleSongAddedToQueueEvent). Keyed by user email
+-- rather than a user_account FK, since user accounts live only on master. source_sync_id is
+-- master's user_song_credit_usage.sync_id -- the master-to-slave mirror's idempotency key.
+-- FinancialLedgerServiceImpl sums these for a slave's jukebox-split mobile_total.
+CREATE TABLE location_mobile_credit_usage (
+    persistent_identity INT PRIMARY KEY,
+    version               INT NOT NULL DEFAULT 1,
+    location_id             INT NULL,
+    source_sync_id            VARCHAR(36) NOT NULL,
+    user_email                  VARCHAR(255) NOT NULL,
+    amount                        INT NOT NULL,
+    type                            VARCHAR(255) NOT NULL,
+    timestamp                         TIMESTAMP NOT NULL,
+    song_album_id                       INT NULL,
+    song_id                               INT NULL,
+    date_added                              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_updated                              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_location_mobile_credit_usage_source UNIQUE (location_id, source_sync_id)
+) ENGINE=InnoDB;
+
+CREATE INDEX ix_location_mobile_credit_usage_location_timestamp
+    ON location_mobile_credit_usage (location_id, timestamp);
+
 -- Append-only user-activity log (Swing/JFC desktop UI navigation + queue actions, mobile/web queue
--- actions). No update/delete path -- UserActivityRepositoryJpaImpl only ever inserts.
+-- actions). The only update is the slave-side outbox marker; the only delete is the retention purge.
+-- activity_id is a UUID minted when the activity is captured -- the slave-to-master mirror's
+-- idempotency key, so master's mirrored copy of a slave's row carries the same activity_id under
+-- the same location_id. synced_to_master_at is the slave-side outbox marker: NULL until master has
+-- acknowledged the mirror push (always NULL on master's own rows).
 CREATE TABLE user_activity (
     persistent_identity INT PRIMARY KEY,
     location_id          INT NULL,
@@ -271,9 +315,13 @@ CREATE TABLE user_activity (
     activity_type              VARCHAR(64) NOT NULL,
     occurred_at                  TIMESTAMP NOT NULL,
     details                        JSON NULL,
+    activity_id                      VARCHAR(36) NULL,
+    synced_to_master_at                TIMESTAMP NULL,
     date_added                       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    date_updated                       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    date_updated                       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_user_activity_activity_id UNIQUE (location_id, activity_id)
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_user_activity_location_occurred_at ON user_activity (location_id, occurred_at);
 CREATE INDEX idx_user_activity_activity_type ON user_activity (activity_type);
+CREATE INDEX idx_user_activity_synced_to_master_at ON user_activity (synced_to_master_at);

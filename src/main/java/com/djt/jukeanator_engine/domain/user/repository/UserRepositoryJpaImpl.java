@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.user.repository;
 
 import static java.util.Objects.requireNonNull;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -82,6 +83,10 @@ public final class UserRepositoryJpaImpl implements UserRepository {
 
     requireNonNull(root, "root cannot be null");
 
+    // Users whose in-memory children just had their placeholder ids replaced by real ones -- see
+    // the rehash after the transaction below.
+    List<UserEntity> reIdentifiedUsers = new ArrayList<>();
+
     transactionTemplate.executeWithoutResult(status -> {
 
       Set<Integer> currentIds = new HashSet<>();
@@ -104,8 +109,8 @@ public final class UserRepositoryJpaImpl implements UserRepository {
 
       // A brand-new UserEntity still carries the placeholder persistentIdentity that
       // UserServiceImpl/UserEntity assign for the filesystem-repository's benefit (there's no DB
-      // there to generate one) -- e.g. userRoot.getUsers().size() + 1. That placeholder is
-      // meaningless here: merge()-ing an entity whose id doesn't yet exist in `user_account` makes
+      // there to generate one) -- see UserRootEntity.nextUserPersistentIdentity(). That placeholder
+      // is meaningless here: merge()-ing an entity whose id doesn't yet exist in `user_account` makes
       // Hibernate assume the row must already exist and issue an UPDATE instead of an INSERT,
       // which matches zero rows and throws OptimisticLockException ("...or unsaved-value mapping
       // was incorrect"). persist() instead lets the real @GeneratedValue(SEQUENCE) on
@@ -121,14 +126,21 @@ public final class UserRepositoryJpaImpl implements UserRepository {
           // The same placeholder-id problem described above applies just as much to a single new
           // PlaylistEntity/UserSongCreditUsageEntity/UserAddFundsTransactionEntity added onto an
           // otherwise-already-persisted user (e.g. UserServiceImpl.deductCredits() assigning
-          // getUserSongCreditUsages().size() + 1): merge() on a non-null id it doesn't recognize
-          // issues an UPDATE that matches zero rows instead of an INSERT, throwing
+          // UserEntity.nextUserSongCreditUsageIdentity()): merge() on a non-null id it doesn't
+          // recognize issues an UPDATE that matches zero rows instead of an INSERT, throwing
           // OptimisticLockException. Unlike the brand-new-user persist() path below, merge() also
           // returns a copy rather than mutating `user` in place, so its cascade wouldn't write the
           // real generated id back onto our long-lived in-memory userRoot anyway -- persist() each
           // new child directly first (which does mutate in place) so it's already a managed,
           // real-id'd entity by the time merge(user) cascades over the rest of the (unchanged)
           // collection.
+          //
+          // Only a child whose id is NOT among this user's persisted ids is treated as new, so a
+          // placeholder must never equal one of them -- which is why every placeholder is minted
+          // one past the highest id already in its scope (see UserEntity.nextIdentity) rather than
+          // from a collection size, which can land on an existing real id and then either merge()
+          // over that row or be silently dropped from a HashSet keyed by id.
+          boolean reIdentified = false;
           Set<Integer> persistedUsageIds = new HashSet<>(entityManager
               .createQuery("select t.persistentIdentity from UserSongCreditUsageEntity t "
                   + "where t.user.persistentIdentity = :userId", Integer.class)
@@ -138,6 +150,7 @@ public final class UserRepositoryJpaImpl implements UserRepository {
             if (!persistedUsageIds.contains(usage.getPersistentIdentity())) {
               usage.setPersistentIdentity(null);
               entityManager.persist(usage);
+              reIdentified = true;
             }
           }
 
@@ -150,6 +163,7 @@ public final class UserRepositoryJpaImpl implements UserRepository {
             if (!persistedAddFundsIds.contains(transaction.getPersistentIdentity())) {
               transaction.setPersistentIdentity(null);
               entityManager.persist(transaction);
+              reIdentified = true;
             }
           }
 
@@ -165,6 +179,9 @@ public final class UserRepositoryJpaImpl implements UserRepository {
             }
           }
 
+          if (reIdentified) {
+            reIdentifiedUsers.add(user);
+          }
           entityManager.merge(user);
         } else {
           user.setPersistentIdentity(null);
@@ -178,9 +195,17 @@ public final class UserRepositoryJpaImpl implements UserRepository {
             transaction.setPersistentIdentity(null);
           }
           entityManager.persist(user);
+          reIdentifiedUsers.add(user);
         }
       }
     });
+
+    // UserSongCreditUsageEntity/UserAddFundsTransactionEntity hash by persistentIdentity, and the
+    // persist() calls above just changed it on entities already sitting in their user's HashSet --
+    // leaving them in stale buckets, where contains()/remove() can no longer find them. Rehash.
+    for (UserEntity user : reIdentifiedUsers) {
+      user.rehashChildCollections();
+    }
   }
 
   private UserRootEntity loadOrCreateRoot() {

@@ -8,10 +8,11 @@ import java.util.List;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
- * Singleton in-memory aggregate root holding every jukebox-split period and every local (cash /
- * credit-card-reader) credit transaction. Not itself JPA-mapped -- {@code
- * FinancialLedgerRepositoryJpaImpl} loads {@link JukeboxSplitPeriodEntity}, {@link
- * LocalCashTransactionEntity}, and {@link LocalCreditTransactionEntity} rows directly and
+ * Singleton in-memory aggregate root holding every jukebox-split period, every local (cash /
+ * credit-card-reader) credit transaction, and (on a slave) every mirrored mobile/web credit spend.
+ * Not itself JPA-mapped -- {@code FinancialLedgerRepositoryJpaImpl} loads {@link
+ * JukeboxSplitPeriodEntity}, {@link LocalCashTransactionEntity}, {@link
+ * LocalCreditTransactionEntity}, and {@link LocationMobileCreditUsageEntity} rows directly and
  * assembles this aggregate around them, exactly like {@code LocationRootEntity}.
  */
 public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
@@ -23,6 +24,7 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
   private final List<JukeboxSplitPeriodEntity> splitPeriods = new ArrayList<>();
   private final List<LocalCashTransactionEntity> localCashTransactions = new ArrayList<>();
   private final List<LocalCreditTransactionEntity> localCreditCardTransactions = new ArrayList<>();
+  private final List<LocationMobileCreditUsageEntity> mobileCreditUsages = new ArrayList<>();
 
   public FinancialLedgerRootEntity() {
     super(Integer.valueOf(0));
@@ -96,14 +98,57 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
     return hasTransactionFromSource(localCreditCardTransactions, locationId, sourceTransactionId);
   }
 
+  /** Same as {@link #hasLocalCashTransactionFromSource}, for mirrored split periods. */
+  public boolean hasSplitPeriodFromSource(Integer locationId, Integer sourcePeriodId) {
+    return splitPeriods.stream().anyMatch(p -> locationId.equals(p.getLocationId())
+        && sourcePeriodId.equals(p.getSourcePeriodId()));
+  }
+
+  public List<LocationMobileCreditUsageEntity> getMobileCreditUsages() {
+    return Collections.unmodifiableList(mobileCreditUsages);
+  }
+
+  public void addMobileCreditUsage(LocationMobileCreditUsageEntity usage) {
+    mobileCreditUsages.add(usage);
+  }
+
+  /** True if master's spend {@code sourceSyncId} has already been mirrored to this instance. */
+  public boolean hasMobileCreditUsageFromSource(String sourceSyncId) {
+    return mobileCreditUsages.stream().anyMatch(u -> sourceSyncId.equals(u.getSourceSyncId()));
+  }
+
   /**
-   * Re-tags every local transaction recorded under {@code oldLocationId} with {@code
-   * newLocationId} -- the in-memory counterpart of {@code
-   * LocationRepositoryJpaImpl.changeLocationId}'s location_transaction update.
+   * Mirrored mobile/web spends tagged with {@code locationId} in {@code [from, to]} (inclusive at
+   * both ends, same as {@code UserService.getCreditLedgerForLocation}).
+   */
+  public List<LocationMobileCreditUsageEntity> getMobileCreditUsagesBetween(Integer locationId,
+      Instant from, Instant to) {
+    return mobileCreditUsages.stream()
+        .filter(u -> locationId.equals(u.getLocationId()))
+        .filter(u -> !u.getTimestamp().isBefore(from) && !u.getTimestamp().isAfter(to))
+        .toList();
+  }
+
+  /** The most recent mirrored mobile/web spend's timestamp, or {@code null} if there are none. */
+  public Instant getLatestMobileCreditUsageTimestamp() {
+    return mobileCreditUsages.stream()
+        .map(LocationMobileCreditUsageEntity::getTimestamp)
+        .max(Comparator.naturalOrder())
+        .orElse(null);
+  }
+
+  /**
+   * Re-tags every local transaction and mirrored mobile spend recorded under {@code
+   * oldLocationId} with {@code newLocationId} -- the in-memory counterpart of {@code
+   * LocationRepositoryJpaImpl.changeLocationId}'s location_transaction and
+   * location_mobile_credit_usage updates.
    */
   public void changeLocationId(Integer oldLocationId, Integer newLocationId) {
     changeLocationId(localCashTransactions, oldLocationId, newLocationId);
     changeLocationId(localCreditCardTransactions, oldLocationId, newLocationId);
+    mobileCreditUsages.stream()
+        .filter(u -> oldLocationId.equals(u.getLocationId()))
+        .forEach(u -> u.changeLocationId(newLocationId));
   }
 
   private static void changeLocationId(

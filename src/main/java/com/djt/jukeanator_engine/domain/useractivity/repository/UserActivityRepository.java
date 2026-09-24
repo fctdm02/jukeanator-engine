@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.useractivity.repository;
 
 import java.time.Instant;
 import java.util.List;
+import com.djt.jukeanator_engine.domain.useractivity.model.PendingUserActivity;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityRecord;
 
 /**
@@ -34,4 +35,25 @@ public interface UserActivityRepository {
   default void changeLocationId(Integer oldLocationId, Integer newLocationId) {
     // no-op by default
   }
+
+  /**
+   * Slave-only. Up to {@code limit} of this instance's activity records master has not yet
+   * acknowledged, oldest first -- the user-activity outbox {@code UserActivitySyncService} drains.
+   * Records attributed to {@code SystemPrincipal.SYSTEM_USERNAME} are never returned: they are this
+   * slave's own log of a queue command master relayed on a mobile/web user's behalf, which master
+   * already recorded itself under that user's email. A record with no {@code activityId} (written
+   * before activity ids existed) is returned with a stable, position-derived one.
+   */
+  List<PendingUserActivity> findPendingMasterSync(int limit);
+
+  /** Slave-only. Marks {@code acknowledged} (from {@link #findPendingMasterSync}) as synced. */
+  void markSyncedToMaster(List<PendingUserActivity> acknowledged);
+
+  /**
+   * Master-only. Stores one mirrored slave activity record unless one with the same {@code
+   * (locationId, activityId)} is already stored -- a retried push is a safe no-op.
+   *
+   * @return {@code true} if the record was stored, {@code false} if it was already present
+   */
+  boolean recordIfAbsent(UserActivityRecord record);
 }

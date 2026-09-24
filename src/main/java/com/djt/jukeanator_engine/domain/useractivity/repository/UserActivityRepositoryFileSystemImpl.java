@@ -12,11 +12,18 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 import com.djt.jukeanator_engine.domain.common.repository.AbstractRepositoryFileSystemImpl;
+import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
+import com.djt.jukeanator_engine.domain.useractivity.model.PendingUserActivity;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityRecord;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 /**
  * JSON-Lines, filesystem-backed implementation of {@link UserActivityRepository}. Activity events
@@ -33,6 +40,10 @@ public final class UserActivityRepositoryFileSystemImpl extends AbstractReposito
 
   private static final DateTimeFormatter DAY_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
+
+  // Slave-side outbox position -- see findPendingMasterSync. Lives directly in the activity
+  // directory, beside (never inside) the location-<id> directories every read/purge walks.
+  static final String SYNC_CURSOR_FILENAME = "master-sync-cursor.json";
 
   private String activityDir;
 
@@ -56,12 +67,182 @@ public final class UserActivityRepositoryFileSystemImpl extends AbstractReposito
 
     requireNonNull(record, "record cannot be null");
 
-    String locationSegment = "location-" + record.locationId();
-    String dayFileName = DAY_FORMATTER.format(record.occurredAt()) + ".jsonl";
-    String filePath =
-        activityDir + File.separator + locationSegment + File.separator + dayFileName;
+    appendJsonLine(dayFilePath(record).toString(), record);
+  }
 
-    appendJsonLine(filePath, record);
+  private Path dayFilePath(UserActivityRecord record) {
+    return Path.of(activityDir, "location-" + record.locationId(),
+        DAY_FORMATTER.format(record.occurredAt()) + ".jsonl");
+  }
+
+  /**
+   * Day-files are append-only, so this slave's outbox is simply "every byte past what master has
+   * acknowledged" in each one: {@link #SYNC_CURSOR_FILENAME} maps each day-file (relative to the
+   * activity directory) to the byte offset up to which master has acknowledged its lines. A file
+   * with no entry is entirely unacknowledged -- including every file written before this existed,
+   * which is simply pushed once (master's copy is idempotent on {@code activityId}).
+   */
+  @Override
+  public synchronized List<PendingUserActivity> findPendingMasterSync(int limit) {
+
+    Path root = Path.of(activityDir);
+    List<PendingUserActivity> result = new ArrayList<>();
+    if (!Files.isDirectory(root) || limit <= 0) {
+      return result;
+    }
+
+    Map<String, Long> cursor = readSyncCursor();
+
+    for (Path dayFile : listDayFilesOldestFirst(root)) {
+      String relativePath = relativePath(root, dayFile);
+      long acknowledgedOffset = cursor.getOrDefault(relativePath, Long.valueOf(0)).longValue();
+
+      byte[] unacknowledged;
+      try {
+        if (Files.size(dayFile) <= acknowledgedOffset) {
+          continue;
+        }
+        byte[] content = Files.readAllBytes(dayFile);
+        unacknowledged = Arrays.copyOfRange(content, (int) acknowledgedOffset, content.length);
+      } catch (IOException ioe) {
+        throw new UncheckedIOException("Could not read activity file: " + dayFile, ioe);
+      }
+
+      int lineStart = 0;
+      for (int i = 0; i < unacknowledged.length && result.size() < limit; i++) {
+        if (unacknowledged[i] != '\n') {
+          continue;
+        }
+        long lineStartOffset = acknowledgedOffset + lineStart;
+        long lineEndOffset = acknowledgedOffset + i + 1;
+        String line = new String(unacknowledged, lineStart, i - lineStart, StandardCharsets.UTF_8)
+            .strip();
+        lineStart = i + 1;
+
+        UserActivityRecord record = parseLine(line);
+        // A malformed line or a master-relayed (SYSTEM) one is never pushed; the cursor still moves
+        // past it once a later line in the same file is acknowledged.
+        if (record == null || SystemPrincipal.SYSTEM_USERNAME.equals(record.username())) {
+          continue;
+        }
+
+        // A line written before activity ids existed gets a stand-in derived from its own
+        // position -- stable across sweeps, so a re-push of it is still idempotent on master.
+        String activityId = record.activityId() != null ? record.activityId()
+            : UUID.nameUUIDFromBytes((relativePath + "#" + lineStartOffset)
+                .getBytes(StandardCharsets.UTF_8)).toString();
+        result.add(new PendingUserActivity(relativePath + "#" + lineEndOffset,
+            record.with(record.locationId(), activityId)));
+      }
+
+      if (result.size() >= limit) {
+        break;
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public synchronized void markSyncedToMaster(List<PendingUserActivity> acknowledged) {
+
+    if (acknowledged.isEmpty()) {
+      return;
+    }
+
+    Path root = Path.of(activityDir);
+    Map<String, Long> cursor = readSyncCursor();
+
+    for (PendingUserActivity pending : acknowledged) {
+      int separator = pending.cursor().lastIndexOf('#');
+      String relativePath = pending.cursor().substring(0, separator);
+      Long endOffset = Long.valueOf(pending.cursor().substring(separator + 1));
+      cursor.merge(relativePath, endOffset, (existing, next) -> Math.max(existing, next));
+    }
+
+    // Day-files removed since (retention purge, location re-key) no longer need a cursor entry.
+    cursor.keySet().removeIf(relativePath -> !Files.exists(root.resolve(relativePath)));
+
+    writeSyncCursor(cursor);
+  }
+
+  @Override
+  public synchronized boolean recordIfAbsent(UserActivityRecord record) {
+
+    requireNonNull(record, "record cannot be null");
+    requireNonNull(record.activityId(), "record.activityId() cannot be null");
+
+    // A given activity's day-file is fully determined by its location and occurredAt, so a
+    // duplicate can only ever be in that one file.
+    Path dayFile = dayFilePath(record);
+    if (Files.exists(dayFile)) {
+      try {
+        for (String line : Files.readAllLines(dayFile, StandardCharsets.UTF_8)) {
+          UserActivityRecord existing = parseLine(line.strip());
+          if (existing != null && record.activityId().equals(existing.activityId())) {
+            return false;
+          }
+        }
+      } catch (IOException ioe) {
+        throw new UncheckedIOException("Could not read activity file: " + dayFile, ioe);
+      }
+    }
+
+    appendJsonLine(dayFile.toString(), record);
+    return true;
+  }
+
+  private static UserActivityRecord parseLine(String line) {
+    if (line.isBlank()) {
+      return null;
+    }
+    try {
+      return MAPPER.readValue(line, UserActivityRecord.class);
+    } catch (IOException ioe) {
+      return null;
+    }
+  }
+
+  private static List<Path> listDayFilesOldestFirst(Path root) {
+
+    try (Stream<Path> listing = Files.walk(root, 2)) {
+      return listing
+          .filter(p -> p.getFileName().toString().endsWith(".jsonl"))
+          .sorted(Comparator.comparing((Path p) -> p.getFileName().toString())
+              .thenComparing(Path::toString))
+          .toList();
+    } catch (IOException ioe) {
+      throw new UncheckedIOException("Could not list activity directory: " + root, ioe);
+    }
+  }
+
+  private static String relativePath(Path root, Path dayFile) {
+    return root.relativize(dayFile).toString().replace(File.separatorChar, '/');
+  }
+
+  private Map<String, Long> readSyncCursor() {
+
+    Path cursorFile = Path.of(activityDir, SYNC_CURSOR_FILENAME);
+    if (!Files.exists(cursorFile)) {
+      return new HashMap<>();
+    }
+    try {
+      return new HashMap<>(
+          MAPPER.readValue(cursorFile.toFile(), new TypeReference<Map<String, Long>>() {}));
+    } catch (IOException ioe) {
+      throw new UncheckedIOException("Could not read activity sync cursor: " + cursorFile, ioe);
+    }
+  }
+
+  private void writeSyncCursor(Map<String, Long> cursor) {
+
+    Path cursorFile = Path.of(activityDir, SYNC_CURSOR_FILENAME);
+    try {
+      Files.createDirectories(cursorFile.getParent());
+      Files.writeString(cursorFile, OBJECT_WRITER.writeValueAsString(cursor),
+          StandardCharsets.UTF_8);
+    } catch (IOException ioe) {
+      throw new UncheckedIOException("Could not write activity sync cursor: " + cursorFile, ioe);
+    }
   }
 
   @Override
@@ -207,9 +388,7 @@ public final class UserActivityRepositoryFileSystemImpl extends AbstractReposito
 
     try {
       UserActivityRecord record = MAPPER.readValue(line, UserActivityRecord.class);
-      return OBJECT_WRITER.writeValueAsString(new UserActivityRecord(newLocationId,
-          record.source(), record.username(), record.activityType(), record.occurredAt(),
-          record.details()));
+      return OBJECT_WRITER.writeValueAsString(record.with(newLocationId, record.activityId()));
     } catch (IOException ioe) {
       return line;
     }

@@ -41,6 +41,16 @@ public class UserRootEntity extends AbstractPersistentEntity {
     return this.users.put(user.getEmailAddress(), user);
   }
 
+  /**
+   * The placeholder id for the next new user -- one past the highest id any user currently holds,
+   * never a user count, for the reason given on {@code UserEntity.nextIdentity}: a count can equal
+   * an existing user's real JPA id, and UserRepositoryJpaImpl would then merge() the new user over
+   * that existing account.
+   */
+  public Integer nextUserPersistentIdentity() {
+    return UserEntity.nextIdentity(this.users.values(), 1);
+  }
+
   public UserEntity getUserByEmailAddressNullIfNotExists(String emailAddress) {
 
     return this.users.get(emailAddress);

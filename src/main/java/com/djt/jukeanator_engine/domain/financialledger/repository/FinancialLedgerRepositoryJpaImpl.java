@@ -15,15 +15,17 @@ import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRoo
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocationMobileCreditUsageEntity;
 
 /**
  * JPA/Hibernate-backed implementation of {@link FinancialLedgerRepository}, following the same
  * shape as {@code LocationRepositoryJpaImpl}: {@link FinancialLedgerRootEntity} is not itself
  * JPA-mapped (no {@code financial_ledger_root} table) -- it's an in-memory aggregate assembled
- * directly from {@link JukeboxSplitPeriodEntity}, {@link LocalCashTransactionEntity}, and {@link
- * LocalCreditTransactionEntity} rows. None of these child types are ever deleted once created, so
- * unlike {@code LocationRepositoryJpaImpl} there is no orphan-removal step -- only merge (existing
- * rows, e.g. finalizing a period) and insert (new rows).
+ * directly from {@link JukeboxSplitPeriodEntity}, {@link LocalCashTransactionEntity}, {@link
+ * LocalCreditTransactionEntity}, and {@link LocationMobileCreditUsageEntity} rows. None of these
+ * child types are ever deleted once created, so unlike {@code LocationRepositoryJpaImpl} there is
+ * no orphan-removal step -- only merge (existing rows, e.g. finalizing a period or marking one
+ * synced to master) and insert (new rows).
  */
 public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRepository {
 
@@ -107,6 +109,19 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
           insertNewLocationTransaction(transaction, "CREDIT_CARD");
         }
       }
+
+      Set<Integer> persistedMobileIds = new HashSet<>(entityManager
+          .createQuery("select u.persistentIdentity from LocationMobileCreditUsageEntity u",
+              Integer.class)
+          .getResultList());
+
+      for (LocationMobileCreditUsageEntity usage : root.getMobileCreditUsages()) {
+        if (persistedMobileIds.contains(usage.getPersistentIdentity())) {
+          entityManager.merge(usage);
+        } else {
+          insertNewMobileCreditUsage(usage);
+        }
+      }
     });
   }
 
@@ -126,24 +141,25 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
     });
   }
 
-  // parent_location_id is sourced from the period's transient parentLocation (see
-  // JukeboxSplitPeriodEntity), same as SongLibraryRepositoryJpaImpl sourcing it from
-  // RootFolderEntity's. It never changes after insert, so merge() of an existing row leaves it be.
+  // parent_location_id is sourced from JukeboxSplitPeriodEntity.getLocationId() -- the period's
+  // transient parentLocation on the owning instance (same as SongLibraryRepositoryJpaImpl sourcing
+  // it from RootFolderEntity's), or the mirrored slave's location id on master. The entity maps it
+  // read-only, so merge() of an existing row leaves it be.
   private void insertNewPeriod(JukeboxSplitPeriodEntity period) {
 
-    requireNonNull(period.getParentLocation(),
-        "period.getParentLocation() cannot be null when storing via FinancialLedgerRepositoryJpaImpl");
+    requireNonNull(period.getLocationId(),
+        "period.getLocationId() cannot be null when storing via FinancialLedgerRepositoryJpaImpl");
 
     entityManager.createNativeQuery("insert into location_jukebox_split "
         + "(persistent_identity, version, parent_location_id, start_date, end_date, "
         + "split_percentage_to_owner, cash_total, card_total, mobile_total, total_earned, "
-        + "amount_due_owner, amount_due_operator) "
+        + "amount_due_owner, amount_due_operator, source_period_id, synced_to_master_at) "
         + "values (:id, :version, :parentLocationId, :startDate, :endDate, "
         + ":splitPercentageToOwner, :cashTotal, :cardTotal, :mobileTotal, :totalEarned, "
-        + ":amountDueOwner, :amountDueOperator)")
+        + ":amountDueOwner, :amountDueOperator, :sourcePeriodId, :syncedToMasterAt)")
         .setParameter("id", period.getPersistentIdentity())
         .setParameter("version", period.getVersion())
-        .setParameter("parentLocationId", period.getParentLocation().getPersistentIdentity())
+        .setParameter("parentLocationId", period.getLocationId())
         .setParameter("startDate", period.getStartDate())
         .setParameter("endDate", period.getEndDate())
         .setParameter("splitPercentageToOwner", period.getSplitPercentageToOwner())
@@ -153,6 +169,8 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
         .setParameter("totalEarned", period.getTotalEarned())
         .setParameter("amountDueOwner", period.getAmountDueOwner())
         .setParameter("amountDueOperator", period.getAmountDueOperator())
+        .setParameter("sourcePeriodId", period.getSourcePeriodId())
+        .setParameter("syncedToMasterAt", period.getSyncedToMasterAt())
         .executeUpdate();
   }
 
@@ -166,9 +184,9 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
 
     entityManager.createNativeQuery("insert into location_transaction "
         + "(persistent_identity, version, transaction_type, amount_dollars, timestamp, "
-        + "location_id, source_transaction_id) "
+        + "location_id, source_transaction_id, synced_to_master_at) "
         + "values (:id, :version, :transactionType, :amountDollars, :timestamp, :locationId, "
-        + ":sourceTransactionId)")
+        + ":sourceTransactionId, :syncedToMasterAt)")
         .setParameter("id", transaction.getPersistentIdentity())
         .setParameter("version", transaction.getVersion())
         .setParameter("transactionType", discriminatorValue)
@@ -176,6 +194,28 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
         .setParameter("timestamp", transaction.getTimestamp())
         .setParameter("locationId", transaction.getLocationId())
         .setParameter("sourceTransactionId", transaction.getSourceTransactionId())
+        .setParameter("syncedToMasterAt", transaction.getSyncedToMasterAt())
+        .executeUpdate();
+  }
+
+  // Native insert for the same pre-assigned-id reason as the two inserts above.
+  private void insertNewMobileCreditUsage(LocationMobileCreditUsageEntity usage) {
+
+    entityManager.createNativeQuery("insert into location_mobile_credit_usage "
+        + "(persistent_identity, version, location_id, source_sync_id, user_email, amount, type, "
+        + "timestamp, song_album_id, song_id) "
+        + "values (:id, :version, :locationId, :sourceSyncId, :userEmail, :amount, :type, "
+        + ":timestamp, :songAlbumId, :songId)")
+        .setParameter("id", usage.getPersistentIdentity())
+        .setParameter("version", usage.getVersion())
+        .setParameter("locationId", usage.getLocationId())
+        .setParameter("sourceSyncId", usage.getSourceSyncId())
+        .setParameter("userEmail", usage.getUserEmail())
+        .setParameter("amount", usage.getAmount())
+        .setParameter("type", usage.getType().name())
+        .setParameter("timestamp", usage.getTimestamp())
+        .setParameter("songAlbumId", usage.getSongAlbumId())
+        .setParameter("songId", usage.getSongId())
         .executeUpdate();
   }
 
@@ -195,10 +235,15 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
           .createQuery("from LocalCreditTransactionEntity", LocalCreditTransactionEntity.class)
           .getResultList();
 
+      List<LocationMobileCreditUsageEntity> mobileCreditUsages = entityManager
+          .createQuery("from LocationMobileCreditUsageEntity", LocationMobileCreditUsageEntity.class)
+          .getResultList();
+
       FinancialLedgerRootEntity root = new FinancialLedgerRootEntity();
       periods.forEach(root::addSplitPeriod);
       cashTransactions.forEach(root::addLocalCashTransaction);
       creditCardTransactions.forEach(root::addLocalCreditCardTransaction);
+      mobileCreditUsages.forEach(root::addMobileCreditUsage);
       return root;
     });
   }

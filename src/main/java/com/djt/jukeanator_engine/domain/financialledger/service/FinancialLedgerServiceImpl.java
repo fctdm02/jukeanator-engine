@@ -11,14 +11,19 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import com.djt.jukeanator_engine.domain.financialledger.config.FinancialLedgerProperties;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodSyncDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.MasterSyncOutboxEntry;
+import com.djt.jukeanator_engine.domain.financialledger.event.JukeboxSplitFinalizedEvent;
 import com.djt.jukeanator_engine.domain.financialledger.event.LocalFinancialTransactionRecordedEvent;
 import com.djt.jukeanator_engine.domain.financialledger.exception.FinancialLedgerException;
 import com.djt.jukeanator_engine.domain.financialledger.mapper.FinancialLedgerMapper;
+import com.djt.jukeanator_engine.domain.financialledger.model.AbstractLocationTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocationMobileCreditUsageEntity;
 import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedgerRepository;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
@@ -41,13 +46,15 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
   private final SongLibraryService songLibraryService;
   private final ApplicationEventPublisher eventPublisher;
   private final LocationService locationService;
+  private final boolean slaveMode;
 
   private FinancialLedgerRootEntity ledgerRoot;
 
   public FinancialLedgerServiceImpl(FinancialLedgerRepository financialLedgerRepository,
       FinancialLedgerProperties financialLedgerProperties, UserService userService,
       PricingService pricingService, SongLibraryService songLibraryService,
-      ApplicationEventPublisher eventPublisher, LocationService locationService) {
+      ApplicationEventPublisher eventPublisher, LocationService locationService,
+      boolean slaveMode) {
 
     this.financialLedgerRepository = financialLedgerRepository;
     this.financialLedgerProperties = financialLedgerProperties;
@@ -56,6 +63,7 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     this.songLibraryService = songLibraryService;
     this.eventPublisher = eventPublisher;
     this.locationService = locationService;
+    this.slaveMode = slaveMode;
 
     initialize();
   }
@@ -159,6 +167,146 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     financialLedgerRepository.storeAggregateRoot(ledgerRoot);
   }
 
+  @Override
+  public synchronized void receiveSplitPeriodSync(Integer locationId, String apiKey,
+      JukeboxSplitPeriodSyncDto dto) throws LocationServiceException {
+
+    requireValidLocation(locationId, apiKey);
+
+    if (dto.endDate() == null) {
+      throw new FinancialLedgerException(
+          "Only finalized jukebox-split periods can be mirrored -- sourcePeriodId: "
+              + dto.sourcePeriodId() + ", locationId: " + locationId);
+    }
+
+    if (ledgerRoot.hasSplitPeriodFromSource(locationId, dto.sourcePeriodId())) {
+      return; // already mirrored -- safe no-op on a retried push
+    }
+
+    Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
+    ledgerRoot.addSplitPeriod(JukeboxSplitPeriodEntity.mirroredFrom(persistentIdentity,
+        locationId, dto.sourcePeriodId(), dto.startDate(), dto.endDate(),
+        dto.splitPercentageToOwner(), dto.cashTotal(), dto.cardTotal(), dto.mobileTotal(),
+        dto.totalEarned(), dto.amountDueOwner(), dto.amountDueOperator()));
+
+    financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+  }
+
+  @Override
+  public synchronized List<MasterSyncOutboxEntry> getPendingMasterSync() {
+
+    // A transaction recorded before this slave's own location was established carries no
+    // locationId -- attribute it to the (now known) own location rather than never mirroring it.
+    Integer ownLocationId = songLibraryService.getOwnLocationId();
+
+    List<MasterSyncOutboxEntry> entries = new ArrayList<>();
+    for (LocalCashTransactionEntity transaction : ledgerRoot.getLocalCashTransactions()) {
+      addPendingTransaction(entries, MasterSyncOutboxEntry.Kind.CASH, transaction, ownLocationId);
+    }
+    for (LocalCreditTransactionEntity transaction : ledgerRoot.getLocalCreditCardTransactions()) {
+      addPendingTransaction(entries, MasterSyncOutboxEntry.Kind.CREDIT_CARD, transaction,
+          ownLocationId);
+    }
+    for (JukeboxSplitPeriodEntity period : ledgerRoot.getSplitPeriods()) {
+      Integer locationId = period.getLocationId() != null ? period.getLocationId() : ownLocationId;
+      if (period.isPendingMasterSync() && locationId != null) {
+        entries.add(new MasterSyncOutboxEntry(MasterSyncOutboxEntry.Kind.SPLIT_PERIOD, locationId,
+            period.getPersistentIdentity(), FinancialLedgerMapper.toSyncDto(period)));
+      }
+    }
+    return entries;
+  }
+
+  private static void addPendingTransaction(List<MasterSyncOutboxEntry> entries,
+      MasterSyncOutboxEntry.Kind kind, AbstractLocationTransactionEntity transaction,
+      Integer ownLocationId) {
+
+    Integer locationId =
+        transaction.getLocationId() != null ? transaction.getLocationId() : ownLocationId;
+    if (transaction.isPendingMasterSync() && locationId != null) {
+      entries.add(new MasterSyncOutboxEntry(kind, locationId, transaction.getPersistentIdentity(),
+          FinancialLedgerMapper.toSyncDto(transaction)));
+    }
+  }
+
+  @Override
+  public synchronized void markSyncedToMaster(List<MasterSyncOutboxEntry> entries) {
+
+    if (entries.isEmpty()) {
+      return;
+    }
+
+    Instant now = Instant.now();
+    for (MasterSyncOutboxEntry entry : entries) {
+      Integer id = entry.persistentIdentity();
+      switch (entry.kind()) {
+        case CASH -> ledgerRoot.getLocalCashTransactions().stream()
+            .filter(t -> id.equals(t.getPersistentIdentity()))
+            .forEach(t -> t.markSyncedToMaster(now));
+        case CREDIT_CARD -> ledgerRoot.getLocalCreditCardTransactions().stream()
+            .filter(t -> id.equals(t.getPersistentIdentity()))
+            .forEach(t -> t.markSyncedToMaster(now));
+        case SPLIT_PERIOD -> ledgerRoot.getSplitPeriods().stream()
+            .filter(p -> id.equals(p.getPersistentIdentity()))
+            .forEach(p -> p.markSyncedToMaster(now));
+      }
+    }
+
+    financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+  }
+
+  @Override
+  public List<UserSongCreditUsageDto> getMobileCreditUsageForSync(Integer locationId,
+      String apiKey, Instant since) throws LocationServiceException {
+
+    requireValidLocation(locationId, apiKey);
+
+    return userService.getCreditLedgerForLocation(locationId, since, Instant.now()).stream()
+        .filter(usage -> usage.syncId() != null)
+        .toList();
+  }
+
+  @Override
+  public synchronized void receiveMobileCreditUsage(UserSongCreditUsageDto usage) {
+
+    if (usage.syncId() == null) {
+      log.warn("Skipping mobile credit usage with no syncId -- it can't be mirrored idempotently");
+      return;
+    }
+
+    // Master only ever sends this slave its own location's spends; anything else is a
+    // misrouted push and must never be attributed to this location.
+    Integer ownLocationId = songLibraryService.getOwnLocationId();
+    if (ownLocationId == null || !ownLocationId.equals(usage.locationId())) {
+      log.warn("Skipping mobile credit usage " + usage.syncId() + " for locationId "
+          + usage.locationId() + " -- this instance's own locationId is " + ownLocationId);
+      return;
+    }
+
+    if (ledgerRoot.hasMobileCreditUsageFromSource(usage.syncId())) {
+      return; // already mirrored -- safe no-op on a live push plus catch-up pull
+    }
+
+    Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
+    ledgerRoot.addMobileCreditUsage(new LocationMobileCreditUsageEntity(persistentIdentity,
+        ownLocationId, usage.syncId(), usage.userEmail(), usage.amount(), usage.type(),
+        usage.timestamp(), usage.songAlbumId(), usage.songId()));
+
+    financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+  }
+
+  @Override
+  public synchronized Instant getOpenPeriodStartDate() {
+
+    JukeboxSplitPeriodEntity currentPeriod = ledgerRoot.getCurrentPeriod();
+    return currentPeriod != null ? currentPeriod.getStartDate() : null;
+  }
+
+  @Override
+  public synchronized Instant getLatestMobileCreditUsageTimestamp() {
+    return ledgerRoot.getLatestMobileCreditUsageTimestamp();
+  }
+
   /**
    * Re-tags this instance's in-memory local transactions from the previous own location id to the
    * confirmed one and persists them -- under JPA the rows were already re-pointed by {@code
@@ -223,6 +371,10 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     openNewPeriod(now.plusNanos(1));
 
     financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+
+    // Harmless on standalone -- only a slave's FinancialLedgerSyncService listens.
+    eventPublisher.publishEvent(new JukeboxSplitFinalizedEvent(currentPeriod.getLocationId(),
+        currentPeriod.getPersistentIdentity()));
   }
 
   private void openNewPeriod(Instant startDate) {
@@ -239,7 +391,7 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
 
     return new JukeboxSplitPeriodDto(openPeriod.getPersistentIdentity(),
         openPeriod.getStartDate(), null, null, totals.cash(), totals.card(), totals.mobile(),
-        totals.total(), null, null);
+        totals.total(), null, null, openPeriod.getLocationId(), null, null);
   }
 
   private PeriodTotals computeTotals(Instant from, Instant to) {
@@ -273,16 +425,24 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
       return BigDecimal.ZERO;
     }
 
-    // UserService.getCreditLedgerForLocation is inclusive at both ends -- safe here because
-    // addSplit() guarantees adjacent periods' boundaries never actually coincide (the new
-    // period's startDate is always strictly after the closing period's endDate), so a mobile
-    // credit can never fall within both periods' [from, to] ranges at once.
-    List<UserSongCreditUsageDto> ledger = userService.getCreditLedgerForLocation(ownLocationId, from, to);
-
-    int creditsUsed = ledger.stream()
-        .filter(t -> t.amount() < 0)
-        .mapToInt(t -> -t.amount())
-        .sum();
+    // Both sources are inclusive at both ends -- safe here because addSplit() guarantees adjacent
+    // periods' boundaries never actually coincide (the new period's startDate is always strictly
+    // after the closing period's endDate), so a mobile credit can never fall within both periods'
+    // [from, to] ranges at once.
+    int creditsUsed;
+    if (slaveMode) {
+      // A slave's own user store never records mobile/web spends (user accounts and credits are
+      // master-owned) -- master mirrors them down into this ledger instead.
+      creditsUsed = ledgerRoot.getMobileCreditUsagesBetween(ownLocationId, from, to).stream()
+          .filter(u -> u.getAmount() < 0)
+          .mapToInt(u -> -u.getAmount())
+          .sum();
+    } else {
+      creditsUsed = userService.getCreditLedgerForLocation(ownLocationId, from, to).stream()
+          .filter(t -> t.amount() < 0)
+          .mapToInt(t -> -t.amount())
+          .sum();
+    }
 
     int creditsPerDollar = pricingService.resolvePricingConfig(ownLocationId).creditsPerDollar();
     if (creditsPerDollar <= 0) {

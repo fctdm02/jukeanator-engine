@@ -62,11 +62,23 @@ public class UserSongCreditUsageEntity extends AbstractPersistentEntity {
   @Column(name = "resulting_balance", nullable = false)
   private int resultingBalance;
 
+  // Master-minted UUID identifying this spend across instances -- the master-to-slave mirror's
+  // idempotency key (see LocationMobileCreditUsageEntity). null on rows recorded before it existed.
+  @Column(name = "sync_id", length = 36)
+  private String syncId;
+
   protected UserSongCreditUsageEntity() {} // for JPA
 
   public UserSongCreditUsageEntity(Integer persistentIdentity, Integer locationId, int amount,
       UserSongCreditUsageType type, Instant timestamp, Integer songAlbumId, Integer songId,
       int resultingBalance) {
+    this(persistentIdentity, locationId, amount, type, timestamp, songAlbumId, songId,
+        resultingBalance, null);
+  }
+
+  public UserSongCreditUsageEntity(Integer persistentIdentity, Integer locationId, int amount,
+      UserSongCreditUsageType type, Instant timestamp, Integer songAlbumId, Integer songId,
+      int resultingBalance, String syncId) {
     super(persistentIdentity);
     this.locationId = locationId;
     this.amount = amount;
@@ -75,6 +87,7 @@ public class UserSongCreditUsageEntity extends AbstractPersistentEntity {
     this.songAlbumId = songAlbumId;
     this.songId = songId;
     this.resultingBalance = resultingBalance;
+    this.syncId = syncId;
   }
 
   void setUser(UserEntity user) {
@@ -123,5 +136,9 @@ public class UserSongCreditUsageEntity extends AbstractPersistentEntity {
 
   public int getResultingBalance() {
     return resultingBalance;
+  }
+
+  public String getSyncId() {
+    return syncId;
   }
 }

@@ -78,7 +78,8 @@ These become two genuinely separate entities:
   (`Set<UserAddFundsTransactionEntity>`) added alongside it, identically mapped.
 - **`UserRepositoryJpaImpl.storeAggregateRoot`**: the existing placeholder-id-then-persist dance
   it already does for `transactions` (JPQL to find which transaction ids are already persisted,
-  `persist()` on the rest after nulling their collection-size-based placeholder id) gets renamed
+  `persist()` on the rest after nulling their placeholder id -- collection-size-based at the
+  time, since replaced; see Part E) gets renamed
   in place for `userSongCreditUsages`, and the exact same pattern is duplicated for
   `userAddFundsTransactions`.
 - **Filesystem round-trip**: `UserDto`/`UserMapper` get a new `userAddFundsTransactions` field/
@@ -159,6 +160,105 @@ These become two genuinely separate entities:
 - `docs/multi-tenant-mode.md` gets a short addendum — it currently states local cash/card is
   untouched by the multi-tenant feature; that line goes stale once this ships.
 
+## Part D — Guaranteed delivery, split-period mirroring, mobile spends on the slave
+
+Part C's push was best-effort with no retry: a transaction recorded while master was unreachable
+never reached master. Part D closes that gap and extends mirroring to the remaining ledger data.
+
+- **Slave→master outbox.** `location_transaction` and `location_jukebox_split` gain
+  `synced_to_master_at` (NULL until master acknowledges). `FinancialLedgerService.getPendingMasterSync()`
+  returns every own, unacknowledged transaction plus every *finalized* split period (the open
+  period has no totals yet and is never mirrored); `markSyncedToMaster(entries)` stamps them.
+  `FinancialLedgerSyncService` drains the outbox on a sweep that runs every 60s, and immediately
+  after a transaction is recorded (`LocalFinancialTransactionRecordedEvent`) or a period finalized
+  (new `JukeboxSplitFinalizedEvent`). An entry master rejects (4xx/5xx) is left pending and logged
+  without blocking the rest; a connectivity failure ends the sweep and the next one retries.
+  Existing rows start with `synced_to_master_at` NULL, so they are pushed once — master's
+  idempotency makes that a safe backfill. A transaction recorded before the slave's own location
+  was known (NULL `location_id`) is attributed to the now-known own location when pushed.
+- **Split-period mirror.** New `POST /api/locations/{locationId}/financial-ledger/split-period`
+  (`JukeboxSplitPeriodSyncDto`) → `FinancialLedgerService.receiveSplitPeriodSync`, idempotent on the
+  new `location_jukebox_split.source_period_id` (unique with `parent_location_id`). Master stores
+  it via `JukeboxSplitPeriodEntity.mirroredFrom(...)`; the entity now maps `parent_location_id`
+  read-only (`getLocationId()`), since master's mirrored periods have no transient `parentLocation`.
+- **Mobile/web spends, master→slave.** `user_song_credit_usage` gains a master-minted
+  `sync_id` (UUID). A location-attributed spend publishes `LocationSongCreditUsageRecordedEvent`;
+  master's `MobileCreditUsageSlaveNotifier` pushes it to the slave as a `recordMobileCreditUsage`
+  command over `/ws-slave`. The slave stores it in the new `location_mobile_credit_usage` table
+  (keyed by user email — user accounts stay master-only), idempotent on `source_sync_id`. Any push
+  the slave misses is recovered by its catch-up pull,
+  `GET /api/locations/{locationId}/financial-ledger/mobile-credit-usage?since=…`: the whole open
+  split period after start-up or any failed sweep, otherwise a 10-minute overlap window past the
+  latest spend already mirrored.
+- **Slave mobile total.** In slave mode, `computeMobileTotal()` sums `location_mobile_credit_usage`
+  instead of the slave's own `user_song_credit_usage` (which never holds mobile/web spends there) —
+  previously a slave's split periods always showed a $0 mobile total.
+- **User activity, slave→master.** Same outbox idea, in `UserActivitySyncService`. Each
+  activity gets a UUID `activity_id` when it is captured (`UserActivityServiceImpl.record`);
+  master's copy is idempotent on `(location_id, activity_id)`
+  (`POST /api/locations/{locationId}/user-activity/sync`, a JSON array of `UserActivityRecord`).
+  Activity is high-frequency, so it is never pushed per event: a sweep every 60s drains the outbox
+  in batches of up to 500 (at most 20 batches per sweep), and a batch is acknowledged only as a
+  whole. The JPA outbox is `user_activity.synced_to_master_at`. The filesystem outbox is a byte
+  offset per append-only day-file, kept in `activity/master-sync-cursor.json`. Rows logged under
+  `SYSTEM` are never pushed: they are the slave's own log of a queue command master relayed for a
+  mobile/web user, which master already recorded under that user's email. Rows written before
+  `activity_id` existed are pushed with a stand-in derived from their position (row id, or
+  day-file + byte offset), stable across re-pushes.
+- **Known limit.** A mobile spend that reaches the slave only after the operator has already
+  finalized the period it falls in is stored, but not counted in that finalized split. Master's
+  `user_song_credit_usage` plus the mirrored `location_jukebox_split` rows remain the authoritative
+  record for reconciling such a case.
+
+## Part E — Placeholder ids for new users and their children
+
+New users, credit usages, Add-Funds transactions, and playlists are given a placeholder
+`persistentIdentity` in memory before they are stored -- the filesystem repository has no
+database sequence, so it simply keeps that id. `UserRepositoryJpaImpl` instead treats any child
+whose id is *not* among the user's persisted ids as new, clears the placeholder, and `persist()`s
+it so `persistent_identity_seq` mints the real id (users follow the same rule against every
+persisted user id).
+
+**The bug.** Placeholders used to be derived from a collection size (`users.size() + 1`,
+`getUserSongCreditUsages().size() + 1`, `getUserAddFundsTransactions().size() + 1`,
+`playlists.size()`). Under JPA, persisted rows carry real sequence ids, and a size-derived
+placeholder can equal one of them:
+
+- **Users / playlists** — the store saw the new entity as the existing row and `merge()`d it over
+  that row: registering a user could overwrite another user's account (email, password hash,
+  credits); creating a playlist could overwrite an existing playlist. Likely on a fresh master,
+  where early accounts get small ids (e.g. users with ids 1 and 3 → the next placeholder is 3).
+- **Credit usages / Add-Funds transactions** — both live in a `HashSet`, and
+  `AbstractPersistentEntity.equals`/`hashCode` compare by id, so the new record was silently
+  dropped from the set (credits deducted, ledger entry lost).
+- **Filesystem** — no collision with real ids, but a size-derived id could repeat after a deletion.
+
+**The fix.**
+
+- Every placeholder is now one past the highest id already in its scope (`UserEntity.nextIdentity`):
+  `UserRootEntity.nextUserPersistentIdentity()`, `UserEntity.nextUserSongCreditUsageIdentity()`,
+  `nextUserAddFundsTransactionIdentity()`, and `createPlaylist` (first playlist, My Favorites,
+  still gets 0). It can never equal an existing id, and stays unique after deletions. Id minting
+  stays in the domain model, so `UserRepository` and the tests that mock it are unchanged.
+- `addUserSongCreditUsage`/`addUserAddFundsTransaction` throw `IllegalStateException` on a
+  duplicate id instead of letting the `HashSet` drop it silently.
+- `persist()` replaces a placeholder with the real id *in place*, on an object already sitting in
+  its user's `HashSet`, leaving it in a stale hash bucket (`contains`/`remove` no longer find it).
+  `UserRepositoryJpaImpl.storeAggregateRoot` now calls `UserEntity.rehashChildCollections()` for
+  every user whose children were re-identified; it clears and refills the same set instance, so
+  Hibernate's orphan-removal bookkeeping on the collection is unaffected.
+- `UserServiceImpl` publishes `LocationSongCreditUsageRecordedEvent` only after the user root has
+  been stored (`announceLocationCreditUsage`), so a slave can never hold a mobile spend master
+  itself failed to record.
+
+**Tests.** `UserEntityPlaceholderIdentityTest` (unit) recreates each collision the old ids caused
+-- user ids 1 and 3, a usage with id 2, Favorites persisted as id 1 -- plus a playlist created
+after a deletion, the duplicate-id failure, and the rehash.
+`UserRepositoryJpaPlaceholderIdentityTest` (live MySQL) hand-inserts a user row at exactly the id
+the old count-based placeholder would produce, registers a new user, and asserts the existing
+account is untouched; it also stores a usage, checks the set still finds it after its id is
+replaced, and stores a second one.
+
 ## Tests
 
 - **`domain/financialledger/service/MasterSlaveFinancialLedgerIntegrationTest.java`** (new, live
@@ -172,8 +272,14 @@ These become two genuinely separate entities:
   `getCreditLedgerForLocation`, proving Add Funds and location-scoped usage are now cleanly
   separated where before they were commingled under one ambiguous `CreditTransaction` concept.
 - **`domain/financialledger/service/FinancialLedgerSyncServiceTest.java`** (new, mock-based unit
-  test, mirrors `LocationServiceTest`'s style): verifies the slave-side event listener builds and
-  sends the right HTTP request shape without a live master.
+  test, mirrors `LocationServiceTest`'s style): verifies the slave-side sweep sends the right HTTP
+  request shapes against a fake master, acknowledges only what master accepted (a rejected entry
+  never blocks the rest; nothing is acknowledged when master is unreachable), and widens the mobile
+  catch-up pull to the whole open period after start-up or a failed sweep.
+- Part D adds `MasterSlaveFinancialLedgerIntegrationTest` coverage for the split-period mirror
+  (per-location, idempotent) and the mobile catch-up pull (per-location, `sync_id` persisted), and
+  `FinancialLedgerServiceTest` coverage for the outbox, split-period intake, and the slave-mode
+  mobile total.
 - Update the existing tests identified above (`FinancialLedgerServiceTest`, `LocationControllerTest`,
   `UserServiceTest`, `FinancialLedgerRepositoryJpaImplTest`,
   `FinancialLedgerRepositoryFileSystemImplTest`) for the renamed types/table.

@@ -1,11 +1,15 @@
 package com.djt.jukeanator_engine.domain.financialledger.service;
 
+import java.time.Instant;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodSyncDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.MasterSyncOutboxEntry;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
+import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 
 public interface FinancialLedgerService {
 
@@ -49,4 +53,46 @@ public interface FinancialLedgerService {
   /** Same as {@link #receiveLocalCashSync}, for the credit-card-reader stream. */
   void receiveLocalCreditCardSync(Integer locationId, String apiKey, LocalTransactionSyncDto dto)
       throws LocationServiceException;
+
+  /**
+   * Master-only. Receives one mirrored, finalized jukebox-split period from a slave. Idempotent:
+   * a retried push carrying the same {@code (locationId, dto.sourcePeriodId())} is a safe no-op.
+   *
+   * @throws LocationServiceException if {@code locationId}/{@code apiKey} don't verify
+   */
+  void receiveSplitPeriodSync(Integer locationId, String apiKey, JukeboxSplitPeriodSyncDto dto)
+      throws LocationServiceException;
+
+  /**
+   * Slave-only. Every local transaction and finalized split period this instance recorded itself
+   * that master has not yet acknowledged -- the slave-to-master outbox {@code
+   * FinancialLedgerSyncService} drains.
+   */
+  List<MasterSyncOutboxEntry> getPendingMasterSync();
+
+  /** Slave-only. Marks {@code entries} (from {@link #getPendingMasterSync()}) as acknowledged. */
+  void markSyncedToMaster(List<MasterSyncOutboxEntry> entries);
+
+  /**
+   * Master-only. The mobile/web song-credit spends master has recorded against {@code locationId}
+   * at or after {@code since} -- the slave's catch-up pull for any live mirror push it missed.
+   * Spends recorded before cross-instance sync ids existed are omitted (they can't be mirrored
+   * idempotently).
+   *
+   * @throws LocationServiceException if {@code locationId}/{@code apiKey} don't verify
+   */
+  List<UserSongCreditUsageDto> getMobileCreditUsageForSync(Integer locationId, String apiKey,
+      Instant since) throws LocationServiceException;
+
+  /**
+   * Slave-only. Stores one mobile/web song-credit spend master recorded against this slave's own
+   * location. Idempotent on {@code usage.syncId()}.
+   */
+  void receiveMobileCreditUsage(UserSongCreditUsageDto usage);
+
+  /** The open (current) period's start date, or {@code null} if there is none (master). */
+  Instant getOpenPeriodStartDate();
+
+  /** The most recent mirrored mobile/web spend's timestamp, or {@code null} if there are none. */
+  Instant getLatestMobileCreditUsageTimestamp();
 }

@@ -20,7 +20,8 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
  * activity-specific payload (tab name, search query, artist/album/song id, ...) serialized as a
  * JSON string by {@code UserActivityRepositoryJpaImpl}; kept as a plain {@code String} column here
  * rather than a Hibernate-specific JSON type so this entity stays consistent with the rest of the
- * codebase's plain-Jakarta-persistence style.
+ * codebase's plain-Jakarta-persistence style. {@code syncedToMasterAt} is set only by {@code
+ * UserActivityRepositoryJpaImpl.markSyncedToMaster}'s bulk update, never through this entity.
  */
 @Entity
 @Table(name = "user_activity")
@@ -52,6 +53,13 @@ public class UserActivityEntity {
   @Column(name = "details", columnDefinition = "json")
   private String details;
 
+  @Column(name = "activity_id", length = 36)
+  private String activityId;
+
+  // Slave-side outbox marker -- null until master has acknowledged the mirror push.
+  @Column(name = "synced_to_master_at")
+  private Instant syncedToMasterAt;
+
   @CreationTimestamp
   @Column(name = "date_added", nullable = false, updatable = false)
   private Instant dateAdded;
@@ -63,13 +71,14 @@ public class UserActivityEntity {
   protected UserActivityEntity() {} // for JPA
 
   public UserActivityEntity(Integer locationId, String source, String username,
-      String activityType, Instant occurredAt, String details) {
+      String activityType, Instant occurredAt, String details, String activityId) {
     this.locationId = locationId;
     this.source = source;
     this.username = username;
     this.activityType = activityType;
     this.occurredAt = occurredAt;
     this.details = details;
+    this.activityId = activityId;
   }
 
   public Integer getPersistentIdentity() {
@@ -98,6 +107,14 @@ public class UserActivityEntity {
 
   public String getDetails() {
     return details;
+  }
+
+  public String getActivityId() {
+    return activityId;
+  }
+
+  public Instant getSyncedToMasterAt() {
+    return syncedToMasterAt;
   }
 
   public Instant getDateAdded() {
