@@ -91,7 +91,8 @@ class UserActivitySyncServiceTest {
     // The second record was captured before this slave's own location was known.
     List<PendingUserActivity> pending =
         List.of(pending("1", LOCATION_ID, "a"), pending("2", null, "b"));
-    when(userActivityService.getPendingMasterSync(anyInt())).thenReturn(pending, List.of());
+    when(userActivityService.getPendingMasterSync(anyInt())).thenReturn(pending)
+        .thenReturn(List.of());
 
     service.sweepNow();
 
@@ -126,7 +127,9 @@ class UserActivitySyncServiceTest {
         .toList();
     List<PendingUserActivity> remainder = List.of(pending("x", LOCATION_ID, "last"));
     when(userActivityService.getPendingMasterSync(anyInt()))
-        .thenReturn(fullBatch, remainder, List.of());
+        .thenReturn(fullBatch)
+        .thenReturn(remainder)
+        .thenReturn(List.of());
 
     service.sweepNow();
 
