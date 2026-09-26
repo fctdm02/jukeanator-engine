@@ -21,6 +21,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueReq
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
@@ -136,6 +137,7 @@ public class SongQueueController {
     return entry;
   }
 
+  /** Admin-only (see {@code SecurityConfig}) -- web patrons cannot queue a whole album. */
   @PostMapping("/addAlbum")
   public List<SongQueueEntryDto> addAlbumToQueue(@PathVariable Integer locationId,
       @RequestBody AddAlbumToQueueRequest addAlbumToQueueRequest) {
@@ -143,11 +145,50 @@ public class SongQueueController {
     return songQueueService.addAlbumToQueue(locationId, addAlbumToQueueRequest);
   }
 
+  /**
+   * For a web user (playing a playlist), songs tagged with a different location are dropped, and
+   * the rest go to the owning instance in a single {@code addMultipleSongsToQueue} command as
+   * normal plays (priority 1) with {@code skipIneligibleSongs} set and {@code maxSongs} capped at
+   * what the user can afford. Each song actually queued is then charged exactly as a single
+   * {@code addSong} normal play -- explicitly, for own and remote locations alike, since a batch
+   * add publishes {@code MultipleSongsAddedToQueueEvent}, which no credit listener handles. Any
+   * other caller (local/admin) gets the unchanged, uncharged batch add.
+   */
   @PostMapping("/addMultipleSongs")
   public List<SongQueueEntryDto> addMultipleSongsToQueue(@PathVariable Integer locationId,
-      @RequestBody AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest) {
+      @RequestBody AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest,
+      Authentication authentication) {
 
-    return songQueueService.addMultipleSongsToQueue(locationId, addMultipleSongsToQueueRequest);
+    if (authentication == null || !(authentication.getPrincipal() instanceof String email)) {
+      return songQueueService.addMultipleSongsToQueue(locationId, addMultipleSongsToQueueRequest);
+    }
+
+    if (addMultipleSongsToQueueRequest == null
+        || addMultipleSongsToQueueRequest.songIdentifiers() == null) {
+      return List.of();
+    }
+
+    List<SongIdentifier> songsAtLocation = addMultipleSongsToQueueRequest.songIdentifiers()
+        .stream()
+        .filter(id -> id != null && locationId.equals(id.getLocationId()))
+        .toList();
+
+    int priority = 1;
+    boolean priorityPlay = false;
+    int maxSongs =
+        userService.getAffordableQueueAddCount(email, locationId, priority, priorityPlay);
+    if (songsAtLocation.isEmpty() || maxSongs <= 0) {
+      return List.of();
+    }
+
+    List<SongQueueEntryDto> queued = songQueueService.addMultipleSongsToQueue(locationId,
+        new AddMultipleSongsToQueueRequest(email, songsAtLocation, priority, true, maxSongs));
+
+    for (SongQueueEntryDto entry : queued) {
+      userService.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, priorityPlay),
+          locationId);
+    }
+    return queued;
   }
 
   @PostMapping("/flushQueue")

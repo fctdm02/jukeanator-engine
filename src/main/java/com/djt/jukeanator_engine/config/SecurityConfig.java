@@ -131,9 +131,15 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.GET, "/api/locations/*/financial-ledger/**")
             .hasRole("LOCATION")
 
+            // ── Admin only: queue a whole album ───────────────────────────────
+            // Patrons queue songs individually (or a playlist via addMultipleSongs).
+            .requestMatchers(HttpMethod.POST, "/api/song-queue/addAlbum",
+                "/api/locations/*/song-queue/addAlbum")
+            .hasRole("ADMIN")
+
             // ── Authenticated users: add songs to the queue ───────────────────
             // Any logged-in patron can queue songs.
-            .requestMatchers(HttpMethod.POST, "/api/song-queue/addSong", "/api/song-queue/addAlbum",
+            .requestMatchers(HttpMethod.POST, "/api/song-queue/addSong",
                 "/api/song-queue/addMultipleSongs")
             .authenticated()
 
@@ -146,7 +152,7 @@ public class SecurityConfig {
 
             // ── Master-mode only: location-scoped mirror of the queue-add/reorder rules ─
             .requestMatchers(HttpMethod.POST, "/api/locations/*/song-queue/addSong",
-                "/api/locations/*/song-queue/addAlbum", "/api/locations/*/song-queue/addMultipleSongs")
+                "/api/locations/*/song-queue/addMultipleSongs")
             .authenticated()
 
             .requestMatchers(HttpMethod.POST, "/api/locations/*/song-queue/moveSongUpInQueue",

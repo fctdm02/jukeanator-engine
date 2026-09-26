@@ -2,6 +2,9 @@ package com.djt.jukeanator_engine.domain.songqueue.controller;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -13,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import com.djt.jukeanator_engine.AbstractControllerTest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -21,6 +26,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueReq
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
@@ -45,6 +51,13 @@ class SongQueueControllerTest extends AbstractControllerTest {
   @Override
   protected Object getController() {
     return songQueueController;
+  }
+
+  private static final String WEB_USER = "web@domain.com";
+
+  /** A JWT-style web user -- JwtAuthenticationFilter's principal is the email string. */
+  private static Authentication webUser() {
+    return new UsernamePasswordAuthenticationToken(WEB_USER, null, List.of());
   }
 
   private SongQueueEntryDto aQueueEntry() {
@@ -124,6 +137,51 @@ class SongQueueControllerTest extends AbstractControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void addMultipleSongsToQueue_webUser_sendsOneCappedCommandAndChargesEachQueuedSong()
+      throws Exception {
+    when(userService.getAffordableQueueAddCount(WEB_USER, LOCATION_ID, 1, false)).thenReturn(4);
+    when(songQueueService.addMultipleSongsToQueue(any(), any(AddMultipleSongsToQueueRequest.class)))
+        .thenReturn(List.of(aQueueEntry(), aQueueEntry()));
+    AddMultipleSongsToQueueRequest request = new AddMultipleSongsToQueueRequest("someone-else",
+        List.of(new SongIdentifier(LOCATION_ID, 3, 1), new SongIdentifier(99, 3, 9),
+            new SongIdentifier(LOCATION_ID, 3, 2)),
+        5);
+
+    mockMvc.perform(post(BASE_PATH + "/addMultipleSongs")
+            .principal(webUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()", is(2)));
+
+    // One command: only this location's songs, as the logged-in user at normal priority,
+    // skipping ineligible songs and capped at what the user can afford.
+    verify(songQueueService).addMultipleSongsToQueue(LOCATION_ID,
+        new AddMultipleSongsToQueueRequest(WEB_USER,
+            List.of(new SongIdentifier(LOCATION_ID, 3, 1), new SongIdentifier(LOCATION_ID, 3, 2)),
+            1, true, 4));
+    verify(songQueueService, never()).addSongToQueue(any(), any());
+    verify(userService, times(2)).handleSongAddedToQueueEvent(any(), eq(LOCATION_ID));
+  }
+
+  @Test
+  void addMultipleSongsToQueue_webUserWhoCannotAffordOneSong_queuesNothing() throws Exception {
+    when(userService.getAffordableQueueAddCount(WEB_USER, LOCATION_ID, 1, false)).thenReturn(0);
+    AddMultipleSongsToQueueRequest request = new AddMultipleSongsToQueueRequest(null,
+        List.of(new SongIdentifier(LOCATION_ID, 3, 1)), 1);
+
+    mockMvc.perform(post(BASE_PATH + "/addMultipleSongs")
+            .principal(webUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()", is(0)));
+
+    verify(songQueueService, never()).addMultipleSongsToQueue(any(), any());
+    verify(userService, never()).handleSongAddedToQueueEvent(any(), any());
   }
 
   @Test

@@ -299,6 +299,7 @@ public class UserEntity extends AbstractPersistentEntity {
   public boolean addSongToPlaylist(String playlistName, Integer locationId, SongFileEntity song)
       throws EntityDoesNotExistException {
 
+    Objects.requireNonNull(locationId, "locationId cannot be null");
     PlaylistEntity playlist = getPlaylistByName(playlistName);
     SongIdentifier songIdentifier = new SongIdentifier(locationId,
         song.getAlbum().getId(), song.getId());
@@ -309,6 +310,7 @@ public class UserEntity extends AbstractPersistentEntity {
   public boolean removeSongFromPlaylist(String playlistName, Integer locationId,
       SongFileEntity song) throws EntityDoesNotExistException {
 
+    Objects.requireNonNull(locationId, "locationId cannot be null");
     PlaylistEntity playlist = getPlaylistByName(playlistName);
     SongIdentifier songIdentifier = new SongIdentifier(locationId,
         song.getAlbum().getId(), song.getId());

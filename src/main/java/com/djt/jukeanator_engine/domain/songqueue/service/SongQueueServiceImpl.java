@@ -605,12 +605,43 @@ public class SongQueueServiceImpl
       return List.of();
     }
 
+    String username = addMultipleSongsToQueueRequest.username();
+    Integer priority = addMultipleSongsToQueueRequest.priority();
+    boolean skipIneligibleSongs =
+        Boolean.TRUE.equals(addMultipleSongsToQueueRequest.skipIneligibleSongs());
+    Integer maxSongs = addMultipleSongsToQueueRequest.maxSongs();
+
     List<SongQueueEntryDto> queueEntries = new ArrayList<>();
 
-    for (SongIdentifier songIdentifier : addMultipleSongsToQueueRequest.songIdentifiers()) {
-      queueEntries.add(
-          addSongToQueue(addMultipleSongsToQueueRequest.username(), songIdentifier.getAlbumId(),
-              songIdentifier.getSongId(), addMultipleSongsToQueueRequest.priority()));
+    // Synchronized so each eligibility check sees the queue exactly as this batch left it.
+    synchronized (this) {
+      for (SongIdentifier songIdentifier : addMultipleSongsToQueueRequest.songIdentifiers()) {
+        if (maxSongs != null && queueEntries.size() >= maxSongs) {
+          break;
+        }
+        Integer albumId = songIdentifier.getAlbumId();
+        Integer songId = songIdentifier.getSongId();
+        if (!skipIneligibleSongs) {
+          queueEntries.add(addSongToQueue(username, albumId, songId, priority));
+          continue;
+        }
+        try {
+          String ineligibleReason = isSongEligibleForQueue(locationId, albumId, songId, priority);
+          if (ineligibleReason == null) {
+            queueEntries.add(addSongToQueue(username, albumId, songId, priority));
+          } else {
+            log.info("addMultipleSongsToQueue: skipping albumId={} songId={} for {}: {}",
+                albumId, songId, username, ineligibleReason);
+          }
+        } catch (SongQueueServiceException e) {
+          log.info("addMultipleSongsToQueue: skipping albumId={} songId={} for {}: {}", albumId,
+              songId, username, e.getMessage());
+        }
+      }
+    }
+
+    if (queueEntries.isEmpty()) {
+      return queueEntries;
     }
 
     eventPublisher.publishEvent(new MultipleSongsAddedToQueueEvent(queueEntries));

@@ -155,9 +155,15 @@
   // song-library/song-player/song-queue endpoints are scoped by locationId
   // server-side (/api/locations/{locationId}/...); rewrite bare calls to those
   // three so every caller can keep writing the short, unscoped path.
+  // Throws (rather than requesting /api/locations/null/...) if the location
+  // has not been resolved yet; api() callers already handle rejected calls.
   function locationScopedPath(path) {
     const m = /^\/api\/(song-library|song-player|song-queue)(\/.*|$)/.exec(path);
-    return m ? `/api/locations/${state.locationId}/${m[1]}${m[2]}` : path;
+    if (!m) return path;
+    if (state.locationId == null) {
+      throw new Error(`Cannot call ${path}: location has not been resolved yet`);
+    }
+    return `/api/locations/${state.locationId}/${m[1]}${m[2]}`;
   }
 
   async function api(path, options = {}) {
@@ -692,17 +698,26 @@
     } else {
       const crawlText = `${escHtml(song.artistName || '')}${song.albumName ? ' &middot; ' + escHtml(song.albumName) : ''}`;
       widget.innerHTML = `
-        <img src="/api/locations/${state.locationId}/song-library/albums/${song.albumId}/coverArt" alt="${escHtml(song.albumName || '')}"
+        <img class="now-playing-album-link" src="/api/locations/${state.locationId}/song-library/albums/${song.albumId}/coverArt" alt="${escHtml(song.albumName || '')}"
              onerror="this.remove()">
-        <div class="now-playing-text">
+        <div class="now-playing-text now-playing-album-link">
           <div class="song-name">${escHtml(song.songName || '')}</div>
           <div class="now-playing-crawl-wrap">
             <div class="now-playing-crawl">${crawlText}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${crawlText}</div>
           </div>
         </div>
         ${viewQueueBtnHtml}`;
+      wireNowPlayingAlbumLinks(widget, song);
     }
     document.getElementById('viewQueueBtn')?.addEventListener('click', () => navigateSub('song-queue'));
+  }
+
+  // Tapping the currently playing song (its art or text) opens that song's album.
+  function wireNowPlayingAlbumLinks(container, song) {
+    if (song?.albumId == null) return;
+    container.querySelectorAll('.now-playing-album-link').forEach(el => {
+      el.addEventListener('click', () => navigateSub('album-detail', { albumId: song.albumId }));
+    });
   }
 
   // ── Add Funds tab content ───────────────────────────────────────────────
@@ -1677,7 +1692,7 @@
         ? `<img class="queue-now-playing-thumb" src="/api/locations/${state.locationId}/song-library/albums/${nowPlaying.albumId}/coverArt"
                 alt="" onerror="this.remove()">`
         : '';
-      return `<div class="queue-now-playing-row">
+      return `<div class="queue-now-playing-row now-playing-album-link">
         ${art}
         <div class="queue-now-playing-info">
           <div class="queue-now-playing-song">${escHtml(nowPlaying.songName || '')}</div>
@@ -1723,6 +1738,8 @@
           <span class="queue-order-note-icon">&#8505;</span>
           Order may change pending additional song selections purchased with priority play or queue operations by other users.  In addition, your song may be removed, at cost by others.  This likely will not happen if you do not troll the jukebox.
         </div>`;
+
+      wireNowPlayingAlbumLinks(subContent, nowPlaying);
 
       subContent.querySelectorAll('.queue-song-row').forEach((row, i) => {
         row.addEventListener('click', () => {
@@ -1946,14 +1963,14 @@
         if (inFavs) {
           await api('/api/users/playlists/favorites/songs', {
             method: 'DELETE',
-            body: JSON.stringify({ albumId: song.albumId, songId: song.songId }),
+            body: JSON.stringify({ locationId: state.locationId, albumId: song.albumId, songId: song.songId }),
           });
           state.favoriteSongIds.delete(key);
           if (label) label.textContent = 'Add to My Favorites';
         } else {
           await api('/api/users/playlists/favorites/songs', {
             method: 'POST',
-            body: JSON.stringify({ albumId: song.albumId, songId: song.songId }),
+            body: JSON.stringify({ locationId: state.locationId, albumId: song.albumId, songId: song.songId }),
           });
           state.favoriteSongIds.add(key);
           if (label) label.textContent = 'Remove from My Favorites';
@@ -2100,6 +2117,10 @@
           <div class="playlist-detail-count">${songs.length} song${songs.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
+      <button class="queue-action-btn state-grey playlist-play-btn" id="playPlaylistBtn" disabled>
+        <span class="qab-label">Play Playlist</span>
+        <span class="qab-sub"></span>
+      </button>
       ${isMyFavorites ? '' : '<button class="playlist-delete-link" id="deletePlaylistBtn">Delete Playlist</button>'}
       <div class="playlist-song-list" id="playlistSongList">${renderSongs(songs)}</div>`;
 
@@ -2108,6 +2129,67 @@
         navigateSub('delete-playlist', { playlist });
       });
     }
+
+    // ── Play Playlist ──
+    // Only the playlist's songs tagged with the current location can be queued here, so the
+    // count and cost cover just those. Each is a normal play (priority 1); the server skips any
+    // song that is ineligible right now and charges only for the songs it actually queues.
+    let localSongIds = [];
+
+    async function refreshPlayButton() {
+      try {
+        const ids = await api(`/api/users/playlists/${encodeURIComponent(name)}/songIdentifiers`) || [];
+        localSongIds = ids.filter(id => id.locationId === state.locationId);
+      } catch {
+        localSongIds = [];
+      }
+      const btn = document.getElementById('playPlaylistBtn');
+      if (!btn) return;
+      const sub = btn.querySelector('.qab-sub');
+      const perSong = queueAddCost(1, false);
+      const total = localSongIds.length * perSong;
+      btn.classList.remove('state-grey', 'state-normal', 'state-warn');
+      btn.disabled = true;
+      if (!localSongIds.length) {
+        btn.classList.add('state-grey');
+        sub.textContent = 'No songs from this location';
+      } else if (state.numCredits < perSong) {
+        btn.classList.add('state-warn');
+        sub.textContent = formatShortfall(perSong - state.numCredits);
+      } else {
+        btn.classList.add('state-normal');
+        btn.disabled = false;
+        sub.textContent = `${localSongIds.length} song${localSongIds.length !== 1 ? 's' : ''} · up to ${formatCredits(total)}`;
+      }
+    }
+
+    document.getElementById('playPlaylistBtn').addEventListener('click', async () => {
+      const count = localSongIds.length;
+      if (!count) return;
+      const perSong = queueAddCost(1, false);
+      const maxCost = count * perSong;
+      const note = state.numCredits < maxCost
+        ? `\n\nYour balance covers only ${Math.floor(state.numCredits / perSong)} of them; queueing stops when your credits run out.`
+        : '';
+      if (!confirm(`Queue ${count} song${count !== 1 ? 's' : ''} from "${name}" for up to ${formatCredits(maxCost, 'Credits')}?\n\nSongs that can't be played right now are skipped and not charged.${note}`)) {
+        return;
+      }
+      try {
+        const queued = await api('/api/song-queue/addMultipleSongs', {
+          method: 'POST',
+          body: JSON.stringify({ songIdentifiers: localSongIds, priority: 1 }),
+        }) || [];
+        const skipped = count - queued.length;
+        alert(`Queued ${queued.length} of ${count} song${count !== 1 ? 's' : ''} for ${formatCredits(queued.length * perSong, 'Credits')}.`
+          + (skipped ? ` ${skipped} song${skipped !== 1 ? 's were' : ' was'} skipped.` : ''));
+        await loadCredits(document.getElementById('creditsValue'));
+      } catch (err) {
+        alert('Could not play playlist: ' + (err.message || err));
+      }
+      await refreshPlayButton();
+    });
+
+    refreshPlayButton();
 
     async function moveAndSave(fromIdx, toIdx) {
       const moved = songs.splice(fromIdx, 1)[0];
@@ -2140,6 +2222,7 @@
           body: JSON.stringify(songs.map(s => ({ albumId: s.albumId, songId: s.songId }))),
         });
         await refreshPlaylistsState();
+        await refreshPlayButton();
       } catch (err) {
         alert('Could not remove song: ' + (err.message || err));
       }
@@ -2285,7 +2368,7 @@
           try {
             await api(`/api/users/playlists/${encodeURIComponent(p.name)}/songs`, {
               method: 'POST',
-              body: JSON.stringify({ albumId: song.albumId, songId: song.songId }),
+              body: JSON.stringify({ locationId: state.locationId, albumId: song.albumId, songId: song.songId }),
             });
             await refreshPlaylistsState();
           } catch (err) {
@@ -2300,7 +2383,7 @@
         try {
           await api(`/api/users/playlists/${encodeURIComponent(name)}/songs`, {
             method: 'POST',
-            body: JSON.stringify({ albumId: song.albumId, songId: song.songId }),
+            body: JSON.stringify({ locationId: state.locationId, albumId: song.albumId, songId: song.songId }),
           });
           await refreshPlaylistsState();
         } catch { /* ignore */ }

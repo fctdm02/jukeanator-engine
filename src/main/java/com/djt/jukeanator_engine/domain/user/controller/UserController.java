@@ -204,9 +204,9 @@ public class UserController {
   public ResponseEntity<Void> addSongToPlaylist(@AuthenticationPrincipal String emailAddress,
       @PathVariable String playlistName, @RequestBody SongIdentifier songIdentifier)
       throws EntityDoesNotExistException {
-    SongFileEntity song = songLibraryService.getSongLibraryRoot(songIdentifier.getLocationId())
-        .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
-    userService.addSongToPlaylist(emailAddress, playlistName, songIdentifier.getLocationId(), song);
+    Integer locationId = resolveLocationId(songIdentifier);
+    SongFileEntity song = getSong(locationId, songIdentifier);
+    userService.addSongToPlaylist(emailAddress, playlistName, locationId, song);
     return ResponseEntity.noContent().build();
   }
 
@@ -214,10 +214,9 @@ public class UserController {
   public ResponseEntity<Void> removeSongFromPlaylist(@AuthenticationPrincipal String emailAddress,
       @PathVariable String playlistName, @RequestBody SongIdentifier songIdentifier)
       throws EntityDoesNotExistException {
-    SongFileEntity song = songLibraryService.getSongLibraryRoot(songIdentifier.getLocationId())
-        .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
-    userService.removeSongFromPlaylist(emailAddress, playlistName, songIdentifier.getLocationId(),
-        song);
+    Integer locationId = resolveLocationId(songIdentifier);
+    SongFileEntity song = getSong(locationId, songIdentifier);
+    userService.removeSongFromPlaylist(emailAddress, playlistName, locationId, song);
     return ResponseEntity.noContent().build();
   }
 
@@ -225,9 +224,9 @@ public class UserController {
   public ResponseEntity<Void> addSongToMyFavoritesPlaylist(
       @AuthenticationPrincipal String emailAddress, @RequestBody SongIdentifier songIdentifier)
       throws EntityDoesNotExistException {
-    SongFileEntity song = songLibraryService.getSongLibraryRoot(songIdentifier.getLocationId())
-        .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
-    userService.addSongToMyFavoritesPlaylist(emailAddress, songIdentifier.getLocationId(), song);
+    Integer locationId = resolveLocationId(songIdentifier);
+    SongFileEntity song = getSong(locationId, songIdentifier);
+    userService.addSongToMyFavoritesPlaylist(emailAddress, locationId, song);
     return ResponseEntity.noContent().build();
   }
 
@@ -235,11 +234,25 @@ public class UserController {
   public ResponseEntity<Void> removeSongFromMyFavoritesPlaylist(
       @AuthenticationPrincipal String emailAddress, @RequestBody SongIdentifier songIdentifier)
       throws EntityDoesNotExistException {
-    SongFileEntity song = songLibraryService.getSongLibraryRoot(songIdentifier.getLocationId())
-        .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
-    userService.removeSongFromMyFavoritesPlaylist(emailAddress, songIdentifier.getLocationId(),
-        song);
+    Integer locationId = resolveLocationId(songIdentifier);
+    SongFileEntity song = getSong(locationId, songIdentifier);
+    userService.removeSongFromMyFavoritesPlaylist(emailAddress, locationId, song);
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * The request's {@code locationId}, or this instance's own location id when the client omitted
+   * it -- every playlist entry must be tagged with the location whose song library it came from.
+   */
+  private Integer resolveLocationId(SongIdentifier songIdentifier) {
+    Integer locationId = songIdentifier.getLocationId();
+    return locationId != null ? locationId : songLibraryService.getOwnLocationId();
+  }
+
+  private SongFileEntity getSong(Integer locationId, SongIdentifier songIdentifier)
+      throws EntityDoesNotExistException {
+    return songLibraryService.getSongLibraryRoot(locationId)
+        .getSongById(songIdentifier.getAlbumId(), songIdentifier.getSongId());
   }
 
   @GetMapping("/playlists")
@@ -259,6 +272,14 @@ public class UserController {
       @AuthenticationPrincipal String emailAddress,
       @PathVariable String playlistName) throws EntityDoesNotExistException {
     return ResponseEntity.ok(userService.getPlaylistSongs(emailAddress, playlistName));
+  }
+
+  /** The playlist's song identifiers (with locationId) -- used to play the playlist. */
+  @GetMapping("/playlists/{playlistName}/songIdentifiers")
+  public ResponseEntity<List<SongIdentifier>> getPlaylistSongIdentifiers(
+      @AuthenticationPrincipal String emailAddress,
+      @PathVariable String playlistName) throws EntityDoesNotExistException {
+    return ResponseEntity.ok(userService.getPlaylistSongIdentifiers(emailAddress, playlistName));
   }
 
   @PutMapping("/playlists/{playlistName}/songs")

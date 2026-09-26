@@ -6,6 +6,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -524,11 +525,20 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     }
 
     PlaylistEntity playlist = user.getPlaylistByName(playlistName);
+    // Match each requested song against the stored entries and keep the stored identifier, so
+    // a client that omits (or mis-tags) locationId can never strip or blank out the entry's
+    // locationId -- matching on the full identifier here previously dropped every such song.
     List<SongIdentifier> current = new ArrayList<>(playlist.getSongs());
     List<SongIdentifier> reordered = new ArrayList<>();
     for (SongIdentifier si : songs) {
-      if (current.contains(si)) {
-        reordered.add(si);
+      for (SongIdentifier stored : current) {
+        if ((si.getLocationId() == null || si.getLocationId().equals(stored.getLocationId()))
+            && Objects.equals(si.getAlbumId(), stored.getAlbumId())
+            && Objects.equals(si.getSongId(), stored.getSongId())) {
+          reordered.add(stored);
+          current.remove(stored);
+          break;
+        }
       }
     }
     playlist.setSongs(reordered);
@@ -549,6 +559,18 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       return new ArrayList<>();
     }
     return new ArrayList<>(favs.getSongs());
+  }
+
+  @Override
+  public synchronized List<SongIdentifier> getPlaylistSongIdentifiers(String emailAddress,
+      String playlistName) throws EntityDoesNotExistException {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    return new ArrayList<>(user.getPlaylistByName(playlistName).getSongs());
   }
 
   /**
@@ -653,6 +675,29 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     this.userRepository.storeAggregateRoot(this.userRoot);
     announceLocationCreditUsage(usage);
+  }
+
+  @Override
+  public synchronized int getAffordableQueueAddCount(String emailAddress, Integer locationId,
+      int priority, boolean priorityPlay) {
+
+    // Mirrors handleSongAddedToQueueEvent, which never charges a web user in slave mode.
+    if (slaveMode) {
+      return Integer.MAX_VALUE;
+    }
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    int cost = CreditCostCalculator.webQueueAddCost(
+        pricingService.resolvePricingConfig(locationId), priority, priorityPlay);
+    if (cost <= 0) {
+      return Integer.MAX_VALUE;
+    }
+    int numCredits = user.getNumCredits() != null ? user.getNumCredits() : 0;
+    return Math.max(0, numCredits) / cost;
   }
 
   @Override

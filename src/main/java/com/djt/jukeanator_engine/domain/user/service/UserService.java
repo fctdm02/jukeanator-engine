@@ -220,6 +220,10 @@ public interface UserService {
 
   List<SongIdentifier> getFavoriteSongIdentifiers(String emailAddress);
 
+  /** The playlist's songs, in order, each tagged with the location it was added from. */
+  List<SongIdentifier> getPlaylistSongIdentifiers(String emailAddress, String playlistName)
+      throws EntityDoesNotExistException;
+
   /**
    *
    * @param event
@@ -264,6 +268,15 @@ public interface UserService {
    * @param locationId the location this queue action was performed at
    */
   void chargeCreditsForQueueAction(String emailAddress, Integer priority, Integer locationId);
+
+  /**
+   * How many queue adds the web user's current balance covers at {@code locationId}'s pricing --
+   * each costing what {@link #handleSongAddedToQueueEvent(SongAddedToQueueEvent, Integer)} would
+   * charge. {@link Integer#MAX_VALUE} in slave mode (where web users are neither registered nor
+   * charged) or when a queue add is free.
+   */
+  int getAffordableQueueAddCount(String emailAddress, Integer locationId, int priority,
+      boolean priorityPlay);
 
   /**
    * Bar-owner accounting: every credit transaction tagged with {@code locationId} in
