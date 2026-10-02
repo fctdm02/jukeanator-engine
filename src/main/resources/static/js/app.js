@@ -199,7 +199,8 @@
   }
 
   // ── Sub-screen shell ────────────────────────────────────────────────────
-  function subScreenShell(title, bodyHtml) {
+  // footerHtml (optional) is pinned just above the bottom tabs, e.g. a Cancel/Save bar.
+  function subScreenShell(title, bodyHtml, footerHtml = '') {
     return `
       <div class="sub-screen">
         <header class="sub-header">
@@ -207,6 +208,7 @@
           <h1 class="sub-title">${title}</h1>
         </header>
         <div class="sub-content">${bodyHtml}</div>
+        ${footerHtml ? `<div class="sub-footer">${footerHtml}` : ''}
         <nav class="bottom-tabs">
           <button class="bottom-tab ${state.currentMainTab === 'music' ? 'active' : ''}" id="tabMusic">
             <span class="tab-icon">&#9835;</span><span>Music</span>
@@ -215,6 +217,7 @@
             <span class="tab-icon">&#128176;</span><span>Add Funds</span>
           </button>
         </nav>
+        ${footerHtml ? '</div>' : ''}
       </div>`;
   }
 
@@ -237,7 +240,8 @@
       case 'songs-hot-here-all':     renderSongsHotHereAll();         break;
       case 'my-playlists-all':       renderMyPlaylistsAll();          break;
       case 'playlist-detail':        renderPlaylistDetail(params);    break;
-      case 'delete-playlist':        renderDeletePlaylist(params);    break;
+      case 'playlist-edit-order':    renderPlaylistEditOrder(params); break;
+      case 'playlist-multi-select':  renderPlaylistMultiSelect(params); break;
       case 'search-entry':           renderSearchEntry();             break;
       case 'search-results':    renderSearchResults(params.query, params.result); break;
       case 'artist-detail':     renderArtistDetail(params);      break;
@@ -1009,44 +1013,6 @@
     });
   }
 
-  // ── Sub-screen: Delete Playlist ──────────────────────────────────────────
-  function renderDeletePlaylist(params = {}) {
-    const playlist = params.playlist || {};
-    const name = playlist.name || '';
-
-    contentPanel.innerHTML = subScreenShell('Delete Playlist', `
-      <div class="delete-confirm-box">
-        <div class="delete-warning-icon">&#9888;&#65039;</div>
-        <p class="delete-warning-text">
-          Are you sure you want to delete the playlist<br>
-          <strong>${escHtml(name)}</strong>?<br>
-          This action <strong>cannot be undone</strong>.
-        </p>
-      </div>
-      <div id="deletePlaylistError" class="form-error"></div>
-      <div class="form-actions">
-        <button class="form-btn cancel" id="cancelDeletePlaylistBtn">Cancel</button>
-        <button class="form-btn delete-btn" id="confirmDeletePlaylistBtn">Delete Playlist</button>
-      </div>`);
-
-    wireBackBtn();
-    document.getElementById('cancelDeletePlaylistBtn').addEventListener('click', goBack);
-    document.getElementById('confirmDeletePlaylistBtn').addEventListener('click', async () => {
-      const btn = document.getElementById('confirmDeletePlaylistBtn');
-      btn.disabled = true; btn.textContent = 'Deleting…';
-      try {
-        await api(`/api/users/playlists/${encodeURIComponent(name)}`, { method: 'DELETE' });
-        await refreshPlaylistsState();
-        goBack(); // off the delete-confirm screen
-        goBack(); // off the playlist-detail screen
-      } catch (err) {
-        document.getElementById('deletePlaylistError').textContent =
-          'Could not delete playlist: ' + (err.message || err);
-        btn.disabled = false; btn.textContent = 'Delete Playlist';
-      }
-    });
-  }
-
   // ── Sub-screen: Generic stub ────────────────────────────────────────────
   function renderStub(title) {
     contentPanel.innerHTML = subScreenShell(title,
@@ -1807,7 +1773,7 @@
         });
         await reload();
       } catch (err) {
-        alert('Could not update the queue: ' + (err.message || err));
+        showAppAlert({ title: 'Song Queue', message: 'Could not update the queue: ' + (err.message || err) });
       }
     }
 
@@ -1931,7 +1897,7 @@
         });
         dismissSongPopup();
       } catch (err) {
-        alert('Could not add song to queue: ' + (err.message || err));
+        showAppAlert({ title: 'Play Song', message: 'Could not add the song to the queue: ' + (err.message || err) });
       }
     }
 
@@ -1977,7 +1943,7 @@
         }
         refreshPlaylistsState();
       } catch (err) {
-        alert('Could not update My Favorites: ' + (err.message || err));
+        showAppAlert({ title: 'My Favorites', message: 'Could not update My Favorites: ' + (err.message || err) });
       }
     });
 
@@ -2071,189 +2037,470 @@
     });
   }
 
+  const PENCIL_ICON_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
+  const SELECT_MULTIPLE_ICON_SVG = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+      <rect x="8" y="3" width="13" height="13" rx="2"/><path d="M16 16v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h3"/></svg>`;
+
+  /** The band under the title: "Sorted by Track Order" plus the live song count. */
+  function playlistSortBandHtml(count) {
+    return `
+      <div class="playlist-sort-band">
+        <div class="playlist-sort-label">Sorted by Track Order</div>
+        <div class="playlist-sort-count">Total Songs: <span class="playlist-song-total">${count}</span></div>
+      </div>`;
+  }
+
+  function playlistSongInfoHtml(s) {
+    return `
+      ${coverArtHtml(s.albumId, '&#127925;')}
+      <div class="result-info">
+        <div class="result-title">${escHtml(s.songName || '')}</div>
+        <div class="result-sub">${escHtml(s.artistName || '')}</div>
+      </div>`;
+  }
+
+  function playlistSongsPath(name) {
+    return `/api/users/playlists/${encodeURIComponent(name)}/songs`;
+  }
+
+  // ── Sub-screen: Playlist (view) ─────────────────────────────────────────
   async function renderPlaylistDetail(params = {}) {
     const playlist = params.playlist || {};
     const name = playlist.name || '';
+    const isMyFavorites = name === 'My Favorites';
 
     contentPanel.innerHTML = subScreenShell(escHtml(name), '<div class="stub-placeholder">Loading…</div>');
     wireBackBtn();
 
     let songs = [];
     try {
-      songs = await api(`/api/users/playlists/${encodeURIComponent(name)}/songs`);
+      songs = await api(playlistSongsPath(name)) || [];
     } catch {
       contentPanel.querySelector('.sub-content').innerHTML = '<div class="stub-placeholder">Could not load playlist.</div>';
       return;
     }
 
-    function renderSongs(songList) {
-      if (!songList.length) {
-        return '<div class="stub-placeholder">No songs yet. Add songs from the song menu.</div>';
-      }
-      return songList.map((s, i) => `
-        <div class="playlist-song-row" data-index="${i}">
-          <img class="result-thumb" src="/api/locations/${state.locationId}/song-library/albums/${s.albumId}/coverArt" alt=""
-               onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#127925;</div>'">
-          <div class="result-info">
-            <div class="result-title">${escHtml(s.songName || '')}</div>
-            <div class="result-sub">${escHtml(s.artistName || '')}</div>
-          </div>
-          <div class="playlist-song-controls">
-            <button class="playlist-order-btn" data-dir="up" data-index="${i}" title="Move up" ${i === 0 ? 'disabled' : ''}>&#8593;</button>
-            <button class="playlist-order-btn" data-dir="down" data-index="${i}" title="Move down" ${i === songList.length - 1 ? 'disabled' : ''}>&#8595;</button>
-            <button class="playlist-remove-btn" data-index="${i}" title="Remove">&#10005;</button>
-          </div>
-        </div>`).join('');
-    }
+    const songListHtml = songs.length
+      ? songs.map((s, i) => `<div class="playlist-song-row" data-index="${i}">${playlistSongInfoHtml(s)}</div>`).join('')
+      : '<div class="stub-placeholder">No songs yet. Add songs from the song menu.</div>';
 
-    const isMyFavorites = name === 'My Favorites';
-
-    const subContent = contentPanel.querySelector('.sub-content');
-    subContent.innerHTML = `
-      <div class="playlist-detail-header">
-        ${playlistCoverArtHtml(playlist, 'playlist-detail-cover-wrap')}
-        <div class="playlist-detail-info">
-          <div class="playlist-detail-name">${escHtml(name)}</div>
-          <div class="playlist-detail-count">${songs.length} song${songs.length !== 1 ? 's' : ''}</div>
+    contentPanel.querySelector('.sub-content').innerHTML = `
+      ${playlistSortBandHtml(songs.length)}
+      <div class="playlist-view-actions">
+        <button class="playlist-select-multiple-btn" id="selectMultipleBtn" ${songs.length ? '' : 'disabled'}>
+          ${SELECT_MULTIPLE_ICON_SVG}<span>Select Multiple</span>
+        </button>
+        <div class="playlist-edit-anchor" id="playlistEditAnchor">
+          <button class="playlist-edit-btn" id="playlistEditBtn" title="Edit playlist"
+                  aria-label="Edit playlist" aria-haspopup="menu" aria-expanded="false">${PENCIL_ICON_SVG}</button>
         </div>
       </div>
-      <button class="queue-action-btn state-grey playlist-play-btn" id="playPlaylistBtn" disabled>
-        <span class="qab-label">Play Playlist</span>
-        <span class="qab-sub"></span>
-      </button>
-      ${isMyFavorites ? '' : '<button class="playlist-delete-link" id="deletePlaylistBtn">Delete Playlist</button>'}
-      <div class="playlist-song-list" id="playlistSongList">${renderSongs(songs)}</div>`;
+      <div class="playlist-song-list">${songListHtml}</div>`;
 
-    if (!isMyFavorites) {
-      document.getElementById('deletePlaylistBtn').addEventListener('click', () => {
-        navigateSub('delete-playlist', { playlist });
-      });
-    }
-
-    // ── Play Playlist ──
-    // Only the playlist's songs tagged with the current location can be queued here, so the
-    // count and cost cover just those. Each is a normal play (priority 1); the server skips any
-    // song that is ineligible right now and charges only for the songs it actually queues.
-    let localSongIds = [];
-
-    async function refreshPlayButton() {
-      try {
-        const ids = await api(`/api/users/playlists/${encodeURIComponent(name)}/songIdentifiers`) || [];
-        localSongIds = ids.filter(id => id.locationId === state.locationId);
-      } catch {
-        localSongIds = [];
-      }
-      const btn = document.getElementById('playPlaylistBtn');
-      if (!btn) return;
-      const sub = btn.querySelector('.qab-sub');
-      const perSong = queueAddCost(1, false);
-      const total = localSongIds.length * perSong;
-      btn.classList.remove('state-grey', 'state-normal', 'state-warn');
-      btn.disabled = true;
-      if (!localSongIds.length) {
-        btn.classList.add('state-grey');
-        sub.textContent = 'No songs from this location';
-      } else if (state.numCredits < perSong) {
-        btn.classList.add('state-warn');
-        sub.textContent = formatShortfall(perSong - state.numCredits);
-      } else {
-        btn.classList.add('state-normal');
-        btn.disabled = false;
-        sub.textContent = `${localSongIds.length} song${localSongIds.length !== 1 ? 's' : ''} · up to ${formatCredits(total)}`;
-      }
-    }
-
-    document.getElementById('playPlaylistBtn').addEventListener('click', async () => {
-      const count = localSongIds.length;
-      if (!count) return;
-      const perSong = queueAddCost(1, false);
-      const maxCost = count * perSong;
-      const note = state.numCredits < maxCost
-        ? `\n\nYour balance covers only ${Math.floor(state.numCredits / perSong)} of them; queueing stops when your credits run out.`
-        : '';
-      if (!confirm(`Queue ${count} song${count !== 1 ? 's' : ''} from "${name}" for up to ${formatCredits(maxCost, 'Credits')}?\n\nSongs that can't be played right now are skipped and not charged.${note}`)) {
-        return;
-      }
-      try {
-        const queued = await api('/api/song-queue/addMultipleSongs', {
-          method: 'POST',
-          body: JSON.stringify({ songIdentifiers: localSongIds, priority: 1 }),
-        }) || [];
-        const skipped = count - queued.length;
-        alert(`Queued ${queued.length} of ${count} song${count !== 1 ? 's' : ''} for ${formatCredits(queued.length * perSong, 'Credits')}.`
-          + (skipped ? ` ${skipped} song${skipped !== 1 ? 's were' : ' was'} skipped.` : ''));
-        await loadCredits(document.getElementById('creditsValue'));
-      } catch (err) {
-        alert('Could not play playlist: ' + (err.message || err));
-      }
-      await refreshPlayButton();
+    contentPanel.querySelectorAll('.playlist-song-row').forEach((row, i) => {
+      row.addEventListener('click', () => showSongPopup(songs[i]));
     });
 
-    refreshPlayButton();
+    document.getElementById('selectMultipleBtn').addEventListener('click', () => {
+      navigateSub('playlist-multi-select', { playlist, songs });
+    });
 
-    async function moveAndSave(fromIdx, toIdx) {
-      const moved = songs.splice(fromIdx, 1)[0];
-      songs.splice(toIdx, 0, moved);
-      document.getElementById('playlistSongList').innerHTML = renderSongs(songs);
-      wireSongListEvents();
-      // Update count
-      subContent.querySelector('.playlist-detail-count').textContent =
-        `${songs.length} song${songs.length !== 1 ? 's' : ''}`;
+    // ── Pencil menu ──
+    const editBtn = document.getElementById('playlistEditBtn');
+
+    function closeEditMenu() {
+      document.getElementById('playlistEditMenu')?.remove();
+      editBtn.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('click', onOutsideClick, true);
+    }
+
+    function onOutsideClick(e) {
+      const menu = document.getElementById('playlistEditMenu');
+      if (!menu || (!menu.contains(e.target) && !editBtn.contains(e.target))) closeEditMenu();
+    }
+
+    editBtn.addEventListener('click', () => {
+      if (document.getElementById('playlistEditMenu')) { closeEditMenu(); return; }
+      const items = [{ id: 'order', label: 'Edit Track Order' }];
+      if (!isMyFavorites) items.push({ id: 'rename', label: 'Rename' }, { id: 'delete', label: 'Delete' });
+      const menu = document.createElement('div');
+      menu.id = 'playlistEditMenu';
+      menu.className = 'playlist-edit-menu';
+      menu.setAttribute('role', 'menu');
+      menu.innerHTML = items.map(item =>
+        `<button class="playlist-edit-menu-item" role="menuitem" data-action="${item.id}">${item.label}</button>`).join('');
+      document.getElementById('playlistEditAnchor').appendChild(menu);
+      editBtn.setAttribute('aria-expanded', 'true');
+      document.addEventListener('click', onOutsideClick, true);
+
+      menu.querySelectorAll('.playlist-edit-menu-item').forEach(item => {
+        item.addEventListener('click', () => {
+          closeEditMenu();
+          const action = item.dataset.action;
+          if (action === 'order') navigateSub('playlist-edit-order', { playlist, songs });
+          if (action === 'rename') renamePlaylist();
+          if (action === 'delete') deletePlaylist();
+        });
+      });
+    });
+
+    async function renamePlaylist() {
+      const newName = await showAppPrompt({
+        title: 'Edit Playlist Name',
+        placeholder: 'Playlist name',
+        value: name,
+        onSave: async (value) => {
+          if (value === name) return null;
+          if (value === 'My Favorites') return 'That name is reserved.';
+          try {
+            await api(`/api/users/playlists/${encodeURIComponent(name)}`, {
+              method: 'PUT',
+              body: JSON.stringify({ playlistName: value }),
+            });
+            return null;
+          } catch (err) {
+            return /: 409$/.test(err.message || '')
+              ? 'A playlist with that name already exists.'
+              : 'Could not rename the playlist.';
+          }
+        },
+      });
+      if (newName == null || newName === name) return;
+      await refreshPlaylistsState();
+      const renamed = { ...playlist, name: newName };
+      const current = state.navStack[state.navStack.length - 1];
+      if (current && current.screen === 'playlist-detail') current.params = { ...current.params, playlist: renamed };
+      renderPlaylistDetail({ ...params, playlist: renamed });
+    }
+
+    async function deletePlaylist() {
+      const confirmed = await showAppConfirm({
+        title: 'Delete Playlist',
+        message: `Are you sure you want to delete "${name}" from your playlists?`,
+        confirmLabel: 'Delete',
+      });
+      if (!confirmed) return;
       try {
-        await api(`/api/users/playlists/${encodeURIComponent(name)}/songs`, {
+        await api(`/api/users/playlists/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        await refreshPlaylistsState();
+        goBack();
+      } catch (err) {
+        showAppAlert({ title: 'Delete Playlist', message: 'Could not delete the playlist: ' + (err.message || err) });
+      }
+    }
+  }
+
+  // ── Sub-screen: Playlist — Edit Track Order ─────────────────────────────
+  // Removals and reordering only change a working copy; Save writes the whole list in one PUT.
+  function renderPlaylistEditOrder(params = {}) {
+    const playlist = params.playlist || {};
+    const name = playlist.name || '';
+    const working = (params.songs || []).slice();
+
+    contentPanel.innerHTML = subScreenShell(escHtml(name), `
+      ${playlistSortBandHtml(working.length)}
+      <div class="playlist-song-list" id="playlistOrderList"></div>`, `
+      <div class="playlist-bottom-bar">
+        <button class="playlist-bar-btn cancel" id="editOrderCancelBtn">Cancel</button>
+        <button class="playlist-bar-btn primary" id="editOrderSaveBtn">Save</button>
+      </div>`);
+    wireBackBtn();
+
+    const list = document.getElementById('playlistOrderList');
+
+    function renderList() {
+      contentPanel.querySelector('.playlist-song-total').textContent = working.length;
+      list.innerHTML = working.length
+        ? working.map((s, i) => `
+          <div class="playlist-order-row" data-index="${i}">
+            <button class="playlist-order-remove" data-index="${i}" title="Remove from playlist"
+                    aria-label="Remove ${escHtml(s.songName || '')} from playlist"><span></span></button>
+            ${playlistSongInfoHtml(s)}
+            <div class="playlist-order-handle" title="Drag to reorder" aria-label="Drag to reorder">
+              <span></span><span></span><span></span>
+            </div>
+          </div>`).join('')
+        : '<div class="stub-placeholder">This playlist is empty.</div>';
+
+      list.querySelectorAll('.playlist-order-remove').forEach(btn => {
+        btn.addEventListener('click', () => {
+          working.splice(parseInt(btn.dataset.index, 10), 1);
+          renderList();
+        });
+      });
+      list.querySelectorAll('.playlist-order-handle').forEach(handle => {
+        handle.addEventListener('pointerdown', (e) => startDrag(e, handle));
+      });
+    }
+
+    // Drag a row by its handle: the row follows the pointer, the rows it passes slide over to
+    // make room, and the move is applied to the working copy on release.
+    function startDrag(e, handle) {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      const row = handle.closest('.playlist-order-row');
+      const rows = Array.from(list.querySelectorAll('.playlist-order-row'));
+      const fromIdx = rows.indexOf(row);
+      const rowStep = rows.length > 1 ? rows[1].offsetTop - rows[0].offsetTop : row.offsetHeight;
+      const startY = e.clientY;
+      let toIdx = fromIdx;
+
+      handle.setPointerCapture(e.pointerId);
+      row.classList.add('dragging');
+
+      function onMove(ev) {
+        const minDy = -fromIdx * rowStep;
+        const maxDy = (rows.length - 1 - fromIdx) * rowStep;
+        const dy = Math.max(minDy, Math.min(maxDy, ev.clientY - startY));
+        row.style.transform = `translateY(${dy}px)`;
+        toIdx = fromIdx + Math.round(dy / rowStep);
+        rows.forEach((r, i) => {
+          if (r === row) return;
+          let shift = 0;
+          if (fromIdx < toIdx && i > fromIdx && i <= toIdx) shift = -rowStep;
+          if (toIdx < fromIdx && i >= toIdx && i < fromIdx) shift = rowStep;
+          r.style.transform = shift ? `translateY(${shift}px)` : '';
+        });
+      }
+
+      function onEnd() {
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onEnd);
+        handle.removeEventListener('pointercancel', onEnd);
+        if (toIdx !== fromIdx) {
+          const [moved] = working.splice(fromIdx, 1);
+          working.splice(toIdx, 0, moved);
+        }
+        renderList();
+      }
+
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onEnd);
+      handle.addEventListener('pointercancel', onEnd);
+    }
+
+    document.getElementById('editOrderCancelBtn').addEventListener('click', goBack);
+    document.getElementById('editOrderSaveBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('editOrderSaveBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      try {
+        await api(playlistSongsPath(name), {
           method: 'PUT',
-          body: JSON.stringify(songs.map(s => ({ albumId: s.albumId, songId: s.songId }))),
+          body: JSON.stringify(working.map(s => ({ albumId: s.albumId, songId: s.songId }))),
         });
         await refreshPlaylistsState();
+        goBack();
       } catch (err) {
-        alert('Could not save order: ' + (err.message || err));
+        btn.disabled = false;
+        btn.textContent = 'Save';
+        showAppAlert({ title: 'Edit Track Order', message: 'Could not save the playlist: ' + (err.message || err) });
+      }
+    });
+
+    renderList();
+  }
+
+  // ── Sub-screen: Playlist — Multi-Select Mode ────────────────────────────
+  // Each song is checked with checkSongsEligibility before it can be selected (one song per tap,
+  // or every unchecked song at once for "Select all songs"); results are kept for the life of the
+  // screen. addMultipleSongs still re-checks every song and charges only for those it queues.
+  async function renderPlaylistMultiSelect(params = {}) {
+    const playlist = params.playlist || {};
+    const name = playlist.name || '';
+    const songs = params.songs || [];
+
+    contentPanel.innerHTML = subScreenShell(
+      `Multi-Select Mode<span class="sub-title-credits" id="msCredits">${escHtml(creditsWidgetText(state.numCredits))}</span>`,
+      '<div class="stub-placeholder">Loading…</div>', `
+      <div class="playlist-bottom-bar" id="msPlayBar" hidden>
+        <button class="playlist-bar-btn primary wide" id="msPlayBtn"></button>
+      </div>`);
+    wireBackBtn();
+
+    // Pair each displayed song with its stored identifier, which carries the song's locationId.
+    let storedIds = [];
+    try {
+      [storedIds] = await Promise.all([
+        api(`/api/users/playlists/${encodeURIComponent(name)}/songIdentifiers`).then(ids => ids || []),
+        loadCredits(null),
+      ]);
+    } catch {
+      contentPanel.querySelector('.sub-content').innerHTML = '<div class="stub-placeholder">Could not load playlist.</div>';
+      return;
+    }
+    document.getElementById('msCredits').textContent = creditsWidgetText(state.numCredits);
+
+    const unpaired = storedIds.slice();
+    const ids = songs.map(s => {
+      const k = unpaired.findIndex(id => id.albumId === s.albumId && id.songId === s.songId);
+      return k >= 0 ? unpaired.splice(k, 1)[0] : { albumId: s.albumId, songId: s.songId };
+    });
+
+    const selected = new Set();
+    const checking = new Set();
+    const eligibility = new Map(); // song index -> null (eligible) or the ineligible reason
+
+    contentPanel.querySelector('.sub-content').innerHTML = `
+      <div class="multi-select-row multi-select-all" id="msSelectAll">
+        <span class="ms-circle"></span>
+        <span class="multi-select-all-label">Select all songs</span>
+      </div>
+      <div class="playlist-song-list">
+        ${songs.map((s, i) => `
+          <div class="multi-select-row" data-index="${i}">
+            <span class="ms-circle"></span>
+            ${playlistSongInfoHtml(s)}
+          </div>`).join('')}
+      </div>`;
+
+    const rows = Array.from(contentPanel.querySelectorAll('.multi-select-row[data-index]'));
+    const selectAllRow = document.getElementById('msSelectAll');
+    const playBar = document.getElementById('msPlayBar');
+    const playBtn = document.getElementById('msPlayBtn');
+    const perSong = queueAddCost(1, false);
+
+    // "All" means every song known to be selectable is selected (ineligible songs never can be).
+    function allSelectableSelected() {
+      return selected.size > 0
+        && songs.every((s, i) => eligibility.has(i) && (eligibility.get(i) !== null || selected.has(i)));
+    }
+
+    function songCountText(n) {
+      return `${n} song${n !== 1 ? 's' : ''}`;
+    }
+
+    function update() {
+      rows.forEach((row, i) => {
+        row.classList.toggle('selected', selected.has(i));
+        row.classList.toggle('checking', checking.has(i));
+        row.setAttribute('aria-checked', selected.has(i) ? 'true' : 'false');
+      });
+      selectAllRow.classList.toggle('selected', allSelectableSelected());
+      selectAllRow.classList.toggle('checking', checking.size > 1);
+
+      const n = selected.size;
+      const total = n * perSong;
+      playBar.hidden = n === 0;
+      playBtn.classList.toggle('warn', total > state.numCredits);
+      playBtn.textContent = total > state.numCredits
+        ? `Play ${songCountText(n)} · ${formatShortfall(total - state.numCredits)}`
+        : `Play ${songCountText(n)} (${formatCredits(total)})`;
+    }
+
+    function ineligibleMessage(i) {
+      const reason = (eligibility.get(i) || '').replace(/[.\s]+$/, '');
+      const title = `"${songs[i].songName || 'This song'}"`;
+      return /^(has|is|was) /.test(reason)
+        ? `${title} ${reason}.`
+        : `${title} can't be played right now: ${reason}.`;
+    }
+
+    async function checkEligibility(indices) {
+      const results = await api('/api/song-queue/checkSongsEligibility', {
+        method: 'POST',
+        body: JSON.stringify({ songIdentifiers: indices.map(i => ids[i]), priority: 1 }),
+      }) || [];
+      indices.forEach((i, k) => {
+        const result = results[k];
+        eligibility.set(i, result ? (result.ineligibleReason || null) : 'could not be checked');
+      });
+    }
+
+    async function runCheck(indices) {
+      indices.forEach(i => checking.add(i));
+      update();
+      try {
+        await checkEligibility(indices);
+        return true;
+      } catch {
+        showAppAlert({ title: "Can't Select Songs", message: 'Could not check whether the songs can be played. Please try again.' });
+        return false;
+      } finally {
+        indices.forEach(i => checking.delete(i));
+        update();
       }
     }
 
-    async function removeAndSave(idx) {
-      songs.splice(idx, 1);
-      document.getElementById('playlistSongList').innerHTML = renderSongs(songs);
-      wireSongListEvents();
-      subContent.querySelector('.playlist-detail-count').textContent =
-        `${songs.length} song${songs.length !== 1 ? 's' : ''}`;
-      try {
-        await api(`/api/users/playlists/${encodeURIComponent(name)}/songs`, {
-          method: 'PUT',
-          body: JSON.stringify(songs.map(s => ({ albumId: s.albumId, songId: s.songId }))),
+    async function toggleSong(i) {
+      if (checking.has(i)) return;
+      if (selected.has(i)) { selected.delete(i); update(); return; }
+      if (!eligibility.has(i) && !(await runCheck([i]))) return;
+      if (eligibility.get(i) !== null) {
+        showAppAlert({ title: "Can't Select Song", message: ineligibleMessage(i) });
+        return;
+      }
+      selected.add(i);
+      update();
+    }
+
+    async function toggleAll() {
+      if (checking.size) return;
+      if (allSelectableSelected()) { selected.clear(); update(); return; }
+      const unchecked = songs.map((s, i) => i).filter(i => !eligibility.has(i));
+      if (unchecked.length && !(await runCheck(unchecked))) return;
+      const skipped = [];
+      songs.forEach((s, i) => {
+        if (eligibility.get(i) === null) selected.add(i);
+        else skipped.push(i);
+      });
+      update();
+      if (skipped.length) {
+        showAppAlert({
+          title: `${songCountText(skipped.length)} couldn't be selected`,
+          message: skipped.map(ineligibleMessage).join('\n\n'),
         });
-        await refreshPlaylistsState();
-        await refreshPlayButton();
-      } catch (err) {
-        alert('Could not remove song: ' + (err.message || err));
       }
     }
 
-    function wireSongListEvents() {
-      const list = document.getElementById('playlistSongList');
-      if (!list) return;
-      list.querySelectorAll('.playlist-order-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const idx = parseInt(btn.dataset.index, 10);
-          const dir = btn.dataset.dir;
-          if (dir === 'up' && idx > 0) moveAndSave(idx, idx - 1);
-          if (dir === 'down' && idx < songs.length - 1) moveAndSave(idx, idx + 1);
-        });
-      });
-      list.querySelectorAll('.playlist-remove-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const idx = parseInt(btn.dataset.index, 10);
-          removeAndSave(idx);
-        });
-      });
-      list.querySelectorAll('.playlist-song-row').forEach((row, i) => {
-        row.style.cursor = 'pointer';
-        row.addEventListener('click', () => showSongPopup(songs[i]));
-      });
-    }
+    rows.forEach((row, i) => {
+      row.setAttribute('role', 'checkbox');
+      row.addEventListener('click', () => toggleSong(i));
+    });
+    selectAllRow.setAttribute('role', 'checkbox');
+    selectAllRow.addEventListener('click', toggleAll);
 
-    wireSongListEvents();
+    playBtn.addEventListener('click', async () => {
+      const n = selected.size;
+      if (!n) return;
+      const total = n * perSong;
+      if (total > state.numCredits) {
+        const addFunds = await showAppConfirm({
+          title: 'Not Enough Credits',
+          message: `Playing ${songCountText(n)} costs ${formatCredits(total, 'Credits')}, but your balance is ${formatCredits(state.numCredits, 'Credits')}.`,
+          confirmLabel: 'Add Funds',
+        });
+        if (addFunds) renderMain('addfunds');
+        return;
+      }
+
+      playBtn.disabled = true;
+      playBtn.textContent = 'Queueing…';
+      try {
+        const chosen = [...selected].sort((a, b) => a - b).map(i => ids[i]);
+        const queued = await api('/api/song-queue/addMultipleSongs', {
+          method: 'POST',
+          body: JSON.stringify({ songIdentifiers: chosen, priority: 1 }),
+        }) || [];
+        await loadCredits(null);
+        const skipped = n - queued.length;
+        await showAppAlert({
+          title: queued.length ? 'Songs Queued' : 'No Songs Queued',
+          message: `Queued ${queued.length} of ${songCountText(n)} for ${formatCredits(queued.length * perSong, 'Credits')}.`
+            + (skipped ? `\n\n${songCountText(skipped)} ${skipped !== 1 ? 'were' : 'was'} skipped because ${skipped !== 1 ? 'they' : 'it'} could no longer be played.` : ''),
+        });
+        goBack();
+      } catch (err) {
+        playBtn.disabled = false;
+        update();
+        showAppAlert({ title: 'Could Not Play Songs', message: 'Could not queue the songs: ' + (err.message || err) });
+      }
+    });
+
+    update();
   }
 
   // ── Location header + picker sheet ─────────────────────────────────────
@@ -2372,7 +2619,7 @@
             });
             await refreshPlaylistsState();
           } catch (err) {
-            alert('Could not add to playlist: ' + (err.message || err));
+            showAppAlert({ title: 'Add to Playlist', message: 'Could not add the song to the playlist: ' + (err.message || err) });
           }
         });
     });
@@ -2471,7 +2718,7 @@
         onSuccess(response);
       } catch (err) {
         if (payBtn) { payBtn.disabled = false; payBtn.textContent = `Pay $${Number(pkg.priceUsd).toFixed(2)}`; }
-        alert('Payment failed: ' + (err.message || err));
+        showAppAlert({ title: 'Payment Failed', message: 'Payment failed: ' + (err.message || err) });
       }
     }
 
@@ -2688,51 +2935,122 @@
     document.getElementById('txSuccessReturnBtn').addEventListener('click', () => renderMain('music'));
   }
 
-  function showCreatePlaylistDialog(opts = {}) {
-    const existing = document.getElementById('createPlaylistDialog');
-    if (existing) existing.remove();
+  // ── Themed dialogs (in place of the browser's alert/confirm/prompt) ─────
 
+  /** Opens a centered dialog box over the app; tapping the backdrop or pressing Escape calls onDismiss. */
+  function openAppDialog(innerHtml, onDismiss) {
     const dialog = document.createElement('div');
-    dialog.id = 'createPlaylistDialog';
-    dialog.className = 'create-playlist-backdrop';
-    dialog.innerHTML = `
-      <div class="create-playlist-box">
-        <div class="create-playlist-title">Create New Playlist</div>
-        <input class="create-playlist-input" id="newPlaylistName" type="text" placeholder="Playlist name" maxlength="64">
-        <div class="create-playlist-actions">
-          <button class="create-playlist-btn cancel" id="createPlaylistCancel">Cancel</button>
-          <button class="create-playlist-btn save" id="createPlaylistSave">Save</button>
-        </div>
-      </div>`;
-
+    dialog.className = 'app-dialog-backdrop';
+    dialog.innerHTML = `<div class="app-dialog-box" role="dialog" aria-modal="true">${innerHtml}</div>`;
     document.getElementById('app-shell').appendChild(dialog);
-    document.getElementById('newPlaylistName').focus();
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) onDismiss(); });
+    dialog.addEventListener('keydown', (e) => { if (e.key === 'Escape') onDismiss(); });
+    return dialog;
+  }
 
-    document.getElementById('createPlaylistCancel').addEventListener('click', () => dialog.remove());
+  function appDialogHeadHtml(title, message) {
+    return (title ? `<div class="app-dialog-title">${escHtml(title)}</div>` : '')
+      + (message ? `<div class="app-dialog-message">${escHtml(message)}</div>` : '');
+  }
 
-    document.getElementById('createPlaylistSave').addEventListener('click', async () => {
-      const nameInput = document.getElementById('newPlaylistName');
-      const name = nameInput ? nameInput.value.trim() : '';
-      if (!name) return;
-      const btn = document.getElementById('createPlaylistSave');
-      btn.disabled = true;
-      btn.textContent = 'Saving…';
-      try {
-        await api('/api/users/playlists', {
-          method: 'POST',
-          body: JSON.stringify({ playlistName: name }),
-        });
-        await refreshPlaylistsState();
-        dialog.remove();
-        if (opts.onCreated) await opts.onCreated(name);
-      } catch (err) {
-        btn.disabled = false;
-        btn.textContent = 'Save';
-        nameInput.placeholder = 'Name already taken or invalid';
-      }
+  /** Resolves once the user dismisses the dialog. */
+  function showAppAlert({ title = '', message = '', okLabel = 'OK' } = {}) {
+    return new Promise(resolve => {
+      const close = () => { dialog.remove(); resolve(); };
+      const dialog = openAppDialog(`
+        ${appDialogHeadHtml(title, message)}
+        <div class="app-dialog-actions">
+          <button class="app-dialog-btn primary">${escHtml(okLabel)}</button>
+        </div>`, close);
+      const okBtn = dialog.querySelector('.app-dialog-btn.primary');
+      okBtn.addEventListener('click', close);
+      okBtn.focus();
     });
+  }
 
-    dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.remove(); });
+  /** Resolves to true when the user confirms, false otherwise. */
+  function showAppConfirm({ title = '', message = '', confirmLabel = 'OK', cancelLabel = 'Cancel' } = {}) {
+    return new Promise(resolve => {
+      const close = (result) => { dialog.remove(); resolve(result); };
+      const dialog = openAppDialog(`
+        ${appDialogHeadHtml(title, message)}
+        <div class="app-dialog-actions">
+          <button class="app-dialog-btn cancel">${escHtml(cancelLabel)}</button>
+          <button class="app-dialog-btn primary">${escHtml(confirmLabel)}</button>
+        </div>`, () => close(false));
+      dialog.querySelector('.app-dialog-btn.cancel').addEventListener('click', () => close(false));
+      const confirmBtn = dialog.querySelector('.app-dialog-btn.primary');
+      confirmBtn.addEventListener('click', () => close(true));
+      confirmBtn.focus();
+    });
+  }
+
+  /**
+   * Asks for a single line of text. onSave(value) runs while the dialog stays open; it resolves to
+   * null on success or to an error message, which is shown inline so the user can try again.
+   * Resolves to the saved value, or null when cancelled.
+   */
+  function showAppPrompt({ title = '', placeholder = '', value = '', saveLabel = 'Save',
+                           cancelLabel = 'Cancel', maxLength = 64, onSave = async () => null } = {}) {
+    return new Promise(resolve => {
+      const close = (result) => { dialog.remove(); resolve(result); };
+      const dialog = openAppDialog(`
+        ${appDialogHeadHtml(title, '')}
+        <input class="app-dialog-input" type="text" placeholder="${escHtml(placeholder)}" maxlength="${maxLength}">
+        <div class="app-dialog-error"></div>
+        <div class="app-dialog-actions">
+          <button class="app-dialog-btn cancel">${escHtml(cancelLabel)}</button>
+          <button class="app-dialog-btn primary">${escHtml(saveLabel)}</button>
+        </div>`, () => close(null));
+      const input = dialog.querySelector('.app-dialog-input');
+      const error = dialog.querySelector('.app-dialog-error');
+      const saveBtn = dialog.querySelector('.app-dialog-btn.primary');
+      input.value = value;
+      input.focus();
+      input.select();
+
+      async function save() {
+        const entered = input.value.trim();
+        if (!entered || saveBtn.disabled) return;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+        error.textContent = '';
+        const failure = await onSave(entered);
+        if (failure) {
+          error.textContent = failure;
+          saveBtn.disabled = false;
+          saveBtn.textContent = saveLabel;
+          input.focus();
+          return;
+        }
+        close(entered);
+      }
+
+      dialog.querySelector('.app-dialog-btn.cancel').addEventListener('click', () => close(null));
+      saveBtn.addEventListener('click', save);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+    });
+  }
+
+  async function showCreatePlaylistDialog(opts = {}) {
+    const name = await showAppPrompt({
+      title: 'Create New Playlist',
+      placeholder: 'Playlist name',
+      onSave: async (value) => {
+        try {
+          await api('/api/users/playlists', {
+            method: 'POST',
+            body: JSON.stringify({ playlistName: value }),
+          });
+          return null;
+        } catch {
+          return 'That name is already taken or is not valid.';
+        }
+      },
+    });
+    if (name == null) return;
+    await refreshPlaylistsState();
+    if (opts.onCreated) await opts.onCreated(name);
   }
 
   // ── WebSocket ───────────────────────────────────────────────────────────

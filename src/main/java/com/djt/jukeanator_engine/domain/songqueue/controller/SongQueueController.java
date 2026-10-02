@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songqueue.controller;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -20,7 +21,9 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.CheckSongsEligibilityRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongEligibilityDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
@@ -109,6 +112,48 @@ public class SongQueueController {
       @RequestParam Integer albumId, @RequestParam Integer songId,
       @RequestParam Integer priority) {
     return songQueueService.isSongEligibleForQueue(locationId, albumId, songId, priority);
+  }
+
+  /**
+   * Vets songs for the web UI's playlist Multi-Select Mode, always as normal plays (priority 1).
+   * A song tagged with a different location cannot be queued here, so it is marked ineligible
+   * without asking the owning instance; the rest are checked in one call, and the results are
+   * returned in request order.
+   */
+  @PostMapping("/checkSongsEligibility")
+  public List<SongEligibilityDto> checkSongsEligibility(@PathVariable Integer locationId,
+      @RequestBody CheckSongsEligibilityRequest checkSongsEligibilityRequest) {
+
+    if (checkSongsEligibilityRequest == null
+        || checkSongsEligibilityRequest.songIdentifiers() == null) {
+      return List.of();
+    }
+
+    List<SongIdentifier> requested = checkSongsEligibilityRequest.songIdentifiers().stream()
+        .filter(Objects::nonNull)
+        .toList();
+    List<SongIdentifier> songsAtLocation = requested.stream()
+        .filter(id -> id.getLocationId() == null || locationId.equals(id.getLocationId()))
+        .toList();
+
+    List<SongEligibilityDto> checked = songsAtLocation.isEmpty()
+        ? List.of()
+        : songQueueService.checkSongsEligibility(locationId, songsAtLocation, 1);
+
+    List<SongEligibilityDto> results = new ArrayList<>();
+    int checkedIndex = 0;
+    for (SongIdentifier id : requested) {
+      if (id.getLocationId() == null || locationId.equals(id.getLocationId())) {
+        SongEligibilityDto result = checkedIndex < checked.size() ? checked.get(checkedIndex) : null;
+        checkedIndex++;
+        results.add(new SongEligibilityDto(id.getLocationId(), id.getAlbumId(), id.getSongId(),
+            result != null ? result.ineligibleReason() : "the song cannot be found"));
+      } else {
+        results.add(new SongEligibilityDto(id.getLocationId(), id.getAlbumId(), id.getSongId(),
+            "is not available at this location"));
+      }
+    }
+    return results;
   }
 
   @PostMapping("/addSong")

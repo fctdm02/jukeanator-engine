@@ -68,6 +68,11 @@ public class PlaylistEntity extends AbstractPersistentEntity {
     return name;
   }
 
+  // Package-private: only UserEntity.renamePlaylist renames a playlist (it enforces uniqueness).
+  void setName(String name) {
+    this.name = name;
+  }
+
   public List<SongIdentifier> getSongs() {
     return songs;
   }

@@ -37,7 +37,9 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.CheckSongsEligibilityRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongEligibilityDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
@@ -535,6 +537,33 @@ public class SongQueueServiceImpl
     }
 
     return null;
+  }
+
+  @Override
+  public List<SongEligibilityDto> checkSongsEligibility(Integer locationId,
+      List<SongIdentifier> songIdentifiers, Integer priority) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "checkSongsEligibility",
+          new CheckSongsEligibilityRequest(songIdentifiers, priority),
+          new TypeReference<List<SongEligibilityDto>>() {});
+    }
+
+    List<SongEligibilityDto> results = new ArrayList<>();
+    if (songIdentifiers == null) {
+      return results;
+    }
+    for (SongIdentifier songIdentifier : songIdentifiers) {
+      Integer albumId = songIdentifier.getAlbumId();
+      Integer songId = songIdentifier.getSongId();
+      String ineligibleReason;
+      try {
+        ineligibleReason = isSongEligibleForQueue(locationId, albumId, songId, priority);
+      } catch (SongQueueServiceException e) {
+        ineligibleReason = "the song cannot be found";
+      }
+      results.add(new SongEligibilityDto(locationId, albumId, songId, ineligibleReason));
+    }
+    return results;
   }
 
   @Override

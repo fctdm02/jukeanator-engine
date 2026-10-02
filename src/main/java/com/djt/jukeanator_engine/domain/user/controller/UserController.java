@@ -200,6 +200,18 @@ public class UserController {
     return ResponseEntity.noContent().build();
   }
 
+  @PutMapping("/playlists/{playlistName}")
+  public ResponseEntity<Void> renamePlaylist(@AuthenticationPrincipal String emailAddress,
+      @PathVariable String playlistName, @RequestBody Map<String, String> body)
+      throws EntityDoesNotExistException, EntityAlreadyExistsException {
+    String newPlaylistName = body.get("playlistName");
+    if (newPlaylistName == null || newPlaylistName.isBlank()) {
+      return ResponseEntity.badRequest().build();
+    }
+    userService.renamePlaylist(emailAddress, playlistName, newPlaylistName.strip());
+    return ResponseEntity.noContent().build();
+  }
+
   @PostMapping("/playlists/{playlistName}/songs")
   public ResponseEntity<Void> addSongToPlaylist(@AuthenticationPrincipal String emailAddress,
       @PathVariable String playlistName, @RequestBody SongIdentifier songIdentifier)

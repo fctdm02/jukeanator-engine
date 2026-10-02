@@ -25,7 +25,9 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.CheckSongsEligibilityRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongEligibilityDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
@@ -95,6 +97,49 @@ class SongQueueControllerTest extends AbstractControllerTest {
         .andExpect(jsonPath("$", is("ELIGIBLE")));
 
     verify(songQueueService).isSongEligibleForQueue(LOCATION_ID, 3, 4, 5);
+  }
+
+  @Test
+  void checkSongsEligibility_marksOtherLocationsAndKeepsRequestOrder() throws Exception {
+    when(songQueueService.checkSongsEligibility(eq(LOCATION_ID), any(), eq(1)))
+        .thenReturn(List.of(new SongEligibilityDto(LOCATION_ID, 3, 1, null),
+            new SongEligibilityDto(LOCATION_ID, 3, 2, "has already been played")));
+    CheckSongsEligibilityRequest request = new CheckSongsEligibilityRequest(
+        List.of(new SongIdentifier(LOCATION_ID, 3, 1), new SongIdentifier(99, 3, 9),
+            new SongIdentifier(LOCATION_ID, 3, 2)),
+        5);
+
+    mockMvc.perform(post(BASE_PATH + "/checkSongsEligibility")
+            .principal(webUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()", is(3)))
+        .andExpect(jsonPath("$[0].songId", is(1)))
+        .andExpect(jsonPath("$[0].ineligibleReason").doesNotExist())
+        .andExpect(jsonPath("$[1].songId", is(9)))
+        .andExpect(jsonPath("$[1].ineligibleReason", is("is not available at this location")))
+        .andExpect(jsonPath("$[2].songId", is(2)))
+        .andExpect(jsonPath("$[2].ineligibleReason", is("has already been played")));
+
+    // Only this location's songs are checked, always as normal plays (priority 1).
+    verify(songQueueService).checkSongsEligibility(LOCATION_ID,
+        List.of(new SongIdentifier(LOCATION_ID, 3, 1), new SongIdentifier(LOCATION_ID, 3, 2)), 1);
+  }
+
+  @Test
+  void checkSongsEligibility_onlyOtherLocations_doesNotCallService() throws Exception {
+    CheckSongsEligibilityRequest request =
+        new CheckSongsEligibilityRequest(List.of(new SongIdentifier(99, 3, 9)), 1);
+
+    mockMvc.perform(post(BASE_PATH + "/checkSongsEligibility")
+            .principal(webUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].ineligibleReason", is("is not available at this location")));
+
+    verify(songQueueService, never()).checkSongsEligibility(any(), any(), any());
   }
 
   @Test

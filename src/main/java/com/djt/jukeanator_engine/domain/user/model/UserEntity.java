@@ -296,6 +296,29 @@ public class UserEntity extends AbstractPersistentEntity {
     return this.playlists.remove(playlist);
   }
 
+  public boolean renamePlaylist(String playlistName, String newPlaylistName)
+      throws EntityDoesNotExistException, EntityAlreadyExistsException {
+
+    if (PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(playlistName)
+        || PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(newPlaylistName)) {
+      throw new IllegalArgumentException("Cannot rename to or from the My Favorites playlist.");
+    }
+
+    PlaylistEntity playlist = getPlaylistByName(playlistName);
+    if (playlistName.equals(newPlaylistName)) {
+      return false;
+    }
+
+    if (getPlaylistByNameNullIfNotExists(newPlaylistName) != null) {
+      throw new EntityAlreadyExistsException("Cannot rename playlist: [" + playlistName
+          + "] to: [" + newPlaylistName + "] for user: [" + this.emailAddress
+          + "] because it already exists.");
+    }
+
+    playlist.setName(newPlaylistName);
+    return true;
+  }
+
   public boolean addSongToPlaylist(String playlistName, Integer locationId, SongFileEntity song)
       throws EntityDoesNotExistException {
 

@@ -437,6 +437,23 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
+  public synchronized boolean renamePlaylist(String emailAddress, String playlistName,
+      String newPlaylistName) throws EntityDoesNotExistException, EntityAlreadyExistsException {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+
+    boolean result = user.renamePlaylist(playlistName, newPlaylistName);
+    if (result) {
+      this.userRepository.storeAggregateRoot(this.userRoot);
+    }
+
+    return result;
+  }
+
+  @Override
   public synchronized boolean addSongToMyFavoritesPlaylist(String emailAddress, Integer locationId,
       SongFileEntity song) throws EntityDoesNotExistException {
 

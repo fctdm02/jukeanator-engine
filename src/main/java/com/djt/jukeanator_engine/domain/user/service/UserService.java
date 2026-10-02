@@ -191,6 +191,18 @@ public interface UserService {
       throws EntityDoesNotExistException;
 
   /**
+   *
+   * @param emailAddress
+   * @param playlistName
+   * @param newPlaylistName
+   * @return false if the name is unchanged
+   * @throws EntityDoesNotExistException
+   * @throws EntityAlreadyExistsException if another playlist already has the new name
+   */
+  boolean renamePlaylist(String emailAddress, String playlistName, String newPlaylistName)
+      throws EntityDoesNotExistException, EntityAlreadyExistsException;
+
+  /**
    * 
    * @param emailAddress
    * @param song

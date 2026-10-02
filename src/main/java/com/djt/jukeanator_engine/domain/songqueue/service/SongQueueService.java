@@ -8,6 +8,8 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueReq
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongEligibilityDto;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 
 /**
@@ -73,6 +75,17 @@ public interface SongQueueService {
    */
   String isSongEligibleForQueue(Integer locationId, Integer albumId, Integer songId,
       Integer priority);
+
+  /**
+   * Checks each song independently against the current queue, as
+   * {@link #isSongEligibleForQueue} does for one song.
+   *
+   * @param songIdentifiers
+   * @param priority
+   * @return One result per song, in request order
+   */
+  List<SongEligibilityDto> checkSongsEligibility(Integer locationId,
+      List<SongIdentifier> songIdentifiers, Integer priority);
 
   /**
    * @param addSongToQueueRequest

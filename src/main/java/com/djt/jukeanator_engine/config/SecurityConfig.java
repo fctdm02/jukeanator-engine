@@ -140,7 +140,7 @@ public class SecurityConfig {
             // ── Authenticated users: add songs to the queue ───────────────────
             // Any logged-in patron can queue songs.
             .requestMatchers(HttpMethod.POST, "/api/song-queue/addSong",
-                "/api/song-queue/addMultipleSongs")
+                "/api/song-queue/addMultipleSongs", "/api/song-queue/checkSongsEligibility")
             .authenticated()
 
             // ── Authenticated users: reorder/remove songs from the queue ──────
@@ -152,7 +152,8 @@ public class SecurityConfig {
 
             // ── Master-mode only: location-scoped mirror of the queue-add/reorder rules ─
             .requestMatchers(HttpMethod.POST, "/api/locations/*/song-queue/addSong",
-                "/api/locations/*/song-queue/addMultipleSongs")
+                "/api/locations/*/song-queue/addMultipleSongs",
+                "/api/locations/*/song-queue/checkSongsEligibility")
             .authenticated()
 
             .requestMatchers(HttpMethod.POST, "/api/locations/*/song-queue/moveSongUpInQueue",

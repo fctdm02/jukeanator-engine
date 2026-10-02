@@ -2,12 +2,19 @@ package com.djt.jukeanator_engine.domain.user.model;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
+import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.security.UserRole;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
@@ -98,5 +105,65 @@ class UserEntityTest {
 
     assertNull(user.getSongPlayHistory());
     assertNull(emptyPlaylist.getSongs());
+  }
+
+  @Test
+  void renamePlaylist_renamesInPlace_keepingIdentityAndSongs() throws Exception {
+
+    UserEntity user = newUser();
+    PlaylistEntity partyMix = user.createPlaylist("Party Mix");
+    partyMix.addSong(new SongIdentifier(PREVIOUS_LOCATION_ID, 1, 2));
+    Integer persistentIdentity = partyMix.getPersistentIdentity();
+
+    assertTrue(user.renamePlaylist("Party Mix", "Dance Mix"));
+
+    assertNull(user.getPlaylistByNameNullIfNotExists("Party Mix"));
+    PlaylistEntity renamed = user.getPlaylistByName("Dance Mix");
+    assertSame(partyMix, renamed);
+    assertEquals(persistentIdentity, renamed.getPersistentIdentity());
+    assertEquals(List.of(new SongIdentifier(PREVIOUS_LOCATION_ID, 1, 2)), renamed.getSongs());
+  }
+
+  @Test
+  void renamePlaylist_toSameName_isNoOp() throws Exception {
+
+    UserEntity user = newUser();
+    user.createPlaylist("Party Mix");
+
+    assertFalse(user.renamePlaylist("Party Mix", "Party Mix"));
+    assertNotNull(user.getPlaylistByNameNullIfNotExists("Party Mix"));
+  }
+
+  @Test
+  void renamePlaylist_toExistingName_throws() throws Exception {
+
+    UserEntity user = newUser();
+    user.createPlaylist("Party Mix");
+    user.createPlaylist("Dance Mix");
+
+    assertThrows(EntityAlreadyExistsException.class,
+        () -> user.renamePlaylist("Party Mix", "Dance Mix"));
+    assertNotNull(user.getPlaylistByNameNullIfNotExists("Party Mix"));
+  }
+
+  @Test
+  void renamePlaylist_toOrFromMyFavorites_throws() throws Exception {
+
+    UserEntity user = newUser();
+    user.createPlaylist("Party Mix");
+
+    assertThrows(IllegalArgumentException.class, () -> user
+        .renamePlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, "Not Favorites"));
+    assertThrows(IllegalArgumentException.class,
+        () -> user.renamePlaylist("Party Mix", PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME));
+  }
+
+  @Test
+  void renamePlaylist_missingPlaylist_throws() {
+
+    UserEntity user = newUser();
+
+    assertThrows(EntityDoesNotExistException.class,
+        () -> user.renamePlaylist("No Such Playlist", "Anything"));
   }
 }

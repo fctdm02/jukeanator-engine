@@ -38,6 +38,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.CheckSongsEligibilityRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
@@ -373,6 +374,11 @@ public class SlaveConnectionManager {
       case "isSongEligibleForQueue": {
         EligibilityCheckPayload p = convert(payload, EligibilityCheckPayload.class);
         return songQueueService.isSongEligibleForQueue(ownLocationId, p.albumId(), p.songId(),
+            p.priority());
+      }
+      case "checkSongsEligibility": {
+        CheckSongsEligibilityRequest p = convert(payload, CheckSongsEligibilityRequest.class);
+        return songQueueService.checkSongsEligibility(ownLocationId, p.songIdentifiers(),
             p.priority());
       }
       case "addSongToQueue":

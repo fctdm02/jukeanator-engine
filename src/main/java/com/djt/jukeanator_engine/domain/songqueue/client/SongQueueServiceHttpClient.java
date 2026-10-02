@@ -8,7 +8,10 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.CheckSongsEligibilityRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongEligibilityDto;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 
@@ -88,6 +91,15 @@ public class SongQueueServiceHttpClient implements SongQueueService {
             .queryParam("albumId", albumId).queryParam("songId", songId)
             .queryParam("priority", priority).build())
         .retrieve().body(String.class);
+  }
+
+  @Override
+  public List<SongEligibilityDto> checkSongsEligibility(Integer locationId,
+      List<SongIdentifier> songIdentifiers, Integer priority) {
+
+    return restClient.post().uri(basePath(locationId) + "/checkSongsEligibility")
+        .body(new CheckSongsEligibilityRequest(songIdentifiers, priority)).retrieve()
+        .body(new ParameterizedTypeReference<List<SongEligibilityDto>>() {});
   }
 
   @Override
