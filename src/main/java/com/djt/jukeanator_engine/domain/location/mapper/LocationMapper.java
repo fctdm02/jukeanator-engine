@@ -43,7 +43,8 @@ public final class LocationMapper {
         entity.getFiveDollarBonusCredits(),
         entity.getTenDollarBonusCredits(),
         entity.getWebCostMultiplier(),
-        entity.getDisplayCurrencyForCost());
+        entity.getDisplayCurrencyForCost(),
+        Boolean.valueOf(entity.isGeoFenced()));
   }
 
   public static LocationRootEntity toEntity(LocationRootDto dto) {
@@ -76,6 +77,11 @@ public final class LocationMapper {
     location.setTenDollarBonusCredits(dto.tenDollarBonusCredits());
     location.setWebCostMultiplier(dto.webCostMultiplier());
     location.setDisplayCurrencyForCost(dto.displayCurrencyForCost());
+    // Null for a JukeANator_Locations.json written before isGeoFenced was persisted -- keep the
+    // entity's own default (geo-fenced) in that case.
+    if (dto.isGeoFenced() != null) {
+      location.setGeoFenced(dto.isGeoFenced().booleanValue());
+    }
 
     return location;
   }

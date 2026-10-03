@@ -33,6 +33,7 @@ import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationStatus;
 import com.djt.jukeanator_engine.domain.location.repository.LocationRepository;
+import com.djt.jukeanator_engine.domain.location.repository.LocationRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
@@ -60,12 +61,17 @@ public class LocationServiceImpl implements LocationService {
   private final ConnectedSlaveRegistry connectedSlaveRegistry;
   private final SongLibraryRepository songLibraryRepository;
 
+  // Non-null only under repositoryType: jpa -- writes the filesystem (JSON) backup of the location
+  // list into app.data-dir. See updateOwnLocationInfo().
+  private final LocationRepository filesystemBackupRepository;
+
   private LocationRootEntity locationRoot;
 
   public LocationServiceImpl(LocationRepository locationRepository,
       PasswordEncoder passwordEncoder, ApplicationEventPublisher eventPublisher,
       ObjectMapper objectMapper, String storageRoot,
-      ConnectedSlaveRegistry connectedSlaveRegistry, SongLibraryRepository songLibraryRepository) {
+      ConnectedSlaveRegistry connectedSlaveRegistry, SongLibraryRepository songLibraryRepository,
+      String filesystemBackupDataDir) {
 
     requireNonNull(locationRepository, "locationRepository cannot be null");
     requireNonNull(passwordEncoder, "passwordEncoder cannot be null");
@@ -82,6 +88,9 @@ public class LocationServiceImpl implements LocationService {
     this.storageRoot = storageRoot;
     this.connectedSlaveRegistry = connectedSlaveRegistry;
     this.songLibraryRepository = songLibraryRepository;
+    this.filesystemBackupRepository = filesystemBackupDataDir != null
+        ? new LocationRepositoryFileSystemImpl(filesystemBackupDataDir)
+        : null;
 
     initialize();
 
@@ -418,6 +427,14 @@ public class LocationServiceImpl implements LocationService {
     requireNonNull(request, "request cannot be null");
 
     LocationEntity location = getOrCreateOwnLocation(null);
+
+    log.info("Updating own location info for locationId [{}]: name=[{}] -> [{}], "
+        + "logoName=[{}] -> [{}], latitude=[{}] -> [{}], longitude=[{}] -> [{}], "
+        + "isGeoFenced=[{}] -> [{}]", location.getPersistentIdentity(), location.getName(),
+        request.name(), location.getLogoName(), request.logoName(), location.getLatitude(),
+        request.latitude(), location.getLongitude(), request.longitude(), location.isGeoFenced(),
+        request.isGeoFenced());
+
     location.setName(request.name());
     location.setLatitude(request.latitude());
     location.setLongitude(request.longitude());
@@ -425,6 +442,22 @@ public class LocationServiceImpl implements LocationService {
     location.setGeoFenced(request.isGeoFenced());
 
     this.locationRepository.storeAggregateRoot(this.locationRoot);
+
+    if (this.filesystemBackupRepository != null) {
+
+      // Under JPA, keep the filesystem (JukeANator_Locations.json) copy of the location list up
+      // to date too -- the same way a location name change keeps the song library's .oos backup
+      // in step (see SongLibraryServiceImpl#renameOwnLocationLibraryFileIfNameChanged) -- so this
+      // instance can be switched back to repositoryType: filesystem later without reverting the
+      // name, logo, coordinates or geo-fencing just saved.
+      this.filesystemBackupRepository.storeAggregateRoot(this.locationRoot);
+    }
+
+    log.info("Saved own location info for locationId [{}] to {}{}",
+        location.getPersistentIdentity(), this.locationRepository.getClass().getSimpleName(),
+        this.filesystemBackupRepository != null
+            ? " and the " + LocationRootEntity.LOCATION_LIST_FILENAME + " filesystem backup"
+            : "");
 
     return location;
   }

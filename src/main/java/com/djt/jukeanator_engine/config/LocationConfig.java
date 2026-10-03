@@ -63,7 +63,8 @@ public class LocationConfig {
 
     return new LocationServiceImpl(locationRepository, passwordEncoder, eventPublisher,
         objectMapper, perLocationSyncStorageRoot(appProperties, locationProperties),
-        connectedSlaveRegistry, songLibraryRepository);
+        connectedSlaveRegistry, songLibraryRepository,
+        "jpa".equals(appProperties.getRepositoryType()) ? appProperties.getDataDir() : null);
   }
 
   @Bean

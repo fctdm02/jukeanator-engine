@@ -30,6 +30,7 @@ import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
+import com.djt.jukeanator_engine.domain.location.dto.UpdateLocationInfoRequest;
 import com.djt.jukeanator_engine.domain.location.event.LocationLibrarySyncedEvent;
 import com.djt.jukeanator_engine.domain.location.event.LocationRegisteredEvent;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
@@ -38,6 +39,7 @@ import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationStatus;
 import com.djt.jukeanator_engine.domain.location.repository.LocationRepository;
+import com.djt.jukeanator_engine.domain.location.repository.LocationRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 
 /**
@@ -87,7 +89,7 @@ public class LocationServiceTest {
 
     locationServiceImpl = new LocationServiceImpl(locationRepository, passwordEncoder,
         eventPublisher, ObjectMappers.create(), storageRoot.toString(), connectedSlaveRegistry,
-        songLibraryRepository);
+        songLibraryRepository, null);
   }
 
   private LocationEntity registeredLocation() {
@@ -323,5 +325,82 @@ public class LocationServiceTest {
   @Test
   void getCoverArtPath_nullWhenNeverUploaded() {
     assertNull(locationServiceImpl.getCoverArtPath(REGISTERED_LOCATION_ID, 999));
+  }
+
+  // ── updateOwnLocationInfo ───────────────────────────────────────────────
+
+  @Test
+  void updateOwnLocationInfo_logoNameOnly_storesToRepository_withoutFilesystemBackup() {
+
+    LocationEntity updated = locationServiceImpl.updateOwnLocationInfo(
+        new UpdateLocationInfoRequest("Rock On Third", 40.0, -105.0, "RockOnThirdLogo.jpg", true));
+
+    assertEquals("RockOnThirdLogo.jpg", updated.getLogoName());
+    verify(locationRepository).storeAggregateRoot(locationRoot);
+  }
+
+  @Test
+  void updateOwnLocationInfo_logoNameOnly_storesToRepositoryAndFilesystemBackup(
+      @TempDir Path backupDataDir) throws EntityDoesNotExistException {
+
+    LocationServiceImpl jpaTypeService = newServiceWithFilesystemBackup(backupDataDir);
+
+    jpaTypeService.updateOwnLocationInfo(
+        new UpdateLocationInfoRequest("Rock On Third", 40.0, -105.0, "RockOnThirdLogo.jpg", true));
+
+    verify(locationRepository).storeAggregateRoot(locationRoot);
+    LocationEntity backedUp = loadBackedUpLocation(backupDataDir);
+    assertEquals("Rock On Third", backedUp.getName());
+    assertEquals("RockOnThirdLogo.jpg", backedUp.getLogoName());
+  }
+
+  @Test
+  void updateOwnLocationInfo_coordinatesAndGeoFencingOnly_storeToRepositoryAndFilesystemBackup(
+      @TempDir Path backupDataDir) throws EntityDoesNotExistException {
+
+    LocationServiceImpl jpaTypeService = newServiceWithFilesystemBackup(backupDataDir);
+
+    jpaTypeService.updateOwnLocationInfo(
+        new UpdateLocationInfoRequest("Rock On Third", 41.5, -83.25, "LocationLogo.jpg", false));
+
+    verify(locationRepository).storeAggregateRoot(locationRoot);
+    LocationEntity backedUp = loadBackedUpLocation(backupDataDir);
+    assertEquals(41.5, backedUp.getLatitude());
+    assertEquals(-83.25, backedUp.getLongitude());
+    assertFalse(backedUp.isGeoFenced());
+  }
+
+  @Test
+  void updateOwnLocationInfo_repeatedSaves_eachStoreToRepositoryAndFilesystemBackup(
+      @TempDir Path backupDataDir) throws EntityDoesNotExistException {
+
+    LocationServiceImpl jpaTypeService = newServiceWithFilesystemBackup(backupDataDir);
+
+    // A name change followed by a logo-only change in the same run -- the scenario the Admin
+    // Panel's Edit Location Info dialog hit in practice.
+    jpaTypeService.updateOwnLocationInfo(
+        new UpdateLocationInfoRequest("Downtown Lounge", 40.0, -105.0, "LocationLogo.jpg", true));
+    jpaTypeService.updateOwnLocationInfo(
+        new UpdateLocationInfoRequest("Downtown Lounge", 40.0, -105.0, "DowntownLogo.jpg", true));
+
+    verify(locationRepository, times(2)).storeAggregateRoot(locationRoot);
+    LocationEntity backedUp = loadBackedUpLocation(backupDataDir);
+    assertEquals("Downtown Lounge", backedUp.getName());
+    assertEquals("DowntownLogo.jpg", backedUp.getLogoName());
+  }
+
+  private LocationServiceImpl newServiceWithFilesystemBackup(Path backupDataDir) {
+
+    return new LocationServiceImpl(locationRepository, passwordEncoder, eventPublisher,
+        ObjectMappers.create(), storageRoot.toString(), connectedSlaveRegistry,
+        songLibraryRepository, backupDataDir.toString());
+  }
+
+  private static LocationEntity loadBackedUpLocation(Path backupDataDir)
+      throws EntityDoesNotExistException {
+
+    LocationRootEntity backedUpRoot = new LocationRepositoryFileSystemImpl(backupDataDir.toString())
+        .loadAggregateRoot(LocationRootEntity.LOCATION_LIST_FILENAME);
+    return backedUpRoot.getLocationByIdNullIfNotExists(REGISTERED_LOCATION_ID);
   }
 }

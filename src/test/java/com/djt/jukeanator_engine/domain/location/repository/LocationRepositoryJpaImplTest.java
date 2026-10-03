@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.location.repository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -22,6 +23,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import jakarta.persistence.EntityManagerFactory;
 import com.zaxxer.hikari.HikariDataSource;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
+import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
 
 /**
  * Integration tests for {@link LocationRepositoryJpaImpl#changeLocationId}, run against a live
@@ -171,7 +174,62 @@ class LocationRepositoryJpaImplTest {
     assertForeignKeyChecksEnabledOnEveryPooledConnection();
   }
 
+  // ── storeAggregateRoot (Edit Location Info) ──────────────────────────────
+
+  @Test
+  void storeAggregateRoot_persistsNonNameFieldChanges_onALoadedLocation() throws Exception {
+
+    insertLocation(OLD_LOCATION_ID, "edit-info");
+    LocationRepositoryJpaImpl repository = newRepository();
+
+    // Mirrors LocationServiceImpl: the root is loaded once at startup and its (detached) entities
+    // are mutated in place by updateOwnLocationInfo before each store.
+    LocationRootEntity root = repository.loadAggregateRoot("ignored");
+    LocationEntity location = root.getLocationByIdNullIfNotExists(OLD_LOCATION_ID);
+    location.setLogoName("EditInfoLogo.jpg");
+    location.setLatitude(41.5);
+    location.setLongitude(-83.25);
+    location.setGeoFenced(false);
+    repository.storeAggregateRoot(root);
+
+    assertEquals("edit-info|EditInfoLogo.jpg|41.5|-83.25|0", locationRow(OLD_LOCATION_ID));
+  }
+
+  @Test
+  void storeAggregateRoot_persistsLogoOnlyChange_afterAnEarlierNameChangeInTheSameRun()
+      throws Exception {
+
+    insertLocation(OLD_LOCATION_ID, "edit-info");
+    LocationRepositoryJpaImpl repository = newRepository();
+
+    LocationRootEntity root = repository.loadAggregateRoot("ignored");
+    LocationEntity location = root.getLocationByIdNullIfNotExists(OLD_LOCATION_ID);
+
+    location.setName("edit-info-renamed");
+    repository.storeAggregateRoot(root);
+
+    location.setLogoName("EditInfoLogo.jpg");
+    repository.storeAggregateRoot(root);
+
+    String row = locationRow(OLD_LOCATION_ID);
+    assertTrue(row.startsWith("edit-info-renamed|EditInfoLogo.jpg|"), row);
+  }
+
   // ── fixtures ─────────────────────────────────────────────────────────────
+
+  private String locationRow(int locationId) throws SQLException {
+
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = connection.prepareStatement("select name, logo_name, "
+            + "latitude, longitude, is_geo_fenced from location where id = ?")) {
+      statement.setInt(1, locationId);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        resultSet.next();
+        return resultSet.getString(1) + "|" + resultSet.getString(2) + "|"
+            + resultSet.getDouble(3) + "|" + resultSet.getDouble(4) + "|" + resultSet.getInt(5);
+      }
+    }
+  }
 
   // song_library gets a parent/child pair per location (to exercise the self-referencing FK), and
   // song_background_music a REGULAR and a SMART row (only the SMART row carries a
@@ -186,9 +244,11 @@ class LocationRepositoryJpaImplTest {
     return 1;
   }
 
+  // is_geo_fenced is set explicitly: a null would fail to load into LocationEntity's primitive
+  // isGeoFenced, and the storeAggregateRoot tests load these rows through Hibernate.
   private void insertLocation(int locationId, String name) throws SQLException {
-    execute("insert into location (id, name, api_key_hash, status) "
-        + "values (?, ?, 'test-api-key-hash', 'PROVISIONED')", locationId, name);
+    execute("insert into location (id, name, api_key_hash, status, is_geo_fenced) "
+        + "values (?, ?, 'test-api-key-hash', 'PROVISIONED', 1)", locationId, name);
   }
 
   private void insertUser() throws SQLException {

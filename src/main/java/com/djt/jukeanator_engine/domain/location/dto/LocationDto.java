@@ -12,7 +12,7 @@ public record LocationDto(Integer persistentIdentity, String name, String logoNa
     Double latitude, Double longitude, String apiKeyHash, String status, Instant lastSeenAt,
     Instant libraryLastSyncedAt, Integer priorityCostMultiplier, Integer creditsPerDollar,
     Integer fiveDollarBonusCredits, Integer tenDollarBonusCredits, Integer webCostMultiplier,
-    Boolean displayCurrencyForCost) implements Serializable {
+    Boolean displayCurrencyForCost, Boolean isGeoFenced) implements Serializable {
 
   @Override
   public boolean equals(Object obj) {
