@@ -1815,24 +1815,48 @@
 
   const QUEUE_TOP_N = 3;
 
+  // Set while the Song Queue screen is showing; the /topic/queue and /topic/now-playing
+  // handlers call it so the screen follows song transitions and other users' queue changes.
+  let activeSongQueueRefresh = null;
+
   async function renderSongQueue() {
     contentPanel.innerHTML = subScreenShell('Song Queue', '<div class="stub-placeholder">Loading&hellip;</div>');
     wireBackBtn();
+    const subContent = contentPanel.querySelector('.sub-content');
 
     let nowPlaying = null;
     let topQueue = [];
     let selectedIndex = -1;
+    let reloadSeq = 0;
+
+    function songKey(entry) {
+      const s = entry?.song;
+      return s ? `${s.albumId}:${s.songId}` : null;
+    }
 
     async function reload() {
+      const seq = ++reloadSeq;
+      const selectedKey = selectedIndex >= 0 ? songKey(topQueue[selectedIndex]) : null;
       const [np, queue] = await Promise.all([
         api('/api/song-player/nowPlayingSong').catch(() => null),
         api('/api/song-queue/queuedSongs').catch(() => []),
       ]);
+      // Drop stale responses (a newer reload started) and responses for a screen that's gone.
+      if (seq !== reloadSeq || !subContent.isConnected) return;
       nowPlaying = np;
       topQueue = (queue || []).slice(0, QUEUE_TOP_N);
-      if (selectedIndex >= topQueue.length) selectedIndex = topQueue.length - 1;
+      // Keep the same song selected as it moves, or clear the selection once it leaves the top N.
+      selectedIndex = selectedKey ? topQueue.findIndex(e => songKey(e) === selectedKey) : -1;
       render();
     }
+
+    activeSongQueueRefresh = () => {
+      if (!subContent.isConnected) {
+        activeSongQueueRefresh = null;
+        return;
+      }
+      reload();
+    };
 
     function nowPlayingHtml() {
       if (!nowPlaying) {
@@ -1874,7 +1898,6 @@
     }
 
     function render() {
-      const subContent = contentPanel.querySelector('.sub-content');
       subContent.innerHTML = `
         <div class="queue-now-playing-label">Now Playing:</div>
         ${nowPlayingHtml()}
@@ -1912,7 +1935,6 @@
     }
 
     function updateActionButtons() {
-      const subContent = contentPanel.querySelector('.sub-content');
       const upBtn = subContent.querySelector('.queue-action-btn[data-action="up"]');
       const downBtn = subContent.querySelector('.queue-action-btn[data-action="down"]');
       const removeBtn = subContent.querySelector('.queue-action-btn[data-action="remove"]');
@@ -3255,6 +3277,7 @@
     stompClient.connect(connectHeaders, () => {
 
       stompClient.subscribe('/topic/now-playing', (frame) => {
+        activeSongQueueRefresh?.();
         const widget = document.getElementById('nowPlayingWidget');
         if (!widget) return;
         const msg = JSON.parse(frame.body);
@@ -3263,11 +3286,13 @@
 
       // Fires on SongAddedToQueueEvent/MultipleSongsAddedToQueueEvent (always paired with a
       // SongQueueChangedEvent broadcast) and SongQueueEmptyEvent (broadcast as an empty list) --
-      // keeps the "View Queue" button in sync with whether there's anything queued.
+      // keeps the "View Queue" button in sync with whether there's anything queued, and the
+      // Song Queue screen (if showing) in sync with the queue itself.
       stompClient.subscribe('/topic/queue', (frame) => {
         const queuedSongs = JSON.parse(frame.body) || [];
         state.queueHasSongs = queuedSongs.length > 0;
         updateViewQueueVisibility();
+        activeSongQueueRefresh?.();
       });
 
       // User-specific updates — only fire for the logged-in user
