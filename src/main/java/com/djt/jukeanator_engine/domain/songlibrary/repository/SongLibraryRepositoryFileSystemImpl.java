@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -247,8 +248,21 @@ public final class SongLibraryRepositoryFileSystemImpl implements SongLibraryRep
     }
 
     Path newFile = Path.of(buildExpectedFilePath(newLocationName));
+    if (oldFile.equals(newFile)) {
+      // Both names sanitize to the same filename (e.g. "Rock On Third" -> "Rock_On_Third").
+      return;
+    }
+
+    // A file may already exist under the new name (e.g. the location previously used that name,
+    // or an earlier rename was interrupted). The old-named file holds the current library, so it
+    // replaces the stale new-named file, and the old-named file is removed as part of the move.
+    if (Files.exists(newFile)) {
+      log.warn("Song library file {} already exists -- replacing it with {} for location name "
+          + "change '{}' -> '{}'.", newFile, oldFile, oldLocationName, newLocationName);
+    }
+
     try {
-      Files.move(oldFile, newFile);
+      Files.move(oldFile, newFile, StandardCopyOption.REPLACE_EXISTING);
       this.resolvedFilePath = newFile.toString();
       log.info("Renamed song library file from {} to {} to match new location name.", oldFile,
           newFile);

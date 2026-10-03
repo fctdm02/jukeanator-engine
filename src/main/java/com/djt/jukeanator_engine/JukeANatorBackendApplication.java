@@ -3,6 +3,8 @@ package com.djt.jukeanator_engine;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
@@ -27,6 +29,8 @@ import com.djt.jukeanator_engine.config.ExternalConfigInitializer;
 @EnableScheduling
 public class JukeANatorBackendApplication {
 
+  private static final Logger log = LoggerFactory.getLogger(JukeANatorBackendApplication.class);
+
   public static void main(String[] args) {
 
     // Points Spring's config loading at the WAR-relative config/ dir explicitly -- its own
@@ -43,6 +47,14 @@ public class JukeANatorBackendApplication {
     SpringApplicationBuilder builder = new SpringApplicationBuilder(JukeANatorBackendApplication.class);
 
     builder.initializers(context -> {
+
+      // Logged as soon as the environment (including the external config dir above) is resolved,
+      // so the effective value is visible regardless of which application.yml supplied it.
+      log.info("mode: {}", context.getEnvironment().getProperty("app.mode"));
+      log.info("repositoryType: {}", context.getEnvironment().getProperty("app.repository-type"));
+      log.info("uiEnabled: {}", context.getEnvironment().getProperty("app.ui-enabled"));
+      log.info("locationID: {}", context.getEnvironment().getProperty("app.location-id"));
+      log.info("masterInstanceUrl: {}", context.getEnvironment().getProperty("master-instance-url"));
 
       if (context.getEnvironment().getProperty("app.ui-enabled", Boolean.class, false)) {
 

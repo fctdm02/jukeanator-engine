@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.songlibrary.repository;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -147,6 +148,26 @@ public class SongLibraryRepositoryFileSystemImplTest {
         "Old-named file should no longer exist");
     assertTrue(Files.exists(basePath.resolve("Downtown_Lounge.oos")),
         "New-named file should exist");
+    assertEquals(basePath.resolve("Downtown_Lounge.oos").toString(),
+        repository.getResolvedFilePath());
+  }
+
+  @Test
+  void renameLocationLibraryFile_replacesExistingNewFile_andRemovesOldFile(@TempDir Path basePath,
+      @TempDir Path rootPath) throws Exception {
+
+    SongLibraryRepositoryFileSystemImpl repository =
+        new SongLibraryRepositoryFileSystemImpl(basePath.toString());
+    repository.storeAggregateRoot(newRoot(rootPath, "Rock On Third"));
+    byte[] currentLibrary = Files.readAllBytes(basePath.resolve("Rock_On_Third.oos"));
+    Files.writeString(basePath.resolve("Downtown_Lounge.oos"), "stale");
+
+    repository.renameLocationLibraryFile("Rock On Third", "Downtown Lounge");
+
+    assertFalse(Files.exists(basePath.resolve("Rock_On_Third.oos")),
+        "Old-named file should no longer exist");
+    assertArrayEquals(currentLibrary, Files.readAllBytes(basePath.resolve("Downtown_Lounge.oos")),
+        "New-named file should hold the current library, not the stale content");
     assertEquals(basePath.resolve("Downtown_Lounge.oos").toString(),
         repository.getResolvedFilePath());
   }
