@@ -26,7 +26,10 @@ import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerS
 import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
+import com.djt.jukeanator_engine.domain.location.dto.LocationInfoSyncDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationPricingConfigDto;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationInfoUpdatedEvent;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.event.AllSongsDonePlayingEvent;
@@ -247,6 +250,36 @@ public class SlaveConnectionManager {
     }
   }
 
+  /**
+   * Pushes this slave's own location info (as set through the JFC/Swing "Edit Location Info"
+   * dialog) to master, which needs the coordinates and geo-fence flag to geo-fence this location's
+   * Web/Mobile UI. Sent on every (re)connect and again whenever the info is edited.
+   */
+  private void sendLocationInfo(StompSession session) {
+    try {
+      Integer locationId = currentLocationId();
+      LocationEntity location =
+          locationId != null ? locationService.getLocationByIdNullIfNotExists(locationId) : null;
+      if (location == null) {
+        return;
+      }
+      session.send("/location-info", new LocationInfoSyncDto(location.getName(),
+          location.getLatitude(), location.getLongitude(), location.getLogoName(),
+          location.isGeoFenced()));
+    } catch (Exception e) {
+      log.debug("Could not send location info to master", e);
+    }
+  }
+
+  @EventListener
+  public void handleOwnLocationInfoUpdatedEvent(OwnLocationInfoUpdatedEvent event) {
+
+    StompSession session = currentSession.get();
+    if (session != null && session.isConnected()) {
+      sendLocationInfo(session);
+    }
+  }
+
   private void sendEvent(String eventType, Object payload) {
 
     StompSession session = currentSession.get();
@@ -271,6 +304,7 @@ public class SlaveConnectionManager {
       session.subscribe("/user/queue/commands", new CommandFrameHandler());
       session.subscribe("/user/queue/location-id-confirmed", new LocationIdConfirmedFrameHandler());
       sendPricingConfig(session);
+      sendLocationInfo(session);
     }
 
     @Override

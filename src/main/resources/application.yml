@@ -7,6 +7,21 @@ app:
   master-instance-url: ~   # required if mode=slave, e.g. https://jukeanator.com
   location-id: ~            # required if mode=slave, assigned at provisioning
   location-api-key: ~       # required if mode=slave, issued at provisioning
+  # Geo-fencing: at a location whose "Geo-fenced" box is ticked (JFC/Swing Edit Location Info),
+  # Web/Mobile UI patrons may only queue, reorder or remove songs while their device is near the
+  # location's latitude/longitude. Admin users and the JFC/Swing kiosk are never fenced.
+  geo-fence:
+    enabled: false   # only takes effect when mode=master; set true on the production master
+    # How far (in meters) from the location's coordinates a patron may be: a radius, so the fence
+    # is twice this across. The device's own reported accuracy also counts in the patron's
+    # favor (allowed when distance - accuracy <= radius), since indoor readings are often 15-50 m
+    # off. Raise this if legitimate patrons are rejected; lower it if remote queueing gets through.
+    radius-meters: 50
+    max-accuracy-meters: 150   # readings less precise than this are rejected outright
+    max-position-age-seconds: 120   # readings older than this are rejected
+    # QA only -- never true in production. Lets the Web UI send a hand-entered position, for
+    # testing from phones on a plain-http LAN address, where browsers block device location.
+    allow-simulated-position: false
   jwt:
     secret: fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP
     expiration-ms: 86400000   # 24 hours

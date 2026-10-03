@@ -114,6 +114,9 @@ public class SecurityConfig {
                 "/api/locations/*/song-queue/highestPriority")
             .permitAll()
 
+            // ── Public: whether queue operations at a location require the device position ─
+            .requestMatchers(HttpMethod.GET, "/api/locations/*/geo-fence").permitAll()
+
             // ── Master-mode only: public location picker, admin-only provisioning ─
             .requestMatchers(HttpMethod.GET, "/api/locations").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/locations").hasRole("ADMIN")

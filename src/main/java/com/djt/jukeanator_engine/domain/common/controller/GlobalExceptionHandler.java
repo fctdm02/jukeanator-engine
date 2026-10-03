@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
+import com.djt.jukeanator_engine.domain.location.exception.GeoFenceViolationException;
 import com.djt.jukeanator_engine.domain.location.exception.LocationOfflineException;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
@@ -62,6 +63,12 @@ public class GlobalExceptionHandler {
     public void handleLocationOffline(LocationOfflineException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
         logExpected(HttpStatus.SERVICE_UNAVAILABLE, ex, request);
         write(HttpStatus.SERVICE_UNAVAILABLE, ex, response);
+    }
+
+    @ExceptionHandler(GeoFenceViolationException.class)
+    public void handleGeoFenceViolation(GeoFenceViolationException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logExpected(HttpStatus.FORBIDDEN, ex, request);
+        write(HttpStatus.FORBIDDEN, ex, response);
     }
 
     @ExceptionHandler(PaymentException.class)

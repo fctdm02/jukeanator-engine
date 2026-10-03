@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
+import com.djt.jukeanator_engine.domain.location.config.GeoFenceProperties;
 
 /**
  * Fails fast on obviously-inconsistent {@code app.mode} configuration, rather than letting a
@@ -17,9 +18,11 @@ public class AppModeValidator implements ApplicationRunner {
   private static final Logger log = LoggerFactory.getLogger(AppModeValidator.class);
 
   private final AppProperties appProperties;
+  private final GeoFenceProperties geoFenceProperties;
 
-  public AppModeValidator(AppProperties appProperties) {
+  public AppModeValidator(AppProperties appProperties, GeoFenceProperties geoFenceProperties) {
     this.appProperties = appProperties;
+    this.geoFenceProperties = geoFenceProperties;
   }
 
   @Override
@@ -38,6 +41,26 @@ public class AppModeValidator implements ApplicationRunner {
     }
 
     log.info("Running with app.mode={}", appProperties.getMode());
+    logGeoFenceSettings();
+  }
+
+  // Geo-fencing misconfiguration is logged rather than fatal: it only ever leaves the fence
+  // unenforced or more permissive, and must never stop a location's jukebox from starting.
+  private void logGeoFenceSettings() {
+
+    if (geoFenceProperties.isEnabled() && !appProperties.isMaster()) {
+      log.warn("app.geo-fence.enabled=true is ignored: geo-fencing is only enforced when "
+          + "app.mode=master (current app.mode={})", appProperties.getMode());
+    } else if (geoFenceProperties.isEnabled()) {
+      log.info("Geo-fencing enabled: radius={} m, max accuracy={} m, max position age={} s",
+          geoFenceProperties.getRadiusMeters(), geoFenceProperties.getMaxAccuracyMeters(),
+          geoFenceProperties.getMaxPositionAgeSeconds());
+    }
+
+    if (geoFenceProperties.isAllowSimulatedPosition()) {
+      log.warn("app.geo-fence.allow-simulated-position=true: patrons can enter any location by "
+          + "hand. This is for QA only and must never be set in production.");
+    }
   }
 
   private void requireNonBlank(String propertyName, String value) {

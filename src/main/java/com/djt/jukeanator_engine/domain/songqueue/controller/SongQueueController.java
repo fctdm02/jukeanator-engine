@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.djt.jukeanator_engine.domain.location.controller.GeoPositionHeaders;
+import com.djt.jukeanator_engine.domain.location.service.GeoFenceService;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddMultipleSongsToQueueRequest;
@@ -29,6 +31,8 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Every endpoint is scoped by {@code locationId} -- on a standalone/slave instance this is always
@@ -51,23 +55,49 @@ import com.djt.jukeanator_engine.domain.user.service.UserService;
 @RequestMapping("/api/locations/{locationId}/song-queue")
 public class SongQueueController {
 
+  private static final String ROLE_ADMIN = "ROLE_ADMIN";
+
   private final SongQueueService songQueueService;
   private final UserService userService;
   private final SongLibraryService songLibraryService;
+  private final GeoFenceService geoFenceService;
 
   public SongQueueController(@Qualifier("songQueueService") SongQueueService songQueueService,
-      UserService userService, SongLibraryService songLibraryService) {
+      UserService userService, SongLibraryService songLibraryService,
+      GeoFenceService geoFenceService) {
 
     requireNonNull(songQueueService, "songQueueService cannot be null");
     requireNonNull(userService, "userService cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
+    requireNonNull(geoFenceService, "geoFenceService cannot be null");
     this.songQueueService = songQueueService;
     this.userService = userService;
     this.songLibraryService = songLibraryService;
+    this.geoFenceService = geoFenceService;
   }
 
   private boolean isOwnLocation(Integer locationId) {
     return Objects.equals(locationId, songLibraryService.getOwnLocationId());
+  }
+
+  /**
+   * Refuses a Web/Mobile UI patron's queue operation at a geo-fenced location unless the request's
+   * {@code X-Geo-*} headers place the patron inside the fence (see {@link GeoFenceService}). Admin
+   * web users are exempt, as are the JFC/Swing kiosk ({@code LocalPrincipal}) and system callers,
+   * whose principal is not the email string. Must run before any credit is charged.
+   */
+  private void requireAtLocation(Integer locationId, Authentication authentication,
+      HttpServletRequest request) {
+
+    if (authentication == null || !(authentication.getPrincipal() instanceof String)) {
+      return;
+    }
+    boolean isAdmin = authentication.getAuthorities().stream()
+        .anyMatch(authority -> ROLE_ADMIN.equals(authority.getAuthority()));
+    if (isAdmin) {
+      return;
+    }
+    geoFenceService.verifyWithinFence(locationId, GeoPositionHeaders.fromRequest(request));
   }
 
   /**
@@ -158,7 +188,10 @@ public class SongQueueController {
 
   @PostMapping("/addSong")
   public SongQueueEntryDto addSongToQueue(@PathVariable Integer locationId,
-      @RequestBody AddSongToQueueRequest addSongToQueueRequest, Authentication authentication) {
+      @RequestBody AddSongToQueueRequest addSongToQueueRequest, Authentication authentication,
+      HttpServletRequest request) {
+
+    requireAtLocation(locationId, authentication, request);
 
     // For JWT-authenticated web users the principal is the email string; override the request body
     // username so that the server is authoritative and clients cannot impersonate other users.
@@ -202,11 +235,13 @@ public class SongQueueController {
   @PostMapping("/addMultipleSongs")
   public List<SongQueueEntryDto> addMultipleSongsToQueue(@PathVariable Integer locationId,
       @RequestBody AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest,
-      Authentication authentication) {
+      Authentication authentication, HttpServletRequest request) {
 
     if (authentication == null || !(authentication.getPrincipal() instanceof String email)) {
       return songQueueService.addMultipleSongsToQueue(locationId, addMultipleSongsToQueueRequest);
     }
+
+    requireAtLocation(locationId, authentication, request);
 
     if (addMultipleSongsToQueueRequest == null
         || addMultipleSongsToQueueRequest.songIdentifiers() == null) {
@@ -250,8 +285,10 @@ public class SongQueueController {
 
   @PostMapping("/moveSongUpInQueue")
   public Integer moveSongUpInQueue(@PathVariable Integer locationId,
-      @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication) {
+      @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication,
+      HttpServletRequest request) {
 
+    requireAtLocation(locationId, authentication, request);
     Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.albumId(),
         changeSongQueueRequest.songId());
     Integer result = songQueueService.moveSongUpInQueue(locationId, changeSongQueueRequest);
@@ -263,8 +300,10 @@ public class SongQueueController {
 
   @PostMapping("/moveSongDownInQueue")
   public Integer moveSongDownInQueue(@PathVariable Integer locationId,
-      @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication) {
+      @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication,
+      HttpServletRequest request) {
 
+    requireAtLocation(locationId, authentication, request);
     Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.albumId(),
         changeSongQueueRequest.songId());
     Integer result = songQueueService.moveSongDownInQueue(locationId, changeSongQueueRequest);
@@ -276,8 +315,10 @@ public class SongQueueController {
 
   @PostMapping("/removeSongDownFromQueue")
   public Integer removeSongDownFromQueue(@PathVariable Integer locationId,
-      @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication) {
+      @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication,
+      HttpServletRequest request) {
 
+    requireAtLocation(locationId, authentication, request);
     Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.albumId(),
         changeSongQueueRequest.songId());
     Integer result = songQueueService.removeSongDownFromQueue(locationId, changeSongQueueRequest);

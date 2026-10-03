@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import com.djt.jukeanator_engine.AbstractControllerTest;
+import com.djt.jukeanator_engine.domain.location.service.GeoFenceService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
@@ -46,6 +47,11 @@ class SongQueueControllerTest extends AbstractControllerTest {
 
   @Mock
   private SongLibraryService songLibraryService;
+
+  // A mock never throws, so the geo-fence never refuses anything here; see
+  // SongQueueControllerGeoFenceTest for the fenced behavior.
+  @Mock
+  private GeoFenceService geoFenceService;
 
   @InjectMocks
   private SongQueueController songQueueController;

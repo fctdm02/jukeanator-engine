@@ -1447,6 +1447,13 @@ input {
   background: rgba(255,255,255,0.04);
 }
 
+.song-popup-geo-note {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
 .song-popup-action--icon {
   justify-content: flex-start;
 }

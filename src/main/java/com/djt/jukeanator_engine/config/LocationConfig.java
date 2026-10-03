@@ -9,6 +9,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManagerFactory;
+import com.djt.jukeanator_engine.domain.location.config.GeoFenceProperties;
 import com.djt.jukeanator_engine.domain.location.config.LocationProperties;
 import com.djt.jukeanator_engine.domain.location.repository.LocationRepository;
 import com.djt.jukeanator_engine.domain.location.repository.LocationRepositoryFileSystemImpl;
@@ -16,6 +17,8 @@ import com.djt.jukeanator_engine.domain.location.repository.LocationRepositoryJp
 import com.djt.jukeanator_engine.domain.location.security.LocationApiKeyAuthenticationFilter;
 import com.djt.jukeanator_engine.domain.location.security.StompLocationApiKeyChannelInterceptor;
 import com.djt.jukeanator_engine.domain.location.service.ConnectedSlaveRegistry;
+import com.djt.jukeanator_engine.domain.location.service.GeoFenceService;
+import com.djt.jukeanator_engine.domain.location.service.GeoFenceServiceImpl;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.location.service.LocationServiceImpl;
 import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
@@ -65,6 +68,15 @@ public class LocationConfig {
         objectMapper, perLocationSyncStorageRoot(appProperties, locationProperties),
         connectedSlaveRegistry, songLibraryRepository,
         "jpa".equals(appProperties.getRepositoryType()) ? appProperties.getDataDir() : null);
+  }
+
+  // Exists in every app.mode so the Web/Mobile UI can always ask whether a location is fenced;
+  // GeoFenceServiceImpl itself only enforces the fence on master.
+  @Bean
+  public GeoFenceService geoFenceService(GeoFenceProperties geoFenceProperties,
+      AppProperties appProperties, LocationService locationService) {
+
+    return new GeoFenceServiceImpl(geoFenceProperties, appProperties, locationService);
   }
 
   @Bean

@@ -179,6 +179,54 @@ too -- start one instance, wait until it is up, then start the other.
 - [ ] A patron queueing a song while the slave is stopped gets an immediate "location offline"
   error rather than hanging, and is not charged.
 
+## 12. Geo-fencing
+
+Geo-fencing refuses a Web/Mobile UI patron's queue operations (Play Song, Play Priority Song,
+Play Playlist, move up, move down, remove) at a location whose **Geo-fenced** box is ticked,
+unless the patron's device is near the location's latitude/longitude. Admin users and the
+JFC/Swing kiosk are never fenced. It is enforced only on master, and only with
+`app.geo-fence.enabled: true` (see `src/main/resources/application.yml` for every setting).
+
+How it works:
+- The slave pushes its own name, logo, latitude, longitude and geo-fence flag to master on every
+  connect, and again whenever **Edit Location Info** is saved.
+- The Web UI asks `GET /api/locations/{id}/geo-fence` whether the fence is enforced. If it is,
+  each queue request carries the device position in `X-Geo-Latitude`, `X-Geo-Longitude`,
+  `X-Geo-Accuracy`, `X-Geo-Timestamp` (and `X-Geo-Simulated` for a hand-entered position).
+- Master allows the request when `distance - accuracy <= radius-meters` (default 50 m), the
+  accuracy is at most `max-accuracy-meters` (default 150 m) and the reading is at most
+  `max-position-age-seconds` old (default 120 s). Otherwise it returns 403
+  `GeoFenceViolationException` with a message for the patron.
+
+Browsers only provide device location on https pages or `http://localhost`, so a phone on the LAN
+over plain http cannot send a real position. For QA, set this in master's `application.yml`:
+
+```yaml
+app:
+  geo-fence:
+    enabled: true
+    allow-simulated-position: true   # QA only
+```
+
+- [ ] On the slave, tick **Geo-fenced** in Edit Location Info and save. Master's log shows
+  `Syncing location info for locationId [...]` with the new values.
+- [ ] Desktop browser on `http://localhost:<master port>`, logged in as a patron: allow location
+  access, then Play Song. It is refused with "You must be at ... to queue songs." (your real
+  position is not at the location's coordinates), and no credits are charged.
+- [ ] Phone on the LAN: Account > **Simulate My Location (QA)** > **Use Location's Coordinates** >
+  Save, then Play Song. It is queued.
+- [ ] Simulate My Location > **Offset 250 m North** > Save, then Play Song. It is refused.
+- [ ] Simulate My Location > **Clear**, then Play Song. It is refused with the https message.
+- [ ] Untick **Geo-fenced** on the slave and save. Play Song works with no position.
+- [ ] Logged in as an admin, queueing works regardless of position.
+
+Production checklist for the master at https://www.jukeanator.com:
+- [ ] `app.geo-fence.enabled: true`.
+- [ ] `app.geo-fence.allow-simulated-position` absent or `false` (master logs a WARN at startup if
+  it is on).
+- [ ] Each geo-fenced location's latitude/longitude are accurate (a phone map pin at the
+  jukebox is usually close enough).
+
 ---
 
 ## Before a real pairing

@@ -27,6 +27,7 @@ import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotAlbumDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
+import com.djt.jukeanator_engine.domain.location.dto.LocationInfoSyncDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
@@ -34,6 +35,7 @@ import com.djt.jukeanator_engine.domain.location.dto.UpdateLocationInfoRequest;
 import com.djt.jukeanator_engine.domain.location.event.LocationLibrarySyncedEvent;
 import com.djt.jukeanator_engine.domain.location.event.LocationRegisteredEvent;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationInfoUpdatedEvent;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
@@ -387,6 +389,71 @@ public class LocationServiceTest {
     LocationEntity backedUp = loadBackedUpLocation(backupDataDir);
     assertEquals("Downtown Lounge", backedUp.getName());
     assertEquals("DowntownLogo.jpg", backedUp.getLogoName());
+  }
+
+  @Test
+  void updateOwnLocationInfo_publishesOwnLocationInfoUpdatedEvent() {
+
+    locationServiceImpl.updateOwnLocationInfo(
+        new UpdateLocationInfoRequest("Rock On Third", 41.5, -83.25, "LocationLogo.jpg", true));
+
+    verify(eventPublisher).publishEvent(new OwnLocationInfoUpdatedEvent(REGISTERED_LOCATION_ID));
+  }
+
+  // ── updateLocationInfo (master, synced from a slave) ─────────────────────
+
+  @Test
+  void updateLocationInfo_appliesSyncedFieldsAndStores() {
+
+    locationServiceImpl.updateLocationInfo(REGISTERED_LOCATION_ID,
+        new LocationInfoSyncDto("Downtown Lounge", 41.5, -83.25, "DowntownLogo.jpg", false));
+
+    LocationEntity location = registeredLocation();
+    assertEquals("Downtown Lounge", location.getName());
+    assertEquals(41.5, location.getLatitude());
+    assertEquals(-83.25, location.getLongitude());
+    assertEquals("DowntownLogo.jpg", location.getLogoName());
+    assertFalse(location.isGeoFenced());
+    verify(locationRepository).storeAggregateRoot(locationRoot);
+  }
+
+  @Test
+  void updateLocationInfo_nullFields_leaveExistingValues() {
+
+    locationServiceImpl.updateLocationInfo(REGISTERED_LOCATION_ID,
+        new LocationInfoSyncDto(null, 41.5, null, null, null));
+
+    LocationEntity location = registeredLocation();
+    assertEquals("Rock On Third", location.getName());
+    assertEquals(40.0, location.getLatitude());
+    assertEquals(-105.0, location.getLongitude());
+    assertTrue(location.isGeoFenced());
+  }
+
+  @Test
+  void updateLocationInfo_nameUsedByAnotherLocation_keepsOwnNameButAppliesTheRest() {
+
+    LocationEntity other = new LocationEntity(Integer.valueOf(2), "Downtown Lounge", 1.0, 2.0,
+        "other-hash");
+    locationRoot.addLocation(other);
+
+    locationServiceImpl.updateLocationInfo(REGISTERED_LOCATION_ID,
+        new LocationInfoSyncDto("Downtown Lounge", 41.5, -83.25, "LocationLogo.jpg", true));
+
+    LocationEntity location = registeredLocation();
+    assertEquals("Rock On Third", location.getName());
+    assertEquals(41.5, location.getLatitude());
+    assertEquals("Downtown Lounge", other.getName());
+  }
+
+  @Test
+  void updateLocationInfo_unknownLocation_isIgnored() {
+
+    locationServiceImpl.updateLocationInfo(Integer.valueOf(99),
+        new LocationInfoSyncDto("Nowhere", 1.0, 2.0, "Logo.jpg", false));
+
+    verify(locationRepository, never()).storeAggregateRoot(any());
+    assertEquals("Rock On Third", registeredLocation().getName());
   }
 
   private LocationServiceImpl newServiceWithFilesystemBackup(Path backupDataDir) {

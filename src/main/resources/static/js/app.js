@@ -23,6 +23,9 @@
     pricingConfig: null,    // {priorityCostMultiplier, webCostMultiplier, creditsPerDollar, ...}
                             // from GET /api/users/pricing-config; refreshed at boot and on
                             // selectLocation() — see loadPricingConfig()
+    geoFence: null,         // {enforced, radiusMeters, allowSimulatedPosition, latitude, ...}
+                            // from GET /api/locations/{id}/geo-fence; refreshed at boot and on
+                            // selectLocation() — see loadGeoFenceStatus()
   };
 
   // Fallback used only until the real config loads (matches JukeANatorUserInterfaceProperties'
@@ -177,9 +180,183 @@
       clearAuth();
       renderLogin();
     }
-    if (!res.ok) throw new Error(`${options.method || 'GET'} ${path} failed: ${res.status}`);
+    if (!res.ok) {
+      // A geo-fence refusal carries a message written for the patron; surface it as-is.
+      if (res.status === 403) {
+        const body = await res.json().catch(() => null);
+        if (body && body.error === 'GeoFenceViolationException') {
+          throw geoFenceError(body.message);
+        }
+      }
+      throw new Error(`${options.method || 'GET'} ${path} failed: ${res.status}`);
+    }
     const text = await res.text();
     return text ? JSON.parse(text) : null;
+  }
+
+  // ── Geo-fencing ─────────────────────────────────────────────────────────
+  // At a geo-fenced location (master only), queue operations must carry the device's position in
+  // X-Geo-* headers, which the server checks against the location's coordinates. When
+  // allowSimulatedPosition is on (QA only), a hand-entered position from the account menu's
+  // "Simulate My Location" can stand in for the device, e.g. on a phone using a plain-http LAN
+  // address, where browsers block the Geolocation API.
+
+  /** An Error whose message is meant for the patron, shown without any "Could not..." prefix. */
+  function geoFenceError(message) {
+    const err = new Error(message);
+    err.geoFence = true;
+    return err;
+  }
+
+  /** The message to show for a failed queue operation. */
+  function queueErrorMessage(err, prefix) {
+    return err && err.geoFence ? err.message : prefix + ((err && err.message) || err);
+  }
+
+  async function loadGeoFenceStatus() {
+    state.geoFence = null;
+    if (state.locationId == null) return;
+    try {
+      state.geoFence = await api(`/api/locations/${state.locationId}/geo-fence`);
+    } catch {
+      state.geoFence = null;
+    }
+  }
+
+  function simulatedPositionKey() {
+    return `simulatedPosition_${state.locationId}`;
+  }
+
+  function loadSimulatedPosition() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(simulatedPositionKey()) || 'null');
+      return saved && Number.isFinite(saved.latitude) && Number.isFinite(saved.longitude)
+        && Number.isFinite(saved.accuracy) ? saved : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveSimulatedPosition(position) {
+    try {
+      if (position) localStorage.setItem(simulatedPositionKey(), JSON.stringify(position));
+      else localStorage.removeItem(simulatedPositionKey());
+    } catch {
+      // Storage unavailable (e.g. private mode); the simulated position just isn't kept.
+    }
+  }
+
+  /** Resolves to {latitude, longitude, accuracy, timestamp, simulated} or rejects with a geoFenceError. */
+  function getGeoPosition() {
+    const simulated = state.geoFence?.allowSimulatedPosition ? loadSimulatedPosition() : null;
+    if (simulated) {
+      return Promise.resolve({ ...simulated, timestamp: Date.now(), simulated: true });
+    }
+    if (!window.isSecureContext || !navigator.geolocation) {
+      return Promise.reject(geoFenceError(
+        'This location only accepts songs from patrons who are there, but your device location '
+        + 'cannot be read over this connection. Please use the secure (https) site.'));
+    }
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          timestamp: pos.timestamp || Date.now(),
+          simulated: false,
+        }),
+        (err) => reject(geoFenceError(err.code === err.PERMISSION_DENIED
+          ? 'This location only accepts songs from patrons who are there. Please allow location '
+            + 'access for this site in your browser settings, then try again.'
+          : 'Your device location could not be determined. Please try again.')),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+    });
+  }
+
+  /** api() for queue operations: adds the X-Geo-* headers when the location is geo-fenced. */
+  async function geoApi(path, options = {}) {
+    if (!state.geoFence?.enforced) return api(path, options);
+    const pos = await getGeoPosition();
+    const geoHeaders = {
+      'X-Geo-Latitude': String(pos.latitude),
+      'X-Geo-Longitude': String(pos.longitude),
+      'X-Geo-Accuracy': String(pos.accuracy),
+      'X-Geo-Timestamp': String(Math.round(pos.timestamp)),
+    };
+    if (pos.simulated) geoHeaders['X-Geo-Simulated'] = 'true';
+    return api(path, { ...options, headers: { ...(options.headers || {}), ...geoHeaders } });
+  }
+
+  /** QA only: lets a tester enter the position to send in place of the device's own. */
+  function showSimulateLocationDialog() {
+    const fence = state.geoFence || {};
+    const current = loadSimulatedPosition();
+    const close = () => dialog.remove();
+    const dialog = openAppDialog(`
+      ${appDialogHeadHtml('Simulate My Location',
+        'QA only. This position is sent with queue operations instead of the device location.')}
+      <input class="app-dialog-input" id="simLatitude" type="number" step="any" placeholder="Latitude">
+      <input class="app-dialog-input" id="simLongitude" type="number" step="any" placeholder="Longitude">
+      <input class="app-dialog-input" id="simAccuracy" type="number" step="any" min="0" placeholder="Accuracy (m)">
+      <div class="app-dialog-actions">
+        <button class="app-dialog-btn cancel" id="simUseLocation">Use Location's Coordinates</button>
+        <button class="app-dialog-btn cancel" id="simOffset">Offset 250 m North</button>
+      </div>
+      <div class="app-dialog-error"></div>
+      <div class="app-dialog-actions">
+        <button class="app-dialog-btn cancel" id="simClear">Clear</button>
+        <button class="app-dialog-btn cancel" id="simCancel">Cancel</button>
+        <button class="app-dialog-btn primary" id="simSave">Save</button>
+      </div>`, close);
+
+    const lat = dialog.querySelector('#simLatitude');
+    const lon = dialog.querySelector('#simLongitude');
+    const acc = dialog.querySelector('#simAccuracy');
+    const error = dialog.querySelector('.app-dialog-error');
+    lat.value = current ? current.latitude : '';
+    lon.value = current ? current.longitude : '';
+    acc.value = current ? current.accuracy : 10;
+
+    dialog.querySelector('#simUseLocation').addEventListener('click', () => {
+      if (fence.latitude == null || fence.longitude == null) {
+        error.textContent = 'This location has no coordinates.';
+        return;
+      }
+      lat.value = fence.latitude;
+      lon.value = fence.longitude;
+      acc.value = 10;
+    });
+    dialog.querySelector('#simOffset').addEventListener('click', () => {
+      const base = parseFloat(lat.value);
+      if (!Number.isFinite(base)) {
+        error.textContent = 'Enter a latitude first.';
+        return;
+      }
+      // One degree of latitude is about 111,320 m everywhere.
+      lat.value = (base + 250 / 111320).toFixed(7);
+      acc.value = 10;
+    });
+    dialog.querySelector('#simClear').addEventListener('click', () => {
+      saveSimulatedPosition(null);
+      close();
+    });
+    dialog.querySelector('#simCancel').addEventListener('click', close);
+    dialog.querySelector('#simSave').addEventListener('click', () => {
+      const position = {
+        latitude: parseFloat(lat.value),
+        longitude: parseFloat(lon.value),
+        accuracy: parseFloat(acc.value),
+      };
+      if (!Number.isFinite(position.latitude) || !Number.isFinite(position.longitude)
+          || !Number.isFinite(position.accuracy) || position.accuracy < 0) {
+        error.textContent = 'Enter a latitude, longitude and accuracy.';
+        return;
+      }
+      saveSimulatedPosition(position);
+      close();
+    });
+    lat.focus();
   }
 
   // ── Navigation ──────────────────────────────────────────────────────────
@@ -847,6 +1024,12 @@
           <span class="menu-row-label">Privacy Policy</span>
           <span class="menu-row-arrow">&#8250;</span>
         </button>
+        ${state.geoFence?.allowSimulatedPosition ? `
+        <button class="menu-row" id="simulateLocationBtn">
+          <span class="menu-row-icon">&#128205;</span>
+          <span class="menu-row-label">Simulate My Location (QA)</span>
+          <span class="menu-row-arrow">&#8250;</span>
+        </button>` : ''}
       </div>
 
       <button class="menu-list logout-row" id="logoutBtn">Log Out</button>`;
@@ -857,6 +1040,7 @@
     document.getElementById('settingsBtn').addEventListener('click', () => navigateSub('settings'));
     document.getElementById('termsBtn').addEventListener('click', () => navigateSub('terms'));
     document.getElementById('privacyBtn').addEventListener('click', () => navigateSub('privacy'));
+    document.getElementById('simulateLocationBtn')?.addEventListener('click', showSimulateLocationDialog);
     document.getElementById('logoutBtn').addEventListener('click', () => {
       clearAuth();
       renderMain('music');
@@ -1771,13 +1955,13 @@
         : action === 'down' ? 'moveSongDownInQueue'
         : 'removeSongDownFromQueue';
       try {
-        await api(`/api/song-queue/${endpoint}`, {
+        await geoApi(`/api/song-queue/${endpoint}`, {
           method: 'POST',
           body: JSON.stringify({ albumId: song.albumId, songId: song.songId }),
         });
         await reload();
       } catch (err) {
-        showAppAlert({ title: 'Song Queue', message: 'Could not update the queue: ' + (err.message || err) });
+        showAppAlert({ title: 'Song Queue', message: queueErrorMessage(err, 'Could not update the queue: ') });
       }
     }
 
@@ -1852,6 +2036,8 @@
           </div>
         </div>
         ${readOnly ? '' : `
+        ${state.geoFence?.enforced ? `
+        <div class="song-popup-geo-note">&#128205; You must be at this location to queue songs.</div>` : ''}
         <div class="${playClass}" id="spaPlay">
           <span class="spa-label">Play Song</span>
           <span class="${playCreditClass}">${formatCredits(costPlay, 'Credits')}${canPlay ? '' : ' ⚠'}</span>
@@ -1892,7 +2078,7 @@
 
     async function submitPlay(priority, isPriorityPlay) {
       try {
-        await api('/api/song-queue/addSong', {
+        await geoApi('/api/song-queue/addSong', {
           method: 'POST',
           body: JSON.stringify({
             albumId: song.albumId, songId: song.songId, priority,
@@ -1901,7 +2087,7 @@
         });
         dismissSongPopup();
       } catch (err) {
-        showAppAlert({ title: 'Play Song', message: 'Could not add the song to the queue: ' + (err.message || err) });
+        showAppAlert({ title: 'Play Song', message: queueErrorMessage(err, 'Could not add the song to the queue: ') });
       }
     }
 
@@ -2485,7 +2671,7 @@
       playBtn.textContent = 'Queueing…';
       try {
         const chosen = [...selected].sort((a, b) => a - b).map(i => ids[i]);
-        const queued = await api('/api/song-queue/addMultipleSongs', {
+        const queued = await geoApi('/api/song-queue/addMultipleSongs', {
           method: 'POST',
           body: JSON.stringify({ songIdentifiers: chosen, priority: 1 }),
         }) || [];
@@ -2500,7 +2686,7 @@
       } catch (err) {
         playBtn.disabled = false;
         update();
-        showAppAlert({ title: 'Could Not Play Songs', message: 'Could not queue the songs: ' + (err.message || err) });
+        showAppAlert({ title: 'Could Not Play Songs', message: queueErrorMessage(err, 'Could not queue the songs: ') });
       }
     });
 
@@ -2527,7 +2713,7 @@
   async function selectLocation(loc) {
     state.currentLocation = loc;
     state.locationId = loc.locationId;
-    await loadPricingConfig();
+    await Promise.all([loadPricingConfig(), loadGeoFenceStatus()]);
     renderMain(state.currentMainTab);
   }
 
@@ -3130,7 +3316,7 @@
       state.currentLocation = state.locations[0];
       state.locationId = state.currentLocation.locationId;
     }
-    await loadPricingConfig();
+    await Promise.all([loadPricingConfig(), loadGeoFenceStatus()]);
     renderMain('music');
     connectWebSocket();
   })();

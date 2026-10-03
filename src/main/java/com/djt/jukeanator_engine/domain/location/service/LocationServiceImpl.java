@@ -20,6 +20,7 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotAlbumDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
+import com.djt.jukeanator_engine.domain.location.dto.LocationInfoSyncDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationPricingConfigDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
@@ -28,6 +29,7 @@ import com.djt.jukeanator_engine.domain.location.dto.UpdateLocationInfoRequest;
 import com.djt.jukeanator_engine.domain.location.event.LocationLibrarySyncedEvent;
 import com.djt.jukeanator_engine.domain.location.event.LocationRegisteredEvent;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
+import com.djt.jukeanator_engine.domain.location.event.OwnLocationInfoUpdatedEvent;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
@@ -459,6 +461,11 @@ public class LocationServiceImpl implements LocationService {
             ? " and the " + LocationRootEntity.LOCATION_LIST_FILENAME + " filesystem backup"
             : "");
 
+    // A slave's SlaveConnectionManager pushes the new info to master on this event, so master
+    // geo-fences the location's Web/Mobile UI against the coordinates just saved.
+    this.eventPublisher.publishEvent(
+        new OwnLocationInfoUpdatedEvent(location.getPersistentIdentity()));
+
     return location;
   }
 
@@ -483,6 +490,50 @@ public class LocationServiceImpl implements LocationService {
     location.setTenDollarBonusCredits(pricingConfig.tenDollarBonusCredits());
     location.setWebCostMultiplier(pricingConfig.webCostMultiplier());
     location.setDisplayCurrencyForCost(pricingConfig.displayCurrencyForCost());
+
+    this.locationRepository.storeAggregateRoot(this.locationRoot);
+  }
+
+  @Override
+  public void updateLocationInfo(Integer locationId, LocationInfoSyncDto locationInfo) {
+
+    requireNonNull(locationInfo, "locationInfo cannot be null");
+
+    LocationEntity location = this.locationRoot.getLocationByIdNullIfNotExists(locationId);
+    if (location == null) {
+      log.warn("Ignoring location info sync for unknown locationId: {}", locationId);
+      return;
+    }
+
+    log.info("Syncing location info for locationId [{}]: name=[{}] -> [{}], "
+        + "logoName=[{}] -> [{}], latitude=[{}] -> [{}], longitude=[{}] -> [{}], "
+        + "isGeoFenced=[{}] -> [{}]", locationId, location.getName(), locationInfo.name(),
+        location.getLogoName(), locationInfo.logoName(), location.getLatitude(),
+        locationInfo.latitude(), location.getLongitude(), locationInfo.longitude(),
+        location.isGeoFenced(), locationInfo.geoFenced());
+
+    String name = locationInfo.name();
+    if (name != null && !name.isBlank() && !name.equals(location.getName())) {
+      boolean nameTaken = this.locationRoot.getLocations().stream()
+          .anyMatch(other -> !other.getPersistentIdentity().equals(locationId)
+              && name.equals(other.getName()));
+      if (nameTaken) {
+        log.warn("Not syncing name [{}] for locationId [{}]: another location already uses it",
+            name, locationId);
+      } else {
+        location.setName(name);
+      }
+    }
+    if (locationInfo.latitude() != null && locationInfo.longitude() != null) {
+      location.setLatitude(locationInfo.latitude());
+      location.setLongitude(locationInfo.longitude());
+    }
+    if (locationInfo.logoName() != null && !locationInfo.logoName().isBlank()) {
+      location.setLogoName(locationInfo.logoName());
+    }
+    if (locationInfo.geoFenced() != null) {
+      location.setGeoFenced(locationInfo.geoFenced());
+    }
 
     this.locationRepository.storeAggregateRoot(this.locationRoot);
   }

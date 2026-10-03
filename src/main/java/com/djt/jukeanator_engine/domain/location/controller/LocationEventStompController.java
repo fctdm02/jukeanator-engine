@@ -9,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
+import com.djt.jukeanator_engine.domain.location.dto.LocationInfoSyncDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationPricingConfigDto;
 import com.djt.jukeanator_engine.domain.location.security.LocationPrincipal;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
@@ -63,6 +64,18 @@ public class LocationEventStompController {
 
     Integer locationId = Integer.valueOf(principal.getName());
     locationService.updatePricingConfig(locationId, pricingConfig);
+  }
+
+  /**
+   * Receives a slave's own location info (name, coordinates, logo, geo-fencing), pushed on every
+   * {@code /ws-slave} (re)connect and whenever it is edited (see {@code SlaveConnectionManager}),
+   * so master geo-fences that location's Web/Mobile UI against current coordinates.
+   */
+  @MessageMapping("/location-info")
+  public void handleLocationInfo(LocationInfoSyncDto locationInfo, Principal principal) {
+
+    Integer locationId = Integer.valueOf(principal.getName());
+    locationService.updateLocationInfo(locationId, locationInfo);
   }
 
   /**

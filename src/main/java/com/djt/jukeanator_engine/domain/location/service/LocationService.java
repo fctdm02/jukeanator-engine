@@ -4,6 +4,7 @@ import java.util.List;
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
+import com.djt.jukeanator_engine.domain.location.dto.LocationInfoSyncDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationPricingConfigDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
@@ -134,4 +135,16 @@ public interface LocationService {
    */
   @PublicServiceMethod
   void updatePricingConfig(Integer locationId, LocationPricingConfigDto pricingConfig);
+
+  /**
+   * Master-only. Applies a slave's own location info (pushed on every {@code /ws-slave}
+   * (re)connect and whenever it is edited -- see {@code SlaveConnectionManager}) to master's copy
+   * of that location, so geo-fencing is enforced against the slave's current coordinates and
+   * geo-fence flag. A no-op if {@code locationId} does not (yet) correspond to a known location.
+   * A name already used by a different location is not applied, since names are unique.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   */
+  @PublicServiceMethod
+  void updateLocationInfo(Integer locationId, LocationInfoSyncDto locationInfo);
 }

@@ -7,6 +7,15 @@ app:
   master-instance-url: ~   # required if mode=slave, e.g. https://jukeanator.com
   location-id: ~            # required if mode=slave, assigned at provisioning
   location-api-key: ~       # required if mode=slave, issued at provisioning
+  # Geo-fencing of Web/Mobile UI queue operations (see src/main/resources/application.yml for
+  # every setting). Set enabled: true on the production master at https://www.jukeanator.com.
+  # For local QA of geo-fencing, set enabled: true and allow-simulated-position: true here.
+  geo-fence:
+    enabled: false
+    radius-meters: 50
+    max-accuracy-meters: 150
+    max-position-age-seconds: 120
+    allow-simulated-position: false   # QA only -- never true in production
   jwt:
     secret: fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP
     expiration-ms: 86400000   # 24 hours
