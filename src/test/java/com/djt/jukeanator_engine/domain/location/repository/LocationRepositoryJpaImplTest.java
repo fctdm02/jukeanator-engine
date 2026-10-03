@@ -25,6 +25,7 @@ import jakarta.persistence.EntityManagerFactory;
 import com.zaxxer.hikari.HikariDataSource;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 
 /**
  * Integration tests for {@link LocationRepositoryJpaImpl#changeLocationId}, run against a live
@@ -213,6 +214,27 @@ class LocationRepositoryJpaImplTest {
 
     String row = locationRow(OLD_LOCATION_ID);
     assertTrue(row.startsWith("edit-info-renamed|EditInfoLogo.jpg|"), row);
+  }
+
+  @Test
+  void storeAggregateRoot_persistsLogoChange_whenSongLibraryRootIsWiredIntoTheLocation()
+      throws Exception {
+
+    insertLocation(OLD_LOCATION_ID, "edit-info");
+    LocationRepositoryJpaImpl repository = newRepository();
+
+    // Mirrors SongLibraryServiceImpl#initialize, which wires the (non-persisted) song library root
+    // into the own location at startup, before Edit Location Info ever runs. The bytecode
+    // enhancer once dirty-tracked that field, which hid every later logo change from merge().
+    LocationRootEntity root = repository.loadAggregateRoot("ignored");
+    LocationEntity location = root.getLocationByIdNullIfNotExists(OLD_LOCATION_ID);
+    location.setLocationSongLibraryRoot(new RootFolderEntity(""));
+
+    location.setLogoName("EditInfoLogo.jpg");
+    repository.storeAggregateRoot(root);
+
+    String row = locationRow(OLD_LOCATION_ID);
+    assertTrue(row.startsWith("edit-info|EditInfoLogo.jpg|"), row);
   }
 
   // ── fixtures ─────────────────────────────────────────────────────────────

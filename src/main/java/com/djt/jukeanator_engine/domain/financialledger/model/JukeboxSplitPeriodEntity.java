@@ -5,6 +5,7 @@ import java.time.Instant;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 
@@ -29,7 +30,9 @@ public class JukeboxSplitPeriodEntity extends AbstractPersistentEntity {
   // Not a mapped column and not written by the filesystem repository -- reconstructed uniformly by
   // FinancialLedgerServiceImpl right after any repository load, regardless of backend, exactly like
   // RootFolderEntity's parentLocation. Only ever set on the owning instance's own periods; master's
-  // mirrored periods carry just parentLocationId below.
+  // mirrored periods carry just parentLocationId below. @Transient is required in addition to the
+  // transient keyword -- see LocationEntity#locationSongLibraryRoot for why.
+  @Transient
   private transient LocationEntity parentLocation;
 
   // Read-only view of parent_location_id: FinancialLedgerRepositoryJpaImpl writes that column

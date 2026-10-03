@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 
@@ -81,6 +82,11 @@ public class LocationEntity extends AbstractPersistentEntity {
 
   // Not persisted -- reconstructed uniformly by SongLibraryServiceImpl right after any
   // SongLibraryRepository load. See RootFolderEntity's symmetric transient parentLocation field.
+  // @Transient is required in addition to the transient keyword: the Hibernate bytecode enhancer
+  // ignores the keyword and dirty-tracks writes to this field, and an unmapped name in the dirty
+  // set stops Hibernate from resolving every mapped attribute that sorts after it (logoName,
+  // longitude, name, ...), so those changes were silently never written by merge().
+  @Transient
   private transient RootFolderEntity locationSongLibraryRoot;
 
   public LocationEntity() {}

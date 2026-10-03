@@ -695,22 +695,26 @@
     if (!song) {
       widget.innerHTML = `
         <div class="now-playing-idle">
-          <div class="idle-title">No music playing</div>
+          <div class="now-playing-title-row">
+            <div class="idle-title">No music playing</div>
+            ${viewQueueBtnHtml}
+          </div>
           <div class="idle-sub">Let's play some music!</div>
-        </div>
-        ${viewQueueBtnHtml}`;
+        </div>`;
     } else {
       const crawlText = `${escHtml(song.artistName || '')}${song.albumName ? ' &middot; ' + escHtml(song.albumName) : ''}`;
       widget.innerHTML = `
         <img class="now-playing-album-link" src="/api/locations/${state.locationId}/song-library/albums/${song.albumId}/coverArt" alt="${escHtml(song.albumName || '')}"
              onerror="this.remove()">
-        <div class="now-playing-text now-playing-album-link">
-          <div class="song-name">${escHtml(song.songName || '')}</div>
-          <div class="now-playing-crawl-wrap">
+        <div class="now-playing-text">
+          <div class="now-playing-title-row">
+            <div class="song-name now-playing-album-link">${escHtml(song.songName || '')}</div>
+            ${viewQueueBtnHtml}
+          </div>
+          <div class="now-playing-crawl-wrap now-playing-album-link">
             <div class="now-playing-crawl">${crawlText}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${crawlText}</div>
           </div>
-        </div>
-        ${viewQueueBtnHtml}`;
+        </div>`;
       wireNowPlayingAlbumLinks(widget, song);
     }
     document.getElementById('viewQueueBtn')?.addEventListener('click', () => navigateSub('song-queue'));

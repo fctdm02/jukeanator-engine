@@ -219,6 +219,11 @@ html, body {
   flex-shrink: 0;
 }
 
+.now-playing-idle {
+  flex: 1;
+  min-width: 0;
+}
+
 .now-playing-idle .idle-title {
   font-size: 1.15rem;
   font-weight: 700;
@@ -233,6 +238,21 @@ html, body {
 }
 
 .now-playing-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Song name with the "View Queue" button aligned on the same line */
+.now-playing-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.now-playing-title-row .song-name,
+.now-playing-title-row .idle-title {
+  flex: 1;
   min-width: 0;
 }
 
