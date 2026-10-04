@@ -702,10 +702,8 @@ CREATE TABLE user_song_play_history (
 
 ### Environment Variables (add these)
 
-| Variable | Example Value |
-|----------|---------------|
-| `baseUrl` | `http://localhost:8080` |
-| `authToken` | *(populated automatically by the login script below)* |
+- `baseUrl`: `http://localhost:8080`
+- `authToken`: *(populated automatically by the login script below)*
 
 ### New Requests
 
@@ -746,13 +744,14 @@ This propagates to every request in the collection. No need to edit each request
 
 ### Existing Requests — What Changes
 
-| Endpoint | Change Needed |
-|----------|---------------|
-| All `GET /api/song-library/*` | Nothing — they're public, but the Bearer token is harmless to include |
-| `POST /api/song-library/scan` | Now requires `ROLE_ADMIN` — use an admin account's token |
-| `POST /api/song-library/scanNoPath` | Same |
-| `POST /api/song-library/resetSongStatistics` | Same |
-| `POST /api/song-library/authenticateForAdminPanel` | Still works as before (no Spring Security rule blocks it since it's under `.hasRole("ADMIN")` — or you can leave it `.permitAll()` if it's the admin panel's own login mechanism) |
+- All `GET /api/song-library/*`: Nothing — they're public, but the Bearer token is harmless to
+  include
+- `POST /api/song-library/scan`: Now requires `ROLE_ADMIN` — use an admin account's token
+- `POST /api/song-library/scanNoPath`: Same
+- `POST /api/song-library/resetSongStatistics`: Same
+- `POST /api/song-library/authenticateForAdminPanel`: Still works as before (no Spring Security
+  rule blocks it since it's under `.hasRole("ADMIN")` — or you can leave it `.permitAll()` if it's
+  the admin panel's own login mechanism)
 
 ### Testing the full flow in Postman
 
@@ -764,23 +763,23 @@ This propagates to every request in the collection. No need to edit each request
 
 ## Summary of All Files to Create/Modify
 
-| Action | File |
-|--------|------|
-| **Create** | `UserEntity.java` |
-| **Create** | `UserRepository.java` |
-| **Create** | `RegisterRequest.java`, `LoginRequest.java`, `AuthResponse.java`, `UserProfileDto.java` |
-| **Create** | `JwtUtil.java` |
-| **Create** | `JwtAuthenticationFilter.java` |
-| **Create** | `SecurityConfig.java` |
-| **Create** | `UserService.java` |
-| **Create** | `UserController.java` |
-| **Create** | `V2__create_users.sql` |
-| **Modify** | `pom.xml` — add 4 JWT + security dependencies |
-| **Modify** | `application.yml` — add `app.jwt.*` properties |
-| **Modify** | `application-test.yml` — add test JWT secret |
-| **Modify** | `SongLibraryController.java` — optionally add `@AuthenticationPrincipal` where plays should be recorded |
-| **Modify** | `SongLibraryServiceHttpClient.java` — add token-bearing constructor / static factory |
-| **Modify** | `SongLibraryServiceTest.java` — add `@WithMockUser` to existing tests, add auth tests |
-| **Modify** | Postman collection — add env vars, register/login requests, collection-level Bearer auth |
+- **Create**: `UserEntity.java`
+- **Create**: `UserRepository.java`
+- **Create**: `RegisterRequest.java`, `LoginRequest.java`, `AuthResponse.java`, `UserProfileDto.java`
+- **Create**: `JwtUtil.java`
+- **Create**: `JwtAuthenticationFilter.java`
+- **Create**: `SecurityConfig.java`
+- **Create**: `UserService.java`
+- **Create**: `UserController.java`
+- **Create**: `V2__create_users.sql`
+- **Modify**: `pom.xml` — add 4 JWT + security dependencies
+- **Modify**: `application.yml` — add `app.jwt.*` properties
+- **Modify**: `application-test.yml` — add test JWT secret
+- **Modify**: `SongLibraryController.java` — optionally add `@AuthenticationPrincipal` where plays
+  should be recorded
+- **Modify**: `SongLibraryServiceHttpClient.java` — add token-bearing constructor / static factory
+- **Modify**: `SongLibraryServiceTest.java` — add `@WithMockUser` to existing tests, add auth tests
+- **Modify**: Postman collection — add env vars, register/login requests, collection-level Bearer
+  auth
 
 The `SongLibraryService` **interface** and `SongLibraryServiceImpl` do **not** need to change for authentication to work — Spring Security handles everything at the HTTP boundary before requests reach those classes.

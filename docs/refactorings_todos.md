@@ -97,11 +97,9 @@ These scratch files should be deleted or moved to a `notes/` or `docs/` folder a
 
 ### Priority Order
 
-| Priority | Refactoring |
-|---|---|
-| High | Extract `GenresPanel`, `QueuePanel`, `SearchPanel` into separate classes |
-| High | Extract `CoverArtCache` and fix async image loading in the cell renderer |
-| Medium | Introduce a View interface + Presenter layer |
-| Medium | Extract `JukeANatorTheme` constants class |
-| Low | Move `buildCreditsDescription` logic to a model |
-| Low | Clean up scratch `.txt` files from repo root |
+- **High**: Extract `GenresPanel`, `QueuePanel`, `SearchPanel` into separate classes
+- **High**: Extract `CoverArtCache` and fix async image loading in the cell renderer
+- **Medium**: Introduce a View interface + Presenter layer
+- **Medium**: Extract `JukeANatorTheme` constants class
+- **Low**: Move `buildCreditsDescription` logic to a model
+- **Low**: Clean up scratch `.txt` files from repo root

@@ -4,24 +4,28 @@
 
 ### New files (create in your source tree)
 
-| File | Package | Purpose |
-|---|---|---|
-| `PublicServiceMethod.java` | `…domain.common.aop` | Annotation — bypasses security check on a method |
-| `ServiceLoggingAspect.java` | `…domain.common.aop` | `@Around` aspect: logs user, method, args, timing |
-| `ServiceSecurityAspect.java` | `…domain.common.aop` | `@Before` aspect: rejects calls with no auth |
-| `LocalPrincipal.java` | `…domain.common.security` | Record — the principal for the LOCAL/Swing user |
-| `LocalAuthenticationToken.java` | `…domain.common.security` | Authentication impl for LOCAL |
-| `SystemPrincipal.java` + inner `SystemAuthenticationToken` | `…domain.common.security` | Auth for background/daemon threads |
-| `SecurityContextPropagatingRunnable.java` | `…domain.common.security` | Carries a SecurityContext into an executor thread |
-| `LocalSecurityContextConfigurer.java` | `…domain.common.security` | ApplicationRunner — MODE_GLOBAL + LOCAL auth install |
+- `PublicServiceMethod.java` (`…domain.common.aop`): Annotation — bypasses security check on a
+  method
+- `ServiceLoggingAspect.java` (`…domain.common.aop`): `@Around` aspect: logs user, method, args,
+  timing
+- `ServiceSecurityAspect.java` (`…domain.common.aop`): `@Before` aspect: rejects calls with no auth
+- `LocalPrincipal.java` (`…domain.common.security`): Record — the principal for the LOCAL/Swing
+  user
+- `LocalAuthenticationToken.java` (`…domain.common.security`): Authentication impl for LOCAL
+- `SystemPrincipal.java` + inner `SystemAuthenticationToken` (`…domain.common.security`): Auth for
+  background/daemon threads
+- `SecurityContextPropagatingRunnable.java` (`…domain.common.security`): Carries a SecurityContext
+  into an executor thread
+- `LocalSecurityContextConfigurer.java` (`…domain.common.security`): ApplicationRunner —
+  MODE_GLOBAL + LOCAL auth install
 
 ### Files you must edit
 
-| File | Change |
-|---|---|
-| `UserService` (interface) | Add `@PublicServiceMethod` to `login()` and `register()` |
-| `SongLibraryService` (interface) | Add `@PublicServiceMethod` to `authenticateForAdminPanel()` if present |
-| `SongPlayerServiceImpl.java` | Replace `submitQueueProcessing()` — see `SongPlayerServiceImpl_DIFF.java` |
+- `UserService` (interface): Add `@PublicServiceMethod` to `login()` and `register()`
+- `SongLibraryService` (interface): Add `@PublicServiceMethod` to `authenticateForAdminPanel()` if
+  present
+- `SongPlayerServiceImpl.java`: Replace `submitQueueProcessing()` — see
+  `SongPlayerServiceImpl_DIFF.java`
 
 ---
 

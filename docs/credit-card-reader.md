@@ -12,12 +12,10 @@ Yes. Nayax documentation identifies **Pulse Standard** variants of the VPOS Touc
 
 The relevant U.S. catalog entries include:
 
-| Catalog number   | Description                                         |
-| ---------------- | --------------------------------------------------- |
-| `ST4GVZ003B01S2` | VPOS TOUCH, 4G US (Verizon), Pulse Standard, black  |
-| `ST4GVZ003Y01S2` | VPOS TOUCH, 4G US (Verizon), Pulse Standard, yellow |
-| `ST4GUS003B01S2` | VPOS TOUCH, 4G US, Pulse Standard, black, Tele2     |
-| `ST4GUS003Y01S2` | VPOS TOUCH, 4G US, Pulse Standard, yellow, Tele2    |
+- `ST4GVZ003B01S2`: VPOS TOUCH, 4G US (Verizon), Pulse Standard, black
+- `ST4GVZ003Y01S2`: VPOS TOUCH, 4G US (Verizon), Pulse Standard, yellow
+- `ST4GUS003B01S2`: VPOS TOUCH, 4G US, Pulse Standard, black, Tele2
+- `ST4GUS003Y01S2`: VPOS TOUCH, 4G US, Pulse Standard, yellow, Tele2
 
 > **Note:** These are catalog entries, not a guarantee that every VPOS Touch unit supports every pulse configuration. Confirm the exact part number and cellular carrier with Nayax or the supplier before purchasing.
 
@@ -41,12 +39,17 @@ The pulse interface is conceptually similar to the credit output of a bill accep
 
 ## Pulse mode versus MDB
 
-| Pulse                                                                     | MDB                                                   |
-| ------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Simple electrical credit signaling                                        | Structured digital vending protocol                   |
-| Controller counts configured pulses                                       | Controller exchanges messages with the reader         |
-| Suitable for a controller that already accepts bill-acceptor-style pulses | Suitable for a controller with MDB support            |
-| Requires correct pulse value, wiring, polarity, and timing                | Requires compatible MDB hardware and protocol support |
+**Pulse**
+- Simple electrical credit signaling
+- Controller counts configured pulses
+- Suitable for a controller that already accepts bill-acceptor-style pulses
+- Requires correct pulse value, wiring, polarity, and timing
+
+**MDB**
+- Structured digital vending protocol
+- Controller exchanges messages with the reader
+- Suitable for a controller with MDB support
+- Requires compatible MDB hardware and protocol support
 
 The VPOS Touch should not be assumed to emit pulses in every installation. The actual behavior depends on the selected machine protocol and configuration.
 
@@ -62,13 +65,11 @@ Number of pulses = Transaction amount ÷ Credit per pulse
 
 ### Examples
 
-| Credit per pulse | Pulses for a $10.00 charge |
-| ---------------: | -------------------------: |
-|            $0.10 |                        100 |
-|            $0.25 |                         40 |
-|            $0.50 |                         20 |
-|        **$1.00** |                     **10** |
-|            $2.00 |                          5 |
+- $0.10 per pulse: 100 pulses
+- $0.25 per pulse: 40 pulses
+- $0.50 per pulse: 20 pulses
+- **$1.00 per pulse: 10 pulses**
+- $2.00 per pulse: 5 pulses
 
 Therefore:
 
@@ -82,14 +83,12 @@ The Pulse Manual describes configurations in which the pulse count corresponds t
 
 For example, with a credit value of `$0.50` per pulse:
 
-| Pulses |  Price |
-| -----: | -----: |
-|      3 |  $1.50 |
-|      5 |  $2.50 |
-|      6 |  $3.00 |
-|     10 |  $5.00 |
-|     18 |  $9.00 |
-|     22 | $11.00 |
+- 3 pulses: $1.50
+- 5 pulses: $2.50
+- 6 pulses: $3.00
+- 10 pulses: $5.00
+- 18 pulses: $9.00
+- 22 pulses: $11.00
 
 The exact behavior depends on whether the machine is configured for a single-price or multiple-price setup.
 

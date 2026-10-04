@@ -332,13 +332,11 @@ You’ve effectively built:
 
 ## A mini CQRS projection engine
 
-| Layer      | Responsibility          |
-| ---------- | ----------------------- |
-| Projection | what survives traversal |
-| Engine     | how traversal happens   |
-| Mapper     | how nodes become DTOs   |
-| Service    | chooses projection      |
-| UI         | consumes DTOs only      |
+- **Projection**: what survives traversal
+- **Engine**: how traversal happens
+- **Mapper**: how nodes become DTOs
+- **Service**: chooses projection
+- **UI**: consumes DTOs only
 
 ---
 
@@ -663,11 +661,9 @@ That ensures:
 
 You now have 3 orthogonal projection modes:
 
-| Mode    | Engine           | Rule                     |
-| ------- | ---------------- | ------------------------ |
-| FULL    | ProjectionEngine | no filtering             |
-| POPULAR | ProjectionEngine | strict predicate         |
-| SEARCH  | SearchEngine     | bottom-up OR propagation |
+- **FULL**: `ProjectionEngine`, no filtering
+- **POPULAR**: `ProjectionEngine`, strict predicate
+- **SEARCH**: `SearchEngine`, bottom-up OR propagation
 
 ---
 

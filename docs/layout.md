@@ -85,13 +85,15 @@ Content panels then use `flex: 1` or `calc()` to fill the remainder. No JavaScri
 
 Portrait isn't just "the same layout rotated" — it's a different layout *configuration* for the same content. The general rules are:
 
-| Panel type | Landscape placement | Portrait placement |
-|---|---|---|
-| Header/Footer | Top/bottom strip | Same — still top/bottom |
-| Left/Right sidebar | Vertical column on edge | Horizontal tab bar at top, or hidden in a hamburger menu |
-| Right detail/property panel | Vertical column | Bottom drawer (partial overlay) or full-screen modal |
-| Toolbar | Horizontal bar below header | Same, or collapsed into an icon row |
-| Content area | `flex: 1` fills horizontal gap | `flex: 1` fills vertical gap |
+- **Header/Footer** — Landscape: top/bottom strip. Portrait: same — still top/bottom.
+- **Left/Right sidebar** — Landscape: vertical column on edge. Portrait: horizontal tab bar at
+  top, or hidden in a hamburger menu.
+- **Right detail/property panel** — Landscape: vertical column. Portrait: bottom drawer (partial
+  overlay) or full-screen modal.
+- **Toolbar** — Landscape: horizontal bar below header. Portrait: same, or collapsed into an icon
+  row.
+- **Content area** — Landscape: `flex: 1` fills horizontal gap. Portrait: `flex: 1` fills vertical
+  gap.
 
 **Detection in code:**
 
@@ -236,13 +238,11 @@ That's it — `HomePanel`, `AlbumGridPanel`, and everything downstream are compl
 
 ## What this gives you at various resolutions
 
-| Screen | Orientation | Scale | Approx cols × rows | Art size |
-|---|---|---|---|---|
-| 1920 × 1080 | Landscape | 1.00 | 4 × 3 (canonical) | 190 × 190 |
-| 1024 × 768 | Landscape | 0.53 | 3 × 2 | 102 × 102 |
-| 2560 × 1440 | Landscape | 1.33 | 6 × 4 | 254 × 254 |
-| 1080 × 1920 | Portrait | 0.56 | 2 × 5 | 161 × 161 |
-| 768 × 1024 | Portrait | 0.40 (clamped) | 2 × 4 | 130 × 130 |
+- **1920 × 1080**, Landscape, scale 1.00: 4 × 3 (canonical), art 190 × 190
+- **1024 × 768**, Landscape, scale 0.53: 3 × 2, art 102 × 102
+- **2560 × 1440**, Landscape, scale 1.33: 6 × 4, art 254 × 254
+- **1080 × 1920**, Portrait, scale 0.56: 2 × 5, art 161 × 161
+- **768 × 1024**, Portrait, scale 0.40 (clamped): 2 × 4, art 130 × 130
 
 ---
 
@@ -250,17 +250,16 @@ That's it — `HomePanel`, `AlbumGridPanel`, and everything downstream are compl
 
 All of the tuning values are named constants at the top of the private methods in `LayoutTheme`:
 
-| Constant | Default | What it controls |
-|---|---|---|
-| `GRID_SCALE_MIN` | 0.40 | Smallest allowed tile — increase if 15" screen tiles feel cramped |
-| `GRID_SCALE_MAX` | 1.50 | Largest allowed tile — lower if 4K tiles feel overwhelming |
-| `PORTRAIT_ART_REDUCTION` | 0.85 | Extra shrink in portrait — reduce toward 0.70 for even smaller portrait tiles |
-| `LETTER_NAV_H` | 44 | Must match `AlbumGridPanel`'s nav strip height |
-| `TILE_TEXT_H` | 44 | Must match the album/artist text panel height below each tile |
-| `GRID_MAX_COLS_LANDSCAPE` | 8 | Hard cap on cols in landscape |
-| `GRID_MAX_ROWS_LANDSCAPE` | 5 | Hard cap on rows in landscape |
-| `GRID_MAX_COLS_PORTRAIT` | 4 | Hard cap on cols in portrait |
-| `GRID_MAX_ROWS_PORTRAIT` | 8 | Hard cap on rows in portrait |
+- `GRID_SCALE_MIN` (0.40): Smallest allowed tile — increase if 15" screen tiles feel cramped
+- `GRID_SCALE_MAX` (1.50): Largest allowed tile — lower if 4K tiles feel overwhelming
+- `PORTRAIT_ART_REDUCTION` (0.85): Extra shrink in portrait — reduce toward 0.70 for even smaller
+  portrait tiles
+- `LETTER_NAV_H` (44): Must match `AlbumGridPanel`'s nav strip height
+- `TILE_TEXT_H` (44): Must match the album/artist text panel height below each tile
+- `GRID_MAX_COLS_LANDSCAPE` (8): Hard cap on cols in landscape
+- `GRID_MAX_ROWS_LANDSCAPE` (5): Hard cap on rows in landscape
+- `GRID_MAX_COLS_PORTRAIT` (4): Hard cap on cols in portrait
+- `GRID_MAX_ROWS_PORTRAIT` (8): Hard cap on rows in portrait
 
 
 
@@ -297,14 +296,12 @@ Let me read all the uploaded files carefully before touching anything.Good. Now 
 
 `GenreGridProfile(cols, rows, imageSize)` and `genreGridProfile(screenW, screenH)` were added, directly mirroring the `GridProfile`/`homeGridProfile` pattern from the previous pass. The genre grid has structurally different fixed chrome than the album grid (no letter-nav strip, no per-tile text panel — those are baked into the tile itself), so it gets its own tuning constants:
 
-| Constant | Value | Meaning |
-|---|---|---|
-| `GENRE_LABEL_H` | 44px | Text label + padding below each tile |
-| `GENRE_PORTRAIT_IMG_REDUCTION` | 0.80× | Extra shrink on portrait short axis |
-| `GENRE_MAX_COLS_LANDSCAPE` | 8 | Cap for very wide / 4K screens |
-| `GENRE_MAX_ROWS_LANDSCAPE` | 4 | Genres rarely need more than 4 rows |
-| `GENRE_MAX_COLS_PORTRAIT` | 2 | Narrow portrait widths |
-| `GENRE_MAX_ROWS_PORTRAIT` | 6 | More rows available in tall portrait |
+- `GENRE_LABEL_H` (44px): Text label + padding below each tile
+- `GENRE_PORTRAIT_IMG_REDUCTION` (0.80×): Extra shrink on portrait short axis
+- `GENRE_MAX_COLS_LANDSCAPE` (8): Cap for very wide / 4K screens
+- `GENRE_MAX_ROWS_LANDSCAPE` (4): Genres rarely need more than 4 rows
+- `GENRE_MAX_COLS_PORTRAIT` (2): Narrow portrait widths
+- `GENRE_MAX_ROWS_PORTRAIT` (6): More rows available in tall portrait
 
 All existing fields (`genreGridCols`, `genreGridRows`, `genreImageSize`, `genreDetailPreviewCount`, `sortBtnW/H`, `resultRowMaxH`, `resultThumbSize`, `resultNumLabelW`, `resultNavBtnW/H`) were already present — no new fields needed.
 
@@ -316,13 +313,16 @@ All existing fields (`genreGridCols`, `genreGridRows`, `genreImageSize`, `genreD
 
 **Three hardcoded values replaced:**
 
-| Was | Now |
-|---|---|
-| `new GridLayout(2, 6, 20, 20)` field initialiser | `new GridLayout(genreProfile.rows(), genreProfile.cols(), lt.genreGridGapH, lt.genreGridGapV)` — moved into constructor so the profile is available |
-| `GENRES_PER_PAGE = 12` local constant | `genreProfile.tilesPerPage()` — derived from cols × rows |
-| `imageLoader.loadImage(resource, 240, 240)` | `imageLoader.loadImage(resource, imgSize, imgSize)` where `imgSize = genreProfile.imageSize()` |
-| `new EmptyBorder(30, 60, 20, 60)` page wrapper | `LayoutTheme.get().genrePagePadV / genrePagePadH` |
-| `new Dimension(140, 36)` pagination wrappers | `lt.genrePaginationBtnW / H` |
+- Was: `new GridLayout(2, 6, 20, 20)` field initialiser. Now:
+  `new GridLayout(genreProfile.rows(), genreProfile.cols(), lt.genreGridGapH, lt.genreGridGapV)` —
+  moved into constructor so the profile is available.
+- Was: `GENRES_PER_PAGE = 12` local constant. Now: `genreProfile.tilesPerPage()` — derived from
+  cols × rows.
+- Was: `imageLoader.loadImage(resource, 240, 240)`. Now:
+  `imageLoader.loadImage(resource, imgSize, imgSize)` where `imgSize = genreProfile.imageSize()`.
+- Was: `new EmptyBorder(30, 60, 20, 60)` page wrapper. Now:
+  `LayoutTheme.get().genrePagePadV / genrePagePadH`.
+- Was: `new Dimension(140, 36)` pagination wrappers. Now: `lt.genrePaginationBtnW / H`.
 
 The `genresGridPanel` field moved from a field initialiser (`= new JPanel(new GridLayout(2,6,...))`) to being assigned in the constructor, because the profile isn't available until the constructor runs. This is the only structural change to the class.
 
@@ -336,10 +336,10 @@ The constructor now accepts `LayoutTheme.GridProfile gridProfile` instead of `(i
 
 ### `GenreDetailPanel.java` — one constant, one Dimension
 
-| Was | Now |
-|---|---|
-| `private static final int PREVIEW_COUNT = 9` | `final int previewCount = LayoutTheme.get().genreDetailPreviewCount` read at the top of `rebuildColumns()` |
-| `btn.setPreferredSize(new Dimension(170, 42))` | `new Dimension(lt.sortBtnW, lt.sortBtnH)` |
+- Was: `private static final int PREVIEW_COUNT = 9`. Now:
+  `final int previewCount = LayoutTheme.get().genreDetailPreviewCount` read at the top of
+  `rebuildColumns()`.
+- Was: `btn.setPreferredSize(new Dimension(170, 42))`. Now: `new Dimension(lt.sortBtnW, lt.sortBtnH)`.
 
 The `PREVIEW_COUNT` was a local constant that duplicated `LayoutTheme.genreDetailPreviewCount`. It's now read at call-time so a portrait theme (with more vertical space available) can increase it without touching the panel.
 
@@ -349,15 +349,13 @@ The `PREVIEW_COUNT` was a local constant that duplicated `LayoutTheme.genreDetai
 
 This class is shared by Genres, Hot Here, and Search, so cleaning it here benefits all three tabs at once. Every previously hardcoded dimension is now sourced from a `LayoutTheme lt` snapshot taken at the top of `build()`:
 
-| Was | Now |
-|---|---|
-| `new EmptyBorder(0, 10, 0, 10)` outer column | `lt.resultColumnPadH` |
-| `row.setMaximumSize(..., 72)` | `lt.resultRowMaxH` |
-| `numLabel.setPreferredSize(36, 56)` | `lt.resultNumLabelW × lt.resultThumbSize` |
-| `thumb.setPreferredSize(56, 56)` | `lt.resultThumbSize` (square) |
-| `imageLoader.loadFilesystemImage(path, 56, 56)` | `lt.resultThumbSize` |
-| `btn.setPreferredSize(75, 45)` nav button | `lt.resultNavBtnW × lt.resultNavBtnH` |
-| `buildEmptyRow` maxSize 72 | `lt.resultRowMaxH` |
+- Was: `new EmptyBorder(0, 10, 0, 10)` outer column. Now: `lt.resultColumnPadH`.
+- Was: `row.setMaximumSize(..., 72)`. Now: `lt.resultRowMaxH`.
+- Was: `numLabel.setPreferredSize(36, 56)`. Now: `lt.resultNumLabelW × lt.resultThumbSize`.
+- Was: `thumb.setPreferredSize(56, 56)`. Now: `lt.resultThumbSize` (square).
+- Was: `imageLoader.loadFilesystemImage(path, 56, 56)`. Now: `lt.resultThumbSize`.
+- Was: `btn.setPreferredSize(75, 45)` nav button. Now: `lt.resultNavBtnW × lt.resultNavBtnH`.
+- Was: `buildEmptyRow` maxSize 72. Now: `lt.resultRowMaxH`.
 
 The `LayoutTheme lt` reference is passed through the private helpers (`buildItemRow`, `buildEmptyRow`, `navButton`) as a parameter rather than calling `LayoutTheme.get()` on every row — one singleton lookup per `build()` call instead of one per row.
 
@@ -450,13 +448,11 @@ Before writing anything, let me do a complete audit of every hardcoded value acr
 The `new Dimension(140, 36)` preferred size and font size 18 on the navigation button now read from `LayoutTheme.get().navBtnW/H` and `fontSizeNavBtn`. This is the shared factory used by `GenrePanel` pagination and `AlbumGridPanel` prev/next buttons, so one change scales all of them.
 
 ### `DetailHeaderPanel.java` — 4 replacements
-| Was | Now |
-|---|---|
-| `new Dimension(72, 72)` image label | `detailHeaderImageW/H` |
-| font 26 title label | `fontSizeDetailTitle` |
-| font 14 subtitle label | `fontSizeDetailSubtitle` |
-| `new Dimension(140, 52)` back button | `detailBackBtnW/H` |
-| font 18 back button | `fontSizeNavBtn` |
+- Was: `new Dimension(72, 72)` image label. Now: `detailHeaderImageW/H`.
+- Was: font 26 title label. Now: `fontSizeDetailTitle`.
+- Was: font 14 subtitle label. Now: `fontSizeDetailSubtitle`.
+- Was: `new Dimension(140, 52)` back button. Now: `detailBackBtnW/H`.
+- Was: font 18 back button. Now: `fontSizeNavBtn`.
 
 ### `KeyboardPanel.java` — 11 replacements
 The two `public static final` constants (`KEYBOARD_HEIGHT`, `SCREEN_PADDING_HORIZONTAL`) are removed and replaced with `LayoutTheme.get()` reads. Every key `Dimension` is now sourced from `keyLetterW/H`, `keyClearW`, `keyBackspaceW`, `keyModeToggleW`, `keySpaceW`. All `FlowLayout` column gaps use `keyColGap`, the grid row gap uses `keyRowGap`, and the inner padding uses `keyboardInnerPad`. The key label font uses `fontSizeKeyLabel`. The Javadoc `{@link #KEYBOARD_HEIGHT}` reference was updated to point to `LayoutTheme#keyboardHeight`.
@@ -468,14 +464,12 @@ All four local `private static final` constants are removed. Every use site now 
 `private static final int PREVIEW_COUNT = 10` removed. The three `ResultsColumnPanel.build()` calls now read `LayoutTheme.get().hotHerePreviewCount`. This is the same pattern applied to `GenreDetailPanel` in the previous pass.
 
 ### `SongQueueCard.java` — 8 replacements
-| Was | Now |
-|---|---|
-| `TIMEOUT_SECONDS = 120` constant | `LayoutTheme.get().overlayTimeoutSeconds` |
-| `MAX_QUEUE_VISIBLE = 5` constant | `LayoutTheme.get().songQueueMaxVisible` |
-| `new Dimension(900, 660)` card size | `songQueueCardW/H` |
-| `new Dimension(200, 52)` cancel button (×3 calls) | `songQueueCancelBtnW/H` |
-| `new Dimension(200, 80)` action button | `songQueueActionBtnW/H` |
-| `new Dimension(200, 60)` `createCancelButton` | `songQueueCancelBtnW/H` |
+- Was: `TIMEOUT_SECONDS = 120` constant. Now: `LayoutTheme.get().overlayTimeoutSeconds`.
+- Was: `MAX_QUEUE_VISIBLE = 5` constant. Now: `LayoutTheme.get().songQueueMaxVisible`.
+- Was: `new Dimension(900, 660)` card size. Now: `songQueueCardW/H`.
+- Was: `new Dimension(200, 52)` cancel button (×3 calls). Now: `songQueueCancelBtnW/H`.
+- Was: `new Dimension(200, 80)` action button. Now: `songQueueActionBtnW/H`.
+- Was: `new Dimension(200, 60)` `createCancelButton`. Now: `songQueueCancelBtnW/H`.
 
 ### `JukeANatorFrame_TopPanel_diff.java` — annotated diff for `JukeANatorFrame`
 Rather than rewriting the entire 1400-line file, the diff lists every precise line to change in `buildContentPanelTabs()`, `initialize()`, `buildTopPanel()`, and `buildNowPlayingPanel()`. All map to already-existing `LayoutTheme` fields: `tabWidth`, `tabHeight`, `tabSeparatorHeight`, `tabIconFontSize`, `tabTextFontSize`, `topPanelHeight`, `creditsPanelW/H`, `topPanelIconSize`, `fontSizeCreditTitle/Desc`, `nowPlayingWrapperW/H`, `nowPlayingPanelW/H`, `fontSizeTrackSong/Artist`.
