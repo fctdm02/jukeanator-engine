@@ -16,6 +16,7 @@ import java.awt.Image;
 import java.awt.LinearGradientPaint;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Window;
 import java.awt.geom.Point2D;
 import java.util.List;
 import javax.swing.BorderFactory;
@@ -1321,6 +1322,64 @@ public class JukeANatorFrame extends JFrame {
     GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
 
     gd.setFullScreenWindow(this);
+  }
+
+  /**
+   * Raises the frame above every other window and gives it OS keyboard focus, or, if a modal dialog
+   * owned by the frame is showing (e.g. the initial "scan file system" dialog), raises that dialog
+   * instead. Called at startup, both right after the frame is first made visible and again once the
+   * initial data load has completed, independent of the {@code always-on-top} property.
+   *
+   * <p>
+   * On Windows, the foreground-lock rules stop a newly started process from taking the foreground
+   * away from the window the user last interacted with — typically the command prompt that
+   * launched the application — so a plain {@link #toFront()} often leaves the frame (and the scan
+   * dialog) hidden behind that console. Briefly making the frame always-on-top forces it to the top
+   * of the z-order, and {@link ForegroundWindowUtil} then works around the foreground lock to
+   * activate it. The frame is restored to the configured {@code always-on-top} value afterwards,
+   * which leaves it on top without pinning it there.
+   *
+   * <p>
+   * On Linux and macOS this simply calls {@link #toFront()} and {@link #requestFocus()}.
+   */
+  public void bringToFront() {
+
+    if (!ForegroundWindowUtil.isApplicable()) {
+      // Linux/macOS: no foreground lock to work around, and toggling always-on-top on macOS would
+      // drop this full-screen window below the display-capture shield. Keep the plain behavior.
+      toFront();
+      requestFocus();
+      return;
+    }
+
+    Window modalDialog = findShowingOwnedModalDialog();
+    if (modalDialog != null) {
+      // Do not toggle the frame's always-on-top state here: un-pinning the frame would also
+      // un-pin the dialog it owns (Window#setAlwaysOnTop propagates to owned windows).
+      modalDialog.toFront();
+      ForegroundWindowUtil.forceToForeground(modalDialog);
+      modalDialog.requestFocus();
+      return;
+    }
+
+    setAlwaysOnTop(true);
+    toFront();
+
+    if (!this.alwaysOnTop) {
+      setAlwaysOnTop(false);
+    }
+
+    ForegroundWindowUtil.forceToForeground(this);
+    requestFocus();
+  }
+
+  private Window findShowingOwnedModalDialog() {
+    for (Window owned : getOwnedWindows()) {
+      if (owned instanceof java.awt.Dialog dialog && dialog.isModal() && dialog.isShowing()) {
+        return dialog;
+      }
+    }
+    return null;
   }
 
   /** Called by AdminPanel immediately before it iconifies the window. */

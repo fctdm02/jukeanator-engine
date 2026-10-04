@@ -90,6 +90,11 @@ public class JukeANatorUserInterfaceApplication {
     this.frame.showFullscreen();
     this.frame.setVisible(true);
 
+    // Raise the frame before promptForInitialLibraryScan(), whose modal dialog blocks this method.
+    // The dialog raises itself when it opens, and bringToFront() is called again below once the
+    // data load completes.
+    this.frame.bringToFront();
+
     if (Boolean.TRUE.equals(songLibraryService.isLibraryLoadFailedAtStartup())) {
       log.info("No song library could be loaded at startup — prompting for initial library scan");
       frame.promptForInitialLibraryScan();
@@ -112,13 +117,17 @@ public class JukeANatorUserInterfaceApplication {
         frame.setNowPlaying(playing);
         frame.setQueue(queue);
 
-        // Grab native OS keyboard focus now that the UI is fully initialized with
-        // real data, so hardware inputs (e.g. the bill acceptor's 'a' keystroke)
-        // work immediately without the operator having to click the screen first.
-        // requestFocus() (not requestFocusInWindow()) is required here because the
-        // frame itself may not yet be the OS-focused window at this point.
-        frame.toFront();
-        frame.requestFocus();
+        // Grab native OS foreground and keyboard focus now that the UI is fully initialized
+        // with real data, so the UI (or, on first use, the scan dialog) is not left behind the
+        // command prompt or Winamp, and hardware inputs (e.g. the bill acceptor's 'a'
+        // keystroke) work immediately without the operator having to click the screen first.
+        frame.bringToFront();
+
+        // Once more after a short delay, in case another window (e.g. Winamp, or the console
+        // finishing its startup output) took the foreground after the data load completed.
+        javax.swing.Timer reRaiseTimer = new javax.swing.Timer(3_000, e -> frame.bringToFront());
+        reRaiseTimer.setRepeats(false);
+        reRaiseTimer.start();
 
         log.info("JukeANator UI: data load complete");
       });

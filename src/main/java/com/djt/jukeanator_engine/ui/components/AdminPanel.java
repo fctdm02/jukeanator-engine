@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -14,8 +15,11 @@ import java.awt.GraphicsEnvironment;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
+import java.awt.HeadlessException;
 import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +33,7 @@ import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComponent;
+import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -578,7 +583,33 @@ public class AdminPanel extends JPanel {
    */
   public void showScanFileSystemDialog() {
 
-    JFileChooser chooser = new JFileChooser();
+    // On Windows, keep the chooser's dialog always-on-top and raise it once shown. On first use
+    // this dialog appears during startup, when Windows may still be keeping the launching command
+    // prompt in the foreground; without this the dialog can open hidden behind that console.
+    // Skipped on Linux/macOS (see ForegroundWindowUtil#isApplicable()), which get the plain dialog.
+    JFileChooser chooser = new JFileChooser() {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      protected JDialog createDialog(Component parent) throws HeadlessException {
+
+        JDialog dialog = super.createDialog(parent);
+        if (!ForegroundWindowUtil.isApplicable()) {
+          return dialog;
+        }
+
+        dialog.setAlwaysOnTop(true);
+        dialog.addWindowListener(new WindowAdapter() {
+          @Override
+          public void windowOpened(WindowEvent e) {
+            dialog.toFront();
+            ForegroundWindowUtil.forceToForeground(dialog);
+            dialog.requestFocus();
+          }
+        });
+        return dialog;
+      }
+    };
     chooser.setDialogTitle("Select Music Folder to Scan");
     chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
     chooser.setAcceptAllFileFilterUsed(false);
