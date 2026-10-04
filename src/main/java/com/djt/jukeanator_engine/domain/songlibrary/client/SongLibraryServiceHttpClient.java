@@ -18,6 +18,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.service.ScanProgressMonitor;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
@@ -216,6 +217,21 @@ public class SongLibraryServiceHttpClient implements SongLibraryService {
 
     return restClient.post().uri("/api/song-library/scan").body(scanRequest).retrieve()
         .body(Integer.class);
+  }
+
+  // Progress, stop and cancel are not carried over HTTP; the monitor is simply ignored.
+  @Override
+  public Integer scanFileSystemForSongs(ScanRequest scanRequest, ScanProgressMonitor monitor)
+      throws SongScanFailedException {
+
+    return scanFileSystemForSongs(scanRequest);
+  }
+
+  @Override
+  public Integer scanFileSystemForSongs(ScanProgressMonitor monitor)
+      throws SongScanFailedException {
+
+    return scanFileSystemForSongs();
   }
 
   @Override

@@ -216,6 +216,29 @@ public interface SongLibraryService {
   Integer scanFileSystemForSongs() throws SongScanFailedException;
 
   /**
+   * Same as {@link #scanFileSystemForSongs(ScanRequest)}, but reports progress to, and can be
+   * stopped or cancelled through, {@code monitor}.
+   *
+   * @return number of albums scanned
+   * @throws SongScanFailedException
+   * @throws com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanCancelledException if
+   *         the scan was cancelled through {@code monitor}; nothing is persisted in that case
+   */
+  Integer scanFileSystemForSongs(ScanRequest request, ScanProgressMonitor monitor)
+      throws SongScanFailedException;
+
+  /**
+   * Same as {@link #scanFileSystemForSongs()} (rescans this instance's current library root), but
+   * reports progress to, and can be stopped or cancelled through, {@code monitor}.
+   *
+   * @return number of albums scanned
+   * @throws SongScanFailedException
+   * @throws com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanCancelledException if
+   *         the scan was cancelled through {@code monitor}; nothing is persisted in that case
+   */
+  Integer scanFileSystemForSongs(ScanProgressMonitor monitor) throws SongScanFailedException;
+
+  /**
    * @return
    */
   Integer resetSongStatistics();

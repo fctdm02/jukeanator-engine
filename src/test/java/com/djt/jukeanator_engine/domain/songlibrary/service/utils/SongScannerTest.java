@@ -12,6 +12,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -21,21 +22,27 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanCancelledException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.FolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.service.ScanProgressMonitor;
+import com.djt.jukeanator_engine.domain.songlibrary.service.ScanProgressMonitor.Phase;
+import com.djt.jukeanator_engine.domain.songlibrary.service.ScanProgressMonitor.Progress;
 
 /**
  * @author tmyers
@@ -493,6 +500,103 @@ public class SongScannerTest {
     scanner.scanFileSystemForSongs(root.toString());
 
     verifyNoInteractions(discogsClientWrapper, musicBrainzClientWrapper, coverArtDownloader);
+  }
+
+  // =========================================================================================
+  // ScanProgressMonitor -- progress, stop and cancel
+  // =========================================================================================
+
+  @Test
+  public void scanFileSystemForSongsReportsDiscoveredAlbumAndSongCounts(@TempDir Path root)
+      throws IOException {
+
+    writeFile(root.resolve("ArtistA/AlbumA"), "ArtistA-01-SongOne.mp3");
+    writeFile(root.resolve("ArtistA/AlbumA"), "ArtistA-02-SongTwo.mp3");
+    writeFile(root.resolve("ArtistB/AlbumB"), "ArtistB-01-SongThree.mp3");
+
+    List<Progress> reports = new ArrayList<>();
+    SongScanner scanner = newScanner(false, true, false, false);
+    scanner.scanFileSystemForSongs(root.toString(), new ScanProgressMonitor(reports::add));
+
+    Progress last = reports.get(reports.size() - 1);
+    assertEquals(Phase.PROCESSING, last.phase());
+    assertEquals(2, last.albumsFound());
+    assertEquals(3, last.songsFound());
+    assertEquals(2, last.albumsProcessed());
+    assertTrue(reports.stream().anyMatch(p -> p.phase() == Phase.DISCOVERING));
+  }
+
+  @Test
+  public void scanFileSystemForSongsStopDuringDiscoveryKeepsAlbumsFoundSoFar(@TempDir Path root)
+      throws IOException {
+
+    writeFile(root.resolve("ArtistA/AlbumA"), "ArtistA-01-SongOne.mp3");
+    writeFile(root.resolve("ArtistB/AlbumB"), "ArtistB-01-SongTwo.mp3");
+
+    AtomicReference<ScanProgressMonitor> monitorRef = new AtomicReference<>();
+    ScanProgressMonitor monitor = new ScanProgressMonitor(progress -> {
+      if (progress.phase() == Phase.DISCOVERING && progress.albumsFound() == 1) {
+        monitorRef.get().requestStop();
+      }
+    });
+    monitorRef.set(monitor);
+
+    SongScanner scanner = newScanner(true, false, false);
+    RootFolderEntity result = scanner.scanFileSystemForSongs(root.toString(), monitor);
+
+    // Whichever artist folder was listed first is kept, fully processed; the other is never
+    // visited, and the slow tag/internet lookups are skipped for the kept album.
+    List<AlbumFolderEntity> albums = result.getAllAlbums();
+    assertEquals(1, albums.size());
+    assertNotNull(albums.get(0).getId());
+    assertNotNull(albums.get(0).getChildSongs().get(0).getId());
+    verifyNoInteractions(jAudioTaggerClient, discogsClientWrapper, musicBrainzClientWrapper,
+        coverArtDownloader);
+  }
+
+  @Test
+  public void scanFileSystemForSongsStopDuringProcessingSkipsLookupsForRemainingAlbums(
+      @TempDir Path root) throws IOException {
+
+    writeFile(root.resolve("ArtistA/AlbumA"), "ArtistA-01-SongOne.mp3");
+    writeFile(root.resolve("ArtistB/AlbumB"), "ArtistB-01-SongTwo.mp3");
+
+    AtomicReference<ScanProgressMonitor> monitorRef = new AtomicReference<>();
+    ScanProgressMonitor monitor = new ScanProgressMonitor(progress -> {
+      if (progress.phase() == Phase.PROCESSING && progress.albumsProcessed() == 1) {
+        monitorRef.get().requestStop();
+      }
+    });
+    monitorRef.set(monitor);
+
+    SongScanner scanner = newScanner(false, false, false);
+    RootFolderEntity result = scanner.scanFileSystemForSongs(root.toString(), monitor);
+
+    // Both albums are kept, but only the first one got an internet lookup.
+    assertEquals(2, result.getAllAlbums().size());
+    verify(musicBrainzClientWrapper, times(1)).searchForAlbumMetadata(anyString(), anyString(),
+        anyBoolean(), anyInt());
+  }
+
+  @Test
+  public void scanFileSystemForSongsThrowsWhenCancelled(@TempDir Path root) throws IOException {
+
+    writeFile(root.resolve("ArtistA/AlbumA"), "ArtistA-01-SongOne.mp3");
+    writeFile(root.resolve("ArtistB/AlbumB"), "ArtistB-01-SongTwo.mp3");
+
+    AtomicReference<ScanProgressMonitor> monitorRef = new AtomicReference<>();
+    ScanProgressMonitor monitor = new ScanProgressMonitor(progress -> {
+      if (progress.albumsFound() == 1) {
+        monitorRef.get().requestCancel();
+      }
+    });
+    monitorRef.set(monitor);
+
+    SongScanner scanner = newScanner(false, false, false);
+
+    assertThrows(SongScanCancelledException.class,
+        () -> scanner.scanFileSystemForSongs(root.toString(), monitor));
+    verifyNoInteractions(musicBrainzClientWrapper, coverArtDownloader);
   }
 
   @Test

@@ -17,6 +17,9 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.FolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.service.ScanProgressMonitor;
+import com.djt.jukeanator_engine.domain.songlibrary.service.ScanProgressMonitor.Phase;
+import com.djt.jukeanator_engine.domain.songlibrary.service.ScanProgressMonitor.Progress;
 
 /**
  * @author tmyers
@@ -41,6 +44,11 @@ public final class SongScanner {
   // whole location (not just within a type) -- see AbstractLibraryEntity.getPersistentIdentity(),
   // whose composite key relies on this. 1-based; reset at the top of each scan.
   private int nextId = 1;
+
+  // Per-scan progress reporting / stop / cancel; reset at the top of each scan.
+  private ScanProgressMonitor monitor = new ScanProgressMonitor();
+  private int albumsFound;
+  private int songsFound;
 
   public SongScanner(DiscogsClientWrapper discogsClientWrapper,
       MusicBrainzClientWrapper musicBrainzClientWrapper, JAudioTaggerClient jAudioTaggerClient,
@@ -71,6 +79,22 @@ public final class SongScanner {
   }
 
   public RootFolderEntity scanFileSystemForSongs(String rootPath) throws IOException {
+    return scanFileSystemForSongs(rootPath, new ScanProgressMonitor());
+  }
+
+  /**
+   * @param monitor receives progress updates, and is polled for stop/cancel requests -- see
+   *        {@link ScanProgressMonitor} for what each one does
+   * @throws com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanCancelledException if
+   *         the monitor's cancel was requested mid-scan
+   */
+  public RootFolderEntity scanFileSystemForSongs(String rootPath, ScanProgressMonitor monitor)
+      throws IOException {
+
+    requireNonNull(monitor, "monitor cannot be null");
+    this.monitor = monitor;
+    albumsFound = 0;
+    songsFound = 0;
 
     nextId = 1;
 
@@ -135,6 +159,16 @@ public final class SongScanner {
     for (int i = 0; i < albums.size(); i++) {
 
       AlbumFolderEntity album = albums.get(i);
+
+      monitor.throwIfCancelled();
+      monitor.report(new Progress(Phase.PROCESSING, albums.size(), songsFound, i,
+          album.getParentFolder().getName() + " - " + album.getName()));
+
+      // Once a stop is requested, the remaining albums are still kept, but only get the cheap
+      // in-memory processing below (ids, filename parsing, legacy metadata) -- the per-song tag
+      // reads and the internet lookups are what make a large scan take hours.
+      boolean skipSlowLookups = monitor.isStopRequested();
+
       album.setId(nextId++);
 
       GenreFolderEntity genre = album.getParentGenre();
@@ -199,13 +233,13 @@ public final class SongScanner {
           song.setTrackNumber(Integer.valueOf(j + 1));
         }
 
-        if (!hasValidCoverArt) {
+        if (!hasValidCoverArt && !skipSlowLookups) {
 
           this.jAudioTaggerClient.extractCoverArt(coverArtPath, songPathname);
           hasValidCoverArt = album.hasValidCoverArt();
         }
 
-        if (requiresMetadata && !hasValidMetadata) {
+        if (requiresMetadata && !hasValidMetadata && !skipSlowLookups) {
 
           Map<String, String> tags = this.jAudioTaggerClient.getTags(songPathname);
           if (tags != null && !tags.isEmpty()) {
@@ -243,7 +277,8 @@ public final class SongScanner {
       // Execute the post-processing track correction and compilation analysis
       album.postProcessSongs();
 
-      if (!disableInternetSearch && (!hasValidCoverArt || (requiresMetadata && !hasValidMetadata))) {
+      if (!disableInternetSearch && !skipSlowLookups
+          && (!hasValidCoverArt || (requiresMetadata && !hasValidMetadata))) {
 
         List<AlbumMetadataDto> albumMetadataResults = searchInternetForAlbumMetadata(album);
 
@@ -262,6 +297,9 @@ public final class SongScanner {
       }
 
     }
+
+    monitor.throwIfCancelled();
+    monitor.report(new Progress(Phase.PROCESSING, albums.size(), songsFound, albums.size(), ""));
 
     return rootFolder;
   }
@@ -292,6 +330,8 @@ public final class SongScanner {
 
   private void process(FolderEntity parentFolder) {
 
+    monitor.throwIfCancelled();
+
     List<String> songFilenames = new ArrayList<>();
     File parentFile = new File(parentFolder.getNaturalIdentity());
 
@@ -310,6 +350,13 @@ public final class SongScanner {
         boolean isHidden = child.isHidden();
 
         if (!isHidden && child.isDirectory()) {
+
+          // On stop, descend no further, but keep collecting this folder's own song files so an
+          // album folder that also has subfolders is never kept with only some of its songs.
+          if (monitor.isStopRequested()) {
+            continue;
+          }
+
           try {
             // SKIP CHILD DIRECTORY IF IT CONTAINS ignore.me
             File childIgnoreMarker = new File(child, IGNORE_MARKER_FILENAME);
@@ -340,7 +387,12 @@ public final class SongScanner {
 
     if (!songFilenames.isEmpty()) {
       parentFolder.getParentFolder().convertChildFolderToAlbumFolder(parentFolder, songFilenames);
+      albumsFound++;
+      songsFound += songFilenames.size();
     }
+
+    monitor.report(new Progress(Phase.DISCOVERING, albumsFound, songsFound, 0,
+        parentFile.getAbsolutePath()));
   }
 
   private String getFileExtension(File file) {

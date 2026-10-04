@@ -974,11 +974,25 @@ public class SongLibraryServiceImpl
   @Override
   public Integer scanFileSystemForSongs() throws SongScanFailedException {
 
-    return scanFileSystemForSongs(new ScanRequest(this.ownRoot.getRootPath()));
+    return scanFileSystemForSongs(new ScanProgressMonitor());
+  }
+
+  @Override
+  public Integer scanFileSystemForSongs(ScanProgressMonitor monitor)
+      throws SongScanFailedException {
+
+    return scanFileSystemForSongs(new ScanRequest(this.ownRoot.getRootPath()), monitor);
   }
 
   @Override
   public Integer scanFileSystemForSongs(ScanRequest scanRequest) throws SongScanFailedException {
+
+    return scanFileSystemForSongs(scanRequest, new ScanProgressMonitor());
+  }
+
+  @Override
+  public Integer scanFileSystemForSongs(ScanRequest scanRequest, ScanProgressMonitor monitor)
+      throws SongScanFailedException {
 
     requireNotMaster();
 
@@ -989,7 +1003,17 @@ public class SongLibraryServiceImpl
       // Scan the file system for songs
       this.ownRoot.storeSongStatistics(this.dataDir);
 
-      RootFolderEntity scannedRoot = songScanner.scanFileSystemForSongs(scanPath);
+      RootFolderEntity scannedRoot = songScanner.scanFileSystemForSongs(scanPath, monitor);
+
+      // Last chance to cancel: from here on the scanned library replaces the current one.
+      monitor.throwIfCancelled();
+      // (getAlbums()/getSongs() aren't populated until initialize(), hence getAllAlbums().)
+      List<AlbumFolderEntity> scannedAlbums = scannedRoot.getAllAlbums();
+      int scannedSongCount =
+          scannedAlbums.stream().mapToInt(album -> album.getChildSongs().size()).sum();
+      monitor.report(new ScanProgressMonitor.Progress(ScanProgressMonitor.Phase.SAVING,
+          scannedAlbums.size(), scannedSongCount, scannedAlbums.size(), ""));
+
       // SongScanner has no notion of LocationEntity -- wire it here so SongLibraryRepositoryJpaImpl
       // (which sources location_id from this) can persist the freshly-scanned tree.
       scannedRoot.setParentLocation(this.ownLocation);

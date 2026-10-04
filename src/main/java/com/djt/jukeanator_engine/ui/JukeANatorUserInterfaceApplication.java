@@ -102,35 +102,42 @@ public class JukeANatorUserInterfaceApplication {
 
     log.info("JukeANator UI launched: fetching library data in background");
 
-    SwingSecurityUtil.runAsync(() -> {
+    SwingSecurityUtil.runAsync(this::loadInitialData).exceptionally(t -> {
+      // CompletableFuture would otherwise swallow this silently -- and with it the bringToFront()
+      // calls below, leaving the UI possibly hidden behind the console with nothing in the log.
+      log.error("JukeANator UI: initial data load failed", t);
+      return null;
+    });
+  }
 
-      Integer          locationId  = songLibraryService.getOwnLocationId();
-      List<AlbumDto>   albums      = songLibraryService.getAlbums(locationId);
-      int              artistCount = songLibraryService.getArtists(locationId).size();
-      var              genres      = songLibraryService.getGenres(locationId);
-      var              playing     = songPlayerService.getNowPlayingSong(locationId);
-      var              queue       = songQueueService.getQueuedSongs(locationId);
+  private void loadInitialData() {
 
-      SwingUtilities.invokeLater(() -> {
-        frame.setAlbums(albums, artistCount);
-        frame.setGenres(genres);
-        frame.setNowPlaying(playing);
-        frame.setQueue(queue);
+    Integer          locationId  = songLibraryService.getOwnLocationId();
+    List<AlbumDto>   albums      = songLibraryService.getAlbums(locationId);
+    int              artistCount = songLibraryService.getArtists(locationId).size();
+    var              genres      = songLibraryService.getGenres(locationId);
+    var              playing     = songPlayerService.getNowPlayingSong(locationId);
+    var              queue       = songQueueService.getQueuedSongs(locationId);
 
-        // Grab native OS foreground and keyboard focus now that the UI is fully initialized
-        // with real data, so the UI (or, on first use, the scan dialog) is not left behind the
-        // command prompt or Winamp, and hardware inputs (e.g. the bill acceptor's 'a'
-        // keystroke) work immediately without the operator having to click the screen first.
-        frame.bringToFront();
+    SwingUtilities.invokeLater(() -> {
+      frame.setAlbums(albums, artistCount);
+      frame.setGenres(genres);
+      frame.setNowPlaying(playing);
+      frame.setQueue(queue);
 
-        // Once more after a short delay, in case another window (e.g. Winamp, or the console
-        // finishing its startup output) took the foreground after the data load completed.
-        javax.swing.Timer reRaiseTimer = new javax.swing.Timer(3_000, e -> frame.bringToFront());
-        reRaiseTimer.setRepeats(false);
-        reRaiseTimer.start();
+      // Grab native OS foreground and keyboard focus now that the UI is fully initialized
+      // with real data, so the UI (or, on first use, the scan dialog) is not left behind the
+      // command prompt or Winamp, and hardware inputs (e.g. the bill acceptor's 'a'
+      // keystroke) work immediately without the operator having to click the screen first.
+      frame.bringToFront();
 
-        log.info("JukeANator UI: data load complete");
-      });
+      // Once more after a short delay, in case another window (e.g. Winamp, or the console
+      // finishing its startup output) took the foreground after the data load completed.
+      javax.swing.Timer reRaiseTimer = new javax.swing.Timer(3_000, e -> frame.bringToFront());
+      reRaiseTimer.setRepeats(false);
+      reRaiseTimer.start();
+
+      log.info("JukeANator UI: data load complete");
     });
   }
 }

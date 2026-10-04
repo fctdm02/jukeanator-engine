@@ -24,6 +24,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -41,6 +42,7 @@ import javax.swing.JLayeredPane;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
+import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
@@ -50,6 +52,8 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanCancelledException;
+import com.djt.jukeanator_engine.domain.songlibrary.service.ScanProgressMonitor;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
@@ -580,8 +584,11 @@ public class AdminPanel extends JPanel {
    * then kicks off a scan against the selected path. Invoked automatically at startup (via
    * {@link JukeANatorFrame#promptForInitialLibraryScan()}) when no persisted song library could be
    * loaded, so the operator can point the app at a music folder on first use.
+   *
+   * @param firstTimeUse true when there is no song library yet; cancelling either the directory
+   *        chooser or the scan then exits the application instead of returning to the Admin panel
    */
-  public void showScanFileSystemDialog() {
+  public void showScanFileSystemDialog(boolean firstTimeUse) {
 
     // On Windows, keep the chooser's dialog always-on-top and raise it once shown. On first use
     // this dialog appears during startup, when Windows may still be keeping the launching command
@@ -614,37 +621,311 @@ public class AdminPanel extends JPanel {
     chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
     chooser.setAcceptAllFileFilterUsed(false);
 
-    if (chooser.showDialog(this, "Scan") != JFileChooser.APPROVE_OPTION)
+    if (chooser.showDialog(this, "Scan") != JFileChooser.APPROVE_OPTION) {
+      // With no library to fall back on, there is nothing useful to do without a music folder.
+      if (firstTimeUse) {
+        System.exit(0);
+      }
       return;
+    }
 
     String scanPath = chooser.getSelectedFile().getAbsolutePath();
 
-    SwingSecurityUtil.runAsync(() -> {
-      try {
-        songLibraryService.scanFileSystemForSongs(new ScanRequest(scanPath));
-        SwingUtilities.invokeLater(() -> {
-          refreshAlbumList();
-          showOverlayMessage("Scan Complete", "Scanned " + scanPath, ColorTheme.get().accentGreen);
-        });
-      } catch (Exception ex) {
-        ex.printStackTrace();
-        SwingUtilities.invokeLater(() -> showOverlayMessage("Scan Failed",
-            "Could not scan: " + ex.getMessage(), ColorTheme.get().accentRed));
-      }
-    });
+    new ScanProgressForm(scanPath, firstTimeUse).start();
   }
 
   private void doRescan() {
 
-    showOverlayConfirm("Rescan Library", "Rescan the song library? This may take a moment.",
-        ColorTheme.get().accentViolet, () -> SwingSecurityUtil.runAsync(() -> {
-          try {
-            songLibraryService.scanFileSystemForSongs();
-            SwingUtilities.invokeLater(this::refreshAlbumList);
-          } catch (Exception ex) {
-            ex.printStackTrace();
-          }
-        }));
+    showOverlayConfirm("Rescan Library", "Rescan the song library? This may take a while.",
+        ColorTheme.get().accentViolet, () -> new ScanProgressForm(null, false).start());
+  }
+
+  /**
+   * In-window progress card shown for the whole of a file-system scan, which can run from minutes
+   * to hours depending on library size and how many albums need an internet lookup. Shows an
+   * indeterminate progress bar (the tree is walked recursively, so there's no cheap up-front total)
+   * plus running album/song counts, and offers:
+   * <ul>
+   * <li><b>Stop</b> -- end the scan early but keep every album found so far (see
+   * {@link ScanProgressMonitor}).</li>
+   * <li><b>Cancel</b> -- discard the scan entirely, leaving the existing library untouched; on
+   * first-time use (no library at all) this exits the application, since the operator presumably
+   * needs to put music on the file system before trying again.</li>
+   * </ul>
+   * Shown via {@link #showOverlayForm} rather than a separate {@code JDialog} window -- see
+   * {@link #overlayCard}.
+   */
+  private class ScanProgressForm {
+
+    private static final int REFRESH_INTERVAL_MILLIS = 200;
+    private static final int MAX_CURRENT_ITEM_CHARS = 70;
+
+    /** null means rescan this instance's current library root. */
+    private final String scanPath;
+    private final boolean firstTimeUse;
+
+    // Written by the scan thread, read by the EDT timer below -- discovery can report thousands
+    // of updates per second, so only the latest snapshot is kept and painted a few times a second.
+    private final AtomicReference<ScanProgressMonitor.Progress> latestProgress =
+        new AtomicReference<>();
+    private final ScanProgressMonitor monitor = new ScanProgressMonitor(latestProgress::set);
+    private final javax.swing.Timer refreshTimer =
+        new javax.swing.Timer(REFRESH_INTERVAL_MILLIS, e -> refresh());
+
+    private final JLabel statusLabel = new JLabel("Starting scan...");
+    private final JLabel albumsLabel = new JLabel();
+    private final JLabel songsLabel = new JLabel();
+    private final JLabel currentItemLabel = new JLabel(" ");
+    private final JButton stopBtn = new JButton("Stop");
+    private final JButton cancelBtn = new JButton("Cancel");
+    private final JPanel content = new JPanel(new BorderLayout(0, 16));
+
+    ScanProgressForm(String scanPath, boolean firstTimeUse) {
+
+      this.scanPath = scanPath;
+      this.firstTimeUse = firstTimeUse;
+
+      content.setOpaque(false);
+
+      JLabel title = new JLabel(firstTimeUse ? "Building Song Library" : "Scanning Song Library");
+      title.setForeground(ColorTheme.get().accentViolet);
+      title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+      content.add(title, BorderLayout.NORTH);
+
+      content.add(buildBody(), BorderLayout.CENTER);
+      content.add(buildButtonRow(), BorderLayout.SOUTH);
+
+      updateCounts(0, 0);
+    }
+
+    void start() {
+
+      showOverlayForm(ColorTheme.get().accentViolet, content);
+      refreshTimer.start();
+
+      // This card is painted inside the frame, not in a window of its own. The directory chooser
+      // that precedes it is a separate, forced-to-the-foreground window (see
+      // showScanFileSystemDialog), and once it closes Windows does not reliably hand the
+      // foreground back to the full-screen frame -- on first use it can fall back to the console
+      // that launched the app, leaving this card hidden. Re-raise the frame so it is visible.
+      raiseFrame();
+
+      SwingSecurityUtil.runAsync(() -> {
+        try {
+          Integer albumCount = scanPath == null
+              ? songLibraryService.scanFileSystemForSongs(monitor)
+              : songLibraryService.scanFileSystemForSongs(new ScanRequest(scanPath), monitor);
+          SwingUtilities.invokeLater(() -> onScanSucceeded(albumCount));
+
+        } catch (SongScanCancelledException ex) {
+          SwingUtilities.invokeLater(this::onScanCancelled);
+
+        } catch (Exception ex) {
+          ex.printStackTrace();
+          SwingUtilities.invokeLater(() -> {
+            refreshTimer.stop();
+            hideOverlay();
+            showOverlayMessage("Scan Failed", "Could not scan: " + ex.getMessage(),
+                ColorTheme.get().accentRed);
+          });
+        }
+      });
+    }
+
+    private JPanel buildBody() {
+
+      JPanel body = new JPanel();
+      body.setOpaque(false);
+      body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+
+      Font labelFont = new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum);
+      Font countFont = new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist);
+
+      if (scanPath != null) {
+        body.add(leftAligned(newLabel("Folder: " + abbreviate(scanPath), labelFont,
+            ColorTheme.get().textSecondary)));
+        body.add(Box.createVerticalStrut(10));
+      }
+
+      styleLabel(statusLabel, labelFont, ColorTheme.get().textPrimary);
+      body.add(leftAligned(statusLabel));
+      body.add(Box.createVerticalStrut(10));
+
+      JProgressBar progressBar = new JProgressBar();
+      progressBar.setIndeterminate(true);
+      progressBar.setForeground(ColorTheme.get().accentViolet);
+      progressBar.setBackground(ColorTheme.get().bgFieldDark);
+      progressBar.setBorder(BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1));
+      progressBar.setPreferredSize(new Dimension(480, 16));
+      progressBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 16));
+      body.add(leftAligned(progressBar));
+      body.add(Box.createVerticalStrut(12));
+
+      styleLabel(albumsLabel, countFont, ColorTheme.get().textPrimary);
+      styleLabel(songsLabel, countFont, ColorTheme.get().textPrimary);
+      body.add(leftAligned(albumsLabel));
+      body.add(Box.createVerticalStrut(4));
+      body.add(leftAligned(songsLabel));
+      body.add(Box.createVerticalStrut(10));
+
+      styleLabel(currentItemLabel, labelFont, ColorTheme.get().textSecondary);
+      body.add(leftAligned(currentItemLabel));
+      body.add(Box.createVerticalStrut(14));
+
+      String hint = firstTimeUse
+          ? "Stop keeps the songs scanned so far. Cancel discards the scan and exits JukeANator."
+          : "Stop keeps the songs scanned so far. Cancel discards the scan and keeps the current library.";
+      body.add(leftAligned(newLabel(hint, labelFont, ColorTheme.get().textSecondary)));
+
+      return body;
+    }
+
+    private JPanel buildButtonRow() {
+
+      styleOverlayButton(stopBtn);
+      stopBtn.addActionListener(e -> {
+        monitor.requestStop();
+        stopBtn.setEnabled(false);
+        refresh();
+      });
+
+      styleOverlayButton(cancelBtn);
+      cancelBtn.addActionListener(e -> {
+        monitor.requestCancel();
+        stopBtn.setEnabled(false);
+        cancelBtn.setEnabled(false);
+        refresh();
+      });
+
+      JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
+      row.setOpaque(false);
+      row.add(stopBtn);
+      row.add(cancelBtn);
+      return row;
+    }
+
+    /** Repaints the card from the latest snapshot; runs on the EDT via {@link #refreshTimer}. */
+    private void refresh() {
+
+      ScanProgressMonitor.Progress progress = latestProgress.get();
+
+      if (monitor.isCancelRequested()) {
+        statusLabel.setText("Cancelling... (waiting for the current step to finish)");
+      }
+
+      if (progress == null) {
+        return;
+      }
+
+      updateCounts(progress.albumsFound(), progress.songsFound());
+      currentItemLabel.setText(abbreviate(progress.currentItem()));
+
+      if (progress.phase() == ScanProgressMonitor.Phase.SAVING) {
+        statusLabel.setText("Saving the song library...");
+        stopBtn.setEnabled(false);
+        cancelBtn.setEnabled(false);
+        return;
+      }
+
+      if (monitor.isCancelRequested()) {
+        return;
+      }
+
+      String albumsOfTotal = String.format("%,d of %,d albums", progress.albumsProcessed(),
+          progress.albumsFound());
+
+      if (monitor.isStopRequested()) {
+        statusLabel.setText(progress.phase() == ScanProgressMonitor.Phase.PROCESSING
+            ? "Stopping... finishing up the albums found so far (" + albumsOfTotal + ")"
+            : "Stopping... finishing up the albums found so far");
+      } else if (progress.phase() == ScanProgressMonitor.Phase.DISCOVERING) {
+        statusLabel.setText("Scanning folders for songs...");
+      } else {
+        statusLabel.setText("Reading tags and looking up cover art / album info ("
+            + albumsOfTotal + ")");
+      }
+    }
+
+    private void onScanSucceeded(Integer albumCount) {
+
+      refreshTimer.stop();
+      hideOverlay();
+      refreshAlbumList();
+
+      ScanProgressMonitor.Progress progress = latestProgress.get();
+      int songCount = progress != null ? progress.songsFound() : 0;
+      String counts = String.format("%,d albums (%,d songs)",
+          albumCount != null ? albumCount : 0, songCount);
+
+      if (monitor.isCancelRequested()) {
+        showOverlayMessage("Scan Complete",
+            "The scan finished saving before it could be cancelled. Loaded " + counts + ".",
+            ColorTheme.get().accentOrange);
+      } else if (monitor.isStopRequested()) {
+        showOverlayMessage("Scan Stopped", "Kept the " + counts + " found before the scan was "
+            + "stopped. Cover art and album info that were not looked up can be filled in by a "
+            + "later rescan.", ColorTheme.get().accentOrange);
+      } else {
+        showOverlayMessage("Scan Complete", "Loaded " + counts + ".",
+            ColorTheme.get().accentGreen);
+      }
+
+      // A first-time scan can run for hours, during which the operator may well have switched to
+      // another window; make sure the result (and the now-loaded jukebox) is what they come back to.
+      if (firstTimeUse) {
+        raiseFrame();
+      }
+    }
+
+    private void raiseFrame() {
+      if (ownerFrame instanceof JukeANatorFrame frame) {
+        SwingUtilities.invokeLater(frame::bringToFront);
+      }
+    }
+
+    private void onScanCancelled() {
+
+      refreshTimer.stop();
+
+      if (firstTimeUse) {
+        System.exit(0);
+        return;
+      }
+
+      hideOverlay();
+      showOverlayMessage("Scan Cancelled", "No changes were made to the song library.",
+          ColorTheme.get().accentOrange);
+    }
+
+    private void updateCounts(int albums, int songs) {
+      albumsLabel.setText(String.format("Albums scanned:  %,d", albums));
+      songsLabel.setText(String.format("Songs scanned:  %,d", songs));
+    }
+
+    /** Keeps the end of long folder paths, which is the part that changes. */
+    private String abbreviate(String text) {
+      if (text == null || text.isBlank()) {
+        return " ";
+      }
+      return text.length() <= MAX_CURRENT_ITEM_CHARS ? text
+          : "..." + text.substring(text.length() - MAX_CURRENT_ITEM_CHARS + 3);
+    }
+
+    private JLabel newLabel(String text, Font font, Color color) {
+      JLabel label = new JLabel(text);
+      styleLabel(label, font, color);
+      return label;
+    }
+
+    private void styleLabel(JLabel label, Font font, Color color) {
+      label.setFont(font);
+      label.setForeground(color);
+    }
+
+    private JComponent leftAligned(JComponent component) {
+      component.setAlignmentX(Component.LEFT_ALIGNMENT);
+      return component;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────

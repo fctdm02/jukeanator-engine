@@ -33,6 +33,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
+import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanCancelledException;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.FolderEntity;
@@ -230,7 +231,7 @@ public class SongLibraryServiceImplTest {
     RootFolderEntity scannedRoot = buildSmallRoot("/scan/path", "Scanned Album");
     RootFolderEntity rehydratedRoot = buildSmallRoot("/scan/path", "Different Album");
 
-    when(songScanner.scanFileSystemForSongs(anyString())).thenReturn(scannedRoot);
+    when(songScanner.scanFileSystemForSongs(anyString(), any())).thenReturn(scannedRoot);
     // doReturn(...).when(...), not when(...).thenReturn(...) -- the mock is already stubbed (in
     // newScanService) to throw for loadAggregateRoot(anyInt()), and when(...) would actually
     // invoke that existing stub while setting up this one, throwing before .thenReturn() ever
@@ -259,7 +260,7 @@ public class SongLibraryServiceImplTest {
     RootFolderEntity scannedRoot = buildSmallRoot("/scan/path", "Same Album");
     RootFolderEntity rehydratedRoot = buildSmallRoot("/scan/path", "Same Album");
 
-    when(songScanner.scanFileSystemForSongs(anyString())).thenReturn(scannedRoot);
+    when(songScanner.scanFileSystemForSongs(anyString(), any())).thenReturn(scannedRoot);
     // doReturn(...).when(...), not when(...).thenReturn(...) -- the mock is already stubbed (in
     // newScanService) to throw for loadAggregateRoot(anyInt()), and when(...) would actually
     // invoke that existing stub while setting up this one, throwing before .thenReturn() ever
@@ -287,7 +288,7 @@ public class SongLibraryServiceImplTest {
     RootFolderEntity scannedRoot = buildSmallRoot("/scan/path", "Scanned Album");
     RootFolderEntity mismatchedRoot = buildSmallRoot("/scan/path", "Totally Different Album");
 
-    when(songScanner.scanFileSystemForSongs(anyString())).thenReturn(scannedRoot);
+    when(songScanner.scanFileSystemForSongs(anyString(), any())).thenReturn(scannedRoot);
     // Even though this would diverge from scannedRoot, the check must never run for the
     // filesystem backend, so loadAggregateRoot should never even be consulted for this purpose.
     doReturn(mismatchedRoot).when(songLibraryRepository).loadAggregateRoot(1);
@@ -295,6 +296,34 @@ public class SongLibraryServiceImplTest {
     assertDoesNotThrow(() -> service.scanFileSystemForSongs(new ScanRequest("/scan/path")));
 
     verify(eventPublisher).publishEvent(any(ScanFileSystemForSongsEvent.class));
+  }
+
+  @Test
+  void scanFileSystemForSongs_persistsNothing_whenCancelled(@TempDir Path tempDir)
+      throws Exception {
+
+    SongLibraryRepository songLibraryRepository = mock(SongLibraryRepository.class);
+    LocationService locationService = mock(LocationService.class);
+    SongScanner songScanner = mock(SongScanner.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    LocationEntity ownLocation = new LocationEntity(1, "Test Location", null, null, "hash");
+
+    SongLibraryServiceImpl service = newScanService("filesystem", tempDir.toString(),
+        songLibraryRepository, locationService, songScanner, eventPublisher, ownLocation);
+
+    RootFolderEntity scannedRoot = buildSmallRoot("/scan/path", "Scanned Album");
+
+    // Cancel arrives just as the scanner finishes -- the service's own last check must catch it.
+    when(songScanner.scanFileSystemForSongs(anyString(), any())).thenAnswer(invocation -> {
+      invocation.<ScanProgressMonitor>getArgument(1).requestCancel();
+      return scannedRoot;
+    });
+
+    assertThrows(SongScanCancelledException.class, () -> service
+        .scanFileSystemForSongs(new ScanRequest("/scan/path"), new ScanProgressMonitor()));
+
+    verify(songLibraryRepository, never()).storeAggregateRoot(any());
+    verify(eventPublisher, never()).publishEvent(any(ScanFileSystemForSongsEvent.class));
   }
 
   // ─────────────────────────────────────────────────────────────────────────
