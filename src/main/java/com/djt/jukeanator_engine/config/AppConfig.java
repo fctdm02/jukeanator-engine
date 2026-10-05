@@ -318,14 +318,16 @@ public class AppConfig {
       SongQueueService songQueueService,
       MasterVolumeService masterVolumeService,
       LineInService lineInService,
-      ApplicationEventPublisher eventPublisher) {
+      ApplicationEventPublisher eventPublisher,
+      org.springframework.core.env.Environment environment) {
 
     return new SongPlayerServiceImpl(
         songPlayerProperties,
         songQueueService,
         masterVolumeService,
         lineInService,
-        eventPublisher);
+        eventPublisher,
+        ExternalConfigUpdater.resolveExternalConfigFile(environment));
   }
 
   @Bean(name = "songPlayerService")

@@ -106,6 +106,10 @@ public final class ExternalConfigInitializer {
   // Single-quoted YAML scalar: unlike double-quoted, it treats backslashes literally, so a
   // Windows path needs no escaping -- only an embedded ' has to be doubled.
   private static String toYamlScalar(Path path) {
-    return "'" + path.toAbsolutePath().toString().replace("'", "''") + "'";
+    return toYamlScalar(path.toAbsolutePath().toString());
+  }
+
+  static String toYamlScalar(String value) {
+    return "'" + value.replace("'", "''") + "'";
   }
 }

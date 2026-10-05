@@ -190,21 +190,14 @@ public class WinampMediaPlayer implements Player {
    */
   public WinampMediaPlayer(String winampExePath, int initialVolume) {
 
-    File file = new File(winampExePath);
-    if (!file.exists()) {
-      file = new File(DEFAULT_WINAMP_EXE_PATH);
-      if (!file.exists()) {
-        File appDirFile = resolveAppDirWinampExe();
-        if (appDirFile != null && appDirFile.exists()) {
-          file = appDirFile;
-        } else {
-          throw new RuntimeException("Cannot find winamp.exe at configured location: ["
-              + winampExePath + "], at default location: [" + DEFAULT_WINAMP_EXE_PATH
-              + "], nor alongside the application at: ["
-              + (appDirFile != null ? appDirFile.getPath() : "<unresolvable>")
-              + "].  Please install Winamp and specify location in application.yml");
-        }
-      }
+    File file = findWinampExe(winampExePath);
+    if (file == null) {
+      File appDirFile = resolveAppDirWinampExe();
+      throw new RuntimeException("Cannot find winamp.exe at configured location: ["
+          + winampExePath + "], at default location: [" + DEFAULT_WINAMP_EXE_PATH
+          + "], nor alongside the application at: ["
+          + (appDirFile != null ? appDirFile.getPath() : "<unresolvable>")
+          + "].  Please install Winamp and specify location in application.yml");
     }
 
     this.winampExePath = file.getPath();
@@ -238,6 +231,32 @@ public class WinampMediaPlayer implements Player {
       Thread.currentThread().interrupt();
       throw new RuntimeException("Interrupted while launching winamp.exe at startup", e);
     }
+  }
+
+  /**
+   * Locates winamp.exe, checking (in order) the configured path, {@link #DEFAULT_WINAMP_EXE_PATH},
+   * and a {@code Winamp\winamp.exe} sibling of the running application archive.
+   *
+   * @param configuredPath the configured {@code song-player.winamp-exe-path}, may be {@code null}
+   * @return the first location that exists, or {@code null} if winamp.exe cannot be found
+   */
+  public static File findWinampExe(String configuredPath) {
+
+    if (configuredPath != null && !configuredPath.isBlank()) {
+      File configured = new File(configuredPath);
+      if (configured.isFile()) {
+        return configured;
+      }
+    }
+    File defaultFile = new File(DEFAULT_WINAMP_EXE_PATH);
+    if (defaultFile.isFile()) {
+      return defaultFile;
+    }
+    File appDirFile = resolveAppDirWinampExe();
+    if (appDirFile != null && appDirFile.isFile()) {
+      return appDirFile;
+    }
+    return null;
   }
 
   /**

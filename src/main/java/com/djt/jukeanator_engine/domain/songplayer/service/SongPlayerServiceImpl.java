@@ -1,6 +1,8 @@
 package com.djt.jukeanator_engine.domain.songplayer.service;
 
 import static java.util.Objects.requireNonNull;
+import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.ExecutorService;
@@ -13,6 +15,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.djt.jukeanator_engine.config.ExternalConfigUpdater;
 import com.djt.jukeanator_engine.domain.common.security.SecurityContextPropagatingRunnable;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
@@ -99,9 +102,15 @@ public class SongPlayerServiceImpl implements SongPlayerService {
    */
   private volatile boolean queueLocked = false;
 
+  /**
+   * @param externalConfigFile the external {@code application.yml} the app was started with (see
+   *        {@link ExternalConfigUpdater#resolveExternalConfigFile}), updated if VLC fails to
+   *        initialize on Windows and Winamp is used instead; may be {@code null}
+   */
   public SongPlayerServiceImpl(SongPlayerProperties songPlayerProperties,
       SongQueueService songQueueService, MasterVolumeService masterVolumeService,
-      LineInService lineInService, ApplicationEventPublisher eventPublisher) {
+      LineInService lineInService, ApplicationEventPublisher eventPublisher,
+      Path externalConfigFile) {
 
     requireNonNull(songPlayerProperties, "songPlayerProperties cannot be null");
     requireNonNull(songQueueService, "songQueueService cannot be null");
@@ -109,30 +118,17 @@ public class SongPlayerServiceImpl implements SongPlayerService {
     requireNonNull(lineInService, "lineInService cannot be null");
     requireNonNull(eventPublisher, "eventPublisher cannot be null");
 
-    this.playerType = songPlayerProperties.getPlayerType();
     this.playerVolume = songPlayerProperties.getPlayerVolume();
     this.masterVolume = songPlayerProperties.getMasterVolume();
-    
+
     this.songQueueService = songQueueService;
     this.masterVolumeService = masterVolumeService;
     this.lineInService = lineInService;
     this.eventPublisher = eventPublisher;
 
-    OSType osType = OperatingSystemDetector.getOperatingSystem();
-    if (this.playerType.equals("winamp") && osType == OSType.WINDOWS) {
-
-      String winampPath = songPlayerProperties.getWinampExePath();
-      this.player = new WinampMediaPlayer(winampPath, this.playerVolume);
-
-    } else if (this.playerType.equals("video-vlc")) {
-
-      this.player = new VideoVlcMediaPlayer(this.playerVolume);
-
-    } else {
-
-      this.player = new VlcMediaPlayer(this.playerVolume);
-
-    }
+    this.player = createPlayer(songPlayerProperties, externalConfigFile);
+    // Read back after createPlayer(), which may have switched it to "winamp".
+    this.playerType = songPlayerProperties.getPlayerType();
 
     initialize();
 
@@ -147,6 +143,53 @@ public class SongPlayerServiceImpl implements SongPlayerService {
      * thread.
      */
     this.player.setOnFinished(this::submitQueueProcessing);
+  }
+
+  /**
+   * Creates the configured {@link Player}. On Windows, if a VLC-based player cannot be initialized
+   * (e.g. VLC is not installed) but winamp.exe can be found, falls back to
+   * {@link WinampMediaPlayer} and persists {@code player-type: winamp} and the located
+   * {@code winamp-exe-path} to the external config so subsequent startups use Winamp directly.
+   */
+  private Player createPlayer(SongPlayerProperties songPlayerProperties, Path externalConfigFile) {
+
+    String configuredPlayerType = songPlayerProperties.getPlayerType();
+    OSType osType = OperatingSystemDetector.getOperatingSystem();
+    if (configuredPlayerType.equals("winamp") && osType == OSType.WINDOWS) {
+
+      String winampPath = songPlayerProperties.getWinampExePath();
+      return new WinampMediaPlayer(winampPath, this.playerVolume);
+    }
+
+    try {
+
+      if (configuredPlayerType.equals("video-vlc")) {
+        return new VideoVlcMediaPlayer(this.playerVolume);
+      }
+      return new VlcMediaPlayer(this.playerVolume);
+
+    } catch (RuntimeException | LinkageError vlcError) {
+
+      if (osType != OSType.WINDOWS) {
+        throw vlcError;
+      }
+      File winampExe = WinampMediaPlayer.findWinampExe(songPlayerProperties.getWinampExePath());
+      if (winampExe == null) {
+        throw vlcError;
+      }
+
+      String winampPath = winampExe.getAbsolutePath();
+      log.warn("Unable to initialize VLC (player-type: {}); falling back to Winamp at {}",
+          configuredPlayerType, winampPath, vlcError);
+
+      Player winampPlayer = new WinampMediaPlayer(winampPath, this.playerVolume);
+
+      songPlayerProperties.setPlayerType("winamp");
+      songPlayerProperties.setWinampExePath(winampPath);
+      ExternalConfigUpdater.persistWinampFallback(externalConfigFile, winampPath);
+
+      return winampPlayer;
+    }
   }
 
   private void initialize() {
