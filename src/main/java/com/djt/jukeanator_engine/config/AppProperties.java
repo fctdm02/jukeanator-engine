@@ -38,6 +38,11 @@ public class AppProperties {
   private Integer locationId; // slave-only: this slave's own initial guess at its locationId
   private String locationApiKey; // slave-only: secret issued at provisioning
 
+  // slave-only, local/testing only -- never true in production. A slave never charges web users
+  // (credits are master's), so it refuses a non-admin web user's queue operations on its own
+  // /api/locations/{id}/song-queue endpoints; true lets them through, uncharged.
+  private boolean allowSlaveUrlQueueOperations = false;
+
   private Jwt jwt = new Jwt();
   private Logging logging = new Logging();
 
@@ -99,6 +104,14 @@ public class AppProperties {
 
   public void setDataDir(String dataDir) {
     this.dataDir = dataDir;
+  }
+
+  public boolean isAllowSlaveUrlQueueOperations() {
+    return allowSlaveUrlQueueOperations;
+  }
+
+  public void setAllowSlaveUrlQueueOperations(boolean allowSlaveUrlQueueOperations) {
+    this.allowSlaveUrlQueueOperations = allowSlaveUrlQueueOperations;
   }
 
   public String getRepositoryType() {

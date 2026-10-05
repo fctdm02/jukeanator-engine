@@ -24,6 +24,7 @@ import com.djt.jukeanator_engine.domain.user.dto.PricingConfigDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
+import com.djt.jukeanator_engine.domain.user.exception.InsufficientCreditsException;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 
 /**
@@ -100,7 +101,12 @@ public interface UserService {
   void changePassword(String emailAddress, ChangePasswordRequest request);
 
   /**
-   * 
+   * Closes the account: the user can no longer log in, and the email address is free to register
+   * again. The user's Add Funds transactions and song-credit usages are financial records, so they
+   * are retained -- the account is anonymized (name, email, password, search/play history and
+   * playlists cleared) rather than deleted, which keeps every location's mobile revenue and every
+   * Braintree charge reconcilable.
+   *
    * @param emailAddress
    */
   void deleteAccount(String emailAddress);
@@ -237,6 +243,8 @@ public interface UserService {
       throws EntityDoesNotExistException;
 
   /**
+   * Charges a web user for a song this instance added to its own queue, tagging the ledger entry
+   * with this instance's own location id.
    *
    * @param event
    */
@@ -282,10 +290,34 @@ public interface UserService {
   void chargeCreditsForQueueAction(String emailAddress, Integer priority, Integer locationId);
 
   /**
+   * Refuses a queue add the web user cannot afford at {@code locationId}'s pricing -- the same cost
+   * {@link #handleSongAddedToQueueEvent(SongAddedToQueueEvent, Integer)} would charge. Must be
+   * called before the song is queued (or forwarded to a slave), so an unaffordable add never
+   * reaches the queue. In slave mode, where web users are never charged, it instead refuses every
+   * web user but an admin with {@code QueueAccessDeniedException} -- patrons queue through master.
+   *
+   * @throws InsufficientCreditsException if the balance does not cover the cost
+   */
+  void requireAffordableQueueAdd(String emailAddress, Integer locationId, int priority,
+      boolean priorityPlay) throws InsufficientCreditsException;
+
+  /**
+   * Refuses a reorder/remove the web user cannot afford -- the same cost
+   * {@link #chargeCreditsForQueueAction(String, Integer, Integer)} would charge. Must be called
+   * before the queue is changed. In slave mode it refuses every web user but an admin, as
+   * {@link #requireAffordableQueueAdd} does.
+   *
+   * @throws InsufficientCreditsException if the balance does not cover the cost
+   */
+  void requireAffordableQueueAction(String emailAddress, Integer priority, Integer locationId)
+      throws InsufficientCreditsException;
+
+  /**
    * How many queue adds the web user's current balance covers at {@code locationId}'s pricing --
    * each costing what {@link #handleSongAddedToQueueEvent(SongAddedToQueueEvent, Integer)} would
-   * charge. {@link Integer#MAX_VALUE} in slave mode (where web users are neither registered nor
-   * charged) or when a queue add is free.
+   * charge. {@link Integer#MAX_VALUE} when a queue add is free, or for an admin in slave mode
+   * (where web users are never charged) -- any other web user in slave mode is refused with
+   * {@code QueueAccessDeniedException}, as in {@link #requireAffordableQueueAdd}.
    */
   int getAffordableQueueAddCount(String emailAddress, Integer locationId, int priority,
       boolean priorityPlay);

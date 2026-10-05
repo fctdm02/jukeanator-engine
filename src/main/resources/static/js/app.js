@@ -181,10 +181,18 @@
       renderLogin();
     }
     if (!res.ok) {
-      // A geo-fence refusal carries a message written for the patron; surface it as-is.
-      if (res.status === 403) {
+      // A geo-fence refusal, an unaffordable queue operation (the balance changed since this page
+      // last saw it, e.g. spent on another device), a queue attempt on a jukebox's own web page and
+      // a failed Add Funds purchase each carry a message written for the patron; surface it as-is.
+      if (res.status === 403 || res.status === 402) {
         const body = await res.json().catch(() => null);
-        if (body && body.error === 'GeoFenceViolationException') {
+        if (body && (body.error === 'GeoFenceViolationException'
+            || body.error === 'InsufficientCreditsException'
+            || body.error === 'QueueAccessDeniedException'
+            || body.error === 'PaymentException')) {
+          if (body.error === 'InsufficientCreditsException') {
+            loadCredits(document.getElementById('creditsValue'));
+          }
           throw geoFenceError(body.message);
         }
       }
@@ -201,7 +209,10 @@
   // "Simulate My Location" can stand in for the device, e.g. on a phone using a plain-http LAN
   // address, where browsers block the Geolocation API.
 
-  /** An Error whose message is meant for the patron, shown without any "Could not..." prefix. */
+  /**
+   * An Error whose message is meant for the patron, shown without any "Could not..." prefix --
+   * geo-fence refusals, and the server's other patron-facing queue refusals (see api()).
+   */
   function geoFenceError(message) {
     const err = new Error(message);
     err.geoFence = true;

@@ -62,6 +62,24 @@ public class UserRootEntity extends AbstractPersistentEntity {
   }
 
   /**
+   * Closes {@code emailAddress}'s account via {@link UserEntity#anonymize} and re-keys it under its
+   * closed-account email address, so the original address can register again while the account's
+   * financial records stay in the user root. Returns the closed account, or {@code null} if no user
+   * has {@code emailAddress}.
+   */
+  public UserEntity closeUser(String emailAddress, String closedEmailAddress,
+      String unusablePasswordHash) {
+
+    UserEntity user = this.users.remove(emailAddress);
+    if (user == null) {
+      return null;
+    }
+    user.anonymize(closedEmailAddress, unusablePasswordHash);
+    this.users.put(user.getEmailAddress(), user);
+    return user;
+  }
+
+  /**
    * Re-tags every user's location-tagged state from {@code oldLocationId} to {@code newLocationId}
    * -- the in-memory counterpart of {@code LocationRepositoryJpaImpl.changeLocationId}'s user
    * table updates.

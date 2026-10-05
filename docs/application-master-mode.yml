@@ -7,6 +7,11 @@ app:
   master-instance-url: ~   # required if mode=slave, e.g. https://jukeanator.com
   location-id: ~            # required if mode=slave, assigned at provisioning
   location-api-key: ~       # required if mode=slave, issued at provisioning
+  # slave-only, local/testing only -- never true in production. A slave never charges web users
+  # (credits are master's), so it refuses a non-admin web user's queue operations (addSong,
+  # addMultipleSongs, move up/down, remove) on its own /api/locations/{id}/song-queue endpoints.
+  # true lets them through, uncharged.
+  allow-slave-url-queue-operations: false
   # Geo-fencing of Web/Mobile UI queue operations (see src/main/resources/application.yml for
   # every setting). Set enabled: true on the production master at https://www.jukeanator.com.
   # For local QA of geo-fencing, set enabled: true and allow-simulated-position: true here.

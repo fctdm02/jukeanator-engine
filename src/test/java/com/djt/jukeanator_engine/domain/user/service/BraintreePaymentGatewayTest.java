@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.util.function.Consumer;
@@ -119,6 +120,33 @@ class BraintreePaymentGatewayTest {
         chargeWithTransactionStub(tx -> when(tx.getPaymentInstrumentType()).thenReturn("some_new_method"));
 
     assertEquals("some_new_method", result.paymentSource());
+  }
+
+  @Test
+  void voidCharge_voidsTheTransactionAtBraintree() {
+    Result<Transaction> voided = mock(Result.class);
+    when(voided.isSuccess()).thenReturn(true);
+    when(transactionGateway.voidTransaction("txn-1")).thenReturn(voided);
+
+    assertTrue(paymentGateway.voidCharge("txn-1"));
+    verify(transactionGateway).voidTransaction("txn-1");
+  }
+
+  @Test
+  void voidCharge_returnsFalseWhenBraintreeRefuses() {
+    Result<Transaction> refused = mock(Result.class);
+    when(refused.isSuccess()).thenReturn(false);
+    when(refused.getMessage()).thenReturn("Transaction can only be voided if status is authorized");
+    when(transactionGateway.voidTransaction("txn-1")).thenReturn(refused);
+
+    assertFalse(paymentGateway.voidCharge("txn-1"));
+  }
+
+  @Test
+  void voidCharge_returnsFalseInsteadOfThrowingWhenTheGatewayFails() {
+    when(transactionGateway.voidTransaction("txn-1")).thenThrow(new RuntimeException("network error"));
+
+    assertFalse(paymentGateway.voidCharge("txn-1"));
   }
 
   private PaymentChargeResult chargeWithTransactionStub(Consumer<Transaction> stub) {

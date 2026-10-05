@@ -13,8 +13,10 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.location.exception.GeoFenceViolationException;
 import com.djt.jukeanator_engine.domain.location.exception.LocationOfflineException;
+import com.djt.jukeanator_engine.domain.user.exception.InsufficientCreditsException;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
+import com.djt.jukeanator_engine.domain.user.exception.QueueAccessDeniedException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -73,6 +75,18 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(PaymentException.class)
     public void handlePayment(PaymentException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logExpected(HttpStatus.PAYMENT_REQUIRED, ex, request);
+        write(HttpStatus.PAYMENT_REQUIRED, ex, response);
+    }
+
+    @ExceptionHandler(QueueAccessDeniedException.class)
+    public void handleQueueAccessDenied(QueueAccessDeniedException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logExpected(HttpStatus.FORBIDDEN, ex, request);
+        write(HttpStatus.FORBIDDEN, ex, response);
+    }
+
+    @ExceptionHandler(InsufficientCreditsException.class)
+    public void handleInsufficientCredits(InsufficientCreditsException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
         logExpected(HttpStatus.PAYMENT_REQUIRED, ex, request);
         write(HttpStatus.PAYMENT_REQUIRED, ex, response);
     }

@@ -13,6 +13,7 @@ import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -28,6 +29,7 @@ import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 import com.djt.jukeanator_engine.AbstractServiceIntegrationTest;
+import com.djt.jukeanator_engine.FakePaymentGatewayConfiguration;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.security.UserRole;
 import com.djt.jukeanator_engine.domain.location.controller.GeoPositionHeaders;
@@ -38,6 +40,9 @@ import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
 import com.djt.jukeanator_engine.domain.location.model.GeoDistance;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
+import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
+import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
+import com.djt.jukeanator_engine.domain.user.service.UserService;
 
 /**
  * End-to-end geo-fencing on a master with {@code app.geo-fence.enabled=true}, over plain http and
@@ -63,6 +68,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
 @ActiveProfiles("test")
 @TestPropertySource(properties = { "app.mode=master", "app.repository-type=jpa",
     "app.geo-fence.enabled=true" })
+@Import(FakePaymentGatewayConfiguration.class)
 class MasterSlaveGeoFenceIntegrationTest extends AbstractServiceIntegrationTest {
 
   private static final double LATITUDE = 42.3314;
@@ -82,6 +88,9 @@ class MasterSlaveGeoFenceIntegrationTest extends AbstractServiceIntegrationTest 
 
   @Autowired
   private JwtUtil jwtUtil;
+
+  @Autowired
+  private UserService userService;
 
   @Autowired
   private TestRestTemplate restTemplate;
@@ -116,8 +125,12 @@ class MasterSlaveGeoFenceIntegrationTest extends AbstractServiceIntegrationTest 
     awaitTrue("master to register the slave disconnect",
         () -> !connectedSlaveRegistry.isConnected(locationId));
 
-    String patronToken = jwtUtil.generateToken("geo-fence-patron@example.com",
-        UserRole.ROLE_USER.name());
+    // A registered patron with credits -- master refuses an unaffordable add before the fence's
+    // outcome could be observed. Unique per run, against a persistent database.
+    String patronEmail = "geo-fence-patron+" + System.nanoTime() + "@example.com";
+    userService.register(new RegisterRequest("Geo", "Patron", patronEmail, "password123"));
+    userService.addFunds(patronEmail, new AddFundsRequest("pkg-7", "fake-nonce"));
+    String patronToken = jwtUtil.generateToken(patronEmail, UserRole.ROLE_USER.name());
 
     // ── Web UI patron: no position, outside the fence, inside the fence ─────────
     ResponseEntity<String> noPosition = postAddSong(locationId, patronToken, null);

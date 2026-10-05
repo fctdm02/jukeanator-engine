@@ -2,6 +2,8 @@ package com.djt.jukeanator_engine.domain.user.service;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.braintreegateway.BraintreeGateway;
 import com.braintreegateway.Result;
 import com.braintreegateway.Transaction;
@@ -15,6 +17,8 @@ import com.braintreegateway.TransactionRequest;
  * gets {@link NoOpPaymentGateway} instead.
  */
 public class BraintreePaymentGateway implements PaymentGateway {
+
+  private static final Logger log = LoggerFactory.getLogger(BraintreePaymentGateway.class);
 
   private final BraintreeGateway braintreeGateway;
 
@@ -48,6 +52,26 @@ public class BraintreePaymentGateway implements PaymentGateway {
 
     Transaction tx = result.getTarget();
     return PaymentChargeResult.success(tx.getId(), describePaymentSource(tx));
+  }
+
+  /**
+   * Voids the sale. {@link #charge} submits for settlement, and a sale stays voidable until
+   * Braintree settles it (hours later), so a void issued right after the charge succeeds.
+   */
+  @Override
+  public boolean voidCharge(String transactionId) {
+
+    try {
+      Result<Transaction> result = braintreeGateway.transaction().voidTransaction(transactionId);
+      if (result.isSuccess()) {
+        return true;
+      }
+      log.error("Braintree refused to void transaction {}: {} -- refund it manually",
+          transactionId, result.getMessage());
+    } catch (RuntimeException e) {
+      log.error("Could not void Braintree transaction {} -- refund it manually", transactionId, e);
+    }
+    return false;
   }
 
   /**

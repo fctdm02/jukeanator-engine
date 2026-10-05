@@ -21,9 +21,10 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
  * the local walk-up (JFC/Swing) user, so this table (renamed from {@code mobile_transactions};
  * see {@code V2__...} migration) never records local bill-acceptor/credit-card-reader activity --
  * see {@code LocalCashTransactionEntity}/{@code LocalCreditTransactionEntity} for those.
- * {@code locationId} is {@code null} for standalone-mode (non-location-attributed) spends, and for
- * the pre-multi-tenant call sites that don't yet have a location to tag — never retroactively
- * backfilled.
+ * {@code locationId} is the location the credits were spent at -- a standalone instance's own
+ * location for a song on its own queue -- and is what that location's mobile revenue is computed
+ * from; it is {@code null} only on rows recorded before every spend was tagged, which are never
+ * retroactively backfilled. {@code amount} is exactly the credits the balance lost, never more.
  *
  * @author tmyers
  */

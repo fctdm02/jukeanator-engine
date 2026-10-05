@@ -2,7 +2,11 @@ package com.djt.jukeanator_engine.domain.songqueue.controller;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -13,12 +17,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import com.djt.jukeanator_engine.AbstractControllerTest;
+import com.djt.jukeanator_engine.domain.location.exception.LocationOfflineException;
 import com.djt.jukeanator_engine.domain.location.service.GeoFenceService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -31,7 +37,10 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueReque
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongEligibilityDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
+import com.djt.jukeanator_engine.domain.user.exception.InsufficientCreditsException;
+import com.djt.jukeanator_engine.domain.user.exception.QueueAccessDeniedException;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 
 class SongQueueControllerTest extends AbstractControllerTest {
@@ -150,9 +159,6 @@ class SongQueueControllerTest extends AbstractControllerTest {
 
   @Test
   void addSongToQueue_passesRequest() throws Exception {
-    // This location is the controller's own -- addSong therefore takes the event-driven credit
-    // charge path (see SongQueueController's class javadoc), not the explicit one.
-    when(songLibraryService.getOwnLocationId()).thenReturn(LOCATION_ID);
     AddSongToQueueRequest request = new AddSongToQueueRequest("user", 3, 4, 5, false);
     when(songQueueService.addSongToQueue(any(), any(AddSongToQueueRequest.class)))
         .thenReturn(aQueueEntry());
@@ -162,6 +168,159 @@ class SongQueueControllerTest extends AbstractControllerTest {
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.songPath", is("/music/song.mp3")));
+  }
+
+  // ── Charged web-user operations: refused before they run unless affordable ──
+
+  private org.springframework.test.web.servlet.ResultActions postAsWebUser(String endpoint,
+      Object body) throws Exception {
+    return mockMvc.perform(post(BASE_PATH + "/" + endpoint)
+        .principal(webUser())
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(body)));
+  }
+
+  @Test
+  void addSong_webUserWhoCannotAffordIt_isRefusedWith402BeforeAnythingIsQueued() throws Exception {
+    doThrow(new InsufficientCreditsException(2, 1)).when(userService)
+        .requireAffordableQueueAdd(WEB_USER, LOCATION_ID, 1, false);
+
+    postAsWebUser("addSong", new AddSongToQueueRequest(null, 3, 4, 1, false))
+        .andExpect(status().isPaymentRequired())
+        .andExpect(jsonPath("$.error", is("InsufficientCreditsException")))
+        .andExpect(jsonPath("$.message",
+            is("This costs 2 credits, but your balance is 1 credits. Add funds to continue.")));
+
+    verify(songQueueService, never()).addSongToQueue(any(), any());
+    verify(userService, never()).handleSongAddedToQueueEvent(any(), any());
+  }
+
+  @Test
+  void addSong_webUserAtOwnLocation_isCheckedThenQueuedAsThemselves_andChargedOnlyOnce()
+      throws Exception {
+    when(songLibraryService.getOwnLocationId()).thenReturn(LOCATION_ID);
+    when(songQueueService.addSongToQueue(any(), any(AddSongToQueueRequest.class)))
+        .thenReturn(aQueueEntry());
+
+    postAsWebUser("addSong", new AddSongToQueueRequest("someone-else", 3, 4, 2, true))
+        .andExpect(status().isOk());
+
+    // The check uses the request's own priority and play type, and runs before the add; the
+    // queued entry is always the logged-in user's, never the body's claimed username.
+    InOrder inOrder = inOrder(userService, songQueueService);
+    inOrder.verify(userService).requireAffordableQueueAdd(WEB_USER, LOCATION_ID, 2, true);
+    inOrder.verify(songQueueService).addSongToQueue(LOCATION_ID,
+        new AddSongToQueueRequest(WEB_USER, 3, 4, 2, true));
+    // Own location: the queue's own SongAddedToQueueEvent charges -- charging here too would
+    // double-charge.
+    verify(userService, never()).handleSongAddedToQueueEvent(any(), any());
+  }
+
+  @Test
+  void addSong_webUserAtAnotherInstancesLocation_isChargedExplicitlyForThatLocation()
+      throws Exception {
+    when(songLibraryService.getOwnLocationId()).thenReturn(null); // master owns no location
+    SongQueueEntryDto entry = aQueueEntry();
+    when(songQueueService.addSongToQueue(any(), any(AddSongToQueueRequest.class)))
+        .thenReturn(entry);
+
+    postAsWebUser("addSong", new AddSongToQueueRequest(null, 3, 4, 1, false))
+        .andExpect(status().isOk());
+
+    InOrder inOrder = inOrder(userService, songQueueService);
+    inOrder.verify(userService).requireAffordableQueueAdd(WEB_USER, LOCATION_ID, 1, false);
+    inOrder.verify(songQueueService).addSongToQueue(eq(LOCATION_ID), any());
+    inOrder.verify(userService).handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, false),
+        LOCATION_ID);
+  }
+
+  @Test
+  void addSong_whenTheQueueRefusesTheSong_chargesNothing() throws Exception {
+    when(songQueueService.addSongToQueue(any(), any(AddSongToQueueRequest.class)))
+        .thenThrow(new LocationOfflineException(LOCATION_ID));
+
+    postAsWebUser("addSong", new AddSongToQueueRequest(null, 3, 4, 1, false))
+        .andExpect(status().isServiceUnavailable());
+
+    verify(userService, never()).handleSongAddedToQueueEvent(any(), any());
+  }
+
+  @Test
+  void addSong_localCaller_isNeverCheckedOrCharged() throws Exception {
+    when(songQueueService.addSongToQueue(any(), any(AddSongToQueueRequest.class)))
+        .thenReturn(aQueueEntry());
+
+    mockMvc.perform(post(BASE_PATH + "/addSong")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(new AddSongToQueueRequest("u", 3, 4, 1, false))))
+        .andExpect(status().isOk());
+
+    verify(userService, never()).requireAffordableQueueAdd(any(), any(), anyInt(), anyBoolean());
+    verify(userService, never()).handleSongAddedToQueueEvent(any(), any());
+  }
+
+  @Test
+  void addSong_patronQueueingDirectlyOnASlave_isRefusedWith403() throws Exception {
+    doThrow(new QueueAccessDeniedException("Use the JukeANator website")).when(userService)
+        .requireAffordableQueueAdd(WEB_USER, LOCATION_ID, 1, false);
+
+    postAsWebUser("addSong", new AddSongToQueueRequest(null, 3, 4, 1, false))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error", is("QueueAccessDeniedException")));
+
+    verify(songQueueService, never()).addSongToQueue(any(), any());
+  }
+
+  @Test
+  void addMultipleSongs_patronQueueingDirectlyOnASlave_isRefusedWith403() throws Exception {
+    when(userService.getAffordableQueueAddCount(WEB_USER, LOCATION_ID, 1, false))
+        .thenThrow(new QueueAccessDeniedException("Use the JukeANator website"));
+
+    postAsWebUser("addMultipleSongs", new AddMultipleSongsToQueueRequest(null,
+        List.of(new SongIdentifier(LOCATION_ID, 3, 1)), 1))
+        .andExpect(status().isForbidden());
+
+    verify(songQueueService, never()).addMultipleSongsToQueue(any(), any());
+  }
+
+  @Test
+  void moveSongUp_webUserWhoCannotAffordIt_isRefusedWith402AndNotMoved() throws Exception {
+    when(songQueueService.getQueuedSongs(LOCATION_ID)).thenReturn(List.of(aQueueEntry()));
+    doThrow(new InsufficientCreditsException(30, 4)).when(userService)
+        .requireAffordableQueueAction(WEB_USER, 5, LOCATION_ID);
+
+    postAsWebUser("moveSongUpInQueue", new ChangeSongQueueRequest(3, 4))
+        .andExpect(status().isPaymentRequired());
+
+    verify(songQueueService, never()).moveSongUpInQueue(any(), any());
+    verify(userService, never()).chargeCreditsForQueueAction(any(), any(), any());
+  }
+
+  @Test
+  void moveSongDown_webUser_isCheckedAtTheQueuedPriority_thenMovedAndCharged() throws Exception {
+    // aQueueEntry() is albumId 3 / songId 4 at priority 5 -- read before the move changes it.
+    when(songQueueService.getQueuedSongs(LOCATION_ID)).thenReturn(List.of(aQueueEntry()));
+    when(songQueueService.moveSongDownInQueue(eq(LOCATION_ID), any())).thenReturn(1);
+
+    postAsWebUser("moveSongDownInQueue", new ChangeSongQueueRequest(3, 4))
+        .andExpect(status().isOk());
+
+    InOrder inOrder = inOrder(userService, songQueueService);
+    inOrder.verify(userService).requireAffordableQueueAction(WEB_USER, 5, LOCATION_ID);
+    inOrder.verify(songQueueService).moveSongDownInQueue(eq(LOCATION_ID), any());
+    inOrder.verify(userService).chargeCreditsForQueueAction(WEB_USER, 5, LOCATION_ID);
+  }
+
+  @Test
+  void removeSong_thatChangesNothing_isNotCharged() throws Exception {
+    when(songQueueService.removeSongDownFromQueue(eq(LOCATION_ID), any())).thenReturn(0);
+
+    postAsWebUser("removeSongDownFromQueue", new ChangeSongQueueRequest(3, 4))
+        .andExpect(status().isOk());
+
+    // Not queued any more: priced at the default priority 1.
+    verify(userService).requireAffordableQueueAction(WEB_USER, 1, LOCATION_ID);
+    verify(userService, never()).chargeCreditsForQueueAction(any(), any(), any());
   }
 
   @Test

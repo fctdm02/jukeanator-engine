@@ -15,4 +15,10 @@ public interface PaymentGateway {
 
   /** Charges {@code amount} against {@code paymentMethodNonce}. Never throws for a decline. */
   PaymentChargeResult charge(BigDecimal amount, String paymentMethodNonce);
+
+  /**
+   * Cancels a successful {@link #charge} that could not be recorded, so the customer is never
+   * billed for credits they did not receive. Returns whether it was cancelled. Never throws.
+   */
+  boolean voidCharge(String transactionId);
 }

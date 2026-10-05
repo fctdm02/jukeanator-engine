@@ -48,8 +48,10 @@ import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.domain.user.event.LocationSongCreditUsageRecordedEvent;
 import com.djt.jukeanator_engine.domain.user.event.PurchaseCompletedEvent;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
+import com.djt.jukeanator_engine.domain.user.exception.InsufficientCreditsException;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
+import com.djt.jukeanator_engine.domain.user.exception.QueueAccessDeniedException;
 import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
@@ -68,6 +70,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   private static final int MAX_RECENT_PLAYS = 10;
 
+  static final Integer STARTING_CREDITS = Integer.valueOf(0);
+
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
@@ -76,6 +80,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private final PricingService pricingService;
   private final boolean slaveMode;
   private final PaymentGateway paymentGateway;
+  private final boolean allowSlaveUrlQueueOperations;
 
   private UserRootEntity userRoot;
 
@@ -83,6 +88,19 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
       SongLibraryService songLibraryService, PricingService pricingService, boolean slaveMode,
       PaymentGateway paymentGateway) {
+    this(userRepository, passwordEncoder, jwtUtil, eventPublisher, songLibraryService,
+        pricingService, slaveMode, paymentGateway, false);
+  }
+
+  /**
+   * @param allowSlaveUrlQueueOperations {@code app.allow-slave-url-queue-operations}: local/testing
+   *        only -- lets a slave queue for any web user on its own endpoints (uncharged), instead of
+   *        refusing all but admins. Ignored unless {@code slaveMode}.
+   */
+  public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder,
+      JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
+      SongLibraryService songLibraryService, PricingService pricingService, boolean slaveMode,
+      PaymentGateway paymentGateway, boolean allowSlaveUrlQueueOperations) {
 
     requireNonNull(userRepository, "userRepository cannot be null");
     requireNonNull(passwordEncoder, "passwordEncoder cannot be null");
@@ -100,6 +118,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     this.pricingService = pricingService;
     this.slaveMode = slaveMode;
     this.paymentGateway = paymentGateway;
+    this.allowSlaveUrlQueueOperations = allowSlaveUrlQueueOperations;
+    if (slaveMode && allowSlaveUrlQueueOperations) {
+      log.warn("app.allow-slave-url-queue-operations is true: web users can queue songs on this "
+          + "slave's own endpoints without being charged -- for local/testing use only");
+    }
 
     initialize();
 
@@ -123,11 +146,17 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     if (check != null) {
       throw new UserServiceException("Email already registered: " + request.emailAddress());
     }
+    if (request.emailAddress() != null
+        && request.emailAddress().endsWith(UserEntity.CLOSED_ACCOUNT_EMAIL_DOMAIN)) {
+      throw new UserServiceException("Invalid email address: " + request.emailAddress());
+    }
 
     Integer persistentIdentity = this.userRoot.nextUserPersistentIdentity();
 
+    // A new account starts with no credits: every credit a web user spends must have been bought
+    // through Add Funds, since each one spent is paid out to the location as mobile revenue.
     UserEntity user = new UserEntity(persistentIdentity, request.firstName(), request.lastName(),
-        request.emailAddress(), passwordEncoder.encode(request.password()), Integer.valueOf(6),
+        request.emailAddress(), passwordEncoder.encode(request.password()), STARTING_CREDITS,
         role);
 
     this.userRoot.addUser(user);
@@ -141,7 +170,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public synchronized AuthResponse login(LoginRequest request) throws InvalidCredentialsException {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(request.emailAddress());;
-    if (user == null) {
+    if (user == null || user.isClosed()) {
       throw new InvalidCredentialsException("Invalid credentials");
     }
 
@@ -269,7 +298,12 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
-    userRoot.removeUser(emailAddress);
+    // Closed, never removed: the account's Add Funds transactions and song-credit usages are the
+    // record that Braintree's charges and every location's mobile revenue are reconciled against.
+    String closedEmailAddress =
+        "closed-" + UUID.randomUUID() + UserEntity.CLOSED_ACCOUNT_EMAIL_DOMAIN;
+    userRoot.closeUser(emailAddress, closedEmailAddress,
+        passwordEncoder.encode(UUID.randomUUID().toString()));
     this.userRepository.storeAggregateRoot(this.userRoot);
   }
 
@@ -298,9 +332,25 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     Integer locationId = songLibraryService.getOwnLocationId();
     Instant now = Instant.now();
 
-    recordAddFundsTransaction(user, emailAddress, pkg, chargeResult, now);
-    this.userRepository.storeAggregateRoot(this.userRoot);
+    int previousBalance = user.getNumCredits() != null ? user.getNumCredits() : 0;
+    UserAddFundsTransactionEntity transaction =
+        recordAddFundsTransaction(user, pkg, chargeResult, now);
+    try {
+      this.userRepository.storeAggregateRoot(this.userRoot);
+    } catch (RuntimeException e) {
+      // The card was charged but the credits could not be stored -- undo both, so the customer
+      // is never billed for credits they did not receive.
+      user.setNumCredits(previousBalance);
+      user.removeUnstoredUserAddFundsTransaction(transaction);
+      boolean voided = paymentGateway.voidCharge(chargeResult.transactionId());
+      log.error("Add Funds for " + emailAddress + " could not be stored; payment transaction "
+          + chargeResult.transactionId() + (voided ? " was voided" : " could NOT be voided"), e);
+      throw new PaymentException(voided
+          ? "Your purchase could not be completed and your payment was cancelled. Please try again."
+          : "Your purchase could not be completed. Please contact support to be refunded.", e);
+    }
 
+    eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, user.getNumCredits()));
     eventPublisher.publishEvent(new PurchaseCompletedEvent(emailAddress, user.getFirstName(),
         pkg.credits(), pkg.bonusCredits(), pkg.priceUsd(), chargeResult.paymentSource(),
         chargeResult.transactionId(), now, user.getNumCredits()));
@@ -604,9 +654,14 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     this.userRepository.storeAggregateRoot(this.userRoot);
   }
 
+  /**
+   * A song this instance added to its own queue -- tagged with the own location id, so the spend
+   * counts toward this location's mobile revenue (an untagged spend is never counted). On master,
+   * which has no queue of its own, this never fires for a web user.
+   */
   @EventListener
   public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
-    handleSongAddedToQueueEvent(event, null);
+    handleSongAddedToQueueEvent(event, songLibraryService.getOwnLocationId());
   }
 
   @Override
@@ -685,21 +740,86 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
-    int cost = CreditCostCalculator.webQueueActionCost(pricingService.resolvePricingConfig(locationId),
-        priority != null ? priority : 1);
+    int cost = queueActionCost(priority, locationId);
     UserSongCreditUsageEntity usage = deductCredits(user, emailAddress, cost,
         UserSongCreditUsageType.QUEUE_ACTION, locationId, null, null);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
-    announceLocationCreditUsage(usage);
+    if (usage != null) {
+      announceLocationCreditUsage(usage);
+    }
+  }
+
+  @Override
+  public synchronized void requireAffordableQueueAdd(String emailAddress, Integer locationId,
+      int priority, boolean priorityPlay) throws InsufficientCreditsException {
+
+    if (slaveMode) {
+      requireSlaveQueueAccess(emailAddress);
+      return;
+    }
+    requireAffordable(requireUser(emailAddress), CreditCostCalculator
+        .webQueueAddCost(pricingService.resolvePricingConfig(locationId), priority, priorityPlay));
+  }
+
+  @Override
+  public synchronized void requireAffordableQueueAction(String emailAddress, Integer priority,
+      Integer locationId) throws InsufficientCreditsException {
+
+    if (slaveMode) {
+      requireSlaveQueueAccess(emailAddress);
+      return;
+    }
+    requireAffordable(requireUser(emailAddress), queueActionCost(priority, locationId));
+  }
+
+  /**
+   * A slave never charges a web user (credits are master-owned, see handleSongAddedToQueueEvent),
+   * so a patron queueing directly on the slave would play for free -- only an admin may, unless
+   * {@code app.allow-slave-url-queue-operations} (local/testing only) lets everyone through.
+   */
+  private void requireSlaveQueueAccess(String emailAddress) {
+
+    if (allowSlaveUrlQueueOperations) {
+      return;
+    }
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null || user.getRole() != UserRole.ROLE_ADMIN) {
+      throw new QueueAccessDeniedException("Songs can't be queued from this jukebox's own web "
+          + "page. Please use the JukeANator website or app to queue songs here.");
+    }
+  }
+
+  private int queueActionCost(Integer priority, Integer locationId) {
+    return CreditCostCalculator.webQueueActionCost(pricingService.resolvePricingConfig(locationId),
+        priority != null ? priority : 1);
+  }
+
+  private UserEntity requireUser(String emailAddress) {
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (user == null) {
+      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    }
+    return user;
+  }
+
+  private static void requireAffordable(UserEntity user, int cost) {
+
+    int balance = user.getNumCredits() != null ? user.getNumCredits() : 0;
+    if (balance < cost) {
+      throw new InsufficientCreditsException(cost, balance);
+    }
   }
 
   @Override
   public synchronized int getAffordableQueueAddCount(String emailAddress, Integer locationId,
       int priority, boolean priorityPlay) {
 
-    // Mirrors handleSongAddedToQueueEvent, which never charges a web user in slave mode.
+    // Mirrors handleSongAddedToQueueEvent, which never charges a web user in slave mode -- so only
+    // an admin may queue there at all.
     if (slaveMode) {
+      requireSlaveQueueAccess(emailAddress);
       return Integer.MAX_VALUE;
     }
 
@@ -738,21 +858,34 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   /**
    * Deducts {@code cost} credits (floored at zero), broadcasts the new balance, and appends a
-   * ledger entry to the user's own song-credit-usage set. {@code locationId} is {@code null} for
-   * standalone-mode/non-location-attributed spends. Callers are responsible for persisting the
-   * user root afterward, and then for passing the returned entry to {@link
+   * ledger entry for the credits actually deducted to the user's own song-credit-usage set -- each
+   * of those credits is paid out to {@code locationId} as mobile revenue, so the entry must never
+   * claim more than the balance really lost. Returns {@code null}, recording nothing, when nothing
+   * was deducted. Callers refuse an unaffordable action up front (see {@link #requireAffordable}),
+   * so the floor only matters as a last line of defense. Callers are responsible for persisting the
+   * user root afterward, and then for passing a non-null entry to {@link
    * #announceLocationCreditUsage}.
    */
   private UserSongCreditUsageEntity deductCredits(UserEntity user, String emailAddress, int cost,
       UserSongCreditUsageType type, Integer locationId, Integer songAlbumId, Integer songId) {
 
-    int remaining = Math.max(0, (user.getNumCredits() != null ? user.getNumCredits() : 0) - cost);
+    int balance = user.getNumCredits() != null ? user.getNumCredits() : 0;
+    int deducted = Math.max(0, Math.min(cost, balance));
+    if (deducted < cost) {
+      log.warn("Charged " + emailAddress + " " + deducted + " of " + cost
+          + " credits -- the balance did not cover the full cost");
+    }
+    if (deducted == 0) {
+      return null;
+    }
+
+    int remaining = balance - deducted;
     user.setNumCredits(remaining);
     eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, remaining));
 
     Integer persistentIdentity = user.nextUserSongCreditUsageIdentity();
     UserSongCreditUsageEntity usage = new UserSongCreditUsageEntity(persistentIdentity,
-        locationId, -cost, type, Instant.now(), songAlbumId, songId, remaining,
+        locationId, -deducted, type, Instant.now(), songAlbumId, songId, remaining,
         UUID.randomUUID().toString());
     return user.addUserSongCreditUsage(usage);
   }
@@ -771,22 +904,20 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   /**
-   * Adds the package's credits (+ bonus), broadcasts the new balance, and appends an Add-Funds
-   * ledger entry to the user's own set -- never location-attributed, since Add-Funds credits can
-   * be spent at any location (see {@link UserAddFundsTransactionEntity}'s javadoc). Symmetric with
-   * {@link #deductCredits}, but never floors (a purchase only ever increases the balance). Callers
-   * are responsible for persisting the user root afterward.
+   * Adds the package's credits (+ bonus) and appends an Add-Funds ledger entry to the user's own
+   * set -- never location-attributed, since Add-Funds credits can be spent at any location (see
+   * {@link UserAddFundsTransactionEntity}'s javadoc). Callers are responsible for persisting the
+   * user root afterward, and only then for broadcasting the new balance.
    */
-  private void recordAddFundsTransaction(UserEntity user, String emailAddress, CreditPackageDto pkg,
-      PaymentChargeResult chargeResult, Instant timestamp) {
+  private UserAddFundsTransactionEntity recordAddFundsTransaction(UserEntity user,
+      CreditPackageDto pkg, PaymentChargeResult chargeResult, Instant timestamp) {
 
     int totalCredits = pkg.credits() + pkg.bonusCredits();
     int newBalance = (user.getNumCredits() != null ? user.getNumCredits() : 0) + totalCredits;
     user.setNumCredits(newBalance);
-    eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, newBalance));
 
     Integer persistentIdentity = user.nextUserAddFundsTransactionIdentity();
-    user.addUserAddFundsTransaction(new UserAddFundsTransactionEntity(persistentIdentity,
+    return user.addUserAddFundsTransaction(new UserAddFundsTransactionEntity(persistentIdentity,
         pkg.id(), pkg.credits(), pkg.bonusCredits(), pkg.priceUsd(), chargeResult.paymentSource(),
         chargeResult.transactionId(), timestamp, newBalance));
   }

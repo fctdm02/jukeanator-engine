@@ -182,6 +182,9 @@ public final class UserRepositoryJpaImpl implements UserRepository {
           if (reIdentified) {
             reIdentifiedUsers.add(user);
           }
+          // Otherwise merge() trusts the snapshot a JPA-wrapped list took when it was loaded or
+          // persisted, and mishandles a playlist removed since (see the method's javadoc).
+          user.replaceJpaCollectionsWithPlainCopies();
           entityManager.merge(user);
         } else {
           user.setPersistentIdentity(null);

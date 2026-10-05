@@ -5,6 +5,9 @@ import static java.util.Objects.requireNonNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.BiFunction;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.core.Authentication;
@@ -49,6 +52,11 @@ import jakarta.servlet.http.HttpServletRequest;
  * instead. The three reorder/remove endpoints were never event-driven in either the old unscoped or
  * location-scoped controller, so they always charge explicitly regardless of location.
  *
+ * <p>
+ * The client's own affordability check is never trusted: every charged web-user operation is
+ * refused with 402 ({@code InsufficientCreditsException}) before it runs unless the user's balance
+ * covers it, so an unpaid play can never reach the queue or the location's mobile revenue.
+ *
  * @author tmyers
  */
 @RestController
@@ -61,6 +69,7 @@ public class SongQueueController {
   private final UserService userService;
   private final SongLibraryService songLibraryService;
   private final GeoFenceService geoFenceService;
+  private final ConcurrentMap<String, Object> userLocks = new ConcurrentHashMap<>();
 
   public SongQueueController(@Qualifier("songQueueService") SongQueueService songQueueService,
       UserService userService, SongLibraryService songLibraryService,
@@ -115,15 +124,15 @@ public class SongQueueController {
   }
 
   /**
-   * Web UI patrons pay for reordering/removing a queued song, same as adding one. A
-   * {@code LOCAL_USERNAME}/JFC caller's {@code Authentication#getPrincipal()} is a
-   * {@code LocalPrincipal}, not a {@code String}, so it is naturally excluded here.
+   * One lock per web user, held across a charged operation's affordability check, the queue change
+   * itself and the charge -- otherwise two near-simultaneous requests from the same user (a double
+   * tap, or two devices) could both pass the check on a balance that only covers one of them.
+   * Only that user's own requests wait on it. A {@code LOCAL_USERNAME}/JFC caller's
+   * {@code Authentication#getPrincipal()} is a {@code LocalPrincipal}, not a {@code String}, so it
+   * is never charged and never takes a lock.
    */
-  private void chargeWebUserForQueueAction(Authentication authentication, Integer priority,
-      Integer locationId) {
-    if (authentication != null && authentication.getPrincipal() instanceof String email) {
-      userService.chargeCreditsForQueueAction(email, priority, locationId);
-    }
+  private Object lockFor(String email) {
+    return userLocks.computeIfAbsent(email, key -> new Object());
   }
 
   @GetMapping("/highestPriority")
@@ -186,6 +195,11 @@ public class SongQueueController {
     return results;
   }
 
+  /**
+   * A web user's add is refused with 402 (before anything is queued or forwarded to the owning
+   * slave) unless their balance covers it; the check, the add and the charge run under that user's
+   * lock (see {@link #lockFor}).
+   */
   @PostMapping("/addSong")
   public SongQueueEntryDto addSongToQueue(@PathVariable Integer locationId,
       @RequestBody AddSongToQueueRequest addSongToQueueRequest, Authentication authentication,
@@ -193,26 +207,32 @@ public class SongQueueController {
 
     requireAtLocation(locationId, authentication, request);
 
+    if (authentication == null || !(authentication.getPrincipal() instanceof String email)) {
+      return songQueueService.addSongToQueue(locationId, addSongToQueueRequest);
+    }
+
     // For JWT-authenticated web users the principal is the email string; override the request body
     // username so that the server is authoritative and clients cannot impersonate other users.
-    if (authentication != null && authentication.getPrincipal() instanceof String email) {
-      addSongToQueueRequest = new AddSongToQueueRequest(
-          email,
-          addSongToQueueRequest.albumId(),
-          addSongToQueueRequest.songId(),
-          addSongToQueueRequest.priority(),
-          addSongToQueueRequest.priorityPlay());
+    AddSongToQueueRequest webUserRequest = new AddSongToQueueRequest(
+        email,
+        addSongToQueueRequest.albumId(),
+        addSongToQueueRequest.songId(),
+        addSongToQueueRequest.priority(),
+        addSongToQueueRequest.priorityPlay());
+    int priority = webUserRequest.priority() != null ? webUserRequest.priority() : 1;
+
+    synchronized (lockFor(email)) {
+      userService.requireAffordableQueueAdd(email, locationId, priority,
+          webUserRequest.priorityPlay());
+
+      SongQueueEntryDto entry = songQueueService.addSongToQueue(locationId, webUserRequest);
+
+      if (!isOwnLocation(locationId)) {
+        userService.handleSongAddedToQueueEvent(
+            new SongAddedToQueueEvent(entry, webUserRequest.priorityPlay()), locationId);
+      }
+      return entry;
     }
-
-    SongQueueEntryDto entry = songQueueService.addSongToQueue(locationId, addSongToQueueRequest);
-
-    if (!isOwnLocation(locationId) && authentication != null
-        && authentication.getPrincipal() instanceof String) {
-      userService.handleSongAddedToQueueEvent(
-          new SongAddedToQueueEvent(entry, addSongToQueueRequest.priorityPlay()), locationId);
-    }
-
-    return entry;
   }
 
   /** Admin-only (see {@code SecurityConfig}) -- web patrons cannot queue a whole album. */
@@ -255,20 +275,23 @@ public class SongQueueController {
 
     int priority = 1;
     boolean priorityPlay = false;
-    int maxSongs =
-        userService.getAffordableQueueAddCount(email, locationId, priority, priorityPlay);
-    if (songsAtLocation.isEmpty() || maxSongs <= 0) {
-      return List.of();
-    }
 
-    List<SongQueueEntryDto> queued = songQueueService.addMultipleSongsToQueue(locationId,
-        new AddMultipleSongsToQueueRequest(email, songsAtLocation, priority, true, maxSongs));
+    synchronized (lockFor(email)) {
+      int maxSongs =
+          userService.getAffordableQueueAddCount(email, locationId, priority, priorityPlay);
+      if (songsAtLocation.isEmpty() || maxSongs <= 0) {
+        return List.of();
+      }
 
-    for (SongQueueEntryDto entry : queued) {
-      userService.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, priorityPlay),
-          locationId);
+      List<SongQueueEntryDto> queued = songQueueService.addMultipleSongsToQueue(locationId,
+          new AddMultipleSongsToQueueRequest(email, songsAtLocation, priority, true, maxSongs));
+
+      for (SongQueueEntryDto entry : queued) {
+        userService.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, priorityPlay),
+            locationId);
+      }
+      return queued;
     }
-    return queued;
   }
 
   @PostMapping("/flushQueue")
@@ -288,14 +311,8 @@ public class SongQueueController {
       @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication,
       HttpServletRequest request) {
 
-    requireAtLocation(locationId, authentication, request);
-    Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.albumId(),
-        changeSongQueueRequest.songId());
-    Integer result = songQueueService.moveSongUpInQueue(locationId, changeSongQueueRequest);
-    if (result != null && result > 0) {
-      chargeWebUserForQueueAction(authentication, priority, locationId);
-    }
-    return result;
+    return changeQueue(locationId, changeSongQueueRequest, authentication, request,
+        songQueueService::moveSongUpInQueue);
   }
 
   @PostMapping("/moveSongDownInQueue")
@@ -303,14 +320,8 @@ public class SongQueueController {
       @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication,
       HttpServletRequest request) {
 
-    requireAtLocation(locationId, authentication, request);
-    Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.albumId(),
-        changeSongQueueRequest.songId());
-    Integer result = songQueueService.moveSongDownInQueue(locationId, changeSongQueueRequest);
-    if (result != null && result > 0) {
-      chargeWebUserForQueueAction(authentication, priority, locationId);
-    }
-    return result;
+    return changeQueue(locationId, changeSongQueueRequest, authentication, request,
+        songQueueService::moveSongDownInQueue);
   }
 
   @PostMapping("/removeSongDownFromQueue")
@@ -318,14 +329,36 @@ public class SongQueueController {
       @RequestBody ChangeSongQueueRequest changeSongQueueRequest, Authentication authentication,
       HttpServletRequest request) {
 
+    return changeQueue(locationId, changeSongQueueRequest, authentication, request,
+        songQueueService::removeSongDownFromQueue);
+  }
+
+  /**
+   * Runs a reorder/remove. A web user's is refused with 402 (before the queue changes) unless
+   * their balance covers it, and is charged only when it actually changed the queue; the check,
+   * the change and the charge run under that user's lock (see {@link #lockFor}).
+   */
+  private Integer changeQueue(Integer locationId, ChangeSongQueueRequest changeSongQueueRequest,
+      Authentication authentication, HttpServletRequest request,
+      BiFunction<Integer, ChangeSongQueueRequest, Integer> queueChange) {
+
     requireAtLocation(locationId, authentication, request);
-    Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.albumId(),
-        changeSongQueueRequest.songId());
-    Integer result = songQueueService.removeSongDownFromQueue(locationId, changeSongQueueRequest);
-    if (result != null && result > 0) {
-      chargeWebUserForQueueAction(authentication, priority, locationId);
+
+    if (authentication == null || !(authentication.getPrincipal() instanceof String email)) {
+      return queueChange.apply(locationId, changeSongQueueRequest);
     }
-    return result;
+
+    synchronized (lockFor(email)) {
+      Integer priority = findQueuedPriority(locationId, changeSongQueueRequest.albumId(),
+          changeSongQueueRequest.songId());
+      userService.requireAffordableQueueAction(email, priority, locationId);
+
+      Integer result = queueChange.apply(locationId, changeSongQueueRequest);
+      if (result != null && result > 0) {
+        userService.chargeCreditsForQueueAction(email, priority, locationId);
+      }
+      return result;
+    }
   }
 
   @PostMapping("/saveQueueAsPlaylist")

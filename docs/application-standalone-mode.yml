@@ -7,6 +7,11 @@ app:
   master-instance-url: ~   # required if mode=slave, e.g. https://jukeanator.com
   location-id: ~            # required if mode=slave, assigned at provisioning
   location-api-key: ~       # required if mode=slave, issued at provisioning
+  # slave-only, local/testing only -- never true in production. A slave never charges web users
+  # (credits are master's), so it refuses a non-admin web user's queue operations (addSong,
+  # addMultipleSongs, move up/down, remove) on its own /api/locations/{id}/song-queue endpoints.
+  # true lets them through, uncharged.
+  allow-slave-url-queue-operations: false
   jwt:
     secret: fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP
     expiration-ms: 86400000   # 24 hours

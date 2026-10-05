@@ -259,6 +259,52 @@ the old count-based placeholder would produce, registers a new user, and asserts
 account is untouched; it also stores a usage, checks the set still finds it after its id is
 replaced, and stores a second one.
 
+## Part F — Every recorded spend is paid for
+
+A review of the web patron's lifecycle (sign up → Add Funds → play at a location → the location's
+split) found ways for a location's mobile revenue to include plays nobody paid for.
+
+- **Server-side affordability.** Only the web UI checked the balance. `SongQueueController` now
+  refuses an unaffordable `addSong`, move or remove with **402** (`InsufficientCreditsException`)
+  before anything is queued, forwarded to a slave or charged
+  (`UserService.requireAffordableQueueAdd`/`requireAffordableQueueAction`). The check, the queue
+  change and the charge run under a per-user lock, so a double tap cannot spend the same credits
+  twice. Admin web users pay like patrons; the admin-only Add Album stays uncharged.
+- **Spends record what was deducted.** `deductCredits` used to floor the balance at zero but
+  record the full cost. It now records only the credits actually deducted, and nothing at all when
+  nothing was deducted.
+- **Standalone spends are location-tagged.** A song added to an instance's own queue was recorded
+  with a `null` location id, which `computeMobileTotal` never counted. It is now tagged with the
+  own location id.
+- **No free credits.** New accounts start with 0 credits (was 6). Every credit spent was bought
+  through Add Funds. A standalone instance has no Add Funds, so its web patrons cannot play.
+- **Slaves don't queue for patrons.** A slave never charges web users (credits are master's), so a
+  patron reaching a slave's own web page could play for free. A slave now refuses every web user
+  but an admin with **403** (`QueueAccessDeniedException`). For local testing only,
+  `app.allow-slave-url-queue-operations: true` (default `false`) lets any web user queue on a
+  slave's own endpoints again, uncharged. It is ignored outside slave mode, and the slave logs a
+  warning at startup when it is on.
+- **Closing an account keeps the records.** `deleteAccount` used to remove the user row, and with
+  it every Add Funds transaction (Braintree ids) and song-credit usage. The account is now
+  anonymized in place (`UserRootEntity.closeUser`): a `closed-<uuid>@closed-account.invalid`
+  address, an unusable password, and name, history and playlists cleared. Its financial rows stay
+  linked to the same `user_account` row, and the original address is free to register again with
+  0 credits.
+- **A purchase that can't be stored is voided.** If storing an Add Funds purchase fails after
+  Braintree charged the card, the in-memory credits and transaction are rolled back and the charge
+  is voided (`PaymentGateway.voidCharge`). If the void also fails, the patron is told to contact
+  support, and the transaction id is logged at ERROR. The new balance is broadcast only after the
+  purchase is stored.
+- **Valuation (unchanged, now locked in by tests).** A location's mobile revenue is the credits
+  spent there divided by that location's own `creditsPerDollar`, the kiosk's bill-acceptor rate.
+  This holds whatever the patron paid for the credits. For example, 12 credits spent at
+  3 per dollar is $4.00, even though `pkg-7` sells 13 credits for $7.00. The bar owner is paid
+  the kiosk-equivalent value of what was played.
+
+`WebPatronPlayLifecycleTest` walks the whole lifecycle through the real `SongQueueController`,
+`UserServiceImpl` and `FinancialLedgerServiceImpl`, with only storage, Braintree and the queue
+stood in for.
+
 ## Tests
 
 - **`domain/financialledger/service/MasterSlaveFinancialLedgerIntegrationTest.java`** (new, live

@@ -363,7 +363,8 @@ public class AppConfig {
         songLibraryService,
         pricingService,
         appProperties.isSlave(),
-        paymentGateway);
+        paymentGateway,
+        appProperties.isAllowSlaveUrlQueueOperations());
   }
 
   // ── Payments / email ─────────────────────────────────────────────────────

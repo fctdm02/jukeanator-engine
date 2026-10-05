@@ -412,6 +412,29 @@ public class UserEntity extends AbstractPersistentEntity {
     set.addAll(members);
   }
 
+  /**
+   * Swaps the lists JPA wrapped in its own collection types (on load, or on {@code persist()}) for
+   * plain copies holding the same elements. This user is held detached for the app's lifetime, and
+   * such a collection keeps a snapshot of the rows it held when it was wrapped -- {@code merge()}
+   * trusts that stale snapshot over the database: a playlist added since is never seen as removed
+   * (its row is never deleted), and a deleted one is looked up again on every later merge (failing
+   * with {@code EntityNotFoundException}). Merging plain lists makes Hibernate compare against the
+   * rows it loads in the same transaction instead. Called by {@code UserRepositoryJpaImpl} before
+   * each merge. The credit-usage and Add Funds sets are left alone: they are append-only, and are
+   * rehashed in place (see {@link #rehashChildCollections}).
+   */
+  public void replaceJpaCollectionsWithPlainCopies() {
+
+    this.playlists = new ArrayList<>(getPlaylists());
+    for (PlaylistEntity playlist : this.playlists) {
+      playlist.setSongs(
+          playlist.getSongs() != null ? new ArrayList<>(playlist.getSongs()) : new ArrayList<>());
+    }
+    this.songPlayHistory =
+        this.songPlayHistory != null ? new ArrayList<>(this.songPlayHistory) : new ArrayList<>();
+    this.searchHistory = new ArrayList<>(getSearchHistory());
+  }
+
   public Set<UserAddFundsTransactionEntity> getUserAddFundsTransactions() {
 
     if (userAddFundsTransactions == null) {
@@ -427,6 +450,46 @@ public class UserEntity extends AbstractPersistentEntity {
     transaction.setUser(this);
     requireAdded(getUserAddFundsTransactions().add(transaction), transaction);
     return transaction;
+  }
+
+  /**
+   * Withdraws an Add Funds transaction that was never stored -- matched by identity, not by id,
+   * since a failed store may already have replaced its placeholder id in place (leaving it in a
+   * stale hash bucket where remove() could no longer find it).
+   */
+  public boolean removeUnstoredUserAddFundsTransaction(UserAddFundsTransactionEntity transaction) {
+    return getUserAddFundsTransactions().removeIf(t -> t == transaction);
+  }
+
+  /** The email-address domain given to every closed (anonymized) account. */
+  public static final String CLOSED_ACCOUNT_EMAIL_DOMAIN = "@closed-account.invalid";
+
+  /**
+   * Closes this account in place: everything that identifies the person, plus their search/play
+   * history and playlists, is removed, while the song-credit usages and Add Funds transactions --
+   * financial records a location's revenue and Braintree's charges are reconciled against -- are
+   * kept. {@code closedEmailAddress} must end in {@link #CLOSED_ACCOUNT_EMAIL_DOMAIN}, and
+   * {@code unusablePasswordHash} must match no password, so the account can never log in again.
+   */
+  public void anonymize(String closedEmailAddress, String unusablePasswordHash) {
+
+    if (closedEmailAddress == null || !closedEmailAddress.endsWith(CLOSED_ACCOUNT_EMAIL_DOMAIN)) {
+      throw new IllegalArgumentException(
+          "A closed account's email address must end in " + CLOSED_ACCOUNT_EMAIL_DOMAIN);
+    }
+
+    this.firstName = "Closed";
+    this.lastName = "Account";
+    this.emailAddress = closedEmailAddress;
+    this.passwordHash = unusablePasswordHash;
+    // Fresh collections rather than clear() -- see replaceJpaCollectionsWithPlainCopies().
+    this.songPlayHistory = new ArrayList<>();
+    this.searchHistory = new ArrayList<>();
+    this.playlists = new ArrayList<>();
+  }
+
+  public boolean isClosed() {
+    return this.emailAddress != null && this.emailAddress.endsWith(CLOSED_ACCOUNT_EMAIL_DOMAIN);
   }
 
   public UserRole getRole() {

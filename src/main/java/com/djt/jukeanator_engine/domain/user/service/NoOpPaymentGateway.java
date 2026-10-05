@@ -23,4 +23,10 @@ public class NoOpPaymentGateway implements PaymentGateway {
   public PaymentChargeResult charge(BigDecimal amount, String paymentMethodNonce) {
     throw new PaymentException(MESSAGE);
   }
+
+  /** Nothing to cancel -- {@link #charge} never succeeds here. */
+  @Override
+  public boolean voidCharge(String transactionId) {
+    return false;
+  }
 }

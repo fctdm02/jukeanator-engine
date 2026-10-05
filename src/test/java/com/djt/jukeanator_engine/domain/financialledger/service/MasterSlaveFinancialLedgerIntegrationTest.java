@@ -19,10 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -34,6 +31,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import com.djt.jukeanator_engine.AbstractServiceIntegrationTest;
+import com.djt.jukeanator_engine.FakePaymentGatewayConfiguration;
 import com.djt.jukeanator_engine.domain.location.controller.LocationController;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
@@ -44,8 +42,6 @@ import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
-import com.djt.jukeanator_engine.domain.user.service.PaymentChargeResult;
-import com.djt.jukeanator_engine.domain.user.service.PaymentGateway;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityRecord;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivitySource;
@@ -80,7 +76,7 @@ import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
  *
  * <p>{@code app.mode=master} wires the real {@code BraintreePaymentGateway} (see {@code
  * AppConfig}), which would otherwise make this test perform a real network call against Braintree
- * with fake sandbox credentials -- {@link FakePaymentGatewayConfig} overrides it with a
+ * with fake sandbox credentials -- {@link FakePaymentGatewayConfiguration} overrides it with a
  * same-process fake that always succeeds, exactly the boundary {@code UserServiceTest}'s own mocked
  * {@code PaymentGateway} already stands in for, just wired through Spring instead of Mockito here.
  *
@@ -90,7 +86,7 @@ import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
 @AutoConfigureTestRestTemplate
 @ActiveProfiles("test")
 @TestPropertySource(properties = { "app.mode=master", "app.repository-type=jpa" })
-@Import(MasterSlaveFinancialLedgerIntegrationTest.FakePaymentGatewayConfig.class)
+@Import(FakePaymentGatewayConfiguration.class)
 class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrationTest {
 
   @Autowired
@@ -192,6 +188,56 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
   }
 
   @Test
+  void closingAnAccount_keepsItsAddFundsAndCreditUsageRows_onTheSameClosedUserRow()
+      throws Exception {
+
+    ProvisionedLocationDto location = locationService
+        .registerLocation(new RegisterLocationRequest(uniqueName("Closing Time Bar"), 41.0, -87.0));
+
+    String email = uniqueName("closer") + "@example.com";
+    userService.register(new RegisterRequest("Clo", "Ser", email, "password123"));
+    AddFundsResponseDto purchase =
+        userService.addFunds(email, new AddFundsRequest("pkg-7", "fake-nonce"));
+    userService.chargeCreditsForQueueAction(email, Integer.valueOf(1), location.locationId());
+
+    Instant from = Instant.now().minusSeconds(60);
+    Instant to = Instant.now().plusSeconds(60);
+    UserSongCreditUsageDto spend =
+        userService.getCreditLedgerForLocation(location.locationId(), from, to).get(0);
+
+    userService.deleteAccount(email);
+
+    // The spend still counts toward the location's revenue on master...
+    List<UserSongCreditUsageDto> afterClosing =
+        userService.getCreditLedgerForLocation(location.locationId(), from, to);
+    assertEquals(List.of(spend.syncId()),
+        afterClosing.stream().map(UserSongCreditUsageDto::syncId).toList());
+    assertSyncIdPersisted(spend.syncId(), location.locationId());
+
+    // ...and the Braintree charge is still reconcilable, both on the same, now closed, account.
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = connection.prepareStatement(
+            "select u.email_address, u.first_name, "
+                + "(select count(*) from user_song_credit_usage c where c.user_id = u.persistent_identity) as usages "
+                + "from user_add_funds_transaction f join user_account u on u.persistent_identity = f.user_id "
+                + "where f.payment_transaction_id = ?")) {
+
+      statement.setString(1, purchase.transactionId());
+      try (ResultSet rs = statement.executeQuery()) {
+        assertTrue(rs.next(), "the Add-Funds row must survive the account being closed");
+        assertTrue(rs.getString("email_address").endsWith("@closed-account.invalid"),
+            rs.getString("email_address"));
+        assertEquals("Closed", rs.getString("first_name"));
+        assertEquals(1, rs.getInt("usages"));
+      }
+    }
+
+    // The address is free again, for a brand-new account with nothing in it.
+    userService.register(new RegisterRequest("Clo", "Ser", email, "password123"));
+    assertEquals(Integer.valueOf(0), userService.getProfile(email).numCredits());
+  }
+
+  @Test
   void finalizedSplitPeriods_mirroredOverHttp_landInLocationJukeboxSplitTaggedByLocation_andAreIdempotent()
       throws Exception {
 
@@ -221,6 +267,8 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
 
     String email = uniqueName("puller") + "@example.com";
     userService.register(new RegisterRequest("Pul", "Ler", email, "password123"));
+    // A new account starts with no credits, and only credits actually spent are recorded.
+    userService.addFunds(email, new AddFundsRequest("pkg-7", "fake-nonce"));
 
     Instant since = Instant.now().minusSeconds(60);
     userService.chargeCreditsForQueueAction(email, Integer.valueOf(1), locationA.locationId());
@@ -459,30 +507,4 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     }
   }
 
-  /**
-   * Overrides {@code AppConfig}'s real {@code BraintreePaymentGateway} (wired unconditionally
-   * whenever {@code app.mode=master}) with a same-process fake that always succeeds -- this test
-   * must never make a real network call to Braintree, and the fake sandbox credentials in {@code
-   * application-test.yml} wouldn't authenticate against it anyway.
-   */
-  @TestConfiguration
-  static class FakePaymentGatewayConfig {
-
-    @Bean
-    @Primary
-    PaymentGateway fakePaymentGateway() {
-      return new PaymentGateway() {
-
-        @Override
-        public String generateClientToken() {
-          return "fake-client-token";
-        }
-
-        @Override
-        public PaymentChargeResult charge(BigDecimal amount, String paymentMethodNonce) {
-          return PaymentChargeResult.success("fake-txn-" + UUID.randomUUID(), "TestGateway");
-        }
-      };
-    }
-  }
 }

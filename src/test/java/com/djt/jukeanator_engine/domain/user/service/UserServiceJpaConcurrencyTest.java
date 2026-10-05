@@ -18,6 +18,7 @@ import org.springframework.test.context.TestPropertySource;
 import com.djt.jukeanator_engine.AbstractServiceIntegrationTest;
 import com.djt.jukeanator_engine.domain.common.security.LocalPrincipal;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
+import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
@@ -61,6 +62,9 @@ class UserServiceJpaConcurrencyTest extends AbstractServiceIntegrationTest {
 
   @Autowired
   private UserService userService;
+
+  @Autowired
+  private SongLibraryService songLibraryService;
 
   @Test
   void concurrentHandleSongAddedToQueueEvent_forLocalUser_doesNotThrowAndPersistsBothPlays()
@@ -119,10 +123,14 @@ class UserServiceJpaConcurrencyTest extends AbstractServiceIntegrationTest {
       executor.shutdownNow();
     }
 
+    // A song this instance queued itself is tagged with this instance's own location.
+    Integer ownLocationId = songLibraryService.getOwnLocationId();
     UserProfileDto profile = userService.getProfile(LocalPrincipal.LOCAL_USERNAME);
-    assertTrue(profile.songPlayHistory().contains(new SongIdentifier(null, albumIdA, songIdA)),
+    assertTrue(
+        profile.songPlayHistory().contains(new SongIdentifier(ownLocationId, albumIdA, songIdA)),
         "song A should have been recorded in play history (lost update if missing)");
-    assertTrue(profile.songPlayHistory().contains(new SongIdentifier(null, albumIdB, songIdB)),
+    assertTrue(
+        profile.songPlayHistory().contains(new SongIdentifier(ownLocationId, albumIdB, songIdB)),
         "song B should have been recorded in play history (lost update if missing)");
   }
 

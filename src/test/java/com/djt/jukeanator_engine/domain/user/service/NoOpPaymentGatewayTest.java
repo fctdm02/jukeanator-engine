@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.user.service;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
@@ -18,5 +19,10 @@ class NoOpPaymentGatewayTest {
   void charge_throwsPaymentException() {
     assertThrows(PaymentException.class,
         () -> gateway.charge(new BigDecimal("7.00"), "fake-nonce"));
+  }
+
+  @Test
+  void voidCharge_hasNothingToCancel() {
+    assertFalse(gateway.voidCharge("txn-1"));
   }
 }
