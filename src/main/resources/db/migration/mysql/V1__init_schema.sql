@@ -35,6 +35,11 @@ CREATE TABLE location (
     latitude                    DOUBLE,
     longitude                    DOUBLE,
     api_key_hash                  VARCHAR(255) NOT NULL,
+    -- SHA-256 (hex) of the API key, uniquely indexed: master finds a connecting slave's location
+    -- with one hash and one lookup instead of a bcrypt check per location (see ApiKeyLookup).
+    -- Nullable for a row inserted by hand with only api_key_hash: filled in the first time its
+    -- slave authenticates (see LocationServiceImpl.verifyApiKey).
+    api_key_lookup                VARCHAR(64) NULL,
     status                          VARCHAR(255) NOT NULL,
     last_seen_at                      TIMESTAMP NULL,
     library_last_synced_at              TIMESTAMP NULL,
@@ -49,7 +54,8 @@ CREATE TABLE location (
     display_currency_for_cost                            BOOLEAN,
     date_added                                             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                                             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_location_name UNIQUE (name)
+    CONSTRAINT uq_location_name UNIQUE (name),
+    CONSTRAINT uq_location_api_key_lookup UNIQUE (api_key_lookup)
 ) ENGINE=InnoDB;
 
 CREATE TABLE user_playlist (

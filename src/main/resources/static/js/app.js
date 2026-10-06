@@ -143,15 +143,18 @@
     localStorage.setItem('jwt', auth.token);
     localStorage.setItem('role', auth.role);
     localStorage.setItem('emailAddress', auth.emailAddress);
+    reconnectWebSocket(); // so /user/queue/... now reaches this user
   }
 
   function clearAuth() {
+    const wasSignedIn = state.token != null;
     state.token = null;
     state.role = null;
     state.emailAddress = null;
     localStorage.removeItem('jwt');
     localStorage.removeItem('role');
     localStorage.removeItem('emailAddress');
+    if (wasSignedIn) reconnectWebSocket(); // stop receiving the previous user's updates
   }
 
   // ── API helper ──────────────────────────────────────────────────────────
@@ -169,6 +172,21 @@
     return `/api/locations/${state.locationId}/${m[1]}${m[2]}`;
   }
 
+  // Refusals whose message is written for the patron and shown as-is: a geo-fence refusal, an
+  // unaffordable queue operation (the balance changed since this page last saw it, e.g. spent on
+  // another device), a queue attempt on a jukebox's own web page, a failed Add Funds purchase, a
+  // song the queue's rules refuse right now, and the account forms' routine mistakes.
+  const PATRON_FACING_ERRORS = new Set([
+    'GeoFenceViolationException', 'InsufficientCreditsException', 'QueueAccessDeniedException',
+    'PaymentException', 'SongNotEligibleException', 'EmailAlreadyRegisteredException',
+    'IncorrectPasswordException',
+  ]);
+
+  /** `?locationId=…` for endpoints that answer for a location (e.g. Hot Here), or '' if unknown. */
+  function locationQuery() {
+    return state.locationId != null ? `?locationId=${encodeURIComponent(state.locationId)}` : '';
+  }
+
   async function api(path, options = {}) {
     const res = await fetch(locationScopedPath(path), {
       ...options,
@@ -181,22 +199,19 @@
       renderLogin();
     }
     if (!res.ok) {
-      // A geo-fence refusal, an unaffordable queue operation (the balance changed since this page
-      // last saw it, e.g. spent on another device), a queue attempt on a jukebox's own web page and
-      // a failed Add Funds purchase each carry a message written for the patron; surface it as-is.
-      if (res.status === 403 || res.status === 402) {
-        const body = await res.json().catch(() => null);
-        if (body && (body.error === 'GeoFenceViolationException'
-            || body.error === 'InsufficientCreditsException'
-            || body.error === 'QueueAccessDeniedException'
-            || body.error === 'PaymentException')) {
-          if (body.error === 'InsufficientCreditsException') {
-            loadCredits(document.getElementById('creditsValue'));
-          }
-          throw geoFenceError(body.message);
+      const body = await res.json().catch(() => null);
+      if (body && PATRON_FACING_ERRORS.has(body.error)) {
+        if (body.error === 'InsufficientCreditsException') {
+          loadCredits(document.getElementById('creditsValue'));
         }
+        throw geoFenceError(body.message);
       }
-      throw new Error(`${options.method || 'GET'} ${path} failed: ${res.status}`);
+      // Anything else keeps its status and the server's message, for screens that can show it
+      // (e.g. a 400 from the account forms' validation, whose messages are written for the patron).
+      const err = new Error(`${options.method || 'GET'} ${path} failed: ${res.status}`);
+      err.status = res.status;
+      err.serverMessage = body && body.message;
+      throw err;
     }
     const text = await res.text();
     return text ? JSON.parse(text) : null;
@@ -541,7 +556,7 @@
     try {
       if (state.token) {
         const [homePage, playlists, favIds] = await Promise.all([
-          api('/api/users/home'),
+          api(`/api/users/home${locationQuery()}`),
           api('/api/users/playlists').catch(() => []),
           api('/api/users/playlists/favorites/songs').catch(() => []),
         ]);
@@ -553,7 +568,7 @@
         state.myPlaylists      = playlists || [];
         state.favoriteSongIds  = new Set((favIds || []).map(si => `${si.albumId}_${si.songId}`));
       } else {
-        const publicPage = await api('/api/users/home-public');
+        const publicPage = await api(`/api/users/home-public${locationQuery()}`);
         state.hotHereArtists   = publicPage.artistsHotHere || [];
         state.hotHereAlbums    = publicPage.albumsHotHere  || [];
         state.hotHereSongs     = publicPage.songsHotHere   || [];
@@ -1126,9 +1141,11 @@
           }),
         });
         goBack();
-      } catch {
-        btn.textContent = 'Error — try again';
+      } catch (err) {
+        btn.textContent = 'Save';
         btn.disabled = false;
+        showAppAlert({ title: 'Edit Profile', message: err.status === 400 && err.serverMessage
+          ? err.serverMessage : 'Could not save your profile. Please try again.' });
       }
     });
   }
@@ -1164,7 +1181,8 @@
       const errEl = document.getElementById('pwError');
       errEl.textContent = '';
       if (newPw !== confirm) { errEl.textContent = 'New passwords do not match.'; return; }
-      if (newPw.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+      const problem = passwordProblem(newPw);
+      if (problem) { errEl.textContent = problem; return; }
       const btn = document.getElementById('savePwBtn');
       btn.disabled = true; btn.textContent = 'Saving…';
       try {
@@ -1174,7 +1192,9 @@
         });
         goBack();
       } catch (err) {
-        errEl.textContent = 'Failed to change password. Check your current password.';
+        // A wrong current password (400) and the server's password rules both explain themselves.
+        errEl.textContent = err.geoFence || err.status === 400
+          ? (err.serverMessage || err.message) : 'Could not change your password. Please try again.';
         btn.disabled = false; btn.textContent = 'Save';
       }
     });
@@ -1267,7 +1287,7 @@
           <div class="auth-logo"><img src="/images/JukeANatorLogo.png" alt="JukeANator"></div>
           <h1>Create Account</h1>
           <form id="registerForm" autocomplete="off">
-            ${errorMessage ? `<div class="error-msg">${errorMessage}</div>` : ''}
+            <div class="error-msg" id="registerError" ${errorMessage ? '' : 'hidden'}>${escHtml(errorMessage || '')}</div>
             <label>First name <input type="text" id="registerFirstName" autocomplete="off" required></label>
             <label>Last name <input type="text" id="registerLastName" autocomplete="off" required></label>
             <label>Email <input type="email" id="registerEmail" autocomplete="off" required></label>
@@ -1281,6 +1301,12 @@
     document.getElementById('registerCancelBtn').addEventListener('click', () => renderLogin());
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const errEl = document.getElementById('registerError');
+      const showError = (message) => { errEl.textContent = message; errEl.hidden = false; };
+      errEl.hidden = true;
+      const password = document.getElementById('registerPassword').value;
+      const problem = passwordProblem(password);
+      if (problem) { showError(problem); return; }
       try {
         const auth = await api('/api/users/register', {
           method: 'POST',
@@ -1288,15 +1314,31 @@
             firstName: document.getElementById('registerFirstName').value,
             lastName: document.getElementById('registerLastName').value,
             emailAddress: document.getElementById('registerEmail').value,
-            password: document.getElementById('registerPassword').value,
+            password,
           }),
         });
         setAuth(auth);
         afterLogin();
-      } catch {
-        renderRegister('Could not create account. That email may already be registered.');
+      } catch (err) {
+        // The server's own validation and duplicate-email messages are written for the patron.
+        showError(err.geoFence || err.status === 400 ? (err.serverMessage || err.message)
+          : 'Could not create your account. Please try again.');
       }
     });
+  }
+
+  /**
+   * Why a new password is not allowed, or null -- mirrors the server's AccountValidator: at least
+   * 8 characters, with at least one letter and one number. Keep both sides in sync.
+   */
+  function passwordProblem(password) {
+    if (!password || password.length < 8 || !/\p{L}/u.test(password) || !/\d/.test(password)) {
+      return 'Your password must be at least 8 characters long and include at least one letter and one number.';
+    }
+    if (new TextEncoder().encode(password).length > 72) {
+      return 'Your password must be at most 72 characters long.';
+    }
+    return null;
   }
 
   function afterLogin() {
@@ -2018,6 +2060,36 @@
     _songPopupTimer = setTimeout(dismissSongPopup, 20000);
   }
 
+  /**
+   * Why the queue's rules refuse `song` right now, or null. Only checked for a signed-in patron
+   * (the endpoint needs an account); null when it cannot be checked, leaving the server -- which
+   * enforces the same rules on every add -- to decide when the patron taps Play.
+   */
+  async function songIneligibleReason(song) {
+    if (!state.token || song.albumId == null || song.songId == null) return null;
+    try {
+      const results = await api('/api/song-queue/checkSongsEligibility', {
+        method: 'POST',
+        body: JSON.stringify({
+          songIdentifiers: [{ locationId: state.locationId, albumId: song.albumId, songId: song.songId }],
+          priority: 1,
+        }),
+      });
+      return (results && results[0] && results[0].ineligibleReason) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** A song's ineligibility, phrased for the patron (mirrors SongQueueServiceImpl.ineligibleMessage). */
+  function ineligibleSongMessage(songName, reason) {
+    const trimmed = (reason || '').replace(/[.\s]+$/, '');
+    const title = `"${songName || 'This song'}"`;
+    return /^(has|is|was) /.test(trimmed)
+      ? `${title} ${trimmed}.`
+      : `${title} can't be played right now: ${trimmed}.`;
+  }
+
   async function showSongPopup(song, opts = {}) {
     // Remove any existing popup
     const existing = document.getElementById('songPopupOverlay');
@@ -2032,11 +2104,15 @@
     // highestPriority already IS the next available priority level (queue's top + 1, or 2 if
     // empty) -- mirrors AddSongToQueueCard, which uses it directly as both the cost basis and
     // the priority to queue at. Do not add another +1 here.
-    const priorityLevel = readOnly ? 1 : (await api('/api/song-queue/highestPriority').catch(() => 1) || 1);
+    const [priorityLevel, ineligibleReason] = readOnly ? [1, null] : await Promise.all([
+      api('/api/song-queue/highestPriority').catch(() => 1).then(level => level || 1),
+      songIneligibleReason(song),
+    ]);
+    const ineligible      = ineligibleReason != null;
     const costPlay        = queueAddCost(1, false);
     const costPriority    = queueAddCost(priorityLevel, true);
-    const canPlay         = credits >= costPlay;
-    const canPriority     = credits >= costPriority;
+    const canPlay         = !ineligible && credits >= costPlay;
+    const canPriority     = !ineligible && credits >= costPriority;
 
     const name      = escHtml(song.songName || song.title || '');
     const albumName = escHtml(song.albumName || '');
@@ -2048,10 +2124,16 @@
               alt="" onerror="this.outerHTML='<div class=\\'song-popup-thumb song-popup-thumb-placeholder\\'>&#127925;</div>'">`
       : `<div class="song-popup-thumb song-popup-thumb-placeholder">&#127925;</div>`;
 
-    const priorityClass       = canPriority ? 'song-popup-action' : 'song-popup-action song-popup-action--warn';
-    const playClass           = canPlay     ? 'song-popup-action' : 'song-popup-action song-popup-action--warn';
-    const priorityCreditClass = canPriority ? 'spa-credits'       : 'spa-credits spa-credits--warn';
-    const playCreditClass     = canPlay     ? 'spa-credits'       : 'spa-credits spa-credits--warn';
+    // An ineligible song greys both play actions out (it is not a credits problem); otherwise an
+    // unaffordable action is flagged with the credits warning.
+    const actionClass = (can) => ineligible ? 'song-popup-action song-popup-action--disabled'
+      : can ? 'song-popup-action' : 'song-popup-action song-popup-action--warn';
+    const creditClass = (can) => ineligible || can ? 'spa-credits' : 'spa-credits spa-credits--warn';
+    const priorityClass       = actionClass(canPriority);
+    const playClass           = actionClass(canPlay);
+    const priorityCreditClass = creditClass(canPriority);
+    const playCreditClass     = creditClass(canPlay);
+    const warnMark = (can) => ineligible || can ? '' : ' ⚠';
 
     const overlay = document.createElement('div');
     overlay.id = 'songPopupOverlay';
@@ -2071,13 +2153,15 @@
         ${readOnly ? '' : `
         ${state.geoFence?.enforced ? `
         <div class="song-popup-geo-note">&#128205; You must be at this location to queue songs.</div>` : ''}
+        ${ineligible ? `
+        <div class="song-popup-geo-note">${escHtml(ineligibleSongMessage(song.songName, ineligibleReason))}</div>` : ''}
         <div class="${playClass}" id="spaPlay">
           <span class="spa-label">Play Song</span>
-          <span class="${playCreditClass}">${formatCredits(costPlay, 'Credits')}${canPlay ? '' : ' ⚠'}</span>
+          <span class="${playCreditClass}">${formatCredits(costPlay, 'Credits')}${warnMark(canPlay)}</span>
         </div>
         <div class="${priorityClass}" id="spaPlayPriority">
           <span class="spa-label">Play Priority Song</span>
-          <span class="${priorityCreditClass}">${formatCredits(costPriority, 'Credits')}${canPriority ? '' : ' ⚠'}</span>
+          <span class="${priorityCreditClass}">${formatCredits(costPriority, 'Credits')}${warnMark(canPriority)}</span>
         </div>`}
         <div class="song-popup-action song-popup-action--icon" id="spaArtist">
           <span class="spa-icon">&#128100;</span>
@@ -2095,9 +2179,30 @@
 
     document.getElementById('app-shell').appendChild(overlay);
 
+    // Ignore every tap until the sheet has finished sliding in: its actions move under the
+    // finger meanwhile, so a quick second tap (e.g. a double-tap on the song that opened it)
+    // could otherwise land on Play / Play Priority and spend credits, or on the background and
+    // close it. Registered in the capture phase, so it runs before any action's own handler.
+    let settled = false;
+    const settle = () => { settled = true; };
+    overlay.addEventListener('click', (e) => {
+      if (!settled) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true);
+    const sheet = overlay.querySelector('.song-popup');
+    sheet.addEventListener('transitionend', (e) => {
+      if (e.target === sheet && e.propertyName === 'transform') settle();
+    });
+
     // Slide in after next frame
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => overlay.classList.add('song-popup-visible'));
+      requestAnimationFrame(() => {
+        overlay.classList.add('song-popup-visible');
+        // Fallback for when no transition runs (e.g. reduced motion): the slide takes 300ms.
+        setTimeout(settle, 400);
+      });
     });
 
     // Dismiss on overlay background click or handle tap
@@ -2615,11 +2720,7 @@
     }
 
     function ineligibleMessage(i) {
-      const reason = (eligibility.get(i) || '').replace(/[.\s]+$/, '');
-      const title = `"${songs[i].songName || 'This song'}"`;
-      return /^(has|is|was) /.test(reason)
-        ? `${title} ${reason}.`
-        : `${title} can't be played right now: ${reason}.`;
+      return ineligibleSongMessage(songs[i].songName, eligibility.get(i));
     }
 
     async function checkEligibility(indices) {
@@ -2746,6 +2847,7 @@
   async function selectLocation(loc) {
     state.currentLocation = loc;
     state.locationId = loc.locationId;
+    subscribeToLocation();
     await Promise.all([loadPricingConfig(), loadGeoFenceStatus()]);
     renderMain(state.currentMainTab);
   }
@@ -3277,45 +3379,35 @@
   }
 
   // ── WebSocket ───────────────────────────────────────────────────────────
+  // The queue and Now Playing topics are per location (/topic/location/{id}/...), published the
+  // same way in every app.mode; a patron's own credits and recent plays arrive on /user/queue/...,
+  // which the server routes by the token sent on CONNECT -- so the connection is reopened whenever
+  // the signed-in user changes (see setAuth/clearAuth) and the location topics are re-subscribed
+  // whenever the location changes (see selectLocation).
   let stompClient = null;
+  let stompReconnectTimer = null;
+  let locationSubscriptions = [];
 
   function connectWebSocket() {
     if (stompClient && stompClient.connected) return;
-    const socket = new SockJS('/ws');
-    stompClient = Stomp.over(socket);
-    stompClient.debug = () => {};
+    clearTimeout(stompReconnectTimer);
+    const client = Stomp.over(new SockJS('/ws'));
+    stompClient = client;
+    client.debug = () => {};
     const connectHeaders = state.token ? { token: state.token } : {};
-    stompClient.connect(connectHeaders, () => {
-
-      stompClient.subscribe('/topic/now-playing', (frame) => {
-        activeSongQueueRefresh?.();
-        const widget = document.getElementById('nowPlayingWidget');
-        if (!widget) return;
-        const msg = JSON.parse(frame.body);
-        setNowPlayingWidget(widget, msg.song);
-      });
-
-      // Fires on SongAddedToQueueEvent/MultipleSongsAddedToQueueEvent (always paired with a
-      // SongQueueChangedEvent broadcast) and SongQueueEmptyEvent (broadcast as an empty list) --
-      // keeps the "View Queue" button in sync with whether there's anything queued, and the
-      // Song Queue screen (if showing) in sync with the queue itself.
-      stompClient.subscribe('/topic/queue', (frame) => {
-        const queuedSongs = JSON.parse(frame.body) || [];
-        state.queueHasSongs = queuedSongs.length > 0;
-        updateViewQueueVisibility();
-        activeSongQueueRefresh?.();
-      });
+    client.connect(connectHeaders, () => {
+      subscribeToLocation();
 
       // User-specific updates — only fire for the logged-in user
       if (state.token) {
-        stompClient.subscribe('/user/queue/credits', (frame) => {
+        client.subscribe('/user/queue/credits', (frame) => {
           const msg = JSON.parse(frame.body);
           state.numCredits = msg.numCredits ?? 0;
           const widget = document.getElementById('creditsValue');
           if (widget) widget.textContent = creditsWidgetText(state.numCredits);
         });
 
-        stompClient.subscribe('/user/queue/recent-plays', (frame) => {
+        client.subscribe('/user/queue/recent-plays', (frame) => {
           const song = JSON.parse(frame.body);
           state.recentPlays.unshift(song);
           if (state.recentPlays.length > 10) state.recentPlays.length = 10;
@@ -3326,8 +3418,48 @@
           }
         });
       }
+    }, () => {
+      // Only the current connection reconnects -- one replaced by reconnectWebSocket() stays closed.
+      if (stompClient === client) stompReconnectTimer = setTimeout(connectWebSocket, 3000);
+    });
+  }
 
-    }, () => setTimeout(connectWebSocket, 3000));
+  /** Reopens the connection as whoever is now signed in (or no one). */
+  function reconnectWebSocket() {
+    const previous = stompClient;
+    stompClient = null;
+    locationSubscriptions = [];
+    clearTimeout(stompReconnectTimer);
+    if (previous) {
+      try { previous.disconnect(() => {}); } catch { /* already closed */ }
+    }
+    connectWebSocket();
+  }
+
+  /** (Re)subscribes to the current location's queue and Now Playing topics. */
+  function subscribeToLocation() {
+    locationSubscriptions.forEach(sub => { try { sub.unsubscribe(); } catch { /* closed */ } });
+    locationSubscriptions = [];
+    if (!stompClient || !stompClient.connected || state.locationId == null) return;
+    const topic = `/topic/location/${state.locationId}`;
+
+    locationSubscriptions.push(stompClient.subscribe(`${topic}/now-playing`, (frame) => {
+      activeSongQueueRefresh?.();
+      const widget = document.getElementById('nowPlayingWidget');
+      if (!widget) return;
+      const msg = JSON.parse(frame.body);
+      setNowPlayingWidget(widget, msg.song);
+    }));
+
+    // The whole queue on every change, [] once it is empty -- keeps the "View Queue" button in
+    // sync with whether there's anything queued, and the Song Queue screen (if showing) in sync
+    // with the queue itself.
+    locationSubscriptions.push(stompClient.subscribe(`${topic}/queue`, (frame) => {
+      const queuedSongs = JSON.parse(frame.body) || [];
+      state.queueHasSongs = queuedSongs.length > 0;
+      updateViewQueueVisibility();
+      activeSongQueueRefresh?.();
+    }));
   }
 
   // ── Init ────────────────────────────────────────────────────────────────

@@ -1487,6 +1487,16 @@ input {
   color: #e05555;
 }
 
+/* A song the queue's rules refuse right now: both play actions greyed out, not tappable. */
+.song-popup-action--disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.song-popup-action--disabled:hover {
+  background: none;
+}
+
 /* ── Playlist tiles ─────────────────────────────────────────────────────── */
 
 .playlist-tile-create-img {

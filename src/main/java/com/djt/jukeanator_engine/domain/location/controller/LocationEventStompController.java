@@ -1,6 +1,8 @@
 package com.djt.jukeanator_engine.domain.location.controller;
 
 import java.security.Principal;
+import java.util.Collections;
+import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -14,6 +16,7 @@ import com.djt.jukeanator_engine.domain.location.dto.LocationPricingConfigDto;
 import com.djt.jukeanator_engine.domain.location.security.LocationPrincipal;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
+import com.djt.jukeanator_engine.web.event.LocationTopics;
 
 /**
  * Master-only STOMP {@code @MessageMapping} handlers for the {@code /ws-slave} channel — the
@@ -41,12 +44,27 @@ public class LocationEventStompController {
     this.locationService = locationService;
   }
 
+  /**
+   * Republishes a slave's event to that location's {@link LocationTopics} topic, in the same
+   * payload shape a standalone jukebox publishes its own (see {@code WebSocketEventBroadcaster}): a
+   * slave forwards the now-playing song bare (null when playback stops), and a broker message can
+   * never carry a null payload.
+   */
   @MessageMapping("/location-events")
   public void handleLocationEvent(LocationEventMessage message, Principal principal) {
 
     String locationId = principal.getName();
-    messagingTemplate.convertAndSend(
-        "/topic/location/" + locationId + "/" + message.eventType(), message.payload());
+    Object payload = switch (message.eventType()) {
+      // The same JSON as NowPlayingMessage: {"song": ...}, with song null when nothing is playing.
+      case LocationTopics.NOW_PLAYING -> Collections.singletonMap("song", message.payload());
+      case LocationTopics.QUEUE -> message.payload() != null ? message.payload() : List.of();
+      default -> message.payload();
+    };
+    if (payload == null) {
+      return;
+    }
+    messagingTemplate.convertAndSend(LocationTopics.topic(locationId, message.eventType()),
+        payload);
   }
 
   @MessageMapping("/location-command-reply")

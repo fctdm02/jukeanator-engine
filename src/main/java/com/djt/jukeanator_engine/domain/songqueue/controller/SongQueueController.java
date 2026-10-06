@@ -213,13 +213,13 @@ public class SongQueueController {
 
     // For JWT-authenticated web users the principal is the email string; override the request body
     // username so that the server is authoritative and clients cannot impersonate other users.
+    int priority = webUserPriority(addSongToQueueRequest);
     AddSongToQueueRequest webUserRequest = new AddSongToQueueRequest(
         email,
         addSongToQueueRequest.albumId(),
         addSongToQueueRequest.songId(),
-        addSongToQueueRequest.priority(),
+        priority,
         addSongToQueueRequest.priorityPlay());
-    int priority = webUserRequest.priority() != null ? webUserRequest.priority() : 1;
 
     synchronized (lockFor(email)) {
       userService.requireAffordableQueueAdd(email, locationId, priority,
@@ -233,6 +233,25 @@ public class SongQueueController {
       }
       return entry;
     }
+  }
+
+  /**
+   * The priority a web user's song is queued at decides its place in the queue and, for a priority
+   * play, its price -- so it is never taken from the client on trust. A normal play has a fixed
+   * price and always queues at priority 1; a priority play below priority 1 would be free (or
+   * negatively priced) and is refused.
+   */
+  private static int webUserPriority(AddSongToQueueRequest addSongToQueueRequest) {
+
+    if (!addSongToQueueRequest.priorityPlay()) {
+      return 1;
+    }
+    Integer priority = addSongToQueueRequest.priority();
+    if (priority == null || priority < 1) {
+      throw new IllegalArgumentException(
+          "A priority play must be queued at priority 1 or higher, not: " + priority);
+    }
+    return priority;
   }
 
   /** Admin-only (see {@code SecurityConfig}) -- web patrons cannot queue a whole album. */

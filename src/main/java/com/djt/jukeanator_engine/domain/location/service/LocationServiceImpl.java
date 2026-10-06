@@ -126,6 +126,7 @@ public class LocationServiceImpl implements LocationService {
 
     LocationEntity location = new LocationEntity(persistentIdentity, request.name(),
         request.latitude(), request.longitude(), passwordEncoder.encode(apiKey));
+    location.setApiKeyLookup(ApiKeyLookup.of(apiKey));
     location.setStatus(LocationStatus.PROVISIONED);
 
     this.locationRoot.addLocation(location);
@@ -148,6 +149,12 @@ public class LocationServiceImpl implements LocationService {
     return summaries;
   }
 
+  /**
+   * Checks {@code apiKey} against the location's indexed SHA-256 lookup value (see
+   * {@link ApiKeyLookup}). A location row inserted by hand has only its bcrypt hash: its key is
+   * checked against that once, and on a match the lookup value is stored, so every later check is
+   * the fast one.
+   */
   @Override
   public boolean verifyApiKey(Integer locationId, String apiKey) {
 
@@ -155,21 +162,53 @@ public class LocationServiceImpl implements LocationService {
     if (location == null || apiKey == null) {
       return false;
     }
-    return passwordEncoder.matches(apiKey, location.getApiKeyHash());
+    if (location.getApiKeyLookup() != null) {
+      return ApiKeyLookup.matches(location.getApiKeyLookup(), apiKey);
+    }
+    return verifyLegacyApiKey(location, apiKey);
   }
 
+  /**
+   * Finds the location by {@code apiKey}'s lookup value: one SHA-256 and a comparison per
+   * location, never a bcrypt check -- so a wrong key costs almost nothing. Only locations still
+   * without a lookup value (rows inserted by hand, whose slave has not yet authenticated) are
+   * bcrypt-checked, each at most until its slave first connects.
+   */
   @Override
   public Integer resolveAndVerifyByApiKey(String apiKey) {
 
     if (apiKey == null) {
       return null;
     }
+    String lookup = ApiKeyLookup.of(apiKey);
     for (LocationEntity location : this.locationRoot.getLocations()) {
-      if (passwordEncoder.matches(apiKey, location.getApiKeyHash())) {
+      if (lookup.equals(location.getApiKeyLookup())) {
+        return location.getPersistentIdentity();
+      }
+    }
+    for (LocationEntity location : this.locationRoot.getLocations()) {
+      if (location.getApiKeyLookup() == null && verifyLegacyApiKey(location, apiKey)) {
         return location.getPersistentIdentity();
       }
     }
     return null;
+  }
+
+  /** A bcrypt check of a hand-inserted location's key, storing its lookup value on a match. */
+  private boolean verifyLegacyApiKey(LocationEntity location, String apiKey) {
+
+    if (!passwordEncoder.matches(apiKey, location.getApiKeyHash())) {
+      return false;
+    }
+    synchronized (this) {
+      if (location.getApiKeyLookup() == null) {
+        location.setApiKeyLookup(ApiKeyLookup.of(apiKey));
+        this.locationRepository.storeAggregateRoot(this.locationRoot);
+        log.info("Stored the API key lookup value for locationId " + location.getPersistentIdentity()
+            + " -- its key is no longer bcrypt-checked");
+      }
+    }
+    return true;
   }
 
   @Override
@@ -380,7 +419,9 @@ public class LocationServiceImpl implements LocationService {
     // Nothing ever authenticates into a standalone/slave instance's own local LocationRepository
     // (that check only happens on master, against master's own copy) -- this hash is a throwaway,
     // distinct from app.location-api-key, which is the real secret used for outbound auth to master.
-    location.setApiKeyHash(passwordEncoder.encode(generateApiKey()));
+    String throwawayApiKey = generateApiKey();
+    location.setApiKeyHash(passwordEncoder.encode(throwawayApiKey));
+    location.setApiKeyLookup(ApiKeyLookup.of(throwawayApiKey));
 
     this.locationRoot.addLocation(location);
     this.locationRepository.storeAggregateRoot(this.locationRoot);

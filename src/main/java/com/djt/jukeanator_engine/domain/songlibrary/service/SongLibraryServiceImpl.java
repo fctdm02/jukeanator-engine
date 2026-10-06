@@ -26,6 +26,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.exception.ResourceNotFoundException;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandRequest;
 import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResponse;
@@ -227,7 +228,7 @@ public class SongLibraryServiceImpl
       this.songLibraryRoots.put(locationId, loaded);
       return loaded;
     } catch (EntityDoesNotExistException ednee) {
-      throw new SongLibraryServiceException(
+      throw new ResourceNotFoundException(
           "No song library found for locationId: [" + locationId + "]", ednee);
     }
   }
@@ -924,7 +925,7 @@ public class SongLibraryServiceImpl
     try {
       return SongLibraryMapper.toArtistDto(getOrLoadRoot(locationId).getArtistByName(artistName));
     } catch (EntityDoesNotExistException ednee) {
-      throw new SongLibraryServiceException("Could not find artist by name: " + artistName, ednee);
+      throw new ResourceNotFoundException("Could not find artist by name: " + artistName, ednee);
     }
   }
 
@@ -934,7 +935,7 @@ public class SongLibraryServiceImpl
     try {
       return SongLibraryMapper.toArtistDto(getOrLoadRoot(locationId).getArtistById(artistId));
     } catch (EntityDoesNotExistException ednee) {
-      throw new SongLibraryServiceException("Could not find artist by id: " + artistId, ednee);
+      throw new ResourceNotFoundException("Could not find artist by id: " + artistId, ednee);
     }
   }
 
@@ -944,7 +945,7 @@ public class SongLibraryServiceImpl
     try {
       return SongLibraryMapper.toArtistDto(getOrLoadRoot(locationId).getArtistByAlbumId(albumId));
     } catch (EntityDoesNotExistException ednee) {
-      throw new SongLibraryServiceException(
+      throw new ResourceNotFoundException(
           "Could not find artist by album id: " + albumId, ednee);
     }
   }
@@ -955,7 +956,7 @@ public class SongLibraryServiceImpl
     try {
       return SongLibraryMapper.toAlbumDto(getOrLoadRoot(locationId).getAlbumById(albumId));
     } catch (EntityDoesNotExistException ednee) {
-      throw new SongLibraryServiceException("Could not find album by id: " + albumId, ednee);
+      throw new ResourceNotFoundException("Could not find album by id: " + albumId, ednee);
     }
   }
 
@@ -965,7 +966,8 @@ public class SongLibraryServiceImpl
     try {
       return SongLibraryMapper.toSongDto(getOrLoadRoot(locationId).getSongById(albumId, songId));
     } catch (EntityDoesNotExistException ednee) {
-      throw new SongLibraryServiceException("Could not find song by id: " + albumId, ednee);
+      throw new ResourceNotFoundException(
+          "Could not find song by id: " + songId + " on album: " + albumId, ednee);
     }
   }
 

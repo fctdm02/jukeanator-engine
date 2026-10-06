@@ -11,7 +11,6 @@ public class ArtistFolderEntity extends FolderEntity implements LibraryItem {
   private transient String coverArtPath;
   private transient Integer albumCount;
   private transient Integer songCount;
-  private transient Integer numPlays;
   private transient List<AlbumFolderEntity> albums;
   private transient GenreFolderEntity parentGenre;
   private transient Year releaseDate;
@@ -104,24 +103,22 @@ public class ArtistFolderEntity extends FolderEntity implements LibraryItem {
       getAlbums();
     }
 
-    if (numPlays == null) {
+    // Summed on every call, never cached: songs gain plays while the jukebox runs, and a cached
+    // total froze every artist's popularity at whatever it was when first asked for.
+    int np = 0;
+    for (AlbumFolderEntity album : albums) {
 
-      int np = 0;
-      for (AlbumFolderEntity album : albums) {
-
-        if (!album.isCompilation()) {
-          np = np + album.getNumPlays();
-        } else {
-          for (SongFileEntity song : album.getChildSongs()) {
-            if (song.getArtistName().equals(getName())) {
-              np = np + song.getNumPlays();
-            }
+      if (!album.isCompilation()) {
+        np = np + album.getNumPlays();
+      } else {
+        for (SongFileEntity song : album.getChildSongs()) {
+          if (getName().equals(song.getArtistName())) {
+            np = np + song.getNumPlays();
           }
         }
       }
-      numPlays = Integer.valueOf(np);
     }
-    return numPlays;
+    return Integer.valueOf(np);
   }
 
   @Override

@@ -17,7 +17,6 @@ public final class ArtistFromSongEntity extends ArtistFolderEntity {
   private transient String coverArtPath;
   private transient Integer albumCount;
   private transient Integer songCount;
-  private transient Integer numPlays;
   private transient List<AlbumFolderEntity> childAlbumList;
   private transient GenreFolderEntity genre; // Will be the most prevalent genre from all the child
                                              // albums
@@ -114,24 +113,22 @@ public final class ArtistFromSongEntity extends ArtistFolderEntity {
   @Override
   public Integer getNumPlays() {
 
-    if (numPlays == null) {
+    // Summed on every call, never cached: songs gain plays while the jukebox runs, and a cached
+    // total froze every artist's popularity at whatever it was when first asked for.
+    int np = 0;
+    for (AlbumFolderEntity album : childAlbums) {
 
-      int np = 0;
-      for (AlbumFolderEntity album : childAlbums) {
-
-        if (!album.isCompilation()) {
-          np = np + album.getNumPlays();
-        } else {
-          for (SongFileEntity song : album.getChildSongs()) {
-            if (song.getArtistName().equals(getName())) {
-              np = np + song.getNumPlays();
-            }
+      if (!album.isCompilation()) {
+        np = np + album.getNumPlays();
+      } else {
+        for (SongFileEntity song : album.getChildSongs()) {
+          if (getName().equals(song.getArtistName())) {
+            np = np + song.getNumPlays();
           }
         }
       }
-      numPlays = Integer.valueOf(np);
     }
-    return numPlays;
+    return Integer.valueOf(np);
   }
 
   @Override

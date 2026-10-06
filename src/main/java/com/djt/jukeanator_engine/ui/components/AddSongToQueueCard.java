@@ -214,7 +214,9 @@ public class AddSongToQueueCard extends JPanel {
    */
   public void showConstraintPanel(String reason) {
 
-    this.constraintLabelText = this.constraintLabelText.replace("[REASON]", reason);
+    // Reasons such as "is already in the queue" describe the song itself: "...because it is...".
+    String phrased = reason.matches("^(has|is|was) .*") ? "it " + reason : reason;
+    this.constraintLabelText = this.constraintLabelText.replace("[REASON]", phrased);
     this.constraintLabel.setText(this.constraintLabelText);
     innerCardLayout.show(innerCardRoot, INNER_CARD_CONSTRAINT);
   }

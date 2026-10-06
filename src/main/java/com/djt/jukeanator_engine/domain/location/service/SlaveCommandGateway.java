@@ -9,21 +9,22 @@ import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import com.djt.jukeanator_engine.domain.common.exception.ResourceNotFoundException;
 import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.exception.LocationOfflineException;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
+import com.djt.jukeanator_engine.domain.songqueue.exception.SongNotEligibleException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Master-only. Bridges a synchronous-looking master-side service call to an async round trip
  * over the {@code /ws-slave} push channel: only the slave can dial master (no public IP), so
- * master cannot simply {@code RestClient.post()} a slave the way the dead
- * {@code SongQueueServiceHttpClient} does. Instead, a command is pushed to the slave's user
- * destination via {@code convertAndSendToUser}, and this class holds the calling thread on a
- * {@link CompletableFuture} keyed by a correlationId until the slave's reply arrives (via
- * {@code LocationEventStompController}) or {@code location.command-timeout-ms} elapses.
+ * master cannot simply {@code RestClient.post()} a slave. Instead, a command is pushed to the
+ * slave's user destination via {@code convertAndSendToUser}, and this class holds the calling
+ * thread on a {@link CompletableFuture} keyed by a correlationId until the slave's reply arrives
+ * (via {@code LocationEventStompController}) or {@code location.command-timeout-ms} elapses.
  *
  * @author tmyers
  */
@@ -120,6 +121,14 @@ public class SlaveCommandGateway {
       }
 
       if (!reply.success()) {
+        // A refusal written for the patron is re-raised as-is, so it reaches them with the same
+        // status and message as on a standalone jukebox.
+        if (SongNotEligibleException.class.getSimpleName().equals(reply.errorType())) {
+          throw new SongNotEligibleException(reply.errorMessage());
+        }
+        if (ResourceNotFoundException.class.getSimpleName().equals(reply.errorType())) {
+          throw new ResourceNotFoundException(reply.errorMessage());
+        }
         throw new LocationServiceException("Command " + commandType + " rejected by locationId "
             + locationId + ": " + reply.errorMessage());
       }

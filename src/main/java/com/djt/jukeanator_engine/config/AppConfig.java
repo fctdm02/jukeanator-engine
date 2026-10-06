@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.config;
 
+import java.nio.file.Path;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -294,15 +295,20 @@ public class AppConfig {
       BackgroundMusicService backgroundMusicService,
       SongQueueRepository songQueueRepository,
       ApplicationEventPublisher eventPublisher,
-      Optional<SlaveCommandGateway> slaveCommandGateway) {
+      Optional<SlaveCommandGateway> slaveCommandGateway,
+      AppProperties appProperties) {
 
+    // When each song last played, for the minimum-minutes-between-plays rule -- kept beside the
+    // queue's own state so a restart does not let a song that just played be queued again. (Master
+    // never plays a song, so it never writes this file.)
     return new SongQueueServiceImpl(
         songQueueProperties,
         songLibraryService,
         backgroundMusicService,
         songQueueRepository,
         eventPublisher,
-        slaveCommandGateway);
+        slaveCommandGateway,
+        Path.of(appProperties.getDataDir(), "JukeANator_RecentSongPlays.json"));
   }
 
   // Real, hardware-backed implementation -- never constructed on master (its constructor spins up

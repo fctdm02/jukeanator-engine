@@ -3,6 +3,8 @@ package com.djt.jukeanator_engine.domain.user.model;
 import java.util.Collection;
 import java.util.Map;
 import java.util.TreeMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
@@ -18,9 +20,13 @@ public class UserRootEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
+  private static final Logger log = LoggerFactory.getLogger(UserRootEntity.class);
+
   public static final String USER_LIST_FILENAME = "JukeANator_Users.json";
 
-  private Map<String, UserEntity> users = new TreeMap<>();
+  // Keyed without regard to case: an email address names one account however it is typed (a
+  // phone's keyboard often capitalizes the first letter).
+  private Map<String, UserEntity> users = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 
   public UserRootEntity() {
     super(Integer.valueOf(0));
@@ -38,8 +44,17 @@ public class UserRootEntity extends AbstractPersistentEntity {
 
   public UserEntity addUser(UserEntity user) {
 
-    return this.users.put(user.getEmailAddress(), user);
+    UserEntity replaced = this.users.put(user.getEmailAddress(), user);
+    if (replaced != null && replaced != user) {
+      // Only possible for accounts stored before addresses were compared without regard to case.
+      log.warn("Two accounts share email address [{}] (ignoring case): user ids {} and {} -- only "
+          + "the latter can sign in", user.getEmailAddress(), replaced.getPersistentIdentity(),
+          user.getPersistentIdentity());
+    }
+    return replaced;
   }
+
+  /** {@code emailAddress} is matched without regard to case; null matches no one. */
 
   /**
    * The placeholder id for the next new user -- one past the highest id any user currently holds,
@@ -53,7 +68,7 @@ public class UserRootEntity extends AbstractPersistentEntity {
 
   public UserEntity getUserByEmailAddressNullIfNotExists(String emailAddress) {
 
-    return this.users.get(emailAddress);
+    return emailAddress == null ? null : this.users.get(emailAddress);
   }
 
   public UserEntity removeUser(String emailAddress) {

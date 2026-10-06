@@ -210,14 +210,25 @@ class UserControllerTest extends AbstractControllerTest {
     AlbumDto album = new AlbumDto(1, "Genre", 1, "Artist", 2, "Album", false, "Label", "2020",
         "/cover.jpg", false, 5, List.of());
     SongDto song = new SongDto(1, "Genre", 1, "Artist", 2, "Album", "/cover.jpg", 3, "Song", 1, 5);
-    when(userService.getPublicHomePage())
+    when(userService.getPublicHomePage(12))
         .thenReturn(new HomePageDto(List.of(artist), List.of(album), List.of(song)));
 
-    mockMvc.perform(get("/api/users/home-public"))
+    mockMvc.perform(get("/api/users/home-public").param("locationId", "12"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.artistsHotHere[0].artistName", is("Artist")))
         .andExpect(jsonPath("$.albumsHotHere[0].albumName", is("Album")))
         .andExpect(jsonPath("$.songsHotHere[0].songName", is("Song")));
+  }
+
+  @Test
+  void getPublicHomePage_withoutALocation_isForThisInstancesOwnLocation() throws Exception {
+    when(songLibraryService.getOwnLocationId()).thenReturn(7);
+    when(userService.getPublicHomePage(7))
+        .thenReturn(new HomePageDto(List.of(), List.of(), List.of()));
+
+    mockMvc.perform(get("/api/users/home-public"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.songsHotHere").isEmpty());
   }
 
   @Test
@@ -248,9 +259,9 @@ class UserControllerTest extends AbstractControllerTest {
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     UserHomePageDto homePage = new UserHomePageDto(List.of(), List.of("My Favorites"), List.of(),
         List.of(), List.of(), List.of("beatles"));
-    when(userService.getHomePage("jane@example.com")).thenReturn(homePage);
+    when(userService.getHomePage("jane@example.com", 12)).thenReturn(homePage);
 
-    mockMvc.perform(get("/api/users/home"))
+    mockMvc.perform(get("/api/users/home").param("locationId", "12"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.myPlaylists[0]", is("My Favorites")))
         .andExpect(jsonPath("$.searchHistory[0]", is("beatles")));

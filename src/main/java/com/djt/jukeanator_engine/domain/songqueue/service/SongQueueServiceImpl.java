@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songqueue.service;
 
 import static java.util.Objects.requireNonNull;
 import java.io.File;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -18,6 +19,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.djt.jukeanator_engine.domain.backgroundmusic.exception.BackgroundMusicServiceException;
 import com.djt.jukeanator_engine.domain.backgroundmusic.service.BackgroundMusicService;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.exception.ResourceNotFoundException;
 import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.common.service.AggregateRootService;
@@ -46,8 +48,10 @@ import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueu
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueEmptyEvent;
+import com.djt.jukeanator_engine.domain.songqueue.exception.SongNotEligibleException;
 import com.djt.jukeanator_engine.domain.songqueue.exception.SongQueueServiceException;
 import com.djt.jukeanator_engine.domain.songqueue.mapper.SongQueueMapper;
+import com.djt.jukeanator_engine.domain.songqueue.model.RecentSongPlays;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
@@ -94,6 +98,10 @@ public class SongQueueServiceImpl
   /** Reference to the track that is currently playing on the output system */
   private SongFileEntity currentlyPlayingSong;
 
+  // ── Rule A State Tracking ────────────────────────────────────────────────
+  /** When each song last started playing, within the minimum-minutes-between-plays window. */
+  private final RecentSongPlays recentSongPlays;
+
   // ── Song Queue Lock State ────────────────────────────────────────────────
   /**
    * When {@code true}, {@link #dequeueNextSong()} will not dequeue/play any song -- songs may
@@ -102,10 +110,23 @@ public class SongQueueServiceImpl
    */
   private volatile boolean isSongQueueLocked = false;
 
+  /** Keeps recent song plays in memory only -- see the overload taking the file to keep them in. */
   public SongQueueServiceImpl(SongQueueProperties songQueueProperties,
       SongLibraryService songLibraryService, BackgroundMusicService backgroundMusicService,
       SongQueueRepository songQueueRepository, ApplicationEventPublisher eventPublisher,
       Optional<SlaveCommandGateway> slaveCommandGateway) {
+    this(songQueueProperties, songLibraryService, backgroundMusicService, songQueueRepository,
+        eventPublisher, slaveCommandGateway, null);
+  }
+
+  /**
+   * @param recentSongPlaysFile where the time each song last started playing is kept across
+   *        restarts (see {@link RecentSongPlays}), or null to keep it in memory only
+   */
+  public SongQueueServiceImpl(SongQueueProperties songQueueProperties,
+      SongLibraryService songLibraryService, BackgroundMusicService backgroundMusicService,
+      SongQueueRepository songQueueRepository, ApplicationEventPublisher eventPublisher,
+      Optional<SlaveCommandGateway> slaveCommandGateway, Path recentSongPlaysFile) {
 
     requireNonNull(songQueueProperties, "songQueueProperties cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
@@ -129,6 +150,8 @@ public class SongQueueServiceImpl
     this.allowExplicitSongsAtAllTimes = songQueueProperties.isAllowExplicitSongsAtAllTimes();
     this.allowExplicitSongsBegin = songQueueProperties.getAllowExplicitSongsBegin();
     this.allowExplicitSongsEnd = songQueueProperties.getAllowExplicitSongsEnd();
+    this.recentSongPlays = new RecentSongPlays(
+        Duration.ofMinutes(this.minimumMinutesBetweenSongPlays), recentSongPlaysFile);
 
     initialize();
   }
@@ -231,8 +254,15 @@ public class SongQueueServiceImpl
     // Rotate the currently playing song into history before advancing to the next track.
     if (currentlyPlayingSong != null) {
       songPlayHistory.add(currentlyPlayingSong);
+      // Rule B only ever looks back maximumConsecutiveSongPlaysByArtist songs.
+      while (songPlayHistory.size() > Math.max(1, maximumConsecutiveSongPlaysByArtist)) {
+        songPlayHistory.removeFirst();
+      }
     }
     currentlyPlayingSong = nextSong.getSong();
+
+    // ── Rule A State Tracking ────────────────────────────────────────────────
+    recentSongPlays.recordPlay(currentlyPlayingSong, Instant.now());
 
     autoPopulateQueue();
 
@@ -399,36 +429,24 @@ public class SongQueueServiceImpl
 
 
       // ─────────────────────────────────────────────────────────────────────
-      // Rule A — minimum time between plays of the same song
+      // Rule A — the same song is never queued twice, and never replayed within
+      // minimumMinutesBetweenSongPlays of when it last started playing
       // ─────────────────────────────────────────────────────────────────────
-      String targetSongName = targetSong.getSongName();
-      String targetSongArtistName = targetSong.getArtistName();
-      String targetAlbumArtistName = album.getParentArtist().getName();
-
-      List<SongQueueEntryEntity> queuedSongs = songQueueRoot.getSongs();
-      for (SongQueueEntryEntity queuedEntry : queuedSongs) {
-
-        SongFileEntity queuedSong = queuedEntry.getSong();
-
-        String queuedSongName = queuedSong.getSongName();
-        String queuedSongArtistName = queuedSong.getArtistName();
-        String queuedSongAlbumArtistName = queuedSong.getAlbum().getParentArtist().getName();
-
-        boolean isSameSong = (targetSongName.equals(queuedSongName)
-            && (targetSongArtistName.equals(queuedSongArtistName)
-                || targetAlbumArtistName.equals(queuedSongAlbumArtistName)));
-
-        if (isSameSong) {
-
-          long minutesBetween = Duration.between(queuedEntry.getQueuedAtTime(), now).toMinutes();
-          if (minutesBetween < minimumMinutesBetweenSongPlays) {
-
-            long minutesRemaining = minimumMinutesBetweenSongPlays - minutesBetween;
-
-            return "has already been played in the last " + minimumMinutesBetweenSongPlays
-                + " min. Try again in " + minutesRemaining + " min";
-          }
+      // A song still waiting in the queue is refused however long it has waited -- the wait is
+      // measured from when a song plays, not from when it was queued.
+      for (SongQueueEntryEntity queuedEntry : songQueueRoot.getSongs()) {
+        if (isSameSong(targetSong, queuedEntry.getSong())) {
+          return "is already in the queue";
         }
+      }
+
+      Optional<Instant> lastPlayed = recentSongPlays.lastPlayedWithinWindow(targetSong, now);
+      if (lastPlayed.isPresent()) {
+        long secondsRemaining = Duration.ofMinutes(minimumMinutesBetweenSongPlays)
+            .minus(Duration.between(lastPlayed.get(), now)).toSeconds();
+        long minutesRemaining = Math.max(1, (secondsRemaining + 59) / 60);
+        return "has already been played in the last " + minimumMinutesBetweenSongPlays
+            + " min. Try again in " + minutesRemaining + " min";
       }
 
 
@@ -558,7 +576,7 @@ public class SongQueueServiceImpl
       String ineligibleReason;
       try {
         ineligibleReason = isSongEligibleForQueue(locationId, albumId, songId, priority);
-      } catch (SongQueueServiceException e) {
+      } catch (SongQueueServiceException | ResourceNotFoundException e) {
         ineligibleReason = "the song cannot be found";
       }
       results.add(new SongEligibilityDto(locationId, albumId, songId, ineligibleReason));
@@ -576,6 +594,7 @@ public class SongQueueServiceImpl
 
     SongQueueEntryDto queueEntryDto;
     synchronized (this) {
+      requireEligibleForPatron(locationId, addSongToQueueRequest);
       queueEntryDto =
           addSongToQueue(addSongToQueueRequest.username(), addSongToQueueRequest.albumId(),
               addSongToQueueRequest.songId(), addSongToQueueRequest.priority());
@@ -586,6 +605,75 @@ public class SongQueueServiceImpl
     eventPublisher.publishEvent(new SongQueueChangedEvent(getQueuedSongs(locationId)));
 
     return queueEntryDto;
+  }
+
+  /**
+   * The same song for Rule A: the same title by the same song artist, or by the same album artist
+   * (so the same song on a compilation or a greatest-hits album still counts).
+   */
+  private static boolean isSameSong(SongFileEntity target, SongFileEntity other) {
+
+    if (other == null || target.getSongName() == null
+        || !target.getSongName().equals(other.getSongName())) {
+      return false;
+    }
+    if (target.getArtistName() != null && target.getArtistName().equals(other.getArtistName())) {
+      return true;
+    }
+    String targetAlbumArtist = albumArtistName(target);
+    return targetAlbumArtist != null && targetAlbumArtist.equals(albumArtistName(other));
+  }
+
+  private static String albumArtistName(SongFileEntity song) {
+    try {
+      return song.getAlbum().getParentArtist().getName();
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
+  /** Phrased for the patron the same way the web UI's Multi-Select Mode phrases a reason. */
+  private static String ineligibleMessage(String songName, String ineligibleReason) {
+    String reason = ineligibleReason.replaceAll("[.\\s]+$", "");
+    String title = "\"" + (songName != null ? songName : "This song") + "\"";
+    return reason.matches("^(has|is|was) .*")
+        ? title + " " + reason + "."
+        : title + " can't be played right now: " + reason + ".";
+  }
+
+  /**
+   * Refuses a Web/Mobile UI patron's song (any username but {@code LOCAL_USERNAME}) unless the
+   * queue's rules allow it right now -- the client is never trusted to have checked. The kiosk
+   * checks eligibility itself before it offers a song (see {@code JukeANatorFrame}), so it is left
+   * alone. Must be called while holding this service's lock, so the check and the add see the
+   * same queue.
+   */
+  private void requireEligibleForPatron(Integer locationId,
+      AddSongToQueueRequest addSongToQueueRequest) {
+
+    if (LOCAL_USERNAME.equals(addSongToQueueRequest.username())) {
+      return;
+    }
+    Integer albumId = addSongToQueueRequest.albumId();
+    Integer songId = addSongToQueueRequest.songId();
+    SongFileEntity song;
+    try {
+      AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
+      song = album != null ? album.getChildSong(songId) : null;
+    } catch (EntityDoesNotExistException e) {
+      song = null;
+    }
+    if (song == null) {
+      throw new ResourceNotFoundException(
+          "Could not add song to queue, albumId: " + albumId + ", songId: " + songId);
+    }
+
+    Integer priority =
+        addSongToQueueRequest.priority() != null ? addSongToQueueRequest.priority() : 1;
+    String ineligibleReason = isSongEligibleForQueue(locationId, albumId, songId, priority);
+    if (ineligibleReason != null) {
+      throw new SongNotEligibleException(ineligibleMessage(song.getSongName(), ineligibleReason));
+    }
   }
 
   @Override
@@ -662,7 +750,7 @@ public class SongQueueServiceImpl
             log.info("addMultipleSongsToQueue: skipping albumId={} songId={} for {}: {}",
                 albumId, songId, username, ineligibleReason);
           }
-        } catch (SongQueueServiceException e) {
+        } catch (SongQueueServiceException | ResourceNotFoundException e) {
           log.info("addMultipleSongsToQueue: skipping albumId={} songId={} for {}: {}", albumId,
               songId, username, e.getMessage());
         }
@@ -736,16 +824,16 @@ public class SongQueueServiceImpl
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }
         } else {
-          throw new SongQueueServiceException("Could not add move song up in queue, albumId: "
+          throw new ResourceNotFoundException("Could not add move song up in queue, albumId: "
               + albumId + ", songId: " + songId + ", error: song does not exist!");
         }
       } else {
-        throw new SongQueueServiceException("Could not add move song up in queue, albumId: "
+        throw new ResourceNotFoundException("Could not add move song up in queue, albumId: "
             + albumId + ", songId: " + songId + ", error: album does not exist!");
       }
       return numSongsInQueue;
     } catch (EntityDoesNotExistException e) {
-      throw new SongQueueServiceException("Could not add move song up in queue, albumId: " + albumId
+      throw new ResourceNotFoundException("Could not add move song up in queue, albumId: " + albumId
           + ", songId: " + songId + ", error: " + e.getMessage(), e);
     }
   }
@@ -776,16 +864,16 @@ public class SongQueueServiceImpl
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }
         } else {
-          throw new SongQueueServiceException("Could not add move song down in queue, albumId: "
+          throw new ResourceNotFoundException("Could not add move song down in queue, albumId: "
               + albumId + ", songId: " + songId + ", error: song does not exist!");
         }
       } else {
-        throw new SongQueueServiceException("Could not add move song down in queue, albumId: "
+        throw new ResourceNotFoundException("Could not add move song down in queue, albumId: "
             + albumId + ", songId: " + songId + ", error: album does not exist!");
       }
       return numSongsInQueue;
     } catch (EntityDoesNotExistException e) {
-      throw new SongQueueServiceException("Could not add move song down in queue, albumId: "
+      throw new ResourceNotFoundException("Could not add move song down in queue, albumId: "
           + albumId + ", songId: " + songId + ", error: " + e.getMessage(), e);
     }
   }
@@ -819,16 +907,16 @@ public class SongQueueServiceImpl
                 new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
           }
         } else {
-          throw new SongQueueServiceException("Could not remove song down in queue, albumId: "
+          throw new ResourceNotFoundException("Could not remove song down in queue, albumId: "
               + albumId + ", songId: " + songId + ", error: song does not exist!");
         }
       } else {
-        throw new SongQueueServiceException("Could not remove song down in queue, albumId: "
+        throw new ResourceNotFoundException("Could not remove song down in queue, albumId: "
             + albumId + ", songId: " + songId + ", error: album does not exist!");
       }
       return numSongsRemoved;
     } catch (EntityDoesNotExistException e) {
-      throw new SongQueueServiceException("Could not remove song down in queue, albumId: " + albumId
+      throw new ResourceNotFoundException("Could not remove song down in queue, albumId: " + albumId
           + ", songId: " + songId + ", error: " + e.getMessage(), e);
     }
   }
@@ -920,10 +1008,10 @@ public class SongQueueServiceImpl
         }
       }
     } catch (EntityDoesNotExistException ednee) {
-      throw new SongQueueServiceException("Could not add song to queue, albumId: " + albumId
+      throw new ResourceNotFoundException("Could not add song to queue, albumId: " + albumId
           + ", songId: " + songId + ", priority: " + priority, ednee);
     }
-    throw new SongQueueServiceException("Could not add song to queue, albumId: " + albumId
+    throw new ResourceNotFoundException("Could not add song to queue, albumId: " + albumId
         + ", songId: " + songId + ", priority: " + priority);
   }
 

@@ -69,17 +69,16 @@ public interface UserService {
   UserProfileDto getProfile(String emailAddress);
 
   /**
-   *
-   * @return
+   * What's hot at {@code locationId} -- on master, the location the patron picked; a null
+   * {@code locationId} there (master has no library of its own) yields empty lists.
    */
-  HomePageDto getPublicHomePage();
+  HomePageDto getPublicHomePage(Integer locationId);
 
   /**
-   * 
-   * @param emailAddress
-   * @return
+   * The signed-in patron's home page, with what's hot at {@code locationId} (see
+   * {@link #getPublicHomePage(Integer)}).
    */
-  UserHomePageDto getHomePage(String emailAddress);
+  UserHomePageDto getHomePage(String emailAddress, Integer locationId);
 
   /**
    * 

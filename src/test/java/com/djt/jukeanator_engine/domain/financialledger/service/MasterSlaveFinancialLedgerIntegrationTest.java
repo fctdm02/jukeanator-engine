@@ -157,7 +157,7 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     ProvisionedLocationDto locationB = locationService
         .registerLocation(new RegisterLocationRequest(uniqueName("Uptown Bar"), 41.9, -87.6));
 
-    String email = uniqueName("patron") + "@example.com";
+    String email = "patron+" + System.nanoTime() + "@example.com";
     userService.register(new RegisterRequest("Pat", "Ron", email, "password123"));
 
     // ── real money -> song credits, never location-attributed ──────────────
@@ -194,7 +194,7 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     ProvisionedLocationDto location = locationService
         .registerLocation(new RegisterLocationRequest(uniqueName("Closing Time Bar"), 41.0, -87.0));
 
-    String email = uniqueName("closer") + "@example.com";
+    String email = "closer+" + System.nanoTime() + "@example.com";
     userService.register(new RegisterRequest("Clo", "Ser", email, "password123"));
     AddFundsResponseDto purchase =
         userService.addFunds(email, new AddFundsRequest("pkg-7", "fake-nonce"));
@@ -265,7 +265,7 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     ProvisionedLocationDto locationB = locationService
         .registerLocation(new RegisterLocationRequest(uniqueName("Other Bar"), 41.9, -87.6));
 
-    String email = uniqueName("puller") + "@example.com";
+    String email = "puller+" + System.nanoTime() + "@example.com";
     userService.register(new RegisterRequest("Pul", "Ler", email, "password123"));
     // A new account starts with no credits, and only credits actually spent are recorded.
     userService.addFunds(email, new AddFundsRequest("pkg-7", "fake-nonce"));

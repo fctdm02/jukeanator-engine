@@ -151,8 +151,9 @@ public class AlbumFolderEntity extends FolderEntity implements LibraryItem {
     this.metaData = new AlbumMetaDataFileEntity(this, METADATA_FILENAME);
   }
 
+  /** False for an album with no metadata at all -- nothing marks it explicit. */
   public boolean hasExplicit() {
-    return this.metaData.hasExplicit();
+    return this.metaData != null && this.metaData.hasExplicit();
   }
 
   public String getRecordLabel() {

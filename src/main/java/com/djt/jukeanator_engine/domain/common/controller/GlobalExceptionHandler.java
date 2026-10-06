@@ -10,9 +10,13 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.common.exception.ResourceNotFoundException;
 import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.location.exception.GeoFenceViolationException;
 import com.djt.jukeanator_engine.domain.location.exception.LocationOfflineException;
+import com.djt.jukeanator_engine.domain.songqueue.exception.SongNotEligibleException;
+import com.djt.jukeanator_engine.domain.user.exception.EmailAlreadyRegisteredException;
+import com.djt.jukeanator_engine.domain.user.exception.IncorrectPasswordException;
 import com.djt.jukeanator_engine.domain.user.exception.InsufficientCreditsException;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
@@ -35,6 +39,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EntityDoesNotExistException.class)
     public void handleNotFound(EntityDoesNotExistException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logExpected(HttpStatus.NOT_FOUND, ex, request);
+        write(HttpStatus.NOT_FOUND, ex, response);
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public void handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
         logExpected(HttpStatus.NOT_FOUND, ex, request);
         write(HttpStatus.NOT_FOUND, ex, response);
     }
@@ -89,6 +99,25 @@ public class GlobalExceptionHandler {
     public void handleInsufficientCredits(InsufficientCreditsException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
         logExpected(HttpStatus.PAYMENT_REQUIRED, ex, request);
         write(HttpStatus.PAYMENT_REQUIRED, ex, response);
+    }
+
+    @ExceptionHandler(SongNotEligibleException.class)
+    public void handleSongNotEligible(SongNotEligibleException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logExpected(HttpStatus.CONFLICT, ex, request);
+        write(HttpStatus.CONFLICT, ex, response);
+    }
+
+    @ExceptionHandler(EmailAlreadyRegisteredException.class)
+    public void handleEmailAlreadyRegistered(EmailAlreadyRegisteredException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logExpected(HttpStatus.CONFLICT, ex, request);
+        write(HttpStatus.CONFLICT, ex, response);
+    }
+
+    // 400, never 401: the Web/Mobile UI treats a 401 as an expired session and signs out.
+    @ExceptionHandler(IncorrectPasswordException.class)
+    public void handleIncorrectPassword(IncorrectPasswordException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logExpected(HttpStatus.BAD_REQUEST, ex, request);
+        write(HttpStatus.BAD_REQUEST, ex, response);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

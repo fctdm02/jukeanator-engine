@@ -47,7 +47,10 @@ import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.domain.user.event.LocationSongCreditUsageRecordedEvent;
 import com.djt.jukeanator_engine.domain.user.event.PurchaseCompletedEvent;
+import com.djt.jukeanator_engine.domain.user.event.RecentPlayAddedEvent;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
+import com.djt.jukeanator_engine.domain.user.exception.EmailAlreadyRegisteredException;
+import com.djt.jukeanator_engine.domain.user.exception.IncorrectPasswordException;
 import com.djt.jukeanator_engine.domain.user.exception.InsufficientCreditsException;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
@@ -140,36 +143,55 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     return registerWithRole(request, UserRole.ROLE_ADMIN);
   }
 
+  /** Validates the request against {@link AccountValidator}'s rules before creating the account. */
   private synchronized AuthResponse registerWithRole(RegisterRequest request, UserRole role) {
 
-    UserEntity check = userRoot.getUserByEmailAddressNullIfNotExists(request.emailAddress());
-    if (check != null) {
-      throw new UserServiceException("Email already registered: " + request.emailAddress());
+    String emailAddress = AccountValidator.requireValidEmail(request.emailAddress());
+    if (emailAddress.endsWith(UserEntity.CLOSED_ACCOUNT_EMAIL_DOMAIN)) {
+      throw new IllegalArgumentException("Please enter a valid email address.");
     }
-    if (request.emailAddress() != null
-        && request.emailAddress().endsWith(UserEntity.CLOSED_ACCOUNT_EMAIL_DOMAIN)) {
-      throw new UserServiceException("Invalid email address: " + request.emailAddress());
+    String firstName = AccountValidator.requireValidName(request.firstName(), "first name");
+    String lastName = AccountValidator.requireValidName(request.lastName(), "last name");
+    AccountValidator.requireValidPassword(request.password());
+
+    if (userRoot.getUserByEmailAddressNullIfNotExists(emailAddress) != null) {
+      throw new EmailAlreadyRegisteredException(
+          "An account already exists for " + emailAddress + ". Please sign in instead.");
     }
+
+    UserEntity user = createUser(firstName, lastName, emailAddress, request.password(), role);
+    String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole().name());
+    return new AuthResponse(token, user.getEmailAddress(), user.getRole().name());
+  }
+
+  /**
+   * Creates and stores an account, unvalidated -- callers validate (or, for the kiosk's own
+   * internal {@code LOCAL_USERNAME} account, deliberately do not).
+   */
+  private UserEntity createUser(String firstName, String lastName, String emailAddress,
+      String password, UserRole role) {
 
     Integer persistentIdentity = this.userRoot.nextUserPersistentIdentity();
 
     // A new account starts with no credits: every credit a web user spends must have been bought
     // through Add Funds, since each one spent is paid out to the location as mobile revenue.
-    UserEntity user = new UserEntity(persistentIdentity, request.firstName(), request.lastName(),
-        request.emailAddress(), passwordEncoder.encode(request.password()), STARTING_CREDITS,
-        role);
+    // The UserEntity constructor gives every new account its My Favorites playlist.
+    UserEntity user = new UserEntity(persistentIdentity, firstName, lastName, emailAddress,
+        passwordEncoder.encode(password), STARTING_CREDITS, role);
 
     this.userRoot.addUser(user);
     this.userRepository.storeAggregateRoot(this.userRoot);
-
-    String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole().name());
-    return new AuthResponse(token, user.getEmailAddress(), user.getRole().name());
+    return user;
   }
 
   @Override
   public synchronized AuthResponse login(LoginRequest request) throws InvalidCredentialsException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(request.emailAddress());;
+    if (request.emailAddress() == null || request.password() == null) {
+      throw new InvalidCredentialsException("Invalid credentials");
+    }
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(
+        AccountValidator.normalizeEmail(request.emailAddress()));
     if (user == null || user.isClosed()) {
       throw new InvalidCredentialsException("Invalid credentials");
     }
@@ -202,8 +224,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private static final int MAX_HOT_HERE = 10;
 
   @Override
-  public synchronized HomePageDto getPublicHomePage() {
-    var popular = songLibraryService.getMusicByPopularity(songLibraryService.getOwnLocationId());
+  public synchronized HomePageDto getPublicHomePage(Integer locationId) {
+    var popular = songLibraryService.getMusicByPopularity(locationId);
     var artists = popular.artists().stream().limit(MAX_HOT_HERE).toList();
     var albums = popular.albums().stream().limit(MAX_HOT_HERE).toList();
     var songs = popular.songs().stream().limit(MAX_HOT_HERE).toList();
@@ -211,19 +233,13 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public synchronized UserHomePageDto getHomePage(String emailAddress) {
+  public synchronized UserHomePageDto getHomePage(String emailAddress, Integer locationId) {
 
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
     if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
-
-    // Handle the case where a de-serialized user does not have any playlists.
-    List<PlaylistEntity> playlists = user.getPlaylists();
-    if (playlists == null || playlists.isEmpty()) {
-
-      user.createMyFavoritesPlaylist();
-    }
+    ensureMyFavorites(user);
 
     List<String> playlistNames = new ArrayList<>();
     for (PlaylistEntity playlist : user.getPlaylists()) {
@@ -235,10 +251,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     for (int i = history.size() - 1; i >= 0 && recentPlays.size() < MAX_RECENT_PLAYS; i--) {
       SongIdentifier id = history.get(i);
       try {
-        // TODO(Phase E): once SongIdentifier carries its own locationId, use that instead of
-        // getOwnLocationId() -- a master-served user's history can span multiple locations.
-        SongDto song = songLibraryService.getSongById(songLibraryService.getOwnLocationId(),
-            id.getAlbumId(), id.getSongId());
+        // A master-served user's history can span multiple locations.
+        SongDto song =
+            songLibraryService.getSongById(locationIdOf(id), id.getAlbumId(), id.getSongId());
         if (song != null)
           recentPlays.add(song);
       } catch (Exception e) {
@@ -246,7 +261,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       }
     }
 
-    HomePageDto publicHomePageDto = getPublicHomePage();
+    HomePageDto publicHomePageDto = getPublicHomePage(locationId);
     
     UserHomePageDto userHomePageDto =
         new UserHomePageDto(recentPlays, playlistNames, publicHomePageDto.artistsHotHere(),
@@ -282,9 +297,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
-    if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
-      throw new UserServiceException("Current password is incorrect");
+    if (request.currentPassword() == null
+        || !passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+      throw new IncorrectPasswordException("Your current password is incorrect.");
     }
+    AccountValidator.requireValidPassword(request.newPassword());
 
     user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
     this.userRepository.storeAggregateRoot(this.userRoot);
@@ -376,10 +393,15 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
-    if (request.firstName() != null)
-      user.setFirstName(request.firstName());
-    if (request.lastName() != null)
-      user.setLastName(request.lastName());
+    // Validate both before changing either, so a refused update changes nothing.
+    String firstName = request.firstName() != null
+        ? AccountValidator.requireValidName(request.firstName(), "first name") : null;
+    String lastName = request.lastName() != null
+        ? AccountValidator.requireValidName(request.lastName(), "last name") : null;
+    if (firstName != null)
+      user.setFirstName(firstName);
+    if (lastName != null)
+      user.setLastName(lastName);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
     return getProfile(emailAddress);
@@ -512,6 +534,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
+    user.ensureMyFavoritesPlaylist();
     boolean result =
         user.addSongToPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, locationId, song);
 
@@ -529,6 +552,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
+    user.ensureMyFavoritesPlaylist();
     boolean result =
         user.removeSongFromPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, locationId, song);
 
@@ -544,6 +568,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
+    ensureMyFavorites(user);
 
     List<PlaylistSummaryDto> result = new ArrayList<>();
     for (PlaylistEntity p : user.getPlaylists()) {
@@ -562,15 +587,15 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
+    ensureMyFavorites(user);
 
     PlaylistEntity playlist = user.getPlaylistByName(playlistName);
     List<SongDto> result = new ArrayList<>();
     for (SongIdentifier si : playlist.getSongs()) {
       try {
-        // TODO(Phase E): once SongIdentifier carries its own locationId, use that instead of
-        // getOwnLocationId() -- a master-served playlist can span multiple locations.
-        SongDto song = songLibraryService.getSongById(songLibraryService.getOwnLocationId(),
-            si.getAlbumId(), si.getSongId());
+        // A master-served playlist can span multiple locations.
+        SongDto song =
+            songLibraryService.getSongById(locationIdOf(si), si.getAlbumId(), si.getSongId());
         if (song != null) {
           result.add(song);
         }
@@ -580,6 +605,22 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       }
     }
     return result;
+  }
+
+  /** See {@link UserEntity#ensureMyFavoritesPlaylist()}; stores the user if it was created. */
+  private void ensureMyFavorites(UserEntity user) {
+    if (user.ensureMyFavoritesPlaylist()) {
+      this.userRepository.storeAggregateRoot(this.userRoot);
+    }
+  }
+
+  /**
+   * The location whose song library {@code songIdentifier} came from -- this instance's own
+   * location for an entry stored before entries were tagged with one.
+   */
+  private Integer locationIdOf(SongIdentifier songIdentifier) {
+    return songIdentifier.getLocationId() != null ? songIdentifier.getLocationId()
+        : songLibraryService.getOwnLocationId();
   }
 
   @Override
@@ -619,12 +660,10 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
+    ensureMyFavorites(user);
 
     PlaylistEntity favs =
         user.getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
-    if (favs == null) {
-      return new ArrayList<>();
-    }
     return new ArrayList<>(favs.getSongs());
   }
 
@@ -636,6 +675,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     if (user == null) {
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
+    ensureMyFavorites(user);
 
     return new ArrayList<>(user.getPlaylistByName(playlistName).getSongs());
   }
@@ -684,14 +724,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(username);
     if (user == null && LocalPrincipal.LOCAL_USERNAME.equals(username)) {
 
-      String firstName = "Local";
-      String lastName = "User";
-      String password = "password";
-
-      RegisterRequest request = new RegisterRequest(firstName, lastName, username, password);
-      register(request);
-
-      user = userRoot.getUserByEmailAddressNullIfNotExists(username);
+      // The kiosk's own internal account: never signed into, so not held to a patron's
+      // email/password rules.
+      user = createUser("Local", "User", username, "password", UserRole.ROLE_USER);
     }
 
     if (user == null) {
@@ -717,6 +752,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     this.userRepository.storeAggregateRoot(this.userRoot);
     if (usage != null) {
       announceLocationCreditUsage(usage);
+    }
+    // Every web user's queued song -- single or from a playlist, here or forwarded to a slave --
+    // passes through here, so this is the one place the live Recent Plays row is fed from.
+    if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
+      eventPublisher.publishEvent(new RecentPlayAddedEvent(username, song));
     }
   }
 

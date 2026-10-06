@@ -209,12 +209,13 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
   private void insertNewLocation(LocationEntity location) {
 
     entityManager.createNativeQuery("insert into location "
-        + "(id, version, name, latitude, longitude, api_key_hash, status, last_seen_at, "
-        + "library_last_synced_at, logo_name, is_geo_fenced, priority_cost_multiplier, "
-        + "credits_per_dollar, five_dollar_bonus_credits, ten_dollar_bonus_credits, "
-        + "web_cost_multiplier, display_currency_for_cost) "
-        + "values (:id, :version, :name, :latitude, :longitude, :apiKeyHash, :status, "
-        + ":lastSeenAt, :libraryLastSyncedAt, :logoName, :isGeoFenced, :priorityCostMultiplier, "
+        + "(id, version, name, latitude, longitude, api_key_hash, api_key_lookup, status, "
+        + "last_seen_at, library_last_synced_at, logo_name, is_geo_fenced, "
+        + "priority_cost_multiplier, credits_per_dollar, five_dollar_bonus_credits, "
+        + "ten_dollar_bonus_credits, web_cost_multiplier, display_currency_for_cost) "
+        + "values (:id, :version, :name, :latitude, :longitude, :apiKeyHash, :apiKeyLookup, "
+        + ":status, :lastSeenAt, :libraryLastSyncedAt, :logoName, :isGeoFenced, "
+        + ":priorityCostMultiplier, "
         + ":creditsPerDollar, :fiveDollarBonusCredits, :tenDollarBonusCredits, "
         + ":webCostMultiplier, :displayCurrencyForCost)")
         .setParameter("id", location.getPersistentIdentity())
@@ -223,6 +224,7 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
         .setParameter("latitude", location.getLatitude())
         .setParameter("longitude", location.getLongitude())
         .setParameter("apiKeyHash", location.getApiKeyHash())
+        .setParameter("apiKeyLookup", location.getApiKeyLookup())
         .setParameter("status", location.getStatus().name())
         .setParameter("lastSeenAt", location.getLastSeenAt())
         .setParameter("libraryLastSyncedAt", location.getLibraryLastSyncedAt())

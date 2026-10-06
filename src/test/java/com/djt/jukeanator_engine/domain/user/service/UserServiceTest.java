@@ -60,7 +60,8 @@ import com.djt.jukeanator_engine.domain.user.exception.InsufficientCreditsExcept
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
 import com.djt.jukeanator_engine.domain.user.exception.QueueAccessDeniedException;
-import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
+import com.djt.jukeanator_engine.domain.user.exception.EmailAlreadyRegisteredException;
+import com.djt.jukeanator_engine.domain.user.exception.IncorrectPasswordException;
 import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
@@ -168,7 +169,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     assertEquals("ROLE_USER", registerResponse.role());
 
     // Registering the same email address again should fail
-    assertThrows(UserServiceException.class, () -> userService.register(registerRequest));
+    assertThrows(EmailAlreadyRegisteredException.class, () -> userService.register(registerRequest));
 
     // Log in with the registered user's credentials
     LoginRequest loginRequest = new LoginRequest(emailAddress, "password123");
@@ -223,7 +224,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     RegisterRequest request = new RegisterRequest("Ada", "Min", REGISTERED_EMAIL, "password123");
 
-    assertThrows(UserServiceException.class, () -> userServiceImpl.addAdminUser(request));
+    assertThrows(EmailAlreadyRegisteredException.class, () -> userServiceImpl.addAdminUser(request));
   }
 
   @Test
@@ -247,9 +248,9 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void changePassword_updatesHashWhenCurrentPasswordMatchesAndPersists() {
 
     when(passwordEncoder.matches("oldPass", REGISTERED_PASSWORD_HASH)).thenReturn(true);
-    when(passwordEncoder.encode("newPass")).thenReturn("new-hashed-password");
+    when(passwordEncoder.encode("newPass123")).thenReturn("new-hashed-password");
 
-    userServiceImpl.changePassword(REGISTERED_EMAIL, new ChangePasswordRequest("oldPass", "newPass"));
+    userServiceImpl.changePassword(REGISTERED_EMAIL, new ChangePasswordRequest("oldPass", "newPass123"));
 
     assertEquals("new-hashed-password", registeredUser().getPasswordHash());
     verify(userRepository).storeAggregateRoot(userRoot);
@@ -260,8 +261,8 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     when(passwordEncoder.matches("wrongPass", REGISTERED_PASSWORD_HASH)).thenReturn(false);
 
-    assertThrows(UserServiceException.class, () -> userServiceImpl.changePassword(REGISTERED_EMAIL,
-        new ChangePasswordRequest("wrongPass", "newPass")));
+    assertThrows(IncorrectPasswordException.class, () -> userServiceImpl.changePassword(REGISTERED_EMAIL,
+        new ChangePasswordRequest("wrongPass", "newPass123")));
   }
 
   @Test
@@ -330,7 +331,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
         () -> userServiceImpl.login(new LoginRequest(closedEmail, "password")));
     assertThrows(InvalidPrincipalException.class, () -> userServiceImpl.getProfile(REGISTERED_EMAIL));
 
-    userServiceImpl.register(new RegisterRequest("Jane", "Doe", REGISTERED_EMAIL, "password"));
+    userServiceImpl.register(new RegisterRequest("Jane", "Doe", REGISTERED_EMAIL, "password123"));
 
     UserEntity fresh = registeredUser();
     assertEquals(0, fresh.getNumCredits(), "a new account never inherits a closed one's credits");
@@ -344,7 +345,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     when(jwtUtil.generateToken(anyString(), anyString())).thenReturn("token");
 
-    userServiceImpl.register(new RegisterRequest("New", "Patron", "new@example.com", "password"));
+    userServiceImpl.register(new RegisterRequest("New", "Patron", "new@example.com", "password123"));
 
     // Every credit a web user spends is paid out to the location, so none may be free.
     assertEquals(0, userRoot.getUserByEmailAddressNullIfNotExists("new@example.com").getNumCredits());
@@ -356,8 +357,8 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void register_rejectsTheClosedAccountEmailDomain() {
 
-    assertThrows(UserServiceException.class, () -> userServiceImpl.register(new RegisterRequest(
-        "X", "Y", "someone" + UserEntity.CLOSED_ACCOUNT_EMAIL_DOMAIN, "password")));
+    assertThrows(IllegalArgumentException.class, () -> userServiceImpl.register(new RegisterRequest(
+        "X", "Y", "someone" + UserEntity.CLOSED_ACCOUNT_EMAIL_DOMAIN, "password123")));
   }
 
   @Test
@@ -561,7 +562,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     when(songLibraryService.getMusicByPopularity(any()))
         .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
 
-    var homePage = userServiceImpl.getPublicHomePage();
+    var homePage = userServiceImpl.getPublicHomePage(42);
 
     assertNotNull(homePage);
     assertTrue(homePage.artistsHotHere().isEmpty());
@@ -575,7 +576,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
         .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
     registeredUser().addToSearchHistory("beatles", 10);
 
-    UserHomePageDto homePage = userServiceImpl.getHomePage(REGISTERED_EMAIL);
+    UserHomePageDto homePage = userServiceImpl.getHomePage(REGISTERED_EMAIL, 42);
 
     assertNotNull(homePage);
     assertEquals(List.of(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME), homePage.myPlaylists());
@@ -586,7 +587,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void getHomePage_throwsForUnknownEmailAddress() {
 
-    assertThrows(InvalidPrincipalException.class, () -> userServiceImpl.getHomePage("unknown@example.com"));
+    assertThrows(InvalidPrincipalException.class, () -> userServiceImpl.getHomePage("unknown@example.com", 42));
   }
 
   @Test

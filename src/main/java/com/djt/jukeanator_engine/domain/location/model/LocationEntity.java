@@ -45,6 +45,12 @@ public class LocationEntity extends AbstractPersistentEntity {
   @Column(name = "api_key_hash", nullable = false)
   private String apiKeyHash;
 
+  // SHA-256 (hex) of the API secret, uniquely indexed, for finding a location by its key without
+  // a bcrypt check per location (see ApiKeyLookup). Null only for a row inserted by hand with just
+  // api_key_hash, until its slave first authenticates (see LocationServiceImpl.verifyApiKey).
+  @Column(name = "api_key_lookup", length = 64, unique = true)
+  private String apiKeyLookup;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private LocationStatus status = LocationStatus.PENDING;
@@ -151,6 +157,14 @@ public class LocationEntity extends AbstractPersistentEntity {
 
   public void setApiKeyHash(String apiKeyHash) {
     this.apiKeyHash = apiKeyHash;
+  }
+
+  public String getApiKeyLookup() {
+    return apiKeyLookup;
+  }
+
+  public void setApiKeyLookup(String apiKeyLookup) {
+    this.apiKeyLookup = apiKeyLookup;
   }
 
   public LocationStatus getStatus() {

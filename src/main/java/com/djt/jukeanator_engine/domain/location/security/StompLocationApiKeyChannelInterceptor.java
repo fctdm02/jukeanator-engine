@@ -11,8 +11,9 @@ import com.djt.jukeanator_engine.domain.location.service.LocationService;
 
 /**
  * Master-only. Reads the {@code location-api-key} native header from the {@code /ws-slave} STOMP
- * CONNECT frame and resolves the location by that key alone (never trusting the slave's
- * self-reported {@code location-id} header) — a fresh slave's own guess at its locationId (from
+ * CONNECT frame and resolves the location by that key (the slave's self-reported {@code
+ * location-id} header only decides which location's key is checked first, see
+ * {@link #resolveLocation}) — a fresh slave's own guess at its locationId (from
  * {@code app.location-id}) may not match the id an admin later assigns by hand when inserting its
  * row into master's database, so authentication can't require them to match up front. On success,
  * sets a {@link LocationPrincipal} on the session (enabling
@@ -41,7 +42,7 @@ public class StompLocationApiKeyChannelInterceptor implements ChannelInterceptor
 
     if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
       String apiKey = accessor.getFirstNativeHeader("location-api-key");
-      Integer locationId = locationService.resolveAndVerifyByApiKey(apiKey);
+      Integer locationId = resolveLocation(apiKey, accessor.getFirstNativeHeader("location-id"));
       if (locationId != null) {
         accessor.setUser(new LocationPrincipal(locationId));
         connectedSlaveRegistry.markConnected(locationId, accessor.getSessionId());
@@ -49,5 +50,34 @@ public class StompLocationApiKeyChannelInterceptor implements ChannelInterceptor
       }
     }
     return message;
+  }
+
+  /**
+   * The location whose API key this is, or null. Keys are found by their indexed SHA-256 lookup
+   * value (see {@code ApiKeyLookup}), so a connect -- right or wrong key -- costs master almost
+   * nothing however many locations it serves. The slave's self-reported {@code location-id} is
+   * only a hint for which location to check first, which still matters for a location row
+   * inserted by hand with only its bcrypt hash: its key is bcrypt-checked (deliberately slow)
+   * until its slave's first connect stores the lookup value. The key is always verified against a
+   * stored hash, so trusting the hint gains an impostor nothing.
+   */
+  private Integer resolveLocation(String apiKey, String locationIdHint) {
+
+    if (apiKey == null) {
+      return null;
+    }
+    Integer hinted = parseLocationId(locationIdHint);
+    if (hinted != null && locationService.verifyApiKey(hinted, apiKey)) {
+      return hinted;
+    }
+    return locationService.resolveAndVerifyByApiKey(apiKey);
+  }
+
+  private static Integer parseLocationId(String locationIdHint) {
+    try {
+      return locationIdHint != null ? Integer.valueOf(locationIdHint.trim()) : null;
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 }

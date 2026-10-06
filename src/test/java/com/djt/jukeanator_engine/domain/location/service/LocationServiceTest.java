@@ -242,6 +242,67 @@ public class LocationServiceTest {
     assertNull(locationServiceImpl.resolveAndVerifyByApiKey("wrong-key"));
   }
 
+  // ── API key lookups: no bcrypt check per location ───────────────────────
+
+  @Test
+  void aNewlyRegisteredLocation_isFoundByItsKey_withoutAnyBcryptCheck() {
+
+    when(passwordEncoder.encode(anyString())).thenReturn("hashed-new-key");
+    ProvisionedLocationDto provisioned =
+        locationServiceImpl.registerLocation(new RegisterLocationRequest("Lookup Bar", 1.0, 2.0));
+    registeredLocation().setApiKeyLookup(ApiKeyLookup.of("the-legacy-key"));
+
+    assertEquals(ApiKeyLookup.of(provisioned.apiKey()),
+        locationRoot.getLocationByIdNullIfNotExists(provisioned.locationId()).getApiKeyLookup());
+    assertEquals(provisioned.locationId(),
+        locationServiceImpl.resolveAndVerifyByApiKey(provisioned.apiKey()));
+    assertTrue(locationServiceImpl.verifyApiKey(provisioned.locationId(), provisioned.apiKey()));
+    assertFalse(locationServiceImpl.verifyApiKey(provisioned.locationId(), "wrong-key"));
+
+    verify(passwordEncoder, never()).matches(any(), any());
+  }
+
+  @Test
+  void aWrongKey_costsNoBcryptCheck_onceEveryLocationHasALookupValue() {
+
+    registeredLocation().setApiKeyLookup(ApiKeyLookup.of("the-real-key"));
+
+    assertNull(locationServiceImpl.resolveAndVerifyByApiKey("wrong-key"));
+    assertFalse(locationServiceImpl.verifyApiKey(REGISTERED_LOCATION_ID, "wrong-key"));
+
+    verify(passwordEncoder, never()).matches(any(), any());
+  }
+
+  @Test
+  void aLocationInsertedByHandWithOnlyItsBcryptHash_isBcryptCheckedOnce_thenGetsItsLookupValue() {
+
+    assertNull(registeredLocation().getApiKeyLookup());
+    when(passwordEncoder.matches("the-real-key", REGISTERED_API_KEY_HASH)).thenReturn(true);
+
+    assertEquals(REGISTERED_LOCATION_ID,
+        locationServiceImpl.resolveAndVerifyByApiKey("the-real-key"));
+
+    assertEquals(ApiKeyLookup.of("the-real-key"), registeredLocation().getApiKeyLookup());
+    verify(locationRepository).storeAggregateRoot(locationRoot);
+
+    // From now on the fast check alone decides, for the right key and a wrong one.
+    assertTrue(locationServiceImpl.verifyApiKey(REGISTERED_LOCATION_ID, "the-real-key"));
+    assertNull(locationServiceImpl.resolveAndVerifyByApiKey("wrong-key"));
+    verify(passwordEncoder, times(1)).matches(any(), any());
+  }
+
+  @Test
+  void aWrongKey_neverStoresALookupValue() {
+
+    when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
+
+    assertFalse(locationServiceImpl.verifyApiKey(REGISTERED_LOCATION_ID, "wrong-key"));
+    assertNull(locationServiceImpl.resolveAndVerifyByApiKey("wrong-key"));
+
+    assertNull(registeredLocation().getApiKeyLookup());
+    verify(locationRepository, never()).storeAggregateRoot(any());
+  }
+
   private LibrarySnapshotDto emptySnapshot() {
     return new LibrarySnapshotDto(List.of(), List.of(), List.of());
   }
@@ -313,7 +374,8 @@ public class LocationServiceTest {
   @Test
   void receiveLibraryCoverArt_writesFileAndRecordsHeartbeat() {
 
-    when(passwordEncoder.matches("good-key", REGISTERED_API_KEY_HASH)).thenReturn(true);
+    // A location with its API key lookup value already stored, so the only store is the heartbeat.
+    registeredLocation().setApiKeyLookup(ApiKeyLookup.of("good-key"));
 
     byte[] imageBytes = new byte[] {1, 2, 3, 4};
     locationServiceImpl.receiveLibraryCoverArt(REGISTERED_LOCATION_ID, "good-key", 1, imageBytes);

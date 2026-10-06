@@ -105,7 +105,7 @@ class MasterSlaveGeoFenceIntegrationTest extends AbstractServiceIntegrationTest 
     Integer locationId = provisioned.locationId();
 
     // ── slave: connects and pushes its real coordinates, geo-fenced ────────────
-    StompSession slaveSession = connectAsSlave(provisioned.apiKey());
+    StompSession slaveSession = connectAsSlave(locationId, provisioned.apiKey());
     slaveSession.send("/location-info",
         new LocationInfoSyncDto(name, LATITUDE, LONGITUDE, "LocationLogo.jpg", true));
     awaitTrue("master to apply the slave's coordinates", () -> {
@@ -146,7 +146,7 @@ class MasterSlaveGeoFenceIntegrationTest extends AbstractServiceIntegrationTest 
     assertEquals(HttpStatus.SERVICE_UNAVAILABLE, inside.getStatusCode(), inside.getBody());
 
     // ── slave: the operator unticks Geo-fenced; no position is needed any more ───
-    StompSession reconnected = connectAsSlave(provisioned.apiKey());
+    StompSession reconnected = connectAsSlave(locationId, provisioned.apiKey());
     reconnected.send("/location-info",
         new LocationInfoSyncDto(name, LATITUDE, LONGITUDE, "LocationLogo.jpg", false));
     awaitTrue("master to apply the slave's geo-fence flag",
@@ -164,12 +164,13 @@ class MasterSlaveGeoFenceIntegrationTest extends AbstractServiceIntegrationTest 
   // ── The simulated slave and Web UI ─────────────────────────────────────────
 
   /** Connects to master's /ws-slave the way SlaveConnectionManager does. */
-  private StompSession connectAsSlave(String apiKey) throws Exception {
+  private StompSession connectAsSlave(Integer locationId, String apiKey) throws Exception {
 
     WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
     stompClient.setMessageConverter(new JacksonJsonMessageConverter());
 
     StompHeaders connectHeaders = new StompHeaders();
+    connectHeaders.set("location-id", String.valueOf(locationId));
     connectHeaders.set("location-api-key", apiKey);
 
     return stompClient.connectAsync("ws://localhost:" + port + "/ws-slave",

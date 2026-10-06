@@ -65,11 +65,16 @@ public class UserController {
     return ResponseEntity.ok(userService.login(request));
   }
 
-  /** Returns trending artists and songs for unauthenticated users. */
+  /**
+   * Returns trending artists and songs at {@code locationId} for unauthenticated users (defaults to
+   * this instance's own location on standalone/slave; master has none, so it needs the location
+   * the patron picked).
+   */
   @GetMapping("/home-public")
-  public ResponseEntity<HomePageDto> getPublicHomePage() {
+  public ResponseEntity<HomePageDto> getPublicHomePage(
+      @RequestParam(required = false) Integer locationId) {
 
-    return ResponseEntity.ok(userService.getPublicHomePage());
+    return ResponseEntity.ok(userService.getPublicHomePage(resolveLocationId(locationId)));
   }
 
   /**
@@ -96,11 +101,15 @@ public class UserController {
             location.getLogoName()));
   }
 
-  /** Returns home-page content and search history for the currently authenticated user. */
+  /**
+   * Returns home-page content and search history for the currently authenticated user, with
+   * what's hot at {@code locationId} (see {@link #getPublicHomePage(Integer)}).
+   */
   @GetMapping("/home")
-  public ResponseEntity<UserHomePageDto> getHomePage(@AuthenticationPrincipal String emailAddress) {
+  public ResponseEntity<UserHomePageDto> getHomePage(@AuthenticationPrincipal String emailAddress,
+      @RequestParam(required = false) Integer locationId) {
 
-    return ResponseEntity.ok(userService.getHomePage(emailAddress));
+    return ResponseEntity.ok(userService.getHomePage(emailAddress, resolveLocationId(locationId)));
   }
 
   /** Returns the profile for the currently authenticated user */
@@ -125,9 +134,7 @@ public class UserController {
   public ResponseEntity<PricingConfigDto> getPricingConfig(
       @RequestParam(required = false) Integer locationId) {
 
-    Integer resolvedLocationId =
-        locationId != null ? locationId : songLibraryService.getOwnLocationId();
-    return ResponseEntity.ok(userService.getPricingConfig(resolvedLocationId));
+    return ResponseEntity.ok(userService.getPricingConfig(resolveLocationId(locationId)));
   }
 
   @PostMapping("/change-password")
@@ -257,7 +264,11 @@ public class UserController {
    * it -- every playlist entry must be tagged with the location whose song library it came from.
    */
   private Integer resolveLocationId(SongIdentifier songIdentifier) {
-    Integer locationId = songIdentifier.getLocationId();
+    return resolveLocationId(songIdentifier.getLocationId());
+  }
+
+  /** {@code locationId}, or this instance's own location id (null on master) when omitted. */
+  private Integer resolveLocationId(Integer locationId) {
     return locationId != null ? locationId : songLibraryService.getOwnLocationId();
   }
 
@@ -303,32 +314,35 @@ public class UserController {
     return ResponseEntity.noContent().build();
   }
 
+  /**
+   * One image URL per playlist: a redirect to My Favorites' own image, to the cover art of the
+   * playlist's first song at the location that song came from, or to the generic playlist image.
+   */
   @GetMapping("/playlists/{playlistName}/coverArt")
   public ResponseEntity<Void> getPlaylistCoverArt(
       @AuthenticationPrincipal String emailAddress,
       @PathVariable String playlistName) {
     if (PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(playlistName)) {
-      return ResponseEntity.status(HttpStatus.FOUND)
-          .header("Location", "/images/MyFavorites_Playlist.png")
-          .build();
+      return redirect("/images/MyFavorites_Playlist.png");
     }
     try {
-      for (PlaylistSummaryDto p : userService.getPlaylists(emailAddress)) {
-        if (p.name().equals(playlistName)) {
-          if (p.firstSongAlbumId() != null) {
-            return ResponseEntity.status(HttpStatus.FOUND)
-                .header("Location",
-                    "/api/song-library/albums/" + p.firstSongAlbumId() + "/coverArt")
-                .build();
-          }
-          break;
+      List<SongIdentifier> songs =
+          userService.getPlaylistSongIdentifiers(emailAddress, playlistName);
+      if (!songs.isEmpty()) {
+        SongIdentifier first = songs.get(0);
+        Integer locationId = resolveLocationId(first);
+        if (locationId != null) {
+          return redirect("/api/locations/" + locationId + "/song-library/albums/"
+              + first.getAlbumId() + "/coverArt");
         }
       }
-    } catch (Exception e) {
-      // fall through to generic image
+    } catch (EntityDoesNotExistException e) {
+      // fall through to the generic image
     }
-    return ResponseEntity.status(HttpStatus.FOUND)
-        .header("Location", "/images/Generic_Playlist.png")
-        .build();
+    return redirect("/images/Generic_Playlist.png");
+  }
+
+  private static ResponseEntity<Void> redirect(String location) {
+    return ResponseEntity.status(HttpStatus.FOUND).header("Location", location).build();
   }
 }

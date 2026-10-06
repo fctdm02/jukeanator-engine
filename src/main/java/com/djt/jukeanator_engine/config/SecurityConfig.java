@@ -74,28 +74,11 @@ public class SecurityConfig {
             // silently overwrites the real 401/403 status set by the handlers below.
             .requestMatchers("/error").permitAll()
 
+            // Every song-library/song-player/song-queue route is location-scoped
+            // (/api/locations/{locationId}/...) in every app.mode -- on standalone/slave the
+            // locationId is the instance's own location.
+
             // ── Public: read-only music browsing ─────────────────────────────
-            .requestMatchers(HttpMethod.GET, "/api/song-library/popular",
-                "/api/song-library/search", "/api/song-library/genres",
-                "/api/song-library/genres/**", "/api/song-library/artists",
-                "/api/song-library/artists/**", "/api/song-library/artistByAlbum/**",
-                "/api/song-library/albums",
-                "/api/song-library/albums/**", "/api/song-library/songs/**",
-                "/api/song-library/artist", "/api/song-library/searchInternetForAlbumMetadata")
-            .permitAll()
-
-            // ── Public: playback status (read-only, display on jukebox UI) ───
-            .requestMatchers(HttpMethod.GET, "/api/song-player/nowPlayingSong",
-                "/api/song-player/playbackStatus")
-            .permitAll()
-
-            // ── Public: view the queue ────────────────────────────────────────
-            .requestMatchers(HttpMethod.GET, "/api/song-queue/queuedSongs",
-                "/api/song-queue/highestPriority")
-            .permitAll()
-
-            // ── Master-mode only: location-scoped mirrors of the three rule
-            // categories above, for web/mobile users browsing/queuing at a chosen location ─
             .requestMatchers(HttpMethod.GET, "/api/locations/*/song-library/popular",
                 "/api/locations/*/song-library/search", "/api/locations/*/song-library/genres",
                 "/api/locations/*/song-library/genres/**", "/api/locations/*/song-library/artists",
@@ -106,6 +89,7 @@ public class SecurityConfig {
                 "/api/locations/*/song-library/songs/**", "/api/locations/*/song-library/artist")
             .permitAll()
 
+            // ── Public: playback status and the queue (read-only) ────────────
             .requestMatchers(HttpMethod.GET, "/api/locations/*/song-player/nowPlayingSong",
                 "/api/locations/*/song-player/playbackStatus")
             .permitAll()
@@ -136,55 +120,33 @@ public class SecurityConfig {
 
             // ── Admin only: queue a whole album ───────────────────────────────
             // Patrons queue songs individually (or a playlist via addMultipleSongs).
-            .requestMatchers(HttpMethod.POST, "/api/song-queue/addAlbum",
-                "/api/locations/*/song-queue/addAlbum")
+            .requestMatchers(HttpMethod.POST, "/api/locations/*/song-queue/addAlbum")
             .hasRole("ADMIN")
 
-            // ── Authenticated users: add songs to the queue ───────────────────
-            // Any logged-in patron can queue songs.
-            .requestMatchers(HttpMethod.POST, "/api/song-queue/addSong",
-                "/api/song-queue/addMultipleSongs", "/api/song-queue/checkSongsEligibility")
-            .authenticated()
-
-            // ── Authenticated users: reorder/remove songs from the queue ──────
-            // Mirrors the JFC/Swing Queue tab's move-up/move-down/remove actions,
-            // priced the same way addSong is (see UserServiceImpl WEB_QUEUE_ACTION_COST).
-            .requestMatchers(HttpMethod.POST, "/api/song-queue/moveSongUpInQueue",
-                "/api/song-queue/moveSongDownInQueue", "/api/song-queue/removeSongDownFromQueue")
-            .authenticated()
-
-            // ── Master-mode only: location-scoped mirror of the queue-add/reorder rules ─
+            // ── Authenticated users: add, reorder and remove songs in the queue ──
+            // Charged per action (see SongQueueController); move-up/move-down/remove mirror the
+            // JFC/Swing Queue tab's actions.
             .requestMatchers(HttpMethod.POST, "/api/locations/*/song-queue/addSong",
                 "/api/locations/*/song-queue/addMultipleSongs",
-                "/api/locations/*/song-queue/checkSongsEligibility")
-            .authenticated()
-
-            .requestMatchers(HttpMethod.POST, "/api/locations/*/song-queue/moveSongUpInQueue",
+                "/api/locations/*/song-queue/checkSongsEligibility",
+                "/api/locations/*/song-queue/moveSongUpInQueue",
                 "/api/locations/*/song-queue/moveSongDownInQueue",
                 "/api/locations/*/song-queue/removeSongDownFromQueue")
             .authenticated()
 
-            // ── Admin only: song library mutations ────────────────────────────
-            .requestMatchers(HttpMethod.POST, "/api/song-library/scan",
-                "/api/song-library/scanNoPath", "/api/song-library/resetSongStatistics",
-                "/api/song-library/downloadAlbumCoverArt",
-                "/api/song-library/authenticateForAdminPanel")
+            // ── Admin only: song library mutations -- without these, any logged-in patron
+            // could rescan the library or reset its statistics ─
+            .requestMatchers(HttpMethod.POST, "/api/locations/*/song-library/scan",
+                "/api/locations/*/song-library/scanNoPath",
+                "/api/locations/*/song-library/resetSongStatistics",
+                "/api/locations/*/song-library/restoreSongStatistics",
+                "/api/locations/*/song-library/storeSongLibraryAndStatistics",
+                "/api/locations/*/song-library/downloadAlbumCoverArt",
+                "/api/locations/*/song-library/authenticateForAdminPanel",
+                "/api/locations/*/song-library/albums/*/updateAlbumMetadata")
             .hasRole("ADMIN")
 
-            .requestMatchers(HttpMethod.POST, "/api/song-library/albums/*/updateAlbumMetadata")
-            .hasRole("ADMIN")
-
-            .requestMatchers(HttpMethod.POST, "/api/song-queue/flushQueue",
-                "/api/song-queue/randomizeQueue",
-                "/api/song-queue/saveQueueAsPlaylist", "/api/song-queue/loadPlaylistIntoQueue")
-            .hasRole("ADMIN")
-
-            // ── Admin only: player controls ───────────────────────────────────
-            .requestMatchers(HttpMethod.POST, "/api/song-player/next", "/api/song-player/pause",
-                "/api/song-player/stop")
-            .hasRole("ADMIN")
-
-            // ── Master-mode only: location-scoped mirror of admin-only queue/player rules ─
+            // ── Admin only: queue management and player controls ──────────────
             .requestMatchers(HttpMethod.POST, "/api/locations/*/song-queue/flushQueue",
                 "/api/locations/*/song-queue/randomizeQueue",
                 "/api/locations/*/song-queue/saveQueueAsPlaylist",

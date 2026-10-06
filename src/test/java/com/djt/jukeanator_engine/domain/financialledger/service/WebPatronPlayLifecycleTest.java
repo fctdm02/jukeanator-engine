@@ -185,7 +185,7 @@ class WebPatronPlayLifecycleTest {
   void patronAtABar_fromSignUpToTheBarOwnersSplit() throws Exception {
 
     // ── 1. Sign up: a new account holds no credits, so nothing can be played yet ──────────
-    masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "secret"));
+    masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "secret123"));
     assertEquals(0, balance());
 
     InsufficientCreditsException refused =
@@ -290,7 +290,7 @@ class WebPatronPlayLifecycleTest {
     masterUserService.deleteAccount(PATRON);
 
     assertThrows(InvalidCredentialsException.class,
-        () -> masterUserService.login(new LoginRequest(PATRON, "secret")));
+        () -> masterUserService.login(new LoginRequest(PATRON, "secret123")));
     assertEquals(barSpends.stream().map(UserSongCreditUsageDto::syncId).toList(),
         spendsAt(BAR).stream().map(UserSongCreditUsageDto::syncId).toList(),
         "the bar's revenue on master must survive the patron leaving");
@@ -315,21 +315,21 @@ class WebPatronPlayLifecycleTest {
   @Test
   void theSameEmailRegisteringAgainAfterClosing_startsFromNothing() throws Exception {
 
-    masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "secret"));
+    masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "secret123"));
     masterUserService.addFunds(PATRON, new AddFundsRequest("pkg-7", "nonce-1"));
     masterUserService.deleteAccount(PATRON);
 
-    masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "new-secret"));
+    masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "new-secret123"));
 
     assertEquals(0, balance(), "a closed account's unspent credits never carry over");
     assertThrows(InsufficientCreditsException.class, () -> play(BAR, 1, 1, false));
-    masterUserService.login(new LoginRequest(PATRON, "new-secret"));
+    masterUserService.login(new LoginRequest(PATRON, "new-secret123"));
   }
 
   @Test
   void anAdminWebUserPaysToPlayLikeAnyPatron() throws Exception {
 
-    masterUserService.addAdminUser(new RegisterRequest("Ada", "Min", ADMIN, "secret"));
+    masterUserService.addAdminUser(new RegisterRequest("Ada", "Min", ADMIN, "secret123"));
 
     assertThrows(InsufficientCreditsException.class,
         () -> masterController.addSongToQueue(BAR, new AddSongToQueueRequest(null, ALBUM_ID, 1,
@@ -347,7 +347,7 @@ class WebPatronPlayLifecycleTest {
   @Test
   void aDoubleTapWithCreditsForOnePlay_queuesExactlyOneSong() throws Exception {
 
-    masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "secret"));
+    masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "secret123"));
     masterUserService.addFunds(PATRON, new AddFundsRequest("pkg-7", "nonce-1")); // 13 credits
 
     // The first add is still in flight at the slave when the second tap arrives.

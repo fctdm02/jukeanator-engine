@@ -44,7 +44,8 @@ public final class LocationMapper {
         entity.getTenDollarBonusCredits(),
         entity.getWebCostMultiplier(),
         entity.getDisplayCurrencyForCost(),
-        Boolean.valueOf(entity.isGeoFenced()));
+        Boolean.valueOf(entity.isGeoFenced()),
+        entity.getApiKeyLookup());
   }
 
   public static LocationRootEntity toEntity(LocationRootDto dto) {
@@ -82,6 +83,9 @@ public final class LocationMapper {
     if (dto.isGeoFenced() != null) {
       location.setGeoFenced(dto.isGeoFenced().booleanValue());
     }
+    // Null for a location recorded with only its api-key hash (e.g. inserted by hand) -- filled in
+    // the first time its slave authenticates (see LocationServiceImpl.verifyApiKey).
+    location.setApiKeyLookup(dto.apiKeyLookup());
 
     return location;
   }

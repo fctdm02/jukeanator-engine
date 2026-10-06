@@ -1,13 +1,11 @@
 package com.djt.jukeanator_engine.web.event;
 
+import java.util.List;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
-
 import com.djt.jukeanator_engine.config.NotMasterModeCondition;
-import com.djt.jukeanator_engine.domain.common.security.LocalPrincipal;
-import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.SongStatisticsChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -17,16 +15,16 @@ import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEven
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStoppedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
-import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueEmptyEvent;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
-import java.util.List;
-import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
 
 /**
- * Web UI counterpart to {@code JukeANatorEventListener}: rebroadcasts the same
- * domain events over STOMP topics instead of updating Swing components.
+ * Web UI counterpart to {@code JukeANatorEventListener}: rebroadcasts this instance's own
+ * location's domain events over STOMP topics instead of updating Swing components. The queue and
+ * player topics are the location-scoped {@link LocationTopics}, exactly as master publishes them
+ * for a slave's location, so the Web/Mobile UI subscribes the same way in every {@code app.mode}.
+ * A patron's own credits and recent plays are sent by {@link UserWebSocketBroadcaster}.
  */
 @Component
 @Conditional(NotMasterModeCondition.class)
@@ -62,63 +60,42 @@ public class WebSocketEventBroadcaster {
 
   @EventListener
   public void handleSongQueueChangedEvent(SongQueueChangedEvent event) {
-    messagingTemplate.convertAndSend("/topic/queue", event.queuedSongs());
+    messagingTemplate.convertAndSend(LocationTopics.queue(ownLocationId()), event.queuedSongs());
   }
 
   /**
    * Dequeuing from an already-empty queue skips {@link SongQueueChangedEvent} entirely (see
    * {@code SongQueueServiceImpl.dequeueNextSong()}), so this is the only signal that reaches the
-   * web UI in that case. Broadcast on the same {@code /topic/queue} topic as an empty list so the
-   * frontend's single subscription handles both "queue changed" and "queue is now empty".
+   * web UI in that case. Broadcast on the same queue topic as an empty list so the frontend's
+   * single subscription handles both "queue changed" and "queue is now empty".
    */
   @EventListener
   public void handleSongQueueEmptyEvent(SongQueueEmptyEvent event) {
-    messagingTemplate.convertAndSend("/topic/queue", List.of());
+    messagingTemplate.convertAndSend(LocationTopics.queue(ownLocationId()), List.of());
   }
 
   @EventListener
   public void handlePlaybackStarted(SongPlaybackStartedEvent event) {
-    messagingTemplate.convertAndSend("/topic/now-playing",
-        new NowPlayingMessage(event.songQueueEntry().song()));
-    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
+    sendNowPlaying(new NowPlayingMessage(event.songQueueEntry().song()));
+    sendPlaybackStatus();
   }
 
   @EventListener
   public void handlePlaybackPaused(SongPlaybackPausedEvent event) {
-    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
+    sendPlaybackStatus();
   }
 
   @EventListener
   public void handleSongPlaybackStoppedEvent(SongPlaybackStoppedEvent event) {
-    messagingTemplate.convertAndSend("/topic/now-playing", new NowPlayingMessage(null));
-    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
+    sendNowPlaying(new NowPlayingMessage(null));
+    sendPlaybackStatus();
   }
 
   @EventListener
   public void handleAllSongsDonePlayingEvent(AllSongsDonePlayingEvent event) {
-    messagingTemplate.convertAndSend("/topic/now-playing", new NowPlayingMessage(null));
-    messagingTemplate.convertAndSend("/topic/playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
+    sendNowPlaying(new NowPlayingMessage(null));
+    sendPlaybackStatus();
   }
-
-  @EventListener
-  public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
-    String username = event.queueEntry().username();
-    if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
-      messagingTemplate.convertAndSendToUser(
-          username, "/queue/recent-plays", event.queueEntry().song());
-    }
-  }
-
-  @EventListener
-  public void handleUserCreditsChangedEvent(UserCreditsChangedEvent event) {
-    messagingTemplate.convertAndSendToUser(
-        event.emailAddress(), "/queue/credits", new CreditsMessage(event.numCredits()));
-  }
-
-  /** Wraps the now-playing song so a "nothing playing" state can be sent as JSON {@code {"song":null}}. */
-  public record NowPlayingMessage(SongDto song) {}
-
-  public record CreditsMessage(int numCredits) {}
 
   @EventListener
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
@@ -126,8 +103,22 @@ public class WebSocketEventBroadcaster {
     messagingTemplate.convertAndSend("/topic/genres", songLibraryService.getGenres(locationId));
     messagingTemplate.convertAndSend("/topic/popularity",
         songLibraryService.getMusicByPopularity(locationId));
-    messagingTemplate.convertAndSend("/topic/now-playing",
-        new NowPlayingMessage(songPlayerService.getNowPlayingSong(locationId)));
-    messagingTemplate.convertAndSend("/topic/queue", songQueueService.getQueuedSongs(locationId));
+    sendNowPlaying(new NowPlayingMessage(songPlayerService.getNowPlayingSong(locationId)));
+    messagingTemplate.convertAndSend(LocationTopics.queue(locationId),
+        songQueueService.getQueuedSongs(locationId));
+  }
+
+  private Integer ownLocationId() {
+    return songLibraryService.getOwnLocationId();
+  }
+
+  private void sendNowPlaying(NowPlayingMessage message) {
+    messagingTemplate.convertAndSend(LocationTopics.nowPlaying(ownLocationId()), message);
+  }
+
+  private void sendPlaybackStatus() {
+    Integer locationId = ownLocationId();
+    messagingTemplate.convertAndSend(LocationTopics.playbackStatus(locationId),
+        songPlayerService.getPlaybackStatus(locationId));
   }
 }

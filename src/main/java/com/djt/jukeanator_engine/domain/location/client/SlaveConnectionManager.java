@@ -18,9 +18,9 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHttpHeaders;
-import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 import com.djt.jukeanator_engine.config.AppProperties;
+import com.djt.jukeanator_engine.domain.common.exception.ResourceNotFoundException;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
@@ -44,8 +44,10 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.CheckSongsEligibilityRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
+import com.djt.jukeanator_engine.domain.songqueue.exception.SongNotEligibleException;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
+import com.djt.jukeanator_engine.web.event.LocationTopics;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -111,7 +113,9 @@ public class SlaveConnectionManager {
     this.objectMapper = objectMapper;
     this.userInterfaceProperties = userInterfaceProperties;
 
-    this.stompClient = new WebSocketStompClient(new StandardWebSocketClient());
+    // Sends come from several threads (command replies, player events, heartbeats) -- see
+    // SerializedSendWebSocketClient.
+    this.stompClient = new WebSocketStompClient(new SerializedSendWebSocketClient());
     // Not MappingJackson2MessageConverter (deprecated since Spring 7, removed in a future
     // release) — its replacement, JacksonJsonMessageConverter, is Jackson 3.x-based
     // (tools.jackson.databind) and can't take this app's Jackson 2.x ObjectMapper. That's fine
@@ -203,30 +207,30 @@ public class SlaveConnectionManager {
 
   @EventListener
   public void handleSongQueueChangedEvent(SongQueueChangedEvent event) {
-    sendEvent("queue", event.queuedSongs());
+    sendEvent(LocationTopics.QUEUE, event.queuedSongs());
   }
 
   @EventListener
   public void handlePlaybackStarted(SongPlaybackStartedEvent event) {
-    sendEvent("now-playing", event.songQueueEntry().song());
-    sendEvent("playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
+    sendEvent(LocationTopics.NOW_PLAYING, event.songQueueEntry().song());
+    sendEvent(LocationTopics.PLAYBACK_STATUS, songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
   public void handlePlaybackPaused(SongPlaybackPausedEvent event) {
-    sendEvent("playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
+    sendEvent(LocationTopics.PLAYBACK_STATUS, songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
   public void handleSongPlaybackStoppedEvent(SongPlaybackStoppedEvent event) {
-    sendEvent("now-playing", null);
-    sendEvent("playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
+    sendEvent(LocationTopics.NOW_PLAYING, null);
+    sendEvent(LocationTopics.PLAYBACK_STATUS, songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   @EventListener
   public void handleAllSongsDonePlayingEvent(AllSongsDonePlayingEvent event) {
-    sendEvent("now-playing", null);
-    sendEvent("playback-status", songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
+    sendEvent(LocationTopics.NOW_PLAYING, null);
+    sendEvent(LocationTopics.PLAYBACK_STATUS, songPlayerService.getPlaybackStatus(songLibraryService.getOwnLocationId()));
   }
 
   /**
@@ -289,7 +293,8 @@ public class SlaveConnectionManager {
     try {
       session.send("/location-events", new LocationEventMessage(eventType, payload));
     } catch (Exception e) {
-      log.debug("Could not forward {} event to master", eventType, e);
+      // A lost event leaves patrons' live queue / now-playing view stale until the next one.
+      log.warn("Could not forward {} event to master", eventType, e);
     }
   }
 
@@ -388,9 +393,15 @@ public class SlaveConnectionManager {
     try {
       Object result = dispatch(envelope.commandType(), envelope.payload());
       return new CommandReplyDto(envelope.correlationId(), true, result, null);
+    } catch (SongNotEligibleException | ResourceNotFoundException e) {
+      // A patron's routine refusal (see SlaveCommandGateway, which re-raises it on master).
+      log.info("Command {} refused: {}", envelope.commandType(), e.getMessage());
+      return new CommandReplyDto(envelope.correlationId(), false, null, e.getMessage(),
+          e.getClass().getSimpleName());
     } catch (Exception e) {
       log.warn("Command {} failed locally", envelope.commandType(), e);
-      return new CommandReplyDto(envelope.correlationId(), false, null, e.getMessage());
+      return new CommandReplyDto(envelope.correlationId(), false, null, e.getMessage(),
+          e.getClass().getSimpleName());
     } finally {
       SecurityContextHolder.clearContext();
     }

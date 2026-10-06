@@ -224,15 +224,13 @@ public class UserEntity extends AbstractPersistentEntity {
       return playlist;
     }
 
-    createMyFavoritesPlaylist();
-
     throw new EntityDoesNotExistException(
         "Cannot find playlist: [" + playlistName + "] for user: [" + this.emailAddress + "].");
   }
 
   public PlaylistEntity getPlaylistByNameNullIfNotExists(String playlistName) {
 
-    for (PlaylistEntity playlist : this.playlists) {
+    for (PlaylistEntity playlist : getPlaylists()) {
 
       if (playlist.getName().equals(playlistName)) {
         return playlist;
@@ -253,6 +251,29 @@ public class UserEntity extends AbstractPersistentEntity {
 
     // This should never occur.
     return this.getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
+  }
+
+  /**
+   * Repairs an account from before every account got My Favorites at registration, and before My
+   * Favorites was a set: creates the playlist if it is missing, and drops any duplicate songs.
+   *
+   * @return true if anything changed (the caller must then store the user)
+   */
+  public boolean ensureMyFavoritesPlaylist() {
+
+    PlaylistEntity favorites =
+        getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
+    if (favorites == null) {
+      createMyFavoritesPlaylist();
+      return true;
+    }
+    List<SongIdentifier> songs = favorites.getSongs();
+    if (songs == null || songs.size() == new HashSet<>(songs).size()) {
+      return false;
+    }
+    Set<SongIdentifier> seen = new HashSet<>();
+    songs.removeIf(song -> !seen.add(song));
+    return true;
   }
 
   public PlaylistEntity createPlaylist(String playlistName) throws EntityAlreadyExistsException {
@@ -327,6 +348,11 @@ public class UserEntity extends AbstractPersistentEntity {
     SongIdentifier songIdentifier = new SongIdentifier(locationId,
         song.getAlbum().getId(), song.getId());
 
+    // My Favorites is a set -- a song is a favorite or it is not -- while any other playlist may
+    // hold a song more than once, as a music playlist can.
+    if (isMyFavorites(playlist) && playlist.getSongs().contains(songIdentifier)) {
+      return false;
+    }
     return playlist.addSong(songIdentifier);
   }
 
@@ -338,7 +364,15 @@ public class UserEntity extends AbstractPersistentEntity {
     SongIdentifier songIdentifier = new SongIdentifier(locationId,
         song.getAlbum().getId(), song.getId());
 
+    // Un-favoriting removes every copy, including duplicates stored before My Favorites was a set.
+    if (isMyFavorites(playlist)) {
+      return playlist.getSongs().removeIf(songIdentifier::equals);
+    }
     return playlist.removeSong(songIdentifier);
+  }
+
+  private static boolean isMyFavorites(PlaylistEntity playlist) {
+    return PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(playlist.getName());
   }
 
   public Set<UserSongCreditUsageEntity> getUserSongCreditUsages() {

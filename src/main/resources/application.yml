@@ -11,7 +11,7 @@ app:
   # (credits are master's), so it refuses a non-admin web user's queue operations (addSong,
   # addMultipleSongs, move up/down, remove) on its own /api/locations/{id}/song-queue endpoints.
   # true lets them through, uncharged.
-  allow-slave-url-queue-operations: false
+  allow-slave-url-queue-operations: true
   # Geo-fencing: at a location whose "Geo-fenced" box is ticked (JFC/Swing Edit Location Info),
   # Web/Mobile UI patrons may only queue, reorder or remove songs while their device is near the
   # location's latitude/longitude. Admin users and the JFC/Swing kiosk are never fenced.
@@ -96,7 +96,7 @@ song-library:
   search-result-page-size: 100
 
 song-queue:
-  reset-queue-at-startup: true
+  reset-queue-at-startup: false
   minimum-number-songs-to-keep-in-queue: 3 # Only used when background-music.enable-background-music is true
   minimum-minutes-between-song-plays: 60
   allow-explicit-songs-at-all-times: false
