@@ -94,6 +94,63 @@ html, body {
   font-size: 0.85rem;
 }
 
+.password-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.form-group + .password-hint {
+  margin: -0.5rem 0 1rem;
+}
+
+/* Live password checks: red until the rules are met (or the confirmation matches), then green */
+input.pw-invalid,
+input.pw-invalid:focus {
+  border: 1px solid #e05252;
+  box-shadow: 0 0 0 1px #e05252;
+  outline: none;
+}
+
+input.pw-valid,
+input.pw-valid:focus {
+  border: 1px solid #3cb371;
+  box-shadow: 0 0 0 1px #3cb371;
+  outline: none;
+}
+
+/* Password input with an inline "peek" (show/hide) toggle on its right edge */
+.password-peek-wrap {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.password-peek-wrap input {
+  width: 100%;
+  padding-right: 2.25rem;
+}
+
+.password-peek-btn {
+  position: absolute;
+  top: 50%;
+  right: 0.2rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.password-peek-btn:hover,
+.password-peek-btn[aria-pressed="true"] {
+  color: var(--accent);
+}
+
 /* Blue gradient button — matches JFC/Swing "Back" nav button palette */
 .auth-btn {
   width: 100%;

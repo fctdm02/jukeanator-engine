@@ -1154,17 +1154,19 @@
   function renderChangePassword() {
     contentPanel.innerHTML = subScreenShell('Password', `
       <div class="form-group">
-        <label class="form-label">Current Password</label>
-        <input class="form-input" type="password" id="currentPassword" placeholder="Enter current password">
+        <label class="form-label" for="currentPassword">Current Password</label>
+        ${peekablePassword('currentPassword', { className: 'form-input',
+          placeholder: 'Enter current password', autocomplete: 'current-password' })}
       </div>
       <div class="form-group">
-        <label class="form-label">New Password</label>
-        <input class="form-input" type="password" id="newPassword" placeholder="Enter new password">
+        <label class="form-label" for="newPassword">New Password</label>
+        ${peekablePassword('newPassword', { className: 'form-input', placeholder: 'Enter new password' })}
       </div>
       <div class="form-group">
-        <label class="form-label">Confirm New Password</label>
-        <input class="form-input" type="password" id="confirmPassword" placeholder="Confirm new password">
+        <label class="form-label" for="confirmPassword">Confirm New Password</label>
+        ${peekablePassword('confirmPassword', { className: 'form-input', placeholder: 'Confirm new password' })}
       </div>
+      <div class="password-hint">${PASSWORD_POLICY_TEXT}</div>
       <div id="pwError" class="form-error"></div>
       <div class="form-spacer"></div>
       <div class="form-actions">
@@ -1173,6 +1175,9 @@
       </div>`);
 
     wireBackBtn();
+    wirePasswordPeeks(contentPanel);
+    wirePasswordValidity(document.getElementById('newPassword'),
+      document.getElementById('confirmPassword'));
     document.getElementById('cancelPwBtn').addEventListener('click', goBack);
     document.getElementById('savePwBtn').addEventListener('click', async () => {
       const current = document.getElementById('currentPassword').value;
@@ -1180,9 +1185,9 @@
       const confirm = document.getElementById('confirmPassword').value;
       const errEl = document.getElementById('pwError');
       errEl.textContent = '';
-      if (newPw !== confirm) { errEl.textContent = 'New passwords do not match.'; return; }
       const problem = passwordProblem(newPw);
       if (problem) { errEl.textContent = problem; return; }
+      if (newPw !== confirm) { errEl.textContent = 'New passwords do not match.'; return; }
       const btn = document.getElementById('savePwBtn');
       btn.disabled = true; btn.textContent = 'Saving…';
       try {
@@ -1291,13 +1296,18 @@
             <label>First name <input type="text" id="registerFirstName" autocomplete="off" required></label>
             <label>Last name <input type="text" id="registerLastName" autocomplete="off" required></label>
             <label>Email <input type="email" id="registerEmail" autocomplete="off" required></label>
-            <label>Password <input type="password" id="registerPassword" autocomplete="new-password" required></label>
+            <label>Password ${peekablePassword('registerPassword')}</label>
+            <label>Confirm ${peekablePassword('registerConfirmPassword')}</label>
+            <div class="password-hint">${PASSWORD_POLICY_TEXT}</div>
             <button type="submit" class="auth-btn">Submit</button>
             <button type="button" id="registerCancelBtn" class="auth-btn">Cancel</button>
           </form>
         </div>
       </div>`;
 
+    wirePasswordPeeks(contentPanel);
+    wirePasswordValidity(document.getElementById('registerPassword'),
+      document.getElementById('registerConfirmPassword'));
     document.getElementById('registerCancelBtn').addEventListener('click', () => renderLogin());
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -1307,6 +1317,10 @@
       const password = document.getElementById('registerPassword').value;
       const problem = passwordProblem(password);
       if (problem) { showError(problem); return; }
+      if (password !== document.getElementById('registerConfirmPassword').value) {
+        showError('Passwords do not match.');
+        return;
+      }
       try {
         const auth = await api('/api/users/register', {
           method: 'POST',
@@ -1327,13 +1341,70 @@
     });
   }
 
+  /** A new-password input with a "peek" toggle; call wirePasswordPeeks once it is in the DOM. */
+  function peekablePassword(id, { className = '', placeholder = '', autocomplete = 'new-password' } = {}) {
+    return `
+      <span class="password-peek-wrap">
+        <input type="password" id="${id}" class="${className}" placeholder="${placeholder}"
+               autocomplete="${autocomplete}" required>
+        <button type="button" class="password-peek-btn" data-peek-for="${id}"
+                aria-label="Show password" aria-pressed="false" title="Show password">${EYE_ICON}</button>
+      </span>`;
+  }
+
+  /** Toggles each peek button's input between masked and plain text. */
+  function wirePasswordPeeks(root) {
+    root.querySelectorAll('.password-peek-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.peekFor);
+        const reveal = input.type === 'password';
+        input.type = reveal ? 'text' : 'password';
+        btn.innerHTML = reveal ? EYE_OFF_ICON : EYE_ICON;
+        btn.setAttribute('aria-pressed', String(reveal));
+        btn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+        btn.title = btn.getAttribute('aria-label');
+        input.focus();
+      });
+    });
+  }
+
+  /**
+   * Live red/green borders: the new password turns green once it meets passwordProblem's rules, and
+   * the confirmation once it is non-empty and matches the new password.
+   */
+  function wirePasswordValidity(passwordInput, confirmInput) {
+    const mark = (input, ok) => {
+      input.classList.toggle('pw-valid', ok);
+      input.classList.toggle('pw-invalid', !ok);
+    };
+    const update = () => {
+      mark(passwordInput, !passwordProblem(passwordInput.value));
+      mark(confirmInput, confirmInput.value !== '' && confirmInput.value === passwordInput.value);
+    };
+    passwordInput.addEventListener('input', update);
+    confirmInput.addEventListener('input', update);
+    update();
+  }
+
+  const EYE_ICON =`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const EYE_OFF_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19"/>
+      <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
+  const PASSWORD_POLICY_TEXT =
+    'Your password must be at least 8 characters long and include at least one letter and one number.';
+
   /**
    * Why a new password is not allowed, or null -- mirrors the server's AccountValidator: at least
    * 8 characters, with at least one letter and one number. Keep both sides in sync.
    */
   function passwordProblem(password) {
     if (!password || password.length < 8 || !/\p{L}/u.test(password) || !/\d/.test(password)) {
-      return 'Your password must be at least 8 characters long and include at least one letter and one number.';
+      return PASSWORD_POLICY_TEXT;
     }
     if (new TextEncoder().encode(password).length > 72) {
       return 'Your password must be at most 72 characters long.';
