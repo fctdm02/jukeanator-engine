@@ -72,6 +72,16 @@ public interface LocationService {
       byte[] imageBytes) throws LocationServiceException;
 
   /**
+   * Persists {@code locationId}'s logo image under {@code <dataDir>/images/<logoName>} -- the
+   * same directory {@link com.djt.jukeanator_engine.config.WebConfig} serves {@code /images/**}
+   * from -- so the logo the slave already shows locally renders on master's Web/Mobile UI too,
+   * without an operator manually copying the file. {@code logoName} itself comes from the
+   * location record (already synced via {@code /location-info}), not from this call.
+   */
+  void receiveLocationLogo(Integer locationId, String apiKey, byte[] imageBytes)
+      throws LocationServiceException;
+
+  /**
    * The most recently synced metadata snapshot for {@code locationId}, or {@code null} if the
    * location has never synced.
    */

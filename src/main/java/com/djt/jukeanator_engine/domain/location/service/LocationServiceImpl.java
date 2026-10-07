@@ -62,6 +62,7 @@ public class LocationServiceImpl implements LocationService {
   private final String storageRoot;
   private final ConnectedSlaveRegistry connectedSlaveRegistry;
   private final SongLibraryRepository songLibraryRepository;
+  private final String dataDir;
 
   // Non-null only under repositoryType: jpa -- writes the filesystem (JSON) backup of the location
   // list into app.data-dir. See updateOwnLocationInfo().
@@ -73,7 +74,7 @@ public class LocationServiceImpl implements LocationService {
       PasswordEncoder passwordEncoder, ApplicationEventPublisher eventPublisher,
       ObjectMapper objectMapper, String storageRoot,
       ConnectedSlaveRegistry connectedSlaveRegistry, SongLibraryRepository songLibraryRepository,
-      String filesystemBackupDataDir) {
+      String filesystemBackupDataDir, String dataDir) {
 
     requireNonNull(locationRepository, "locationRepository cannot be null");
     requireNonNull(passwordEncoder, "passwordEncoder cannot be null");
@@ -82,6 +83,7 @@ public class LocationServiceImpl implements LocationService {
     requireNonNull(storageRoot, "storageRoot cannot be null");
     requireNonNull(connectedSlaveRegistry, "connectedSlaveRegistry cannot be null");
     requireNonNull(songLibraryRepository, "songLibraryRepository cannot be null");
+    requireNonNull(dataDir, "dataDir cannot be null");
 
     this.locationRepository = locationRepository;
     this.passwordEncoder = passwordEncoder;
@@ -90,6 +92,7 @@ public class LocationServiceImpl implements LocationService {
     this.storageRoot = storageRoot;
     this.connectedSlaveRegistry = connectedSlaveRegistry;
     this.songLibraryRepository = songLibraryRepository;
+    this.dataDir = dataDir;
     this.filesystemBackupRepository = filesystemBackupDataDir != null
         ? new LocationRepositoryFileSystemImpl(filesystemBackupDataDir)
         : null;
@@ -379,6 +382,39 @@ public class LocationServiceImpl implements LocationService {
     } catch (IOException ioe) {
       throw new LocationServiceException("Could not write cover art for locationId: " + locationId
           + ", sourceAlbumId: " + sourceAlbumId, ioe);
+    }
+
+    recordHeartbeat(locationId);
+  }
+
+  @Override
+  public void receiveLocationLogo(Integer locationId, String apiKey, byte[] imageBytes) {
+
+    requireValidLocation(locationId, apiKey);
+
+    LocationEntity location = this.locationRoot.getLocationByIdNullIfNotExists(locationId);
+    String logoName = location != null ? location.getLogoName() : null;
+    if (logoName == null || logoName.isBlank()) {
+      throw new LocationServiceException(
+          "Cannot store logo for locationId: " + locationId + " -- no logoName on record");
+    }
+
+    Path imagesDir = Path.of(this.dataDir, "images");
+    // logoName travels in from the slave's own location record (see /location-info), so it's
+    // only semi-trusted -- resolve + normalize and confirm the result still lands inside
+    // imagesDir before writing, the same guard any path built from caller-supplied input needs.
+    Path logoFile = imagesDir.resolve(logoName).normalize();
+    if (!logoFile.startsWith(imagesDir)) {
+      throw new LocationServiceException(
+          "Invalid logoName for locationId: " + locationId + ": " + logoName);
+    }
+
+    try {
+      Files.createDirectories(imagesDir);
+      Files.write(logoFile, imageBytes);
+    } catch (IOException ioe) {
+      throw new LocationServiceException(
+          "Could not write logo for locationId: " + locationId, ioe);
     }
 
     recordHeartbeat(locationId);

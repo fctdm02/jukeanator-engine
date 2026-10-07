@@ -81,6 +81,16 @@ public class LocationController {
     return ResponseEntity.noContent().build();
   }
 
+  @PostMapping("/{locationId}/location-sync/logo")
+  public ResponseEntity<Void> syncLocationLogo(
+      @PathVariable Integer locationId,
+      @RequestHeader(LOCATION_API_KEY_HEADER) String apiKey,
+      @RequestBody byte[] imageBytes) {
+
+    locationService.receiveLocationLogo(locationId, apiKey, imageBytes);
+    return ResponseEntity.noContent().build();
+  }
+
   /** Admin-only, bar-owner accounting: every credit transaction tagged with this location. */
   @GetMapping("/{locationId}/credit-ledger")
   public ResponseEntity<List<UserSongCreditUsageDto>> getCreditLedger(

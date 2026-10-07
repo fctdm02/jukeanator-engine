@@ -91,7 +91,7 @@ public class LocationServiceTest {
 
     locationServiceImpl = new LocationServiceImpl(locationRepository, passwordEncoder,
         eventPublisher, ObjectMappers.create(), storageRoot.toString(), connectedSlaveRegistry,
-        songLibraryRepository, null);
+        songLibraryRepository, null, storageRoot.toString());
   }
 
   private LocationEntity registeredLocation() {
@@ -522,7 +522,7 @@ public class LocationServiceTest {
 
     return new LocationServiceImpl(locationRepository, passwordEncoder, eventPublisher,
         ObjectMappers.create(), storageRoot.toString(), connectedSlaveRegistry,
-        songLibraryRepository, backupDataDir.toString());
+        songLibraryRepository, backupDataDir.toString(), storageRoot.toString());
   }
 
   private static LocationEntity loadBackedUpLocation(Path backupDataDir)

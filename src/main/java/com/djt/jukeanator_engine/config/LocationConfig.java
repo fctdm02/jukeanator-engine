@@ -67,7 +67,8 @@ public class LocationConfig {
     return new LocationServiceImpl(locationRepository, passwordEncoder, eventPublisher,
         objectMapper, perLocationSyncStorageRoot(appProperties, locationProperties),
         connectedSlaveRegistry, songLibraryRepository,
-        "jpa".equals(appProperties.getRepositoryType()) ? appProperties.getDataDir() : null);
+        "jpa".equals(appProperties.getRepositoryType()) ? appProperties.getDataDir() : null,
+        appProperties.getDataDir());
   }
 
   // Exists in every app.mode so the Web/Mobile UI can always ask whether a location is fenced;

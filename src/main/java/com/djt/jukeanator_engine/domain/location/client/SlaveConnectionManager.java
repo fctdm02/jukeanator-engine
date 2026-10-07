@@ -1,6 +1,9 @@
 package com.djt.jukeanator_engine.domain.location.client;
 
 import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -9,6 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
+import org.springframework.http.MediaType;
 import org.springframework.messaging.converter.JacksonJsonMessageConverter;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaders;
@@ -17,6 +21,7 @@ import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 import com.djt.jukeanator_engine.config.AppProperties;
@@ -88,12 +93,22 @@ public class SlaveConnectionManager {
   private final FinancialLedgerService financialLedgerService;
 
   private final WebSocketStompClient stompClient;
+  private final RestClient restClient;
   private final ScheduledExecutorService reconnectExecutor =
       Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "slave-connection-manager");
         t.setDaemon(true);
         return t;
       });
+
+  // sendLocationInfo runs on the STOMP I/O thread (afterConnected / a heartbeat-driven event) and
+  // must never block on it -- see the class javadoc -- so the logo upload's blocking HTTP call
+  // happens here instead, off that thread.
+  private final ExecutorService logoUploadExecutor = Executors.newSingleThreadExecutor(r -> {
+    Thread t = new Thread(r, "logo-upload-thread");
+    t.setDaemon(true);
+    return t;
+  });
 
   private final AtomicReference<StompSession> currentSession = new AtomicReference<>();
   private final AtomicBoolean connecting = new AtomicBoolean(false);
@@ -112,6 +127,7 @@ public class SlaveConnectionManager {
     this.locationService = locationService;
     this.objectMapper = objectMapper;
     this.userInterfaceProperties = userInterfaceProperties;
+    this.restClient = RestClient.builder().baseUrl(appProperties.getMasterInstanceUrl()).build();
 
     // Sends come from several threads (command replies, player events, heartbeats) -- see
     // SerializedSendWebSocketClient.
@@ -143,6 +159,7 @@ public class SlaveConnectionManager {
   @PreDestroy
   public void shutdown() {
     reconnectExecutor.shutdownNow();
+    logoUploadExecutor.shutdownNow();
     StompSession session = currentSession.get();
     if (session != null && session.isConnected()) {
       session.disconnect();
@@ -270,9 +287,44 @@ public class SlaveConnectionManager {
       session.send("/location-info", new LocationInfoSyncDto(location.getName(),
           location.getLatitude(), location.getLongitude(), location.getLogoName(),
           location.isGeoFenced()));
+      uploadLocationLogo(locationId, location.getLogoName());
     } catch (Exception e) {
       log.debug("Could not send location info to master", e);
     }
+  }
+
+  /**
+   * Pushes the logo file itself (not just its name) to master, so an operator-supplied logo
+   * override under this slave's own {@code <dataDir>/images/} shows up on master's Web/Mobile UI
+   * without being copied there by hand. Runs on {@link #logoUploadExecutor}, off the STOMP I/O
+   * thread that calls {@link #sendLocationInfo} -- the blocking HTTP call here must never delay
+   * the connect handshake or any other send on that thread.
+   */
+  private void uploadLocationLogo(Integer locationId, String logoName) {
+
+    if (logoName == null || logoName.isBlank()) {
+      return;
+    }
+    Path logoFile = Path.of(appProperties.getDataDir(), "images", logoName);
+    if (!Files.isRegularFile(logoFile)) {
+      return;
+    }
+
+    logoUploadExecutor.submit(() -> {
+      try {
+        byte[] imageBytes = Files.readAllBytes(logoFile);
+        restClient.post()
+            .uri("/api/locations/{locationId}/location-sync/logo", locationId)
+            .header("location-id", String.valueOf(locationId))
+            .header("location-api-key", appProperties.getLocationApiKey())
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .body(imageBytes)
+            .retrieve()
+            .toBodilessEntity();
+      } catch (Exception e) {
+        log.debug("Could not sync location logo to master", e);
+      }
+    });
   }
 
   @EventListener
