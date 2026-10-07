@@ -90,12 +90,9 @@ Two ways to do this -- pick one. Both end with the same `locationId`/`apiKey` pa
 - [ ] On the master machine, generate an admin JWT: run `GeneratePostmanJwtToken` (plain Java main,
   no Spring context) and copy the printed token.
 - [ ] Provision (run from either machine, against the master's address):
-
-```
-bash
-curl -s -X POST http://<master-ip>:8080/api/locations -H "Authorization: Bearer <admin-jwt>" -H "Content-Type: application/json" -d "{\"name\":\"Trial Tavern\",\"latitude\":42.33,\"longitude\":-83.04}"
-```
-  
+  ```bash
+  curl -s -X POST http://<master-ip>:8080/api/locations -H "Authorization: Bearer <admin-jwt>" -H "Content-Type: application/json" -d "{\"name\":\"Trial Tavern\",\"latitude\":42.33,\"longitude\":-83.04}"
+  ```
   Note the returned `locationId` and `apiKey` -- the key is shown **once** (only its hash is
   stored).
 - [ ] Put both into the **slave machine**'s config (`app.location-id`, `app.location-api-key`). To
@@ -121,16 +118,28 @@ This lets you provision without ever calling master's API directly.
   `apiKeyHash` value for the location you just registered (the dialog doesn't display the hash
   itself, only the plaintext key).
 - [ ] Stop the instance.
-- [ ] **On the master machine**, insert the row directly into its database:
+- [ ] **On the master machine**, run this as one script: read the next free id off the shared
+  sequence table, insert the location row with it, then advance the sequence past it so nothing
+  allocated later -- of any entity type; `persistent_identity_seq` is one row shared by every
+  `AbstractPersistentEntity` subclass (users, locations, playlists, song-queue entries, ...), not
+  location-specific -- can collide with this row, since a hand-written insert bypasses that
+  sequence entirely:
 
 ```sql
-  INSERT INTO jukeanator.location (id, name, latitude, longitude, api_key_hash, status, is_geo_fenced)
-  VALUES (<locationId>, 'Trial Tavern', 42.33, -83.04, '<apiKeyHash>', 'PROVISIONED', 1);
+SELECT next_val FROM jukeanator.persistent_identity_seq;
+
+INSERT INTO jukeanator.location (id, name, latitude, longitude, api_key_hash, status, is_geo_fenced)
+VALUES (1, 'Rock On Third', 42.4894, -83.1438, '$2a$10$BQeVHfzEdZDDjAffQo05jeXNlaYGh0CII9wKXpKKQ.3uISS0saOM2', 'PROVISIONED', 0);
+
+UPDATE jukeanator.persistent_identity_seq SET next_val = 2 WHERE next_val <= 1;
 ```
-  Leave `api_key_lookup` out of the statement (NULL) -- it's the newer SHA-256 index column, and
-  it's optional: master self-backfills it via a one-time bcrypt check the first time this slave
-  connects (see `LocationServiceImpl.verifyLegacyApiKey`). `is_geo_fenced` is `1` to match the
-  default the UI's registration path itself used.
+  Swap in the id the `SELECT` just returned (on a freshly-migrated database, `1`), along with your
+  own name/latitude/longitude and the `apiKeyHash` from `JukeANator_Locations.json` -- then point
+  the `UPDATE` one past whichever id you used. Leave `api_key_lookup` out of the statement (NULL)
+  -- it's the newer SHA-256 index column, and it's optional: master self-backfills it via a
+  one-time bcrypt check the first time this slave connects (see
+  `LocationServiceImpl.verifyLegacyApiKey`). Add Location doesn't ask for a geo-fence flag, so set
+  `is_geo_fenced` to whatever you want this trial location's fencing to be.
 - [ ] Back on the **slave machine**, edit `application.yml`: set `app.location-id` and
   `app.location-api-key` to the Location ID / API Key the dialog showed you (`app.mode` and
   `app.master-instance-url` are already correct from step 1). Since this is the same instance,
