@@ -13,9 +13,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import com.djt.jukeanator_engine.config.AppProperties;
+import com.djt.jukeanator_engine.domain.common.security.SecurityContextPropagatingRunnable;
+import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotAlbumDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotArtistDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotDto;
@@ -71,7 +75,17 @@ public class LibrarySyncService {
     // approach already caught every Throwable so a slow/unreachable master couldn't fail the
     // scan, but it could still delay scanFileSystemForSongs() returning for as long as the HTTP
     // calls took. Running on a background thread removes that latency entirely.
-    syncExecutor.submit(() -> {
+    // ServiceSecurityAspect requires an authenticated principal for every songLibraryService
+    // call inside syncLibrary()/buildSnapshot(), but syncExecutor's thread starts with no
+    // security context of its own (it's not the AWT-EventQueue thread the Swing UI runs on, nor
+    // a request thread) -- see SecurityContextPropagatingRunnable's javadoc. Propagate whatever
+    // auth triggered this scan, falling back to the SYSTEM principal when the event came from a
+    // context with none (e.g. a filesystem watcher).
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    Authentication effective =
+        (auth != null) ? auth : SystemPrincipal.SystemAuthenticationToken.INSTANCE;
+
+    syncExecutor.submit(new SecurityContextPropagatingRunnable(() -> {
       try {
         syncLibrary();
       } catch (Throwable t) {
@@ -80,7 +94,7 @@ public class LibrarySyncService {
         // only on a best-effort basis.
         log.warn("Could not sync library to master at " + appProperties.getMasterInstanceUrl(), t);
       }
-    });
+    }, effective));
   }
 
   private void syncLibrary() {

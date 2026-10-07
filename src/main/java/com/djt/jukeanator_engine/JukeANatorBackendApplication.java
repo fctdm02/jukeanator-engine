@@ -54,7 +54,7 @@ public class JukeANatorBackendApplication {
       log.info("repositoryType: {}", context.getEnvironment().getProperty("app.repository-type"));
       log.info("uiEnabled: {}", context.getEnvironment().getProperty("app.ui-enabled"));
       log.info("locationID: {}", context.getEnvironment().getProperty("app.location-id"));
-      log.info("masterInstanceUrl: {}", context.getEnvironment().getProperty("master-instance-url"));
+      log.info("masterInstanceUrl: {}", context.getEnvironment().getProperty("app.master-instance-url"));
 
       if (context.getEnvironment().getProperty("app.ui-enabled", Boolean.class, false)) {
 
