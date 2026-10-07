@@ -28,9 +28,9 @@ Note the argument order: JVM options (`-D...`, `--enable-native-access=...`, etc
 
 On first run this seeds `C:\kiosk\config\application.yml` (with `app.data-dir` pre-wired to a sibling `C:\kiosk\data`) if it doesn't already exist, then loads overrides from it -- same seeding behavior as the WAR-relative default, just rooted at the given directory instead.
 
-# How to start Docker
+# How to run the JFC/Swing GUI Functional Tests
 ```
-sudo systemctl start docker
+mvn test -Pgui-tests
 ```
 
 # Master Mode

@@ -172,6 +172,7 @@ public class AddSongToQueueCard extends JPanel {
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAddSongArtist));
 
     constraintLabel = new JLabel(constraintLabelText, SwingConstants.CENTER);
+    constraintLabel.setName(UiComponentNames.ADD_SONG_CONSTRAINT_LABEL);
     constraintLabel.setAlignmentX(CENTER_ALIGNMENT);
     constraintLabel.setForeground(ColorTheme.get().textSecondary);
     constraintLabel
@@ -189,6 +190,7 @@ public class AddSongToQueueCard extends JPanel {
     // createCancelButton() renders identically to the Cancel button; the
     // action still calls dismiss() so the overlay is closed on tap.
     JButton okButton = createCancelButton("OK");
+    okButton.setName(UiComponentNames.ADD_SONG_OK_BUTTON);
 
     JPanel okRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
     okRow.setOpaque(false);
@@ -368,6 +370,8 @@ public class AddSongToQueueCard extends JPanel {
           }
         });
 
+    this.normalButton.setName(UiComponentNames.ADD_SONG_PLAY_BUTTON);
+    this.priorityButton.setName(UiComponentNames.ADD_SONG_PRIORITY_PLAY_BUTTON);
     buttons.add(this.normalButton);
     buttons.add(this.priorityButton);
 
@@ -377,6 +381,7 @@ public class AddSongToQueueCard extends JPanel {
     updateButtonStates();
 
     JButton cancel = createCancelButton("Cancel");
+    cancel.setName(UiComponentNames.ADD_SONG_CANCEL_BUTTON);
     JPanel cancelRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
     cancelRow.setOpaque(false);
     cancelRow.add(cancel);

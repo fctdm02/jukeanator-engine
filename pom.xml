@@ -274,6 +274,17 @@
 				<configuration>
 					<testFailureIgnore>true</testFailureIgnore>
 				</configuration>
+				<executions>
+					<!-- @Tag("gui") tests drive the real fullscreen JFC/Swing UI and need a JVM that
+					     is not headless, so the normal run leaves them out; -Pgui-tests adds a
+					     second execution that runs them in a JVM of their own. -->
+					<execution>
+						<id>default-test</id>
+						<configuration>
+							<excludedGroups>gui</excludedGroups>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
@@ -283,6 +294,12 @@
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.8.12</version>
+				<configuration>
+					<excludes>
+						<!-- Standalone developer utility (main method), not application code -->
+						<exclude>com/djt/jukeanator_engine/domain/common/security/GeneratePostmanJwtToken*</exclude>
+					</excludes>
+				</configuration>
 				<executions>
 					<execution>
 						<id>prepare-agent</id>
@@ -336,5 +353,35 @@
 			</plugins>
 		</pluginManagement>
 	</build>
+
+	<profiles>
+		<!-- Runs every test, including the @Tag("gui") JFC/Swing functional tests:
+		     ./mvnw test -Pgui-tests
+		     The gui tests run after the others, in a separate JVM (so AWT is not already headless),
+		     and their coverage is added to the same JaCoCo report. -->
+		<profile>
+			<id>gui-tests</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>gui-tests</id>
+								<phase>test</phase>
+								<goals>
+									<goal>test</goal>
+								</goals>
+								<configuration>
+									<groups>gui</groups>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
 </project>

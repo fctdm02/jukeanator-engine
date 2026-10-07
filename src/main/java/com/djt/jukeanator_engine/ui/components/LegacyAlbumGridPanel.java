@@ -231,6 +231,7 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
     Color borderColor = explicit ? ColorTheme.get().accentExplicit : ColorTheme.get().legacyPanelBorder;
 
     JPanel card = new JPanel(new BorderLayout(0, 0));
+    card.setName(UiComponentNames.LEGACY_ALBUM_CARD);
     card.setOpaque(true);
     card.setBackground(Color.BLACK);
     card.setBorder(BorderFactory.createLineBorder(borderColor, 2));
@@ -401,6 +402,7 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
         return new Dimension(super.getPreferredSize().width, profile.trackRowH());
       }
     };
+    row.setName(UiComponentNames.LEGACY_TRACK_ROW);
     row.setOpaque(false);
     row.setBorder(new EmptyBorder(1, 4, 1, 4));
     row.setMaximumSize(new Dimension(Integer.MAX_VALUE, profile.trackRowH()));

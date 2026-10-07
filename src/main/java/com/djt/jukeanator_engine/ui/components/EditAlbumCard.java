@@ -180,6 +180,7 @@ public class EditAlbumCard extends JPanel {
     topContainer.setBorder(new EmptyBorder(0, 0, 10, 0));
 
     lblTopHeader = new JLabel("Editing Album Metadata", SwingConstants.CENTER);
+    lblTopHeader.setName(UiComponentNames.EDIT_ALBUM_HEADER_LABEL);
     lblTopHeader.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeNavBtn));
     lblTopHeader.setForeground(ColorTheme.get().editAlbumTextLight);
     topContainer.add(lblTopHeader, BorderLayout.CENTER);
@@ -188,6 +189,8 @@ public class EditAlbumCard extends JPanel {
     albumNavPanel.setOpaque(false);
     btnPrevAlbum = createStyledButton("< Prev Album", e -> navigateAlbum(-1));
     btnNextAlbum = createStyledButton("Next Album >", e -> navigateAlbum(1));
+    btnPrevAlbum.setName(UiComponentNames.EDIT_ALBUM_PREV_ALBUM_BUTTON);
+    btnNextAlbum.setName(UiComponentNames.EDIT_ALBUM_NEXT_ALBUM_BUTTON);
     albumNavPanel.add(btnPrevAlbum);
     albumNavPanel.add(btnNextAlbum);
     topContainer.add(albumNavPanel, BorderLayout.SOUTH);
@@ -299,6 +302,7 @@ public class EditAlbumCard extends JPanel {
     gbcS.gridx = 3;
     gbcS.weightx = 0.5;
     tfSearchAlbum = new JTextField(10);
+    tfSearchAlbum.setName(UiComponentNames.EDIT_ALBUM_SEARCH_ALBUM_FIELD);
     setupTextField(tfSearchAlbum);
     searchInputsPanel.add(tfSearchAlbum, gbcS);
 
@@ -470,6 +474,7 @@ public class EditAlbumCard extends JPanel {
       if (onDismiss != null)
         onDismiss.run();
     });
+    btnCancel.setName(UiComponentNames.EDIT_ALBUM_CANCEL_BUTTON);
 
     btnUpdateMeta.setEnabled(false);
     btnDownloadArt.setEnabled(false);

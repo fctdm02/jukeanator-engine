@@ -177,7 +177,9 @@ public class GenreDetailPanel extends JPanel {
     row.add(sortLabel);
 
     btnPopularity = sortButton("Popularity", SortMode.POPULARITY);
+    btnPopularity.setName(UiComponentNames.GENRE_DETAIL_SORT_POPULARITY_BUTTON);
     btnTitle = sortButton("Album", SortMode.TITLE);
+    btnTitle.setName(UiComponentNames.GENRE_DETAIL_SORT_ALBUM_BUTTON);
 
     row.add(btnPopularity);
     row.add(btnTitle);

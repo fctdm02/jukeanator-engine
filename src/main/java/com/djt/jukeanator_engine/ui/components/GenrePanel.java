@@ -38,10 +38,10 @@ public class GenrePanel extends JPanel implements TabNavigator {
   private static final long serialVersionUID = 1L;
 
   // ── Card names ────────────────────────────────────────────────────────────
-  private static final String CARD_GENRES = "GENRES";
-  private static final String CARD_ALBUMS = "ALBUMS";
-  private static final String CARD_ARTIST = "ARTIST";
-  private static final String CARD_DETAIL = "DETAIL";
+  public static final String CARD_GENRES = "GENRES";
+  public static final String CARD_ALBUMS = "ALBUMS";
+  public static final String CARD_ARTIST = "ARTIST";
+  public static final String CARD_DETAIL = "DETAIL";
 
   // ── Layout ────────────────────────────────────────────────────────────────
   private final CardLayout cardLayout = new CardLayout();
@@ -264,6 +264,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     int totalPages = Math.max(1, (int) Math.ceil(genresListModel.size() / (double) tilesPerPage));
 
     JButton prevBtn = ButtonFactory.createNavigationButton("❮");
+    prevBtn.setName(UiComponentNames.GENRE_PREV_BUTTON);
     prevBtn.addActionListener(e -> {
       if (currentPage > 0) {
         trackGenreTilePageNavigation("prev");
@@ -274,6 +275,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
     prevBtn.setVisible(currentPage > 0);
 
     JButton nextBtn = ButtonFactory.createNavigationButton("❯");
+    nextBtn.setName(UiComponentNames.GENRE_NEXT_BUTTON);
     nextBtn.addActionListener(e -> {
       if (currentPage < totalPages - 1) {
         trackGenreTilePageNavigation("next");
@@ -377,6 +379,7 @@ public class GenrePanel extends JPanel implements TabNavigator {
       }
     };
 
+    panel.setName(UiComponentNames.GENRE_TILE);
     panel.setOpaque(false);
     // Previously: new EmptyBorder(16, 16, 16, 16) — hard-coded.
     // Now sourced from LayoutTheme so all-sides padding scales with the theme.

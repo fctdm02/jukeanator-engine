@@ -61,6 +61,7 @@ public class DetailHeaderPanel extends JPanel {
     if (buttonText != null && onBack != null) {
 
       JButton backBtn = createBackButton(buttonText);
+      backBtn.setName(UiComponentNames.DETAIL_HEADER_BACK_BUTTON);
       backBtn.addActionListener(e -> onBack.run());
 
       // BorderLayout.WEST stretches its component to the container's full height,

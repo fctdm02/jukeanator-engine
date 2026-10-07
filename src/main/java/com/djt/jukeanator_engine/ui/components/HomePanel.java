@@ -49,9 +49,9 @@ public class HomePanel extends JPanel implements TabNavigator {
   // public static final int DEFAULT_ART_H = 190;
 
   // ── Card names ────────────────────────────────────────────────────────────
-  private static final String CARD_GRID = "GRID";
-  private static final String CARD_ARTIST = "ARTIST";
-  private static final String CARD_DETAIL = "DETAIL";
+  public static final String CARD_GRID = "GRID";
+  public static final String CARD_ARTIST = "ARTIST";
+  public static final String CARD_DETAIL = "DETAIL";
 
   // ── Layout ────────────────────────────────────────────────────────────────
   private final CardLayout cardLayout = new CardLayout();
@@ -413,6 +413,7 @@ public class HomePanel extends JPanel implements TabNavigator {
     row.add(legacyLabel);
 
     legacyToggle = new ToggleSwitch(legacyMode);
+    legacyToggle.setName(UiComponentNames.HOME_LEGACY_TOGGLE);
     legacyToggle.setToggleListener(this::applyLegacyMode);
     row.add(legacyToggle);
 
@@ -424,7 +425,9 @@ public class HomePanel extends JPanel implements TabNavigator {
     row.add(sortLabel);
 
     btnArtist = sortButton("Artist", SortMode.ARTIST);
+    btnArtist.setName(UiComponentNames.HOME_SORT_ARTIST_BUTTON);
     btnTitle = sortButton("Album", SortMode.TITLE);
+    btnTitle.setName(UiComponentNames.HOME_SORT_ALBUM_BUTTON);
 
     row.add(btnArtist);
     row.add(btnTitle);

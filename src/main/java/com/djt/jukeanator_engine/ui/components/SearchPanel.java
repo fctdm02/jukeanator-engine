@@ -45,10 +45,10 @@ public class SearchPanel extends JPanel implements TabNavigator {
   // themes override them from one place.
 
   // ── Card names ────────────────────────────────────────────────────────────
-  private static final String CARD_ENTRY = "ENTRY";
-  private static final String CARD_RESULTS = "RESULTS";
-  private static final String CARD_ARTIST = "ARTIST";
-  private static final String CARD_DETAIL = "DETAIL";
+  public static final String CARD_ENTRY = "ENTRY";
+  public static final String CARD_RESULTS = "RESULTS";
+  public static final String CARD_ARTIST = "ARTIST";
+  public static final String CARD_DETAIL = "DETAIL";
 
   private final CardLayout cardLayout = new CardLayout();
   private final JPanel rootPanel = new JPanel(cardLayout);
@@ -279,6 +279,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
     bar.setBorder(BorderFactory.createMatteBorder(2, 1, 1, 1, Color.WHITE));
 
     JLabel lbl = new JLabel();
+    lbl.setName(UiComponentNames.SEARCH_TEXT_LABEL);
     lbl.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSearchBar));
     lbl.setForeground(Color.WHITE);
     lbl.setOpaque(true);
@@ -297,6 +298,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
     if (!enableTypeAheadSearch) {
       JButton btn = new JButton("SEARCH");
+      btn.setName(UiComponentNames.SEARCH_BUTTON);
       btn.setPreferredSize(
           new Dimension(LayoutTheme.get().searchBtnW, LayoutTheme.get().searchBtnH));
       btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSearchBtn));

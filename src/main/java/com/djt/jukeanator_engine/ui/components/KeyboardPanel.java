@@ -379,6 +379,7 @@ public class KeyboardPanel extends JPanel {
       protected void paintBorder(Graphics g) {}
     };
 
+    btn.setName(UiComponentNames.keyboardKey(text));
     btn.setPreferredSize(size);
     btn.setFocusPainted(false);
     btn.setContentAreaFilled(false);

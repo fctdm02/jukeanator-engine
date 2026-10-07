@@ -78,6 +78,7 @@ public final class ResultsColumnPanel {
     final LayoutTheme lt = LayoutTheme.get();
 
     JPanel outerColumn = new JPanel(new BorderLayout());
+    outerColumn.setName(UiComponentNames.resultsColumn(header));
     outerColumn.setOpaque(false);
     // Only the outward-facing edge of the first/last column gets resultColumnPadH; the
     // inward-facing edges get none so adjacent columns sit flush against each other. The
@@ -98,6 +99,7 @@ public final class ResultsColumnPanel {
     headerPanel.setBorder(new EmptyBorder(lt.resultHeaderPadV, 4, lt.resultHeaderPadV, 4));
 
     JLabel headerLabel = new JLabel(displayTitle);
+    headerLabel.setName(UiComponentNames.RESULTS_COLUMN_HEADER_LABEL);
     headerLabel.setForeground(ColorTheme.get().textPrimary);
     headerLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, lt.fontSizeResultHeader));
     headerPanel.add(headerLabel, BorderLayout.WEST);
@@ -171,6 +173,7 @@ public final class ResultsColumnPanel {
     final int actualCount = Math.min(previewCount, Math.max(0, total - offset));
 
     JButton upBtn = navButton(true, lt);
+    upBtn.setName(UiComponentNames.RESULTS_COLUMN_UP_BUTTON);
     upBtn.setEnabled(offset > 0);
     upBtn.addActionListener(e -> {
       if (onOffsetChanged != null) {
@@ -180,6 +183,7 @@ public final class ResultsColumnPanel {
     });
 
     JButton downBtn = navButton(false, lt);
+    downBtn.setName(UiComponentNames.RESULTS_COLUMN_DOWN_BUTTON);
     downBtn.setEnabled(offset + previewCount < total);
     downBtn.addActionListener(e -> {
       if (onOffsetChanged != null) {
@@ -247,6 +251,7 @@ public final class ResultsColumnPanel {
       int popularityT2, int popularityT3) {
 
     JPanel row = new JPanel(new BorderLayout(10, 0));
+    row.setName(UiComponentNames.RESULTS_ROW);
     row.setOpaque(false);
     row.setBackground(ColorTheme.get().bgRowTransparent);
     // Left inset (before the index number) reduced 25% from 14 to 11 to free up more room

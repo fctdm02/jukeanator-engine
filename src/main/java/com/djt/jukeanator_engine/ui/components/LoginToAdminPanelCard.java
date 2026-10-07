@@ -134,7 +134,7 @@ public class LoginToAdminPanelCard extends JPanel {
       secondsRemaining--;
       updateTimeout();
       if (secondsRemaining <= 0) {
-        onDismiss.run();
+        cancel();
       }
     });
     countdownTimer.start();
@@ -143,6 +143,15 @@ public class LoginToAdminPanelCard extends JPanel {
   /** Must be called when the card is removed from view so the timer doesn't leak. */
   public void dismiss() {
     countdownTimer.stop();
+  }
+
+  /**
+   * Handles Cancel and timeout: stops the countdown before dismissing, so a timer left running
+   * cannot keep calling {@code onDismiss} every second and close whatever overlay is shown later.
+   */
+  private void cancel() {
+    countdownTimer.stop();
+    onDismiss.run();
   }
 
   /** Called whenever this card is shown — restarts the countdown. */
@@ -266,8 +275,10 @@ public class LoginToAdminPanelCard extends JPanel {
 
     if (isPassword) {
       passwordLabel = field;
+      field.setName(UiComponentNames.LOGIN_PASSWORD_FIELD);
     } else {
       usernameLabel = field;
+      field.setName(UiComponentNames.LOGIN_USERNAME_FIELD);
       // Username is active by default
       field.setBorder(BorderFactory.createCompoundBorder(
           BorderFactory.createMatteBorder(2, 1, 1, 1, ColorTheme.get().accentBlue),
@@ -284,12 +295,15 @@ public class LoginToAdminPanelCard extends JPanel {
 
     // Error / feedback label
     errorLabel = new JLabel(" ", SwingConstants.CENTER);
+    errorLabel.setName(UiComponentNames.LOGIN_ERROR_LABEL);
     errorLabel.setForeground(ColorTheme.get().loginError);
     errorLabel
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
 
     JButton loginBtn = createActionButton("Login", () -> attemptLogin());
-    JButton cancelBtn = createActionButton("Cancel", onDismiss);
+    loginBtn.setName(UiComponentNames.LOGIN_LOGIN_BUTTON);
+    JButton cancelBtn = createActionButton("Cancel", this::cancel);
+    cancelBtn.setName(UiComponentNames.LOGIN_CANCEL_BUTTON);
 
     JPanel buttons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 20, 0));
     buttons.setOpaque(false);
@@ -316,6 +330,7 @@ public class LoginToAdminPanelCard extends JPanel {
     timeoutBar.setBorderPainted(false);
     timeoutBar.setStringPainted(false);
 
+    timeoutLabel.setName(UiComponentNames.LOGIN_TIMEOUT_LABEL);
     timeoutLabel.setForeground(ColorTheme.get().textSecondary);
     timeoutLabel
         .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTimeoutLabel));

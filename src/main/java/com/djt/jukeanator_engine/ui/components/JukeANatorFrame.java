@@ -64,9 +64,9 @@ public class JukeANatorFrame extends JFrame {
   private final UserActivityService userActivityService;
 
   private final ImageLoader imageLoader;
-  private static final int POPULARITY_THRESHOLD_1 = 10;
-  private static final int POPULARITY_THRESHOLD_2 = 25;
-  private static final int POPULARITY_THRESHOLD_3 = 50;
+  public static final int POPULARITY_THRESHOLD_1 = 10;
+  public static final int POPULARITY_THRESHOLD_2 = 25;
+  public static final int POPULARITY_THRESHOLD_3 = 50;
 
   // TOP PANEL
   private final CreditManager creditManager;
@@ -112,10 +112,10 @@ public class JukeANatorFrame extends JFrame {
   private AdminPanel adminPanel;
 
   // ── OVERLAY CARD SYSTEM (replaces former JDialog popups) ───────────────────
-  private static final String CARD_TABS = "TABS";
-  private static final String CARD_EDIT_ALBUM = "EDIT_ALBUM";
-  private static final String CARD_LOGIN = "LOGIN";
-  private static final String CARD_NOW_PLAYING_ALBUM = "NOW_PLAYING_ALBUM";
+  public static final String CARD_TABS = "TABS";
+  public static final String CARD_EDIT_ALBUM = "EDIT_ALBUM";
+  public static final String CARD_LOGIN = "LOGIN";
+  public static final String CARD_NOW_PLAYING_ALBUM = "NOW_PLAYING_ALBUM";
 
   private final CardLayout overlayCardLayout = new CardLayout();
   private final JPanel overlayRoot = new JPanel(overlayCardLayout) {
@@ -326,11 +326,13 @@ public class JukeANatorFrame extends JFrame {
     overlayRoot.add(placeholder(), CARD_LOGIN);
     overlayRoot.add(placeholder(), CARD_NOW_PLAYING_ALBUM);
     overlayCardLayout.show(overlayRoot, CARD_TABS);
+    overlayRoot.setName(UiComponentNames.FRAME_OVERLAY_ROOT);
 
     // addSongGlassPane floats above overlayRoot at all times, but stays
     // invisible (and therefore inert) until showAddSongToQueueCard() is called.
     addSongGlassPane.setOpaque(false);
     addSongGlassPane.setVisible(false);
+    addSongGlassPane.setName(UiComponentNames.FRAME_ADD_SONG_GLASS_PANE);
 
     mainLayeredPane.add(overlayRoot, JLayeredPane.DEFAULT_LAYER);
     mainLayeredPane.add(addSongGlassPane, JLayeredPane.PALETTE_LAYER);
@@ -814,6 +816,8 @@ public class JukeANatorFrame extends JFrame {
     // In portrait the natural width fills the bar; in landscape the width is
     // capped at tabWidth and getTabAreaInsets() centres the group horizontally.
 
+    tabs.setName(UiComponentNames.FRAME_TABS);
+
     // Index 0 — invisible dummy (left balancer)
     tabs.addTab("", new JPanel());
 
@@ -1047,6 +1051,7 @@ public class JukeANatorFrame extends JFrame {
     Dimension sidePanelSize =
         new Dimension(topPanelProfile.creditsPanelW(), topPanelProfile.creditsPanelH());
     creditsPanel.setPreferredSize(sidePanelSize);
+    creditsPanel.setName(UiComponentNames.FRAME_CREDITS_PANEL);
 
     //
     // LOCATION LOGO (same size as Now Playing cover art)
@@ -1103,6 +1108,7 @@ public class JukeANatorFrame extends JFrame {
     creditsTextPanel.setLayout(new BoxLayout(creditsTextPanel, BoxLayout.Y_AXIS));
 
     creditsTitle = new JLabel(creditsLabelPrefix() + creditManager.formatCredits(numCredits));
+    creditsTitle.setName(UiComponentNames.FRAME_CREDITS_TITLE);
     creditsTitle.setForeground(ColorTheme.get().frameCreditsTitleColor);
     creditsTitle
         .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeCreditTitle));
@@ -1300,6 +1306,8 @@ public class JukeANatorFrame extends JFrame {
     panel.add(albumArtLabel, BorderLayout.EAST);
 
     panel.setVisible(false); // hidden until a song starts
+    panel.setName(UiComponentNames.FRAME_NOW_PLAYING_PANEL);
+    songLabel.setName(UiComponentNames.FRAME_NOW_PLAYING_SONG_LABEL);
 
     // Clicking anywhere on the Now Playing panel opens the album detail card
     // for the currently-playing song, showing the full track listing.

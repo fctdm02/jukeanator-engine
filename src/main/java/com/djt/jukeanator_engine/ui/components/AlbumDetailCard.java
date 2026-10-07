@@ -79,6 +79,7 @@ public class AlbumDetailCard extends JPanel {
     buttons.setOpaque(false);
 
     JButton backButton = createBackButton("← Back", () -> dismiss(navigator));
+    backButton.setName(UiComponentNames.ALBUM_DETAIL_BACK_BUTTON);
     buttons.add(backButton);
 
     footer.add(buttons, BorderLayout.WEST);

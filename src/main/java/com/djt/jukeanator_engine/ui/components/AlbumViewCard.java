@@ -375,6 +375,8 @@ public class AlbumViewCard extends JPanel {
       rebuildTrackRows();
     });
 
+    trackPrevBtn.setName(UiComponentNames.ALBUM_VIEW_PREV_BUTTON);
+    trackNextBtn.setName(UiComponentNames.ALBUM_VIEW_NEXT_BUTTON);
     navPanel.add(trackPrevBtn, BorderLayout.WEST);
     navPanel.add(trackNextBtn, BorderLayout.EAST);
 
@@ -546,6 +548,7 @@ public class AlbumViewCard extends JPanel {
       SongClickListener listener) {
 
     JPanel row = new JPanel(new BorderLayout(10, 0));
+    row.setName(UiComponentNames.ALBUM_VIEW_TRACK_ROW);
     row.setOpaque(false);
     row.setBorder(new EmptyBorder(LayoutTheme.get().albumViewTrackRowPadV, 16,
         LayoutTheme.get().albumViewTrackRowPadV, 16));

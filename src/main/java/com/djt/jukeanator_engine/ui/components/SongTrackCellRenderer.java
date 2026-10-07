@@ -287,6 +287,10 @@ public class SongTrackCellRenderer extends JPanel
       this.activeBars = n;
     }
 
+    public int getActiveBars() {
+      return activeBars;
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
       super.paintComponent(g);

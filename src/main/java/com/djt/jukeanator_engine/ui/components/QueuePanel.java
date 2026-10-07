@@ -326,6 +326,7 @@ public class QueuePanel extends JPanel {
    */
   private JPanel buildQueueRow(SongQueueEntryDto entry, int index) {
     JPanel row = new JPanel(new BorderLayout(10, 0));
+    row.setName(UiComponentNames.QUEUE_ROW);
     row.setOpaque(false);
     int padV = LayoutTheme.get().albumViewRowPadV;
     row.setBorder(new EmptyBorder(padV, 16, padV, 16));
@@ -450,6 +451,9 @@ public class QueuePanel extends JPanel {
     moveUpButton = createActionButton("Move Song Up", 0, ACCENT_BLUE, e -> doMoveUp());
     moveDownButton = createActionButton("Move Song Down", 0, ACCENT_BLUE, e -> doMoveDown());
     removeButton = createActionButton("Remove Song", 0, ACCENT_BLUE, e -> doRemove());
+    moveUpButton.setName(UiComponentNames.QUEUE_MOVE_UP_BUTTON);
+    moveDownButton.setName(UiComponentNames.QUEUE_MOVE_DOWN_BUTTON);
+    removeButton.setName(UiComponentNames.QUEUE_REMOVE_BUTTON);
 
     buttons.add(moveUpButton);
     buttons.add(moveDownButton);

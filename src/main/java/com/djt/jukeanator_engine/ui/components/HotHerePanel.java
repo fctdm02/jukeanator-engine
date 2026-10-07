@@ -40,9 +40,9 @@ public class HotHerePanel extends JPanel implements TabNavigator {
   // Previously: private static final int PREVIEW_COUNT = 10;
 
   // ── Card names ────────────────────────────────────────────────────────────
-  private static final String CARD_CONTENT = "CONTENT";
-  private static final String CARD_ARTIST = "ARTIST";
-  private static final String CARD_DETAIL = "DETAIL";
+  public static final String CARD_CONTENT = "CONTENT";
+  public static final String CARD_ARTIST = "ARTIST";
+  public static final String CARD_DETAIL = "DETAIL";
 
   // ── Layout ────────────────────────────────────────────────────────────────
   private final CardLayout cardLayout = new CardLayout();
@@ -234,7 +234,9 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     row.add(sortLabel);
 
     btnPopularity = sortButton("Popularity", SortMode.POPULARITY);
+    btnPopularity.setName(UiComponentNames.HOT_HERE_SORT_POPULARITY_BUTTON);
     btnTitle = sortButton("Album", SortMode.TITLE);
+    btnTitle.setName(UiComponentNames.HOT_HERE_SORT_ALBUM_BUTTON);
 
     row.add(btnPopularity);
     row.add(btnTitle);

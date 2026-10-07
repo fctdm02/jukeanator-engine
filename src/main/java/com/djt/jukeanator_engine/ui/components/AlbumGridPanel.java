@@ -217,6 +217,7 @@ public class AlbumGridPanel extends JPanel implements AlbumGridView {
     navPanel.removeAll();
 
     JButton prevBtn = ButtonFactory.createNavigationButton("❮");
+    prevBtn.setName(UiComponentNames.ALBUM_GRID_PREV_BUTTON);
     prevBtn.setVisible(hasPrev);
     prevBtn.addActionListener(e -> {
       trackPageNavigation("prev");
@@ -225,6 +226,7 @@ public class AlbumGridPanel extends JPanel implements AlbumGridView {
     });
 
     JButton nextBtn = ButtonFactory.createNavigationButton("❯");
+    nextBtn.setName(UiComponentNames.ALBUM_GRID_NEXT_BUTTON);
     nextBtn.setVisible(hasNext);
     nextBtn.addActionListener(e -> {
       trackPageNavigation("next");
@@ -328,6 +330,7 @@ public class AlbumGridPanel extends JPanel implements AlbumGridView {
         super.paintComponent(g);
       }
     };
+    tile.setName(UiComponentNames.ALBUM_TILE);
     tile.setOpaque(false);
     tile.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     tile.setBorder(new EmptyBorder(1, 1, 1, 1)); // breathing room inside border

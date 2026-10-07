@@ -232,6 +232,13 @@ public class AdminPanel extends JPanel {
     overlayScrim.setLayout(new GridBagLayout());
     overlayScrim.setOpaque(false);
     overlayScrim.setVisible(false);
+    overlayScrim.setName(UiComponentNames.ADMIN_OVERLAY_SCRIM);
+    overlayCard.setName(UiComponentNames.ADMIN_OVERLAY_CARD);
+    overlayFormCard.setName(UiComponentNames.ADMIN_OVERLAY_FORM_CARD);
+    overlayTitleLabel.setName(UiComponentNames.ADMIN_OVERLAY_TITLE_LABEL);
+    overlayMessageLabel.setName(UiComponentNames.ADMIN_OVERLAY_MESSAGE_LABEL);
+    overlayPrimaryBtn.setName(UiComponentNames.ADMIN_OVERLAY_PRIMARY_BUTTON);
+    overlaySecondaryBtn.setName(UiComponentNames.ADMIN_OVERLAY_SECONDARY_BUTTON);
 
     overlayCard.setOpaque(false);
     overlayCard.setLayout(new BoxLayout(overlayCard, BoxLayout.Y_AXIS));
@@ -363,6 +370,7 @@ public class AdminPanel extends JPanel {
     center.setBorder(new EmptyBorder(6, 0, 6, 0));
 
     // ── Album list ────────────────────────────────────────────────────────
+    albumList.setName(UiComponentNames.ADMIN_ALBUM_LIST);
     albumList.setOpaque(true);
     albumList.setBackground(ColorTheme.get().bgList);
     albumList.setForeground(ColorTheme.get().textPrimary);
@@ -380,6 +388,7 @@ public class AdminPanel extends JPanel {
     albumPane.add(darkScrollPane(albumList), BorderLayout.CENTER);
 
     // ── Queue list ────────────────────────────────────────────────────────
+    queueList.setName(UiComponentNames.ADMIN_QUEUE_LIST);
     queueList.setOpaque(true);
     queueList.setBackground(ColorTheme.get().bgList);
     queueList.setForeground(ColorTheme.get().textPrimary);
@@ -406,28 +415,28 @@ public class AdminPanel extends JPanel {
 
     JPanel strip = buildButtonStrip();
 
-    strip.add(sideButton("Financial\nLedger", ColorTheme.get().accentGold,
+    strip.add(sideButton(UiComponentNames.ADMIN_FINANCIAL_LEDGER_BUTTON, "Financial\nLedger", ColorTheme.get().accentGold,
         e -> doFinancialLedger()));
-    strip.add(sideButton("View\nActivity", ColorTheme.get().accentGold, e -> doViewActivity()));
+    strip.add(sideButton(UiComponentNames.ADMIN_VIEW_ACTIVITY_BUTTON, "View\nActivity", ColorTheme.get().accentGold, e -> doViewActivity()));
 
     strip.add(Box.createVerticalGlue());
-    strip.add(sideButton("Queue\nAlbum", ColorTheme.get().accentGreen, e -> doAddAlbumToQueue()));
-    lockQueueButton = sideButton("Lock\nQueue", ColorTheme.get().accentGreen, e -> doLockQueue());
+    strip.add(sideButton(UiComponentNames.ADMIN_QUEUE_ALBUM_BUTTON, "Queue\nAlbum", ColorTheme.get().accentGreen, e -> doAddAlbumToQueue()));
+    lockQueueButton = sideButton(UiComponentNames.ADMIN_LOCK_QUEUE_BUTTON, "Lock\nQueue", ColorTheme.get().accentGreen, e -> doLockQueue());
     unlockQueueButton =
-        sideButton("Unlock\nQueue", ColorTheme.get().accentGreen, e -> doUnlockQueue());
+        sideButton(UiComponentNames.ADMIN_UNLOCK_QUEUE_BUTTON, "Unlock\nQueue", ColorTheme.get().accentGreen, e -> doUnlockQueue());
     strip.add(lockQueueButton);
     strip.add(unlockQueueButton);
     strip.add(Box.createVerticalGlue());
-    strip.add(sideButton("Edit\nAlbum", ColorTheme.get().accentGold, e -> doEditAlbum()));
-    strip.add(sideButton("Reset\nStats", ColorTheme.get().accentOrange, e -> doResetStats()));
-    strip.add(sideButton("Rescan\nLibrary", ColorTheme.get().accentViolet, e -> doRescan()));
+    strip.add(sideButton(UiComponentNames.ADMIN_EDIT_ALBUM_BUTTON, "Edit\nAlbum", ColorTheme.get().accentGold, e -> doEditAlbum()));
+    strip.add(sideButton(UiComponentNames.ADMIN_RESET_STATS_BUTTON, "Reset\nStats", ColorTheme.get().accentOrange, e -> doResetStats()));
+    strip.add(sideButton(UiComponentNames.ADMIN_RESCAN_LIBRARY_BUTTON, "Rescan\nLibrary", ColorTheme.get().accentViolet, e -> doRescan()));
     strip.add(Box.createVerticalGlue());
-    strip.add(sideButton("Add Admin\nUser", ColorTheme.get().accentGold, e -> doAddAdminUser()));
-    strip.add(sideButton("Add\nLocation", ColorTheme.get().accentGold, e -> doAddLocation()));
-    strip.add(sideButton("Edit Location\nInfo", ColorTheme.get().accentGold, e -> doEditLocationInfo()));
+    strip.add(sideButton(UiComponentNames.ADMIN_ADD_ADMIN_USER_BUTTON, "Add Admin\nUser", ColorTheme.get().accentGold, e -> doAddAdminUser()));
+    strip.add(sideButton(UiComponentNames.ADMIN_ADD_LOCATION_BUTTON, "Add\nLocation", ColorTheme.get().accentGold, e -> doAddLocation()));
+    strip.add(sideButton(UiComponentNames.ADMIN_EDIT_LOCATION_INFO_BUTTON, "Edit Location\nInfo", ColorTheme.get().accentGold, e -> doEditLocationInfo()));
     strip.add(Box.createVerticalGlue());
-    strip.add(sideButton("⊟ Minimize", ColorTheme.get().accentBlue, e -> doMinimize()));
-    strip.add(sideButton("✕ Exit", ColorTheme.get().accentRed, e -> doExit()));
+    strip.add(sideButton(UiComponentNames.ADMIN_MINIMIZE_BUTTON, "⊟ Minimize", ColorTheme.get().accentBlue, e -> doMinimize()));
+    strip.add(sideButton(UiComponentNames.ADMIN_EXIT_BUTTON, "✕ Exit", ColorTheme.get().accentRed, e -> doExit()));
 
     // Wrap so the strip itself is opaque-background-free but has a right border separator
     JPanel wrapper = new JPanel(new BorderLayout());
@@ -446,22 +455,22 @@ public class AdminPanel extends JPanel {
 
     JPanel strip = buildButtonStrip();
     strip.add(Box.createVerticalGlue());
-    strip.add(sideButton("▶▶\nNext", ColorTheme.get().accentGreen, e -> doPlayNextTrack()));
-    strip.add(sideButton("❚❚\nPause", ColorTheme.get().accentBlue, e -> doPause()));
-    strip.add(sideButton("▶\nPlay", ColorTheme.get().accentGreen, e -> doPlaySelected()));
+    strip.add(sideButton(UiComponentNames.ADMIN_NEXT_BUTTON, "▶▶\nNext", ColorTheme.get().accentGreen, e -> doPlayNextTrack()));
+    strip.add(sideButton(UiComponentNames.ADMIN_PAUSE_BUTTON, "❚❚\nPause", ColorTheme.get().accentBlue, e -> doPause()));
+    strip.add(sideButton(UiComponentNames.ADMIN_PLAY_BUTTON, "▶\nPlay", ColorTheme.get().accentGreen, e -> doPlaySelected()));
     strip.add(Box.createVerticalGlue());
-    strip.add(sideButton("▲\nMove Up", ColorTheme.get().accentBlue, e -> doMoveUp()));
-    strip.add(sideButton("▼\nMove Dn", ColorTheme.get().accentBlue, e -> doMoveDown()));
-    strip.add(sideButton("✕\nRemove", ColorTheme.get().accentRed, e -> doRemoveSong()));
+    strip.add(sideButton(UiComponentNames.ADMIN_MOVE_UP_BUTTON, "▲\nMove Up", ColorTheme.get().accentBlue, e -> doMoveUp()));
+    strip.add(sideButton(UiComponentNames.ADMIN_MOVE_DOWN_BUTTON, "▼\nMove Dn", ColorTheme.get().accentBlue, e -> doMoveDown()));
+    strip.add(sideButton(UiComponentNames.ADMIN_REMOVE_BUTTON, "✕\nRemove", ColorTheme.get().accentRed, e -> doRemoveSong()));
     strip.add(verticalSpacer(20));
-    strip.add(sideButton("🗑\nFlush", ColorTheme.get().accentRed, e -> doFlushQueue()));
-    strip.add(sideButton("🔀\nShuffle", ColorTheme.get().accentViolet, e -> doRandomizeQueue()));
+    strip.add(sideButton(UiComponentNames.ADMIN_FLUSH_BUTTON, "🗑\nFlush", ColorTheme.get().accentRed, e -> doFlushQueue()));
+    strip.add(sideButton(UiComponentNames.ADMIN_SHUFFLE_BUTTON, "🔀\nShuffle", ColorTheme.get().accentViolet, e -> doRandomizeQueue()));
     strip.add(verticalSpacer(20));
-    strip.add(sideButton("📂\nLoad Playlist", ColorTheme.get().accentGold, e -> doLoadPlaylist()));
-    strip.add(sideButton("💾\nSave Playlist", ColorTheme.get().accentGold, e -> doSavePlaylist()));
+    strip.add(sideButton(UiComponentNames.ADMIN_LOAD_PLAYLIST_BUTTON, "📂\nLoad Playlist", ColorTheme.get().accentGold, e -> doLoadPlaylist()));
+    strip.add(sideButton(UiComponentNames.ADMIN_SAVE_PLAYLIST_BUTTON, "💾\nSave Playlist", ColorTheme.get().accentGold, e -> doSavePlaylist()));
     strip.add(Box.createVerticalGlue());
-    strip.add(sideButton("➕\nCredits", ColorTheme.get().accentGreen, e -> doIncrementCredits()));
-    strip.add(sideButton("➖\nCredits", ColorTheme.get().accentOrange, e -> doDecrementCredits()));
+    strip.add(sideButton(UiComponentNames.ADMIN_INCREMENT_CREDITS_BUTTON, "➕\nCredits", ColorTheme.get().accentGreen, e -> doIncrementCredits()));
+    strip.add(sideButton(UiComponentNames.ADMIN_DECREMENT_CREDITS_BUTTON, "➖\nCredits", ColorTheme.get().accentOrange, e -> doDecrementCredits()));
 
     JPanel wrapper = new JPanel(new BorderLayout());
     wrapper.setOpaque(false);
@@ -952,6 +961,11 @@ public class AdminPanel extends JPanel {
 
     AddAdminUserForm() {
 
+      firstNameField.setName(UiComponentNames.ADMIN_USER_FIRST_NAME_FIELD);
+      lastNameField.setName(UiComponentNames.ADMIN_USER_LAST_NAME_FIELD);
+      emailField.setName(UiComponentNames.ADMIN_USER_EMAIL_FIELD);
+      passwordField.setName(UiComponentNames.ADMIN_USER_PASSWORD_FIELD);
+      errorLabel.setName(UiComponentNames.ADMIN_USER_ERROR_LABEL);
       content.setOpaque(false);
 
       JLabel title = new JLabel("Create Admin User");
@@ -1023,10 +1037,12 @@ public class AdminPanel extends JPanel {
     private JPanel buildButtonRow() {
 
       JButton createBtn = new JButton("Create Admin");
+      createBtn.setName(UiComponentNames.ADMIN_USER_CREATE_BUTTON);
       styleOverlayButton(createBtn);
       createBtn.addActionListener(e -> attemptCreate());
 
       JButton cancelBtn = new JButton("Cancel");
+      cancelBtn.setName(UiComponentNames.ADMIN_FORM_CANCEL_BUTTON);
       styleOverlayButton(cancelBtn);
       cancelBtn.addActionListener(e -> hideOverlay());
 
@@ -1106,6 +1122,8 @@ public class AdminPanel extends JPanel {
 
     FinancialLedgerDialog() {
 
+      content.setName(UiComponentNames.ADMIN_LEDGER_CONTENT);
+      table.setName(UiComponentNames.ADMIN_LEDGER_TABLE);
       content.setOpaque(false);
 
       JLabel title = new JLabel("Financial Ledger");
@@ -1293,6 +1311,8 @@ public class AdminPanel extends JPanel {
 
     ActivityDialog() {
 
+      content.setName(UiComponentNames.ADMIN_ACTIVITY_CONTENT);
+      table.setName(UiComponentNames.ADMIN_ACTIVITY_TABLE);
       content.setOpaque(false);
 
       JLabel title = new JLabel("Activity");
@@ -1814,6 +1834,7 @@ public class AdminPanel extends JPanel {
 
       this.originalName = current.getName();
 
+      nameField.setName(UiComponentNames.ADMIN_LOCATION_NAME_FIELD);
       content.setOpaque(false);
 
       JLabel title = new JLabel("Edit Location Info");
@@ -1899,10 +1920,12 @@ public class AdminPanel extends JPanel {
     private JPanel buildButtonRow() {
 
       JButton saveBtn = new JButton("Save Changes");
+      saveBtn.setName(UiComponentNames.ADMIN_LOCATION_SAVE_BUTTON);
       styleOverlayButton(saveBtn);
       saveBtn.addActionListener(e -> attemptSave());
 
       JButton cancelBtn = new JButton("Cancel");
+      cancelBtn.setName(UiComponentNames.ADMIN_FORM_CANCEL_BUTTON);
       styleOverlayButton(cancelBtn);
       cancelBtn.addActionListener(e -> hideOverlay());
 
@@ -2392,6 +2415,7 @@ public class AdminPanel extends JPanel {
 
     // ── Filter field ─────────────────────────────────────────────────────
     javax.swing.JTextField filterField = new javax.swing.JTextField();
+    filterField.setName(UiComponentNames.ADMIN_FILTER_FIELD);
     filterField
         .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminSection - 1));
     filterField.setForeground(ColorTheme.get().textPrimary);
@@ -2476,11 +2500,12 @@ public class AdminPanel extends JPanel {
    * rendered in a slightly larger font as an icon/symbol row and the second as the text label —
    * matching the reference screenshot's compact two-line button style.
    *
+   * @param name Component name (see {@link UiComponentNames}), used to locate the button in tests.
    * @param label Button text; use {@code \n} for a two-line layout.
    * @param accent Border/gradient accent colour.
    * @param action {@code ActionListener} fired on click.
    */
-  private static JButton sideButton(String label, Color accent,
+  private static JButton sideButton(String name, String label, Color accent,
       java.awt.event.ActionListener action) {
 
     // Split into icon line + text line if a newline is present
@@ -2579,6 +2604,7 @@ public class AdminPanel extends JPanel {
       }
     };
 
+    btn.setName(name);
     btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSideBtn1));
     btn.setForeground(ColorTheme.get().textPrimary);
     btn.setContentAreaFilled(false);
