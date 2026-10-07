@@ -80,12 +80,14 @@ import jakarta.persistence.EntityManagerFactory;
  * already be set (see {@link RootFolderEntity#setParentLocation}) before calling {@link
  * #storeAggregateRoot}, since this repository sources {@code location_id} from it.
  *
- * <p><b>Known limitation</b>: compilation-album artists that only exist as a song-embedded artist
- * name (no real {@code ArtistFolderEntity} folder on disk -- see {@code ArtistFromSongEntity}) are
- * not currently round-tripped through this schema, since {@code RootFolderEntity.artistsFromSongs}
- * is populated by {@code SongScanner} at scan time, not derived at {@code initialize()} time.
- * Compilation-album artist search may be incomplete on a JPA-hydrated master root until a
- * follow-up adds these to the schema.
+ * <p><b>Compilation-album artists that only exist as a song-embedded artist name</b> (no real
+ * {@code ArtistFolderEntity} folder on disk -- see {@code ArtistFromSongEntity}) are not persisted
+ * as rows in this schema at all; this repository relies on {@link RootFolderEntity#initialize()}
+ * deriving {@code artistsFromSongs} from each loaded song's own {@code artistName} the first time
+ * the tree is read back (see that method's javadoc). For a synthetically-built root populated from
+ * a synced {@code LibrarySnapshotDto}, the caller must therefore set each song's real per-song
+ * artist credit (not the album's) before calling {@link #storeAggregateRoot} -- see {@code
+ * LocationServiceImpl#persistSnapshotToJpa}.
  *
  * @author tmyers
  */

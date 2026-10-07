@@ -139,7 +139,7 @@ public class LibrarySyncService {
 
       List<LibrarySnapshotSongDto> songs = new ArrayList<>();
       for (SongDto song : album.songs()) {
-        songs.add(new LibrarySnapshotSongDto(song.songId(), song.songName(),
+        songs.add(new LibrarySnapshotSongDto(song.songId(), song.songName(), song.artistName(),
             song.trackNumber(), song.numPlays()));
       }
 

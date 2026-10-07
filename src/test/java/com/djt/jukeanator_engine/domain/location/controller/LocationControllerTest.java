@@ -91,7 +91,7 @@ class LocationControllerTest extends AbstractControllerTest {
     // Exercises deserialization all the way down LibrarySnapshotDto's nested record graph
     // (genres/artists/albums/songs) plus serialization of the ack response — the fullest
     // round-trip test of the record conversion available anywhere in the REST layer.
-    LibrarySnapshotSongDto song = new LibrarySnapshotSongDto(1, "Song One", 1, 5);
+    LibrarySnapshotSongDto song = new LibrarySnapshotSongDto(1, "Song One", "Artist One", 1, 5);
     LibrarySnapshotAlbumDto album = new LibrarySnapshotAlbumDto(1, "Album One", 1, "Artist One", 1,
         "Rock", "hash123", true, "Label", "2020", false, List.of(song));
     LibrarySnapshotDto snapshot = new LibrarySnapshotDto(

@@ -352,7 +352,13 @@ public class LocationServiceImpl implements LocationService {
           SongFileEntity song =
               new SongFileEntity(album, songDto.title() + " [" + songDto.sourceSongId() + "]");
           song.setId(songDto.sourceSongId());
-          song.setArtistName(albumDto.artistName());
+          // Each song's own embedded artist credit, not the album's -- a compilation album can
+          // hold songs by different artists, and RootFolderEntity.initialize() derives
+          // artistsFromSongs (what browse/search match against for an artist with no real
+          // ArtistFolderEntity) from exactly this field. Falling back to the album-level artist
+          // only covers a legacy snapshot synced before this field existed.
+          song.setArtistName(
+              songDto.artistName() != null ? songDto.artistName() : albumDto.artistName());
           song.setSongName(songDto.title());
           song.setTrackNumber(songDto.trackNumber());
           song.setNumPlays(songDto.numPlays() != null ? songDto.numPlays() : Integer.valueOf(0));

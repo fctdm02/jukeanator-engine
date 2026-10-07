@@ -224,12 +224,12 @@ class MasterSlaveLibrarySyncIntegrationTest extends AbstractServiceIntegrationTe
 
     LibrarySnapshotAlbumDto albumOne = new LibrarySnapshotAlbumDto(501, "Album One", 101,
         "Artist One", 2, "Rock", albumOneCoverHash, false, "Indie Label", "2020-01-01", false,
-        List.of(new LibrarySnapshotSongDto(9001, "Song A", 1, 3),
-            new LibrarySnapshotSongDto(9002, "Song B", 2, 5)));
+        List.of(new LibrarySnapshotSongDto(9001, "Song A", "Artist One", 1, 3),
+            new LibrarySnapshotSongDto(9002, "Song B", "Artist One", 2, 5)));
 
     LibrarySnapshotAlbumDto albumTwo = new LibrarySnapshotAlbumDto(502, "Album Two", 101,
         "Artist One", 2, "Rock", albumTwoCoverHash, false, "Indie Label", "2021-01-01", false,
-        List.of(new LibrarySnapshotSongDto(9003, "Song C", 1, 1)));
+        List.of(new LibrarySnapshotSongDto(9003, "Song C", "Artist One", 1, 1)));
 
     return new LibrarySnapshotDto(genres, artists, List.of(albumOne, albumTwo));
   }
