@@ -339,7 +339,15 @@ public class LocationServiceImpl implements LocationService {
         albumMetadata.setLoaded(true);
 
         for (var songDto : albumDto.songs()) {
-          SongFileEntity song = new SongFileEntity(album, songDto.title());
+          // Natural identity must be unique within the album -- a real scan gets this for free
+          // from the on-disk filename (track number baked in, see SongFileEntity's
+          // FILENAME_PATTERN), but two distinct songs can share the same display title (e.g. a
+          // studio and live cut on the same "best of" compilation), and the sync DTO chain never
+          // carries the original filename. sourceSongId is already guaranteed unique per scan
+          // (see the genre/artist id comment above), so suffix it in to disambiguate; the
+          // user-visible title is unaffected, since that comes from setSongName below.
+          SongFileEntity song =
+              new SongFileEntity(album, songDto.title() + " [" + songDto.sourceSongId() + "]");
           song.setId(songDto.sourceSongId());
           song.setArtistName(albumDto.artistName());
           song.setSongName(songDto.title());
