@@ -190,6 +190,10 @@ public class LibrarySyncService {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
       return HexFormat.of().formatHex(digest.digest(bytes));
     } catch (Exception e) {
+      // A null return here silently disables cover-art sync for this album (master's ack only
+      // flags albums with a non-null hash, see LocationServiceImpl#receiveLibraryMetadataSync),
+      // so the real cause must be visible rather than swallowed.
+      log.warn("Could not hash cover art at " + coverArtPath, e);
       return null;
     }
   }
