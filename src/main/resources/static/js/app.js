@@ -1254,7 +1254,7 @@
           <form id="loginForm">
             ${errorMessage ? `<div class="error-msg">${errorMessage}</div>` : ''}
             <label>Email <input type="email" id="loginEmail" autocomplete="email" required></label>
-            <label>Password <input type="password" id="loginPassword" autocomplete="current-password" required></label>
+            <label>Password ${peekablePassword('loginPassword', { autocomplete: 'current-password' })}</label>
             <button type="submit" class="auth-btn">Login</button>
             <button type="button" id="showRegisterBtn" class="auth-btn">Create Account</button>
             <button type="button" id="loginCancelBtn" class="auth-btn">Cancel</button>
@@ -1266,6 +1266,7 @@
       state.pendingScreen = null;
       renderMain(state.currentMainTab);
     });
+    wirePasswordPeeks(contentPanel);
     document.getElementById('showRegisterBtn').addEventListener('click', () => renderRegister());
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
