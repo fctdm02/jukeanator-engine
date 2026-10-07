@@ -82,17 +82,59 @@ matters (see step 10).
 
 ## 3. Provision the location
 
+Two ways to do this -- pick one. Both end with the same `locationId`/`apiKey` pair landing in the
+**slave machine**'s config.
+
+### Option A: curl against master's API
+
 - [ ] On the master machine, generate an admin JWT: run `GeneratePostmanJwtToken` (plain Java main,
   no Spring context) and copy the printed token.
 - [ ] Provision (run from either machine, against the master's address):
-  ```bash
-  curl -s -X POST http://<master-ip>:8080/api/locations -H "Authorization: Bearer <admin-jwt>" -H "Content-Type: application/json" -d "{\"name\":\"Trial Tavern\",\"latitude\":42.33,\"longitude\":-83.04}"
-  ```
+
+```
+bash
+curl -s -X POST http://<master-ip>:8080/api/locations -H "Authorization: Bearer <admin-jwt>" -H "Content-Type: application/json" -d "{\"name\":\"Trial Tavern\",\"latitude\":42.33,\"longitude\":-83.04}"
+```
+  
   Note the returned `locationId` and `apiKey` -- the key is shown **once** (only its hash is
   stored).
 - [ ] Put both into the **slave machine**'s config (`app.location-id`, `app.location-api-key`). To
   also exercise the id-correction handshake, deliberately set `app.location-id` to a *different*
   number.
+
+### Option B: the slave machine's own Admin Panel (no curl)
+
+`LocationService`/`registerLocation()` exist regardless of `app.mode`, specifically so a
+standalone or slave instance can locally register a location and hand the operator a ready-made
+record to turn into a SQL insert against master's database (see `LocationConfig`'s class javadoc).
+This lets you provision without ever calling master's API directly.
+
+- [ ] **On the slave machine**, launch the instance once with its config as copied in step 1
+  (placeholder `location-id`/`location-api-key` still in place). It'll fail to connect to the
+  master with those placeholder credentials -- harmless, same failure mode as step 11 -- but the
+  Swing Admin Panel comes up regardless.
+- [ ] Open the Admin Panel and click **Add Location**. Enter the same name/latitude/longitude
+  you'd otherwise pass to curl (e.g. `Trial Tavern` / `42.33` / `-83.04`) and click **Register
+  Location**. Note the **Location ID** and **API Key** shown -- the key is shown **once**, same as
+  the curl response.
+- [ ] Still on the slave machine, open `C:\kiosk-trial\data\JukeANator_Locations.json` and copy the
+  `apiKeyHash` value for the location you just registered (the dialog doesn't display the hash
+  itself, only the plaintext key).
+- [ ] Stop the instance.
+- [ ] **On the master machine**, insert the row directly into its database:
+
+```sql
+  INSERT INTO jukeanator.location (id, name, latitude, longitude, api_key_hash, status, is_geo_fenced)
+  VALUES (<locationId>, 'Trial Tavern', 42.33, -83.04, '<apiKeyHash>', 'PROVISIONED', 1);
+```
+  Leave `api_key_lookup` out of the statement (NULL) -- it's the newer SHA-256 index column, and
+  it's optional: master self-backfills it via a one-time bcrypt check the first time this slave
+  connects (see `LocationServiceImpl.verifyLegacyApiKey`). `is_geo_fenced` is `1` to match the
+  default the UI's registration path itself used.
+- [ ] Back on the **slave machine**, edit `application.yml`: set `app.location-id` and
+  `app.location-api-key` to the Location ID / API Key the dialog showed you (`app.mode` and
+  `app.master-instance-url` are already correct from step 1). Since this is the same instance,
+  `JukeANator_Locations.json` already has the matching row at that id, so nothing else to change.
 
 ## 4. Start the slave and confirm the handshake
 
