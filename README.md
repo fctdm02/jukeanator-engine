@@ -22,6 +22,10 @@ By default the app seeds a `config/application.yml` (and sibling `data/`) next t
 
 ```
 java --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar jukeanator-engine-0.0.1-SNAPSHOT.war --app.config-dir=C:\kiosk\config
+
+or, for Eclipse launch configurations, specify these in program arguments:
+
+--app.data-dir=C:\kiosk\data --app.config-dir=C:\kiosk\config
 ```
 
 Note the argument order: JVM options (`-D...`, `--enable-native-access=...`, etc.) come *before* `-jar <file>`; everything after the jar filename is passed to the application instead -- putting `--app.config-dir` before `-jar` makes the JVM launcher itself reject it as an unrecognized option.
