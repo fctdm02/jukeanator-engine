@@ -1458,6 +1458,7 @@
   }
 
   async function renderSearchEntry() {
+    const MIN_SEARCH_CHARS = 3;
     const history = await loadSearchHistory();
 
     function historyHtml(items) {
@@ -1506,7 +1507,11 @@
         clearBtn.style.display = input.value ? 'flex' : 'none';
       });
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && input.value.trim()) executeSearch(input.value.trim());
+        if (e.key !== 'Enter') return;
+        // Without this, the rest of the Enter press reaches the minimum-length popup's
+        // just-focused OK button and closes it at once (and also fires a duplicate 'search' event).
+        e.preventDefault();
+        if (input.value.trim()) executeSearch(input.value.trim());
       });
       input.addEventListener('search', () => {
         if (input.value.trim()) executeSearch(input.value.trim());
@@ -1545,6 +1550,14 @@
     }
 
     async function executeSearch(query) {
+      if (query.trim().length < MIN_SEARCH_CHARS) {
+        await showAppAlert({
+          title: 'Search',
+          message: `Please enter at least ${MIN_SEARCH_CHARS} characters to search.`,
+        });
+        document.getElementById('searchEntryInput')?.focus();
+        return;
+      }
       await saveSearchQuery(query);
       try {
         const result = await api(`/api/song-library/search?searchFor=${encodeURIComponent(query)}`);

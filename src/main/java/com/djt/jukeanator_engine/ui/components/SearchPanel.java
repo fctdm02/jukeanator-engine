@@ -50,6 +50,9 @@ public class SearchPanel extends JPanel implements TabNavigator {
   public static final String CARD_ARTIST = "ARTIST";
   public static final String CARD_DETAIL = "DETAIL";
 
+  // ── Type-ahead only searches once the (trimmed) query has at least this many characters ──
+  private static final int MIN_TYPE_AHEAD_SEARCH_CHARS = 3;
+
   private final CardLayout cardLayout = new CardLayout();
   private final JPanel rootPanel = new JPanel(cardLayout);
 
@@ -329,7 +332,8 @@ public class SearchPanel extends JPanel implements TabNavigator {
 
   /**
    * Builds a {@link KeyboardPanel} wired to the search buffer so that every key press appends to
-   * (or modifies) the current query and, when type-ahead is enabled, immediately triggers a search.
+   * (or modifies) the current query and, when type-ahead is enabled, triggers a search once the
+   * query has at least {@link #MIN_TYPE_AHEAD_SEARCH_CHARS} characters.
    */
   private KeyboardPanel buildSearchKeyboard() {
     return new KeyboardPanel(new KeyboardPanel.KeyboardListener() {
@@ -338,7 +342,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
         searchBuffer.append(ch);
         syncSearchLabel();
         if (enableTypeAheadSearch)
-          executeSearch();
+          typeAheadSearch();
       }
 
       @Override
@@ -347,7 +351,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
           searchBuffer.deleteCharAt(searchBuffer.length() - 1);
           syncSearchLabel();
           if (enableTypeAheadSearch)
-            executeSearch();
+            typeAheadSearch();
         }
       }
 
@@ -361,9 +365,20 @@ public class SearchPanel extends JPanel implements TabNavigator {
         searchBuffer.append(' ');
         syncSearchLabel();
         if (enableTypeAheadSearch)
-          executeSearch();
+          typeAheadSearch();
       }
     });
+  }
+
+  /**
+   * Runs a type-ahead search once the query is long enough. Below the minimum, any results from a
+   * longer query are dropped and the entry card is shown again, keeping the typed text.
+   */
+  private void typeAheadSearch() {
+    if (searchBuffer.toString().trim().length() >= MIN_TYPE_AHEAD_SEARCH_CHARS)
+      executeSearch();
+    else if (currentQuery != null)
+      showEntryCard();
   }
 
   private void executeSearch() {
@@ -393,6 +408,13 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private void resetSearch() {
     searchBuffer.setLength(0);
     syncSearchLabel();
+    if (keyboard != null)
+      keyboard.resetMode();
+    showEntryCard();
+  }
+
+  /** Discards any search results and returns to the entry card, leaving the search text as is. */
+  private void showEntryCard() {
     currentQuery = null;
     artistBuffer.reset();
     albumBuffer.reset();
@@ -404,7 +426,6 @@ public class SearchPanel extends JPanel implements TabNavigator {
     resultsCard.revalidate();
     resultsCard.repaint();
     if (keyboard != null) {
-      keyboard.resetMode();
       entryKeyboardSlot.add(keyboard, BorderLayout.CENTER);
       entryKeyboardSlot.revalidate();
       entryKeyboardSlot.repaint();

@@ -340,9 +340,15 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     selectTab(TAB_SEARCH);
     Container search = tab(TAB_SEARCH);
     String query = searchWord(homeSong.artistName());
+    assertTrue(query.length() >= 3, "the search word needs at least 3 letters: " + query);
 
-    // Type the query, plus a stray letter removed again with backspace
-    typeOnKeyboard(search, query + "X");
+    // Type-ahead does not search until 3 characters have been entered
+    typeOnKeyboard(search, query.substring(0, 2));
+    assertTrue(isCardShowing(search, SearchPanel.CARD_ENTRY),
+        "type-ahead should not search with fewer than 3 characters");
+
+    // Type the rest of the query, plus a stray letter removed again with backspace
+    typeOnKeyboard(search, query.substring(2) + "X");
     click(search, UiComponentNames.keyboardKey("⌫"));
     assertEquals(query, onEdt(() -> requireShowing(search, UiComponentNames.SEARCH_TEXT_LABEL,
         JLabel.class).getText()));
