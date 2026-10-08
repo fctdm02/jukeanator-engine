@@ -1809,7 +1809,9 @@
       return;
     }
 
-    const albums = [...(artist.albums || [])].sort((a, b) => (b.releaseDate || '').localeCompare(a.releaseDate || ''));
+    const albumPlays = al => (al.songs || []).reduce((sum, s) => sum + (s.numPlays || 0), 0);
+    const albums = [...(artist.albums || [])]
+      .sort((a, b) => albumPlays(b) - albumPlays(a) || (a.albumName || '').localeCompare(b.albumName || ''));
     const songs = (artist.albums || [])
       .flatMap(al => al.songs || [])
       .sort((a, b) => (b.numPlays || 0) - (a.numPlays || 0));
@@ -1818,19 +1820,19 @@
     contentPanel.querySelector('.sub-content').innerHTML = `
       <div class="artist-detail-counts">${artist.songCount ?? songs.length} Songs, ${artist.albumCount ?? albums.length} Albums</div>
       <div class="artist-tabs-bar">
-        <button class="artist-tab active" data-tab="songs">Songs</button>
-        <button class="artist-tab" data-tab="albums">Albums</button>
+        <button class="artist-tab active" data-tab="albums">Albums</button>
+        <button class="artist-tab" data-tab="songs">Songs</button>
       </div>
       <div class="artist-sort-label">
         <span id="artistSortText">Sorted by Popularity</span>
         <span class="artist-sort-icon">&#8693;</span>
       </div>
       <div class="artist-tab-panels">
-        <div class="artist-tab-panel active" id="artist-tab-songs">
-          ${songs.length ? songs.map(artistSongRow).join('') : '<div class="search-empty">No songs found</div>'}
-        </div>
-        <div class="artist-tab-panel" id="artist-tab-albums">
+        <div class="artist-tab-panel active" id="artist-tab-albums">
           ${albums.length ? albums.map(artistAlbumRow).join('') : '<div class="search-empty">No albums found</div>'}
+        </div>
+        <div class="artist-tab-panel" id="artist-tab-songs">
+          ${songs.length ? songs.map(artistSongRow).join('') : '<div class="search-empty">No songs found</div>'}
         </div>
       </div>`;
 
