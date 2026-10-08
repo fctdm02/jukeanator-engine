@@ -33,6 +33,7 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
+import com.djt.jukeanator_engine.domain.location.event.LocationLibrarySyncedEvent;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
@@ -1433,5 +1434,15 @@ public class SongLibraryServiceImpl
       throw new SongLibraryServiceException("Could not increment num plays for: " + event.queueEntries(),
           ednee);
     }
+  }
+
+  // Master-only in practice (a slave's own library never publishes this for itself). Evicts the
+  // cached RootFolderEntity so the next getOrLoadRoot() call re-reads the just-updated JPA rows
+  // instead of continuing to serve whatever tree was cached on this location's first browse/search
+  // -- see getOrLoadRoot()'s class-level comment on songLibraryRoots. Without this, a re-sync's
+  // fixes (e.g. corrected song artist credits) are invisible until the master process restarts.
+  @EventListener
+  public void handleLocationLibrarySyncedEvent(LocationLibrarySyncedEvent event) {
+    this.songLibraryRoots.remove(event.locationId());
   }
 }

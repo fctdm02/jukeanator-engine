@@ -162,17 +162,65 @@ public class SongLibraryController {
       @PathVariable Integer id) throws EntityDoesNotExistException, IOException {
 
     ArtistDto artist = songLibraryService.getArtistById(locationId, id);
-    if (artist.coverArtPath() == null) {
-      throw new EntityDoesNotExistException("No cover art path set for artist: " + id);
+    boolean isOwnLocation = Objects.equals(locationId, songLibraryService.getOwnLocationId());
+
+    Path coverArtPath;
+    if (isOwnLocation) {
+
+      if (artist.coverArtPath() == null) {
+        throw new EntityDoesNotExistException("No cover art path set for artist: " + id);
+      }
+      coverArtPath = Paths.get(artist.coverArtPath());
+
+    } else {
+
+      // artist.coverArtPath() is a locally-loaded AlbumFolderEntity's natural-identity folder
+      // path (e.g. ".../Blood Sugar Sex Magik/cover.jpg") -- never where master actually stores
+      // synced cover art (see getAlbumCoverArt's own isOwnLocation branch below). Re-derive the
+      // same "most popular non-compilation album, else the first album" representative album
+      // ArtistFolderEntity/ArtistFromSongEntity.getCoverArtPath() picks, then resolve it through
+      // master's own per-location storage the same way album cover art already does.
+      Integer representativeAlbumId = pickRepresentativeAlbumId(artist.albums());
+      if (representativeAlbumId == null) {
+        throw new EntityDoesNotExistException("No albums to pick cover art from for artist: " + id);
+      }
+      coverArtPath = locationService.getCoverArtPath(locationId, representativeAlbumId);
+      if (coverArtPath == null) {
+        throw new EntityDoesNotExistException(
+            "No synced cover art for artist: " + id + " at locationId: " + locationId);
+      }
     }
 
-    Path coverArtPath = Paths.get(artist.coverArtPath());
     if (!Files.isRegularFile(coverArtPath)) {
       throw new EntityDoesNotExistException(
           "Cover art file does not exist for artist: " + id + " at path: " + coverArtPath);
     }
 
     return serveCoverArtFile(coverArtPath);
+  }
+
+  /**
+   * Mirrors {@code ArtistFolderEntity.getCoverArtPath()} / {@code ArtistFromSongEntity
+   * .getCoverArtPath()}'s own selection rule (most-played non-compilation album, else the first
+   * album), but over {@link AlbumDto}s rather than entities -- the form available on a synced
+   * (non-own) location, which never loads real {@code AlbumFolderEntity} objects.
+   */
+  private static Integer pickRepresentativeAlbumId(List<AlbumDto> albums) {
+
+    if (albums == null || albums.isEmpty()) {
+      return null;
+    }
+
+    Integer bestId = null;
+    int maxNumPlays = 0;
+    for (AlbumDto album : albums) {
+      int numPlays = album.songNumPlays() != null ? album.songNumPlays() : 0;
+      if (!Boolean.TRUE.equals(album.isCompilation()) && numPlays > maxNumPlays) {
+        maxNumPlays = numPlays;
+        bestId = album.albumId();
+      }
+    }
+    return bestId != null ? bestId : albums.get(0).albumId();
   }
 
   @GetMapping("/albums/{id}/coverArt")

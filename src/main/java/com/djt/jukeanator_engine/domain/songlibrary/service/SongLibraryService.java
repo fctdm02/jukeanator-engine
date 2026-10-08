@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import java.util.List;
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
+import com.djt.jukeanator_engine.domain.location.event.LocationLibrarySyncedEvent;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
@@ -299,11 +300,21 @@ public interface SongLibraryService {
   void handleSongAddedToQueueEvent(SongAddedToQueueEvent event);
 
   /**
-   * 
+   *
    * @param event
    */
   @PublicServiceMethod
   void handleMultipleSongsAddedToQueueEvent(MultipleSongsAddedToQueueEvent event);
+
+  /**
+   * Evicts the cached {@code RootFolderEntity} for a resynced location, so the next browse/search
+   * re-reads the just-updated data instead of continuing to serve a stale in-memory tree -- see
+   * {@code getOrLoadRoot()}.
+   *
+   * @param event
+   */
+  @PublicServiceMethod
+  void handleLocationLibrarySyncedEvent(LocationLibrarySyncedEvent event);
 
   /**
    * Returns the shared {@link RootFolderEntity} instance for {@code locationId}, loading it from
