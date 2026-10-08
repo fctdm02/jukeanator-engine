@@ -1787,9 +1787,27 @@
     </div>`;
   }
 
+  // Album release year for display, or '' when absent or the library's "1950" placeholder.
+  function albumYear(album) {
+    const year = (album.releaseDate || '').trim().slice(0, 4);
+    return year === '1950' ? '' : year;
+  }
+
+  // Album publisher (record label) for display, or '' when absent or the library's "UNKNOWN"
+  // placeholder (matched case-insensitively).
+  function albumPublisher(album) {
+    const label = (album.recordLabel || '').trim();
+    return label.toUpperCase() === 'UNKNOWN' ? '' : label;
+  }
+
+  // Year followed by publisher, e.g. "1983 · Mercury", escaped for HTML; either may be omitted.
+  function albumYearPublisherHtml(album) {
+    return [albumYear(album), albumPublisher(album)].filter(Boolean).map(escHtml).join(' &middot; ');
+  }
+
   function artistAlbumRow(al) {
     const thumb = coverArtHtml(al.albumId, '&#128191;');
-    const year = (al.releaseDate || '').slice(0, 4);
+    const yearPublisher = albumYearPublisherHtml(al);
     // Set only for another artist's album (e.g. a compilation) this artist is credited on --
     // its detail screen then lists just this artist's tracks.
     const matchedSongIds = (al.matchedSongIds || []).join(',');
@@ -1797,7 +1815,7 @@
       ${thumb}
       <div class="result-info">
         <div class="result-title">${escHtml(al.albumName || '')}</div>
-        <div class="result-sub">${escHtml(year)}</div>
+        <div class="result-sub">${yearPublisher}</div>
       </div>
     </div>`;
   }
@@ -1919,10 +1937,16 @@
 
     const songs = [...(album.songs || [])].sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
     // Opened from a search album result reached only by a song-artist match: list just the
-    // tracks that hit the search term (the header still reflects the whole album).
+    // tracks that hit the search term (the header's song and play counts reflect just those).
     const matchedIds = new Set(params.matchedSongIds || []);
     const visibleSongs = matchedIds.size ? songs.filter(s => matchedIds.has(s.songId)) : songs;
-    const year = (album.releaseDate || '').slice(0, 4);
+    const yearPublisher = albumYearPublisherHtml(album);
+    const songCount = visibleSongs.length;
+    const playCount = matchedIds.size
+      ? visibleSongs.reduce((sum, s) => sum + (s.numPlays || 0), 0)
+      : (album.songNumPlays || 0);
+    const countsText = `${songCount.toLocaleString()} ${songCount === 1 ? 'Song' : 'Songs'}`
+      + ` &middot; ${playCount.toLocaleString()} ${playCount === 1 ? 'Play' : 'Plays'}`;
     const coverHtml = album.albumId != null
       ? `<img class="album-detail-cover" src="/api/locations/${state.locationId}/song-library/albums/${album.albumId}/coverArt"
               alt="" onerror="this.outerHTML=\`<div class='album-detail-cover album-detail-cover-placeholder'>&#128191;</div>\`">`
@@ -1935,7 +1959,7 @@
         <div class="album-detail-header-info">
           <div class="album-detail-name">${escHtml(album.albumName || '')}</div>
           <div class="album-detail-artist" id="albumDetailArtist">${escHtml(album.artistName || '')}</div>
-          <div class="album-detail-meta">${year ? year + ' &middot; ' : ''}${songs.length} Songs</div>
+          <div class="album-detail-meta">${yearPublisher ? yearPublisher + ' &middot; ' : ''}${countsText}</div>
         </div>
       </div>
       <div class="album-track-list">

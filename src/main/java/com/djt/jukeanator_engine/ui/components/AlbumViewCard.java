@@ -201,13 +201,16 @@ public class AlbumViewCard extends JPanel {
         LayoutTheme.get().fontSizeDetailSubtitle + 2, ACCENT_BLUE));
     meta.add(Box.createVerticalStrut(6));
 
-    if (album.releaseDate() != null && !album.releaseDate().isBlank()) {
+    // Skip the library's placeholder values for unknown metadata ("1950" / "UNKNOWN").
+    if (album.releaseDate() != null && !album.releaseDate().isBlank()
+        && !"1950".equals(album.releaseDate().trim())) {
       meta.add(singleLineMetaLabel(album.releaseDate(), Font.PLAIN,
           LayoutTheme.get().fontSizeTrackArtist, TEXT_SECONDARY));
       meta.add(Box.createVerticalStrut(4));
     }
 
-    if (album.recordLabel() != null && !album.recordLabel().isBlank()) {
+    if (album.recordLabel() != null && !album.recordLabel().isBlank()
+        && !"UNKNOWN".equalsIgnoreCase(album.recordLabel().trim())) {
       meta.add(singleLineMetaLabel(album.recordLabel(), Font.PLAIN,
           LayoutTheme.get().fontSizeTrackArtist, TEXT_SECONDARY));
       meta.add(Box.createVerticalStrut(4));
@@ -222,15 +225,28 @@ public class AlbumViewCard extends JPanel {
       meta.add(explicit);
     }
 
-    int trackCount = album.songs() == null ? 0 : album.songs().size();
+    // Song and play counts reflect only the songs the (possibly filtered) track list will show.
+    int trackCount;
+    int playCount;
+    if (visibleSongIds == null) {
+      trackCount = album.songs() == null ? 0 : album.songs().size();
+      playCount = album.songNumPlays() == null ? 0 : album.songNumPlays();
+    } else {
+      List<SongDto> visibleSongs = album.songs() == null ? List.of()
+          : album.songs().stream().filter(s -> visibleSongIds.contains(s.songId())).toList();
+      trackCount = visibleSongs.size();
+      playCount = visibleSongs.stream().mapToInt(s -> s.numPlays() == null ? 0 : s.numPlays())
+          .sum();
+    }
+    NumberFormat countFormat = NumberFormat.getIntegerInstance();
     meta.add(Box.createVerticalStrut(6));
-    meta.add(singleLineMetaLabel(trackCount + " songs", Font.PLAIN,
+    meta.add(singleLineMetaLabel(
+        countFormat.format(trackCount) + (trackCount == 1 ? " song" : " songs"), Font.PLAIN,
         LayoutTheme.get().fontSizeTrackArtist, TEXT_SECONDARY));
 
-    int playCount = album.songNumPlays() == null ? 0 : album.songNumPlays();
-    String formattedPlayCount = NumberFormat.getIntegerInstance().format(playCount);
     meta.add(Box.createVerticalStrut(6));
-    meta.add(singleLineMetaLabel(formattedPlayCount + " plays", Font.PLAIN,
+    meta.add(singleLineMetaLabel(
+        countFormat.format(playCount) + (playCount == 1 ? " play" : " plays"), Font.PLAIN,
         LayoutTheme.get().fontSizeTrackArtist, TEXT_SECONDARY));
 
     // BorderLayout: artWrapper in NORTH (natural size), meta in CENTER (full width).
