@@ -173,9 +173,13 @@ public class SearchPanel extends JPanel implements TabNavigator {
     // results or the artist detail panel).
     detailReturnCard = currentVisibleCard();
 
+    // Read from the clicked album, not the refetched one: a search album result reached solely by
+    // a song-artist match, or another artist's album (e.g. a compilation) opened from an artist's
+    // detail panel, carries these, narrowing its track list to the matching tracks.
     currentDetailCard =
         new AlbumDetailCard(owner, full, imageLoader, songQueueService, priorityCostMultiplier,
-            popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey);
+            popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey,
+            album.visibleSongIds());
 
     replaceCard(CARD_DETAIL, currentDetailCard);
     cardLayout.show(rootPanel, CARD_DETAIL);

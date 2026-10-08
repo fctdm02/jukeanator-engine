@@ -3,6 +3,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -635,6 +636,49 @@ public class SongLibraryServiceImplTest {
     assertEquals(Set.of("Random Song One", "Random Song Two"), songNames(result.songs()),
         "a direct album title match should pull in its full tracklist regardless of compilation "
             + "status, unlike an album reached only via artist propagation");
+  }
+
+  private static AlbumDto albumNamed(List<AlbumDto> albums, String albumName) {
+    return albums.stream().filter(a -> albumName.equals(a.albumName())).findFirst().orElseThrow();
+  }
+
+  @Test
+  void getMusicBySearch_songArtistMatchOnlyAlbum_carriesOnlyMatchingSongIds() throws Exception {
+
+    SongLibraryServiceImpl service = newSearchTestService(buildSearchPropagationRoot());
+
+    SearchResultDto result = service.getMusicBySearch(1, "Cornell");
+
+    assertEquals(List.of(33), albumNamed(result.albums(), "Singles (Soundtracks)").matchedSongIds(),
+        "an album reached only via a song-artist match should name just its matching track");
+    assertEquals(List.of(36),
+        albumNamed(result.albums(), "Mission Impossible 2 (Soundtracks)").matchedSongIds());
+  }
+
+  @Test
+  void getMusicBySearch_artistFolderOrAlbumTitleMatch_carriesNoMatchedSongIds() throws Exception {
+
+    SongLibraryServiceImpl service = newSearchTestService(buildSearchPropagationRoot());
+
+    assertNull(albumNamed(service.getMusicBySearch(1, "Artist One").albums(), "Solo Album")
+        .matchedSongIds(), "an album whose artist folder matches should list its full tracklist");
+    assertNull(albumNamed(service.getMusicBySearch(1, "Unique").albums(), "Totally Unique Title")
+        .matchedSongIds(), "a direct album title match should list its full tracklist");
+  }
+
+  @Test
+  void getArtistByName_otherArtistsAlbum_carriesOnlyCreditedSongIds() throws Exception {
+
+    SongLibraryServiceImpl service = newSearchTestService(buildSearchPropagationRoot());
+
+    List<AlbumDto> cornellAlbums = service.getArtistByName(1, "Chris Cornell").albums();
+    assertEquals(List.of(33), albumNamed(cornellAlbums, "Singles (Soundtracks)").matchedSongIds(),
+        "a compilation in an artist's view should name just that artist's credited track");
+    assertEquals(List.of(36),
+        albumNamed(cornellAlbums, "Mission Impossible 2 (Soundtracks)").matchedSongIds());
+
+    assertNull(albumNamed(service.getArtistByName(1, "Artist One").albums(), "Solo Album")
+        .matchedSongIds(), "an artist's own album should list its full tracklist");
   }
 
   @Test

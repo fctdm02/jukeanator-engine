@@ -614,15 +614,27 @@ public class SongLibraryServiceImpl
         slicePage(sortedArtists, artistPageIndex, searchResultPageSize);
     List<AlbumFolderEntity> albums = slicePage(sortedAlbums, albumPageIndex, searchResultPageSize);
 
+    List<AlbumDto> albumDtos = SongLibraryMapper.toAlbumDtoList(albums).stream()
+        .map(dto -> {
+          List<Integer> matchedSongIds = matched.matchedSongIdsByAlbumId().get(dto.albumId());
+          return matchedSongIds != null ? dto.withMatchedSongIds(matchedSongIds) : dto;
+        }).toList();
+
     return new SearchResultDto(
         SongLibraryMapper.toSongDtoList(songs),
         SongLibraryMapper.toArtistDtoList(artists),
-        SongLibraryMapper.toAlbumDtoList(albums));
+        albumDtos);
   }
 
-  /** Unsorted, unpaginated match set produced by {@link #matchLibraryItems}. */
+  /**
+   * Unsorted, unpaginated match set produced by {@link #matchLibraryItems}.
+   * {@code matchedSongIdsByAlbumId} holds, for each album pulled in solely by a song-artist match
+   * (neither its own name nor its artist folder's name hit the search term), the ids of its tracks
+   * that did hit -- so the album detail can list just those.
+   */
   private record MatchedLibraryItems(List<ArtistFolderEntity> artists,
-      List<AlbumFolderEntity> albums, List<SongFileEntity> songs) {
+      List<AlbumFolderEntity> albums, List<SongFileEntity> songs,
+      Map<Integer, List<Integer>> matchedSongIdsByAlbumId) {
   }
 
   /**
@@ -667,6 +679,7 @@ public class SongLibraryServiceImpl
     // term's matching tracks are pulled in, since a compilation's other tracks are unrelated).
     List<AlbumFolderEntity> expandedAlbums = matchedAlbums;
     List<SongFileEntity> expandedSongs = matchedSongs;
+    Map<Integer, List<Integer>> matchedSongIdsByAlbumId = new HashMap<>();
 
     if (searchFor != null) {
 
@@ -690,20 +703,35 @@ public class SongLibraryServiceImpl
         boolean pullInAllSongs =
             directAlbumMatchIds.contains(album.getId()) || !album.isCompilation();
 
+        // An album here only via a song-artist match (e.g. a "Compilations" soundtrack carrying
+        // one track credited to the searched artist) has its track listing narrowed to the
+        // matching tracks; one matched by its own name or its artist folder's name shows them all.
+        boolean songArtistMatchOnly = !directAlbumMatchIds.contains(album.getId())
+            && calculateSearchResultWeight(album.getParentArtist().getName(), searchFor) == 0;
+        List<Integer> albumMatchedSongIds = new ArrayList<>();
+
         for (SongFileEntity song : album.getChildSongs()) {
 
-          if (pullInAllSongs
-              || calculateSearchResultWeight(song.getSongName(), searchFor) > 0
-              || calculateSearchResultWeight(song.getArtistName(), searchFor) > 0) {
+          boolean songMatches = calculateSearchResultWeight(song.getSongName(), searchFor) > 0
+              || calculateSearchResultWeight(song.getArtistName(), searchFor) > 0;
 
+          if (pullInAllSongs || songMatches) {
             songsByKey.putIfAbsent(buildExpandedSongKey(song), song);
           }
+          if (songMatches) {
+            albumMatchedSongIds.add(song.getId());
+          }
+        }
+
+        if (songArtistMatchOnly && !albumMatchedSongIds.isEmpty()) {
+          matchedSongIdsByAlbumId.put(album.getId(), albumMatchedSongIds);
         }
       }
       expandedSongs = songsByKey.values().stream().filter(hasPlays).filter(inGenre).toList();
     }
 
-    return new MatchedLibraryItems(matchedArtists, expandedAlbums, expandedSongs);
+    return new MatchedLibraryItems(matchedArtists, expandedAlbums, expandedSongs,
+        matchedSongIdsByAlbumId);
   }
 
   /**

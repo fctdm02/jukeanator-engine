@@ -44,9 +44,35 @@ public final class SongLibraryMapper {
             .reversed())
         .toList();
 
+    List<AlbumDto> albumDtos = new ArrayList<>();
+    for (AlbumFolderEntity album : albums) {
+
+      AlbumDto albumDto = toAlbumDto(artistEntity, album);
+      List<Integer> creditedSongIds = getCreditedSongIdsOnOtherArtistsAlbum(artistEntity, album);
+      albumDtos.add(
+          creditedSongIds.isEmpty() ? albumDto : albumDto.withMatchedSongIds(creditedSongIds));
+    }
+
     return new ArtistDto(artistEntity.getId(), artistEntity.getName(),
         artistEntity.getCoverArtPath(), artistEntity.getAlbumCount(), artistEntity.getSongCount(),
-        artistEntity.getNumPlays(), SongLibraryMapper.toAlbumDtoList(artistEntity, albums));
+        artistEntity.getNumPlays(), albumDtos);
+  }
+
+  /**
+   * For an album that belongs to a different artist folder (e.g. a "Compilations" soundtrack that
+   * an {@link ArtistFromSongEntity} is merely credited on), returns the ids of the tracks credited
+   * to {@code artist}, so the album detail opened from that artist's view can list just those.
+   * Returns an empty list for the artist's own albums, which list every track.
+   */
+  private static List<Integer> getCreditedSongIdsOnOtherArtistsAlbum(ArtistFolderEntity artist,
+      AlbumFolderEntity album) {
+
+    if (album.getParentArtist().getName().equalsIgnoreCase(artist.getName())) {
+      return List.of();
+    }
+    return album.getChildSongs().stream()
+        .filter(song -> artist.getName().equalsIgnoreCase(song.getArtistName()))
+        .map(SongFileEntity::getId).toList();
   }
 
   public static List<AlbumDto> toAlbumDtoList(Collection<AlbumFolderEntity> albumEntities) {

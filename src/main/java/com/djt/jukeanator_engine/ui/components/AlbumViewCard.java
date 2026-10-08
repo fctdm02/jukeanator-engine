@@ -13,6 +13,7 @@ import java.awt.RenderingHints;
 import java.awt.geom.Point2D;
 import java.text.NumberFormat;
 import java.util.List;
+import java.util.Set;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -74,6 +75,8 @@ public class AlbumViewCard extends JPanel {
    */
   private int lastRenderedCount = TRACKS_PER_PAGE;
   private List<SongDto> trackSongs;
+  /** Null means every album track is listed; see the filtering constructor. */
+  private final Set<Integer> visibleSongIds;
   private AlbumDto trackAlbum;
   private int trackT1;
   private int trackT2;
@@ -93,6 +96,19 @@ public class AlbumViewCard extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   public AlbumViewCard(AlbumDto album, ImageLoader imageLoader, int threshold1, int threshold2,
       int threshold3, SongClickListener songClickListener) {
+
+    this(album, imageLoader, threshold1, threshold2, threshold3, songClickListener, null);
+  }
+
+  /**
+   * @param visibleSongIds when non-null, the track list shows only these songs (e.g. the tracks
+   *        that hit a search term on an album reached solely by a song-artist match); the sidebar's
+   *        song/play counts still describe the whole album
+   */
+  public AlbumViewCard(AlbumDto album, ImageLoader imageLoader, int threshold1, int threshold2,
+      int threshold3, SongClickListener songClickListener, Set<Integer> visibleSongIds) {
+
+    this.visibleSongIds = visibleSongIds;
 
     setLayout(new BorderLayout(0, 0));
     setOpaque(false);
@@ -244,7 +260,9 @@ public class AlbumViewCard extends JPanel {
 
     // Stash state needed for page rebuilds.
     this.trackAlbum = album;
-    this.trackSongs = album.songs() != null ? album.songs() : List.of();
+    List<SongDto> albumSongs = album.songs() != null ? album.songs() : List.of();
+    this.trackSongs = visibleSongIds == null ? albumSongs
+        : albumSongs.stream().filter(s -> visibleSongIds.contains(s.songId())).toList();
     this.trackT1 = t1;
     this.trackT2 = t2;
     this.trackT3 = t3;

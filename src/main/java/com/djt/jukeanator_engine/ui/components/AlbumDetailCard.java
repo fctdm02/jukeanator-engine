@@ -10,6 +10,7 @@ import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.util.Set;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.Timer;
@@ -40,6 +41,19 @@ public class AlbumDetailCard extends JPanel {
       int threshold3, TabNavigator navigator, CreditManager creditManager,
       char incrementCreditsKey) {
 
+    this(owner, album, imageLoader, songQueueService, priorityCostMultiplier, threshold1,
+        threshold2, threshold3, navigator, creditManager, incrementCreditsKey, null);
+  }
+
+  /**
+   * @param visibleSongIds when non-null, the track list shows only these songs -- see
+   *        {@link AlbumViewCard}'s filtering constructor
+   */
+  public AlbumDetailCard(Frame owner, AlbumDto album, ImageLoader imageLoader,
+      SongQueueService songQueueService, int priorityCostMultiplier, int threshold1, int threshold2,
+      int threshold3, TabNavigator navigator, CreditManager creditManager,
+      char incrementCreditsKey, Set<Integer> visibleSongIds) {
+
     setLayout(new BorderLayout());
     setOpaque(false);
 
@@ -50,7 +64,8 @@ public class AlbumDetailCard extends JPanel {
     };
 
     AlbumViewCard albumView =
-        new AlbumViewCard(album, imageLoader, threshold1, threshold2, threshold3, songClick);
+        new AlbumViewCard(album, imageLoader, threshold1, threshold2, threshold3, songClick,
+            visibleSongIds);
 
     add(albumView, BorderLayout.CENTER);
     add(buildFooter(navigator), BorderLayout.SOUTH);

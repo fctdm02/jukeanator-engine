@@ -1585,7 +1585,10 @@
 
   function albumResultRow(a) {
     const thumb = coverArtHtml(a.albumId, '&#128191;');
-    return `<div class="result-row album-result-row" data-album-id="${a.albumId ?? ''}">
+    // Set only for an album pulled in solely by a song-artist match -- its detail screen then
+    // lists just these matching tracks.
+    const matchedSongIds = (a.matchedSongIds || []).join(',');
+    return `<div class="result-row album-result-row" data-album-id="${a.albumId ?? ''}" data-matched-song-ids="${matchedSongIds}">
       ${thumb}
       <div class="result-info">
         <div class="result-title">${escHtml(a.albumName || '')}</div>
@@ -1741,7 +1744,9 @@
       const albumRow = e.target.closest('.album-result-row');
       if (albumRow) {
         const albumId = albumRow.dataset.albumId;
-        if (albumId) navigateSub('album-detail', { albumId: Number(albumId) });
+        const matchedSongIds = (albumRow.dataset.matchedSongIds || '')
+          .split(',').filter(Boolean).map(Number);
+        if (albumId) navigateSub('album-detail', { albumId: Number(albumId), matchedSongIds });
         return;
       }
       const row = e.target.closest('.song-result-row');
@@ -1785,7 +1790,10 @@
   function artistAlbumRow(al) {
     const thumb = coverArtHtml(al.albumId, '&#128191;');
     const year = (al.releaseDate || '').slice(0, 4);
-    return `<div class="result-row" data-album-id="${al.albumId ?? ''}">
+    // Set only for another artist's album (e.g. a compilation) this artist is credited on --
+    // its detail screen then lists just this artist's tracks.
+    const matchedSongIds = (al.matchedSongIds || []).join(',');
+    return `<div class="result-row" data-album-id="${al.albumId ?? ''}" data-matched-song-ids="${matchedSongIds}">
       ${thumb}
       <div class="result-info">
         <div class="result-title">${escHtml(al.albumName || '')}</div>
@@ -1812,8 +1820,12 @@
     const albumPlays = al => (al.songs || []).reduce((sum, s) => sum + (s.numPlays || 0), 0);
     const albums = [...(artist.albums || [])]
       .sort((a, b) => albumPlays(b) - albumPlays(a) || (a.albumName || '').localeCompare(b.albumName || ''));
+    // On another artist's album (e.g. a compilation), only this artist's credited tracks count.
     const songs = (artist.albums || [])
-      .flatMap(al => al.songs || [])
+      .flatMap(al => {
+        const matchedIds = new Set(al.matchedSongIds || []);
+        return (al.songs || []).filter(s => !matchedIds.size || matchedIds.has(s.songId));
+      })
       .sort((a, b) => (b.numPlays || 0) - (a.numPlays || 0));
 
     contentPanel.querySelector('.sub-title').textContent = artist.artistName || '';
@@ -1857,7 +1869,9 @@
       const row = e.target.closest('.result-row');
       if (!row) return;
       const albumId = row.dataset.albumId;
-      if (albumId) navigateSub('album-detail', { albumId: Number(albumId) });
+      const matchedSongIds = (row.dataset.matchedSongIds || '')
+        .split(',').filter(Boolean).map(Number);
+      if (albumId) navigateSub('album-detail', { albumId: Number(albumId), matchedSongIds });
     });
   }
 
@@ -1904,6 +1918,10 @@
     }
 
     const songs = [...(album.songs || [])].sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
+    // Opened from a search album result reached only by a song-artist match: list just the
+    // tracks that hit the search term (the header still reflects the whole album).
+    const matchedIds = new Set(params.matchedSongIds || []);
+    const visibleSongs = matchedIds.size ? songs.filter(s => matchedIds.has(s.songId)) : songs;
     const year = (album.releaseDate || '').slice(0, 4);
     const coverHtml = album.albumId != null
       ? `<img class="album-detail-cover" src="/api/locations/${state.locationId}/song-library/albums/${album.albumId}/coverArt"
@@ -1921,13 +1939,13 @@
         </div>
       </div>
       <div class="album-track-list">
-        ${songs.length ? songs.map(albumTrackRow).join('') : '<div class="search-empty">No songs found</div>'}
+        ${visibleSongs.length ? visibleSongs.map(albumTrackRow).join('') : '<div class="search-empty">No songs found</div>'}
       </div>`;
 
     contentPanel.querySelector('.album-track-list').addEventListener('click', (e) => {
       const row = e.target.closest('.album-track-row');
       if (!row) return;
-      const song = songs[parseInt(row.dataset.index, 10)];
+      const song = visibleSongs[parseInt(row.dataset.index, 10)];
       if (song) showSongPopup(song);
     });
 

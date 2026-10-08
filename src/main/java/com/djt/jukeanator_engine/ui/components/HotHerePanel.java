@@ -354,9 +354,12 @@ public class HotHerePanel extends JPanel implements TabNavigator {
     // columns or the artist detail panel).
     detailReturnCard = currentVisibleCard();
 
+    // visibleSongIds comes from the clicked album (not the refetched one): another artist's album
+    // (e.g. a compilation) opened from an artist's detail panel lists just that artist's tracks.
     currentDetailCard =
         new AlbumDetailCard(owner, full, imageLoader, songQueueService, priorityCostMultiplier,
-            popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey);
+            popularityT1, popularityT2, popularityT3, this, creditManager, incrementCreditsKey,
+            album.visibleSongIds());
 
     replaceCard(CARD_DETAIL, currentDetailCard);
     cardLayout.show(rootPanel, CARD_DETAIL);
