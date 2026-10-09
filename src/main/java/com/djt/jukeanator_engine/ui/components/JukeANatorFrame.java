@@ -358,11 +358,9 @@ public class JukeANatorFrame extends JFrame {
     // child component currently holds keyboard focus.
     // A raw KeyListener on JFrame would silently stop working the moment any
     // child panel calls requestFocusInWindow().
-    javax.swing.KeyStroke billAcceptorStroke =
-        javax.swing.KeyStroke.getKeyStroke(incrementCreditsKey);
+    // Bound case-insensitively so an accidental Caps Lock does not disable the bill acceptor.
     final String BILL_ACCEPTOR_ACTION = "billAcceptor";
-    getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).put(billAcceptorStroke,
-        BILL_ACCEPTOR_ACTION);
+    bindKeyCaseInsensitive(incrementCreditsKey, BILL_ACCEPTOR_ACTION);
     getRootPane().getActionMap().put(BILL_ACCEPTOR_ACTION, new javax.swing.AbstractAction() {
       private static final long serialVersionUID = 1L;
 
@@ -377,11 +375,8 @@ public class JukeANatorFrame extends JFrame {
     // Only registered when enable-credit-card-processing is true, so the key is a pure no-op
     // (never falls back to bill-acceptor pricing) on terminals that haven't opted in.
     if (enableCreditCardProcessing) {
-      javax.swing.KeyStroke creditCardReaderStroke =
-          javax.swing.KeyStroke.getKeyStroke(incrementCreditsCreditCardReaderKey);
       final String CREDIT_CARD_READER_ACTION = "creditCardReader";
-      getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
-          .put(creditCardReaderStroke, CREDIT_CARD_READER_ACTION);
+      bindKeyCaseInsensitive(incrementCreditsCreditCardReaderKey, CREDIT_CARD_READER_ACTION);
       getRootPane().getActionMap().put(CREDIT_CARD_READER_ACTION,
           new javax.swing.AbstractAction() {
             private static final long serialVersionUID = 1L;
@@ -566,6 +561,18 @@ public class JukeANatorFrame extends JFrame {
         }
       });
     }
+  }
+
+  /**
+   * Binds both the lowercase and uppercase forms of {@code key} (as KEY_TYPED strokes) to
+   * {@code actionName} in the root pane's WHEN_IN_FOCUSED_WINDOW input map, so hardware key
+   * emulators keep working when Caps Lock (or Shift) is active on an attached keyboard.
+   */
+  private void bindKeyCaseInsensitive(char key, String actionName) {
+    javax.swing.InputMap inputMap =
+        getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW);
+    inputMap.put(javax.swing.KeyStroke.getKeyStroke(Character.toLowerCase(key)), actionName);
+    inputMap.put(javax.swing.KeyStroke.getKeyStroke(Character.toUpperCase(key)), actionName);
   }
 
   /**
