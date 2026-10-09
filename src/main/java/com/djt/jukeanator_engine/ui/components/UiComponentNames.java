@@ -153,8 +153,10 @@ public final class UiComponentNames {
   public static final String ADMIN_LOCATION_SAVE_BUTTON = "AdminPanel.editLocationInfo.saveButton";
   public static final String ADMIN_LEDGER_CONTENT = "AdminPanel.financialLedger.content";
   public static final String ADMIN_LEDGER_TABLE = "AdminPanel.financialLedger.table";
+  public static final String ADMIN_LEDGER_DISMISS = "AdminPanel.financialLedger.dismiss";
   public static final String ADMIN_ACTIVITY_CONTENT = "AdminPanel.activity.content";
   public static final String ADMIN_ACTIVITY_TABLE = "AdminPanel.activity.table";
+  public static final String ADMIN_ACTIVITY_DISMISS = "AdminPanel.activity.dismiss";
 
   // ── EditAlbumCard ───────────────────────────────────────────────────────────
   public static final String EDIT_ALBUM_HEADER_LABEL = "EditAlbumCard.headerLabel";

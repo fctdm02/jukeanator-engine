@@ -1139,7 +1139,22 @@ public class AdminPanel extends JPanel {
 
       statusLabel.setForeground(ColorTheme.get().textSecondary);
       statusLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
-      content.add(statusLabel, BorderLayout.SOUTH);
+
+      // Touchscreen-only deployments have no Escape key, so this is the only way to close the
+      // ledger short of waiting out the IdleMonitor timeout below.
+      JButton dismissBtn = new JButton("Dismiss");
+      dismissBtn.setName(UiComponentNames.ADMIN_LEDGER_DISMISS);
+      styleOverlayButton(dismissBtn);
+      dismissBtn.addActionListener(e -> close());
+      JPanel dismissRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
+      dismissRow.setOpaque(false);
+      dismissRow.add(dismissBtn);
+
+      JPanel bottomRow = new JPanel(new BorderLayout(0, 8));
+      bottomRow.setOpaque(false);
+      bottomRow.add(statusLabel, BorderLayout.NORTH);
+      bottomRow.add(dismissRow, BorderLayout.SOUTH);
+      content.add(bottomRow, BorderLayout.SOUTH);
 
       content.registerKeyboardAction(e -> close(),
           javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
@@ -1324,7 +1339,21 @@ public class AdminPanel extends JPanel {
 
       statusLabel.setForeground(ColorTheme.get().textSecondary);
       statusLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
-      content.add(statusLabel, BorderLayout.SOUTH);
+
+      // Same touchscreen rationale as FinancialLedgerDialog's Dismiss button above.
+      JButton dismissBtn = new JButton("Dismiss");
+      dismissBtn.setName(UiComponentNames.ADMIN_ACTIVITY_DISMISS);
+      styleOverlayButton(dismissBtn);
+      dismissBtn.addActionListener(e -> close());
+      JPanel dismissRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
+      dismissRow.setOpaque(false);
+      dismissRow.add(dismissBtn);
+
+      JPanel bottomRow = new JPanel(new BorderLayout(0, 8));
+      bottomRow.setOpaque(false);
+      bottomRow.add(statusLabel, BorderLayout.NORTH);
+      bottomRow.add(dismissRow, BorderLayout.SOUTH);
+      content.add(bottomRow, BorderLayout.SOUTH);
 
       content.registerKeyboardAction(e -> close(),
           javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
