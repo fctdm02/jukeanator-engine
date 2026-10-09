@@ -44,6 +44,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
+import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 
 /**
  * Covers {@link BackgroundMusicServiceImpl#handleOwnLocationIdChangedEvent} against mocked
@@ -723,5 +725,149 @@ class BackgroundMusicServiceImplTest {
     stubLibrary(List.of(), paths);
 
     assertNull(service.getNextSmartAdditionSong(mock(SongFileEntity.class)));
+  }
+
+  // ── cycle boundary ───────────────────────────────────────────────────────
+
+  private static void queueContains(BackgroundMusicServiceImpl service, String... paths) {
+
+    List<SongQueueEntryDto> entries = new ArrayList<>();
+    for (String path : paths) {
+      entries.add(new SongQueueEntryDto("BG_MUSIC", null, Integer.valueOf(0), path));
+    }
+    service.handleSongQueueChangedEvent(new SongQueueChangedEvent(entries));
+  }
+
+  @Test
+  void regularCycle_keepsQueuedSongStamped_acrossReset() throws Exception {
+
+    List<String> paths = cyclePaths("Regular", 5);
+    Files.write(dataDir.resolve("BackgroundMusic.TXT"), paths);
+    List<BackgroundMusicSongEntity> songs = new ArrayList<>();
+    for (int i = 0; i < paths.size(); i++) {
+      songs.add(song(i + 1, paths.get(i), null));
+    }
+    when(backgroundMusicRepository.loadAll()).thenReturn(songs);
+    BackgroundMusicServiceImpl service = newService();
+    stubLibrary(paths, List.of());
+
+    String lastPicked = null;
+    for (int i = 0; i < paths.size(); i++) {
+      SongFileEntity song = service.getNextSong();
+      service.markSongQueued(song);
+      lastPicked = song.getNaturalIdentity();
+    }
+    String stillQueued = lastPicked;
+    queueContains(service, stillQueued);
+
+    // Completes the cycle: every song but the one still waiting in the queue is cleared.
+    SongFileEntity firstOfNewCycle = service.getNextSong();
+    verify(backgroundMusicRepository, times(1)).resetAllPlayedTimestamps(anyList());
+    for (BackgroundMusicSongEntity song : songs) {
+      if (song.getSongFilePath().equals(stillQueued)) {
+        assertNotNull(song.getTimeLastPlayed(), "the queued song keeps its queue-time stamp");
+      } else {
+        assertNull(song.getTimeLastPlayed(), "every other song is cleared for the new cycle");
+      }
+    }
+
+    // The queued song counts toward the new cycle, so it is not drawn again before the next reset.
+    Set<String> picked = new HashSet<>();
+    picked.add(firstOfNewCycle.getNaturalIdentity());
+    service.markSongQueued(firstOfNewCycle);
+    for (int i = 0; i < paths.size() - 2; i++) {
+      SongFileEntity song = service.getNextSong();
+      picked.add(song.getNaturalIdentity());
+      service.markSongQueued(song);
+    }
+    Set<String> expected = new HashSet<>(paths);
+    expected.remove(stillQueued);
+    assertEquals(expected, picked);
+    verify(backgroundMusicRepository, times(1)).resetAllPlayedTimestamps(anyList());
+  }
+
+  @Test
+  void regularCycle_clearsQueuedSongs_whenEverySongIsQueued() throws Exception {
+
+    List<String> paths = cyclePaths("Regular", 2);
+    BackgroundMusicServiceImpl service = newRegularCycleService(paths);
+    stubLibrary(paths, List.of());
+
+    for (int i = 0; i < paths.size(); i++) {
+      service.markSongQueued(service.getNextSong());
+    }
+    queueContains(service, paths.toArray(new String[0]));
+
+    // Keeping both stamps would leave the new cycle empty, so the reset clears them anyway.
+    assertNotNull(service.getNextSong());
+  }
+
+  @Test
+  void regularCycle_holdsBackLastSongsOfCycle_fromFirstPicksOfNext() throws Exception {
+
+    int holdback = 3;
+    backgroundMusicProperties.setCycleBoundaryHoldback(holdback);
+    List<String> paths = cyclePaths("Regular", 10);
+    BackgroundMusicServiceImpl service = newRegularCycleService(paths);
+    stubLibrary(paths, List.of());
+
+    List<String> previousOrder = null;
+    for (int cycle = 0; cycle < 5; cycle++) {
+
+      List<String> order = new ArrayList<>();
+      for (int i = 0; i < paths.size(); i++) {
+        SongFileEntity song = service.getNextSong();
+        order.add(song.getNaturalIdentity());
+        service.markSongQueued(song);
+        Thread.sleep(2); // distinct queue-time stamps, so "most recent" is unambiguous
+      }
+      assertEquals(new HashSet<>(paths), new HashSet<>(order), "every song is picked once per cycle");
+
+      if (previousOrder != null) {
+        Set<String> heldBack =
+            new HashSet<>(previousOrder.subList(paths.size() - holdback, paths.size()));
+        for (String early : order.subList(0, holdback)) {
+          assertTrue(!heldBack.contains(early),
+              "a song from the end of the previous cycle must not open the next one: " + early);
+        }
+      }
+      previousOrder = order;
+    }
+  }
+
+  @Test
+  void smartCycle_holdsBackLastSongsOfCycle_fromFirstPicksOfNext() throws Exception {
+
+    int holdback = 3;
+    backgroundMusicProperties.setCycleBoundaryHoldback(holdback);
+    List<String> paths = cyclePaths("Smart", 10);
+    BackgroundMusicServiceImpl service = newSmartCycleService(paths);
+    stubLibrary(paths, List.of());
+    SongFileEntity coreSong = mock(SongFileEntity.class);
+
+    List<String> previousOrder = null;
+    for (int cycle = 0; cycle < 5; cycle++) {
+
+      List<String> order = new ArrayList<>();
+      for (int i = 0; i < paths.size(); i++) {
+        SongFileEntity song = service.getNextSmartAdditionSong(coreSong);
+        assertNotNull(song);
+        order.add(song.getNaturalIdentity());
+        service.markSongQueued(song);
+        Thread.sleep(2);
+      }
+      assertEquals(new HashSet<>(paths), new HashSet<>(order));
+
+      if (previousOrder != null) {
+        Set<String> heldBack =
+            new HashSet<>(previousOrder.subList(paths.size() - holdback, paths.size()));
+        for (String early : order.subList(0, holdback)) {
+          assertTrue(!heldBack.contains(early),
+              "a smart song from the end of the previous cycle must not open the next one: "
+                  + early);
+        }
+      }
+      previousOrder = order;
+    }
   }
 }

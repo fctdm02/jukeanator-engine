@@ -138,9 +138,25 @@ public final class BackgroundMusicRepositoryJpaImpl implements BackgroundMusicRe
   @Override
   public void resetAllPlayedTimestamps(List<BackgroundMusicSongEntity> allSongs) {
 
-    transactionTemplate.executeWithoutResult(status -> entityManager
-        .createQuery("update BackgroundMusicSongEntity s set s.timeLastPlayed = null "
-            + "where TYPE(s) = BackgroundMusicSongEntity and s.timeLastPlayed is not null")
-        .executeUpdate());
+    transactionTemplate.executeWithoutResult(status -> {
+
+      entityManager
+          .createQuery("update BackgroundMusicSongEntity s set s.timeLastPlayed = null "
+              + "where TYPE(s) = BackgroundMusicSongEntity and s.timeLastPlayed is not null")
+          .executeUpdate();
+
+      // Re-apply the stamps the caller kept (songs still in the queue).
+      for (BackgroundMusicSongEntity song : allSongs) {
+        if (song.getTimeLastPlayed() != null && song.getPersistentIdentity() != null) {
+          entityManager
+              .createQuery("update BackgroundMusicSongEntity s set s.timeLastPlayed = "
+                  + ":timeLastPlayed where TYPE(s) = BackgroundMusicSongEntity "
+                  + "and s.persistentIdentity = :id")
+              .setParameter("timeLastPlayed", song.getTimeLastPlayed())
+              .setParameter("id", song.getPersistentIdentity())
+              .executeUpdate();
+        }
+      }
+    });
   }
 }

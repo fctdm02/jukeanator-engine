@@ -61,6 +61,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private final int smartBackgroundMusicAdditionsEnd;
   private final int smartBackgroundMusicMinPlays;
   private final double smartBackgroundMusicFavoriteAlbumsPercentage;
+  private final int cycleBoundaryHoldback;
 
   // ── Core background-music in-memory cache (Item 5) ────────────────────────
   private List<BackgroundMusicSongEntity> allSongs = new ArrayList<>();
@@ -68,6 +69,14 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private Map<String, Integer> normalizedPathToId = new HashMap<>();
   private List<Integer> notPlayedIds = new ArrayList<>();
   private Set<String> currentPlaylistPaths = new HashSet<>();
+
+  // ── Cycle-boundary holdback (see #selectCycleHoldbackIds): the most recently played/queued
+  // songs of the cycle that just completed, kept out of the next cycle's picks until that many
+  // picks have been made. Not persisted -- a restart simply starts with no holdback. ──────────
+  private Set<Integer> backgroundHoldbackIds = new HashSet<>();
+  private Set<Integer> smartHoldbackIds = new HashSet<>();
+  private int backgroundPicksUntilHoldbackRelease = 0;
+  private int smartPicksUntilHoldbackRelease = 0;
 
   // ── Genres excluded from smart-addition candidate selection ───────────────
   private Set<String> excludedGenres = new HashSet<>();
@@ -116,6 +125,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     this.smartBackgroundMusicMinPlays = backgroundMusicProperties.getSmartBackgroundMusicMinPlays();
     this.smartBackgroundMusicFavoriteAlbumsPercentage =
         backgroundMusicProperties.getSmartBackgroundMusicFavoriteAlbumsPercentage();
+    this.cycleBoundaryHoldback = Math.max(0, backgroundMusicProperties.getCycleBoundaryHoldback());
 
     initialize();
   }
@@ -151,6 +161,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     log.info("smartBackgroundMusicMinPlays: " + this.smartBackgroundMusicMinPlays);
     log.info("smartBackgroundMusicFavoriteAlbumsPercentage: "
         + this.smartBackgroundMusicFavoriteAlbumsPercentage);
+    log.info("cycleBoundaryHoldback: " + this.cycleBoundaryHoldback);
 
     if (!this.enableBackgroundMusic) {
       return;
@@ -330,10 +341,9 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
   /**
    * NOTE: Selection is read-only — it does <b>not</b> mark the chosen song as played or remove
-   * it from the not-played pool. A song is only ever marked played (via
-   * {@link #handleSongPlaybackStartedEvent}) once it actually starts playing, since there is no
-   * guarantee a queued song will ever be played (e.g. the queue is flushed, the jukebox goes into
-   * hibernation, or the application restarts before its turn comes up).
+   * it from the not-played pool. The caller does that via {@link #markSongQueued} once the song is
+   * actually queued, and {@link #handleSongPlaybackStartedEvent} stamps it again (and counts the
+   * play) once it actually starts playing.
    *
    * <p>
    * A background-music entry can reference a path that is no longer present in the song library
@@ -400,11 +410,14 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    *
    * <p>
    * When the pool is empty — i.e. every song has been played (or skipped as unresolvable, see
-   * {@link #getNextSong()}) this cycle — resets every
-   * song's {@code timeLastPlayed} back to {@code null} and persists that reset immediately, so it
-   * survives a restart even if none of the reset songs happen to be replayed before then. Since
-   * song popularity may have shifted over a full cycle, the smart-additions pool is refreshed at
-   * the same time — see {@link #refreshSmartAdditionPool()}.
+   * {@link #getNextSong()}) this cycle — starts a new cycle via {@link #startNewBackgroundCycle()}.
+   * Since song popularity may have shifted over a full cycle, the smart-additions pool is
+   * refreshed at the same time — see {@link #refreshSmartAdditionPool()}.
+   *
+   * <p>
+   * Songs held back at the start of the cycle (see {@link #selectCycleHoldbackIds}) are avoided
+   * until enough picks have been made to release them, falling back to them only when nothing
+   * else remains.
    *
    * @param excludedIds ids to leave out of consideration, e.g. candidates already tried and
    *        rejected earlier in the same {@link #getNextSong()} call because their path could not
@@ -413,11 +426,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
   private Integer pickNextEligibleBackgroundId(Set<Integer> excludedIds) {
 
     if (notPlayedIds.isEmpty()) {
-      for (BackgroundMusicSongEntity song : allSongs) {
-        song.setTimeLastPlayed(null);
-      }
-      backgroundMusicRepository.resetAllPlayedTimestamps(allSongs);
-      rebuildNotPlayedCache();
+      startNewBackgroundCycle();
 
       if (enableSmartBackgroundMusicAdditions) {
         refreshSmartAdditionPool();
@@ -439,7 +448,89 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         .filter(id -> !isCurrentlyQueued(songsById.get(id)))
         .collect(Collectors.toList());
 
-    return pickRandom(eligible.isEmpty() ? notExcluded : eligible);
+    List<Integer> preferred = eligible.stream()
+        .filter(id -> !backgroundHoldbackIds.contains(id))
+        .collect(Collectors.toList());
+
+    Integer chosenId = pickRandom(
+        !preferred.isEmpty() ? preferred : !eligible.isEmpty() ? eligible : notExcluded);
+
+    if (backgroundPicksUntilHoldbackRelease > 0 && --backgroundPicksUntilHoldbackRelease == 0) {
+      backgroundHoldbackIds.clear();
+    }
+
+    return chosenId;
+  }
+
+  /**
+   * Starts a new core background-music cycle: clears every song's {@code timeLastPlayed} and
+   * persists that immediately, so it survives a restart even if none of the reset songs happen to
+   * be replayed before then. Two exceptions keep the cycle boundary from causing early repeats:
+   * <ul>
+   * <li>Songs still sitting in the song queue keep their queue-time stamp, so they count toward
+   * the new cycle (they will play shortly) rather than being eligible again. If every song in the
+   * playlist is queued, they are cleared anyway, so the new cycle is never empty.</li>
+   * <li>The most recently played/queued songs of the completed cycle are held back from the first
+   * picks of the new one — see {@link #selectCycleHoldbackIds}.</li>
+   * </ul>
+   */
+  private void startNewBackgroundCycle() {
+
+    this.backgroundHoldbackIds = selectCycleHoldbackIds(allSongs, currentPlaylistPaths.size());
+    this.backgroundPicksUntilHoldbackRelease = backgroundHoldbackIds.size();
+
+    clearTimestampsForNewCycle(allSongs, true);
+    rebuildNotPlayedCache();
+    if (notPlayedIds.isEmpty()) {
+      clearTimestampsForNewCycle(allSongs, false);
+      rebuildNotPlayedCache();
+    }
+
+    backgroundMusicRepository.resetAllPlayedTimestamps(allSongs);
+  }
+
+  /**
+   * Returns the ids of up to {@code cycleBoundaryHoldback} (capped at half of {@code poolSize})
+   * songs from {@code pool} with the most recent {@code timeLastPlayed} — i.e. the last songs
+   * played or queued in the cycle that is just completing — excluding songs still in the queue
+   * (those keep their stamp instead, see {@link #clearTimestampsForNewCycle}). Must be called
+   * before the timestamps are cleared.
+   *
+   * <p>
+   * Each cycle is drawn in independent random order, so without this a song played at the end of
+   * one cycle could be drawn again among the first picks of the next. Holding these songs back
+   * until as many picks have been made as were held back guarantees a gap of at least that many
+   * songs between the two plays.
+   */
+  private <T extends BackgroundMusicSongEntity> Set<Integer> selectCycleHoldbackIds(List<T> pool,
+      int poolSize) {
+
+    int limit = Math.min(cycleBoundaryHoldback, poolSize / 2);
+    if (limit <= 0) {
+      return new HashSet<>();
+    }
+
+    return pool.stream()
+        .filter(song -> song.getTimeLastPlayed() != null && !isCurrentlyQueued(song))
+        .sorted(Comparator.comparing(BackgroundMusicSongEntity::getTimeLastPlayed,
+            Comparator.reverseOrder()))
+        .limit(limit)
+        .map(BackgroundMusicSongEntity::getPersistentIdentity)
+        .collect(Collectors.toCollection(HashSet::new));
+  }
+
+  /**
+   * Clears {@code timeLastPlayed} for every song in {@code pool} for a new cycle, except — when
+   * {@code keepQueued} is {@code true} — songs still sitting in the song queue.
+   */
+  private <T extends BackgroundMusicSongEntity> void clearTimestampsForNewCycle(List<T> pool,
+      boolean keepQueued) {
+
+    for (T song : pool) {
+      if (!keepQueued || !isCurrentlyQueued(song)) {
+        song.setTimeLastPlayed(null);
+      }
+    }
   }
 
   private boolean isCurrentlyQueued(BackgroundMusicSongEntity song) {
@@ -504,11 +595,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       while (true) {
 
         if (smartNotPlayedIds.isEmpty() && !smartPool.isEmpty()) {
-          for (SmartBackgroundMusicSongEntity song : smartPool) {
-            song.setTimeLastPlayed(null);
-          }
-          smartBackgroundMusicRepository.resetAllPlayedTimestamps(smartPool);
-          rebuildSmartCaches();
+          startNewSmartCycle();
         }
 
         List<Integer> eligible = smartNotPlayedIds.stream()
@@ -523,7 +610,15 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
           return null;
         }
 
-        Integer chosenId = pickRandom(eligible);
+        List<Integer> preferred = eligible.stream()
+            .filter(id -> !smartHoldbackIds.contains(id))
+            .collect(Collectors.toList());
+
+        Integer chosenId = pickRandom(preferred.isEmpty() ? eligible : preferred);
+
+        if (smartPicksUntilHoldbackRelease > 0 && --smartPicksUntilHoldbackRelease == 0) {
+          smartHoldbackIds.clear();
+        }
         SmartBackgroundMusicSongEntity chosen = smartSongsById.get(chosenId);
 
         try {
@@ -544,6 +639,25 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
       log.warn("getNextSmartAdditionSong: failed for core song {}: {}", coreSong, e.getMessage());
       return null;
     }
+  }
+
+  /**
+   * Starts a new smart-additions cycle — the smart-pool counterpart of
+   * {@link #startNewBackgroundCycle()}, with the same queued-song and holdback exceptions.
+   */
+  private void startNewSmartCycle() {
+
+    this.smartHoldbackIds = selectCycleHoldbackIds(smartPool, smartPool.size());
+    this.smartPicksUntilHoldbackRelease = smartHoldbackIds.size();
+
+    clearTimestampsForNewCycle(smartPool, true);
+    rebuildSmartCaches();
+    if (smartNotPlayedIds.isEmpty()) {
+      clearTimestampsForNewCycle(smartPool, false);
+      rebuildSmartCaches();
+    }
+
+    smartBackgroundMusicRepository.resetAllPlayedTimestamps(smartPool);
   }
 
   private void rebuildSmartCaches() {
@@ -1192,6 +1306,12 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     this.allSongs = rebuilt;
     rebuildSongsById();
     rebuildNotPlayedCache();
+
+    // Every row was re-identified above, so any cycle-boundary holdback no longer applies.
+    this.backgroundHoldbackIds = new HashSet<>();
+    this.backgroundPicksUntilHoldbackRelease = 0;
+    this.smartHoldbackIds = new HashSet<>();
+    this.smartPicksUntilHoldbackRelease = 0;
 
     // Clearing smartPool first forces refreshSmartAdditionPool()'s merge step to treat every
     // freshly computed candidate as brand-new (no existingByPath match to preserve), giving the

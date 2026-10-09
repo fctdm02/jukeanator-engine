@@ -105,6 +105,7 @@ background-music:
   smart-background-music-additions-end: 5 # In 24 hour/military time (e.g. 5:00 hours is 5:00AM) end time for enableSmartBackgroundMusicAdditions
   smart-background-music-min-plays: 0 # candidate songs need at least this many plays to be eligible as a smart addition
   smart-background-music-favorite-albums-percentage: 25 # target % of the smart-addition pool (BackgroundMusic.TXT song count x factor) made up of songs from albums listed in SmartBackgroundMusicAlbumInclusions.TXT
+  cycle-boundary-holdback: 20 # when a full played cycle completes, hold back this many of the most recently played/queued songs from the first picks of the next cycle (capped at half the pool) so no song repeats back-to-back across the cycle boundary
 
 song-player:
   player-type: winamp   # vlc or detached-vlc (all operating systems) | winamp (windows only)

@@ -140,9 +140,24 @@ public final class SmartBackgroundMusicRepositoryJpaImpl implements SmartBackgro
   @Override
   public void resetAllPlayedTimestamps(List<SmartBackgroundMusicSongEntity> smartPool) {
 
-    transactionTemplate.executeWithoutResult(status -> entityManager
-        .createQuery("update SmartBackgroundMusicSongEntity s set s.timeLastPlayed = null "
-            + "where s.timeLastPlayed is not null")
-        .executeUpdate());
+    transactionTemplate.executeWithoutResult(status -> {
+
+      entityManager
+          .createQuery("update SmartBackgroundMusicSongEntity s set s.timeLastPlayed = null "
+              + "where s.timeLastPlayed is not null")
+          .executeUpdate();
+
+      // Re-apply the stamps the caller kept (songs still in the queue).
+      for (SmartBackgroundMusicSongEntity song : smartPool) {
+        if (song.getTimeLastPlayed() != null && song.getPersistentIdentity() != null) {
+          entityManager
+              .createQuery("update SmartBackgroundMusicSongEntity s set s.timeLastPlayed = "
+                  + ":timeLastPlayed where s.persistentIdentity = :id")
+              .setParameter("timeLastPlayed", song.getTimeLastPlayed())
+              .setParameter("id", song.getPersistentIdentity())
+              .executeUpdate();
+        }
+      }
+    });
   }
 }

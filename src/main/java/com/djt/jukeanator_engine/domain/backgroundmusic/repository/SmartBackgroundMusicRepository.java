@@ -37,13 +37,14 @@ public interface SmartBackgroundMusicRepository {
       SmartBackgroundMusicSongEntity song) throws EntityDoesNotExistException;
 
   /**
-   * Resets every song's {@code timeLastPlayed} back to {@code null} -- a targeted bulk update for
-   * when a full played/not-played cycle completes (see {@code
-   * BackgroundMusicServiceImpl.getNextSmartAdditionSong}), instead of rewriting every row via
-   * {@link #storeAll(List)}. {@code smartPool} is the full in-memory list, whose entries the
-   * caller has already nulled out in-memory; a JPA-backed implementation ignores it and issues a
-   * single bulk {@code UPDATE}, while the file-system implementation falls back to persisting
-   * {@code smartPool} in full.
+   * Resets every song's {@code timeLastPlayed} back to {@code null}, except for songs whose
+   * in-memory {@code timeLastPlayed} the caller deliberately left set (songs still sitting in the
+   * song queue) -- a targeted bulk update for when a full played/not-played cycle completes (see
+   * {@code BackgroundMusicServiceImpl.startNewSmartCycle}), instead of rewriting every row via
+   * {@link #storeAll(List)}. {@code smartPool} is the full in-memory list, already reset
+   * in-memory by the caller; a JPA-backed implementation issues a single bulk {@code UPDATE}
+   * followed by a targeted update for each song still stamped in {@code smartPool}, while the
+   * file-system implementation falls back to persisting {@code smartPool} in full.
    *
    * @param smartPool the full in-memory smart-addition song list, already reset in-memory
    */

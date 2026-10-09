@@ -30,6 +30,11 @@ public class BackgroundMusicProperties {
                                                                      // count x factor) made up of
                                                                      // songs from
                                                                      // SmartBackgroundMusicAlbumInclusions.TXT
+  private int cycleBoundaryHoldback = 20; // when a played cycle completes, this many of the most
+                                          // recently played/queued songs are held back from the
+                                          // first picks of the next cycle (capped at half the
+                                          // pool), so no song repeats back-to-back across the
+                                          // cycle boundary
 
   public boolean isEnableBackgroundMusic() {
     return enableBackgroundMusic;
@@ -86,5 +91,13 @@ public class BackgroundMusicProperties {
   public void setSmartBackgroundMusicFavoriteAlbumsPercentage(
       double smartBackgroundMusicFavoriteAlbumsPercentage) {
     this.smartBackgroundMusicFavoriteAlbumsPercentage = smartBackgroundMusicFavoriteAlbumsPercentage;
+  }
+
+  public int getCycleBoundaryHoldback() {
+    return cycleBoundaryHoldback;
+  }
+
+  public void setCycleBoundaryHoldback(int cycleBoundaryHoldback) {
+    this.cycleBoundaryHoldback = cycleBoundaryHoldback;
   }
 }

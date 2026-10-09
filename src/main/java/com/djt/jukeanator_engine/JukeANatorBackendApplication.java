@@ -14,6 +14,7 @@ import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import com.djt.jukeanator_engine.config.ExternalConfigInitializer;
+import com.djt.jukeanator_engine.config.ExternalConfigMerger;
 
 /**
  * DataSource/JPA/Flyway autoconfiguration is excluded here and re-imported only on instances that
@@ -41,6 +42,9 @@ public class JukeANatorBackendApplication {
     Path configDirOverride = extractConfigDirOverride(args);
     Path externalConfigDir = ExternalConfigInitializer
         .seedExternalConfigIfAbsent(JukeANatorBackendApplication.class, configDirOverride);
+    // Surfaces settings added by a newer build in the operator-edited file (behavior is
+    // unchanged either way -- a missing key already falls back to the bundled value).
+    ExternalConfigMerger.addMissingProperties(externalConfigDir.resolve("application.yml"));
     System.setProperty("spring.config.additional-location",
         "file:" + externalConfigDir.toAbsolutePath() + "/");
 
