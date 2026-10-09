@@ -41,6 +41,31 @@ public interface UserService {
   AuthResponse register(RegisterRequest request);
 
   /**
+   * Registers a Web/Mobile UI user. When email verification is required, the account is created
+   * PENDING, its verification link is emailed, and the returned {@link AuthResponse} has a
+   * {@code null} token -- the user signs in once verified. Otherwise the user is logged straight in.
+   *
+   * @param requestBaseUrl the URL the request arrived on, used for the verification link when
+   *        {@code email.verification-base-url} is not set
+   */
+  @PublicServiceMethod
+  AuthResponse register(RegisterRequest request, String requestBaseUrl);
+
+  /**
+   * Activates the PENDING account whose emailed link carried {@code token}.
+   */
+  @PublicServiceMethod
+  VerificationResult verifyAccount(String token);
+
+  /**
+   * Emails a fresh verification link (invalidating the previous one) if {@code emailAddress}
+   * belongs to a PENDING account; silently does nothing otherwise, so callers cannot probe which
+   * email addresses are registered.
+   */
+  @PublicServiceMethod
+  void resendVerification(String emailAddress, String requestBaseUrl);
+
+  /**
    * Admin-only: registers a new user with {@code ROLE_ADMIN} instead of the default
    * {@code ROLE_USER}. Unlike {@link #register(RegisterRequest)}, this is not a
    * {@link PublicServiceMethod} — the caller must already be authenticated (e.g. an operator who

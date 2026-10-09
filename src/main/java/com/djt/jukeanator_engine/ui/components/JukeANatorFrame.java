@@ -62,6 +62,7 @@ public class JukeANatorFrame extends JFrame {
   private final LocationService locationService;
   private final FinancialLedgerService financialLedgerService;
   private final UserActivityService userActivityService;
+  private final List<String> splitSummaryRecipients; // email.financial-ledger-recipients
 
   private final ImageLoader imageLoader;
   public static final int POPULARITY_THRESHOLD_1 = 10;
@@ -219,7 +220,8 @@ public class JukeANatorFrame extends JFrame {
       SongLibraryService songLibraryService, SongQueueService songQueueService,
       SongPlayerService songPlayerService, UserService userService,
       LocationService locationService, FinancialLedgerService financialLedgerService,
-      UserActivityService userActivityService, String dataDir) {
+      UserActivityService userActivityService, String dataDir,
+      List<String> splitSummaryRecipients) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
     this.songLibraryService = songLibraryService;
@@ -229,6 +231,7 @@ public class JukeANatorFrame extends JFrame {
     this.locationService = locationService;
     this.financialLedgerService = financialLedgerService;
     this.userActivityService = userActivityService;
+    this.splitSummaryRecipients = List.copyOf(splitSummaryRecipients);
     this.imageLoader = new ImageLoader(dataDir);
 
     this.alwaysOnTop = jukeANatorUserInterfaceProperties.isAlwaysOnTop();
@@ -1022,7 +1025,7 @@ public class JukeANatorFrame extends JFrame {
 
     return new AdminPanel(this, songLibraryService, songQueueService, songPlayerService,
         userService, locationService, financialLedgerService, userActivityService, creditManager,
-        imageLoader);
+        imageLoader, splitSummaryRecipients);
   }
 
   // ============================================================

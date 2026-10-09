@@ -56,6 +56,8 @@ import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.event.LocationSongCreditUsageRecordedEvent;
 import com.djt.jukeanator_engine.domain.user.event.PurchaseCompletedEvent;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
+import com.djt.jukeanator_engine.domain.user.event.VerificationEmailRequestedEvent;
+import com.djt.jukeanator_engine.domain.user.exception.AccountNotVerifiedException;
 import com.djt.jukeanator_engine.domain.user.exception.InsufficientCreditsException;
 import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsException;
 import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
@@ -67,6 +69,7 @@ import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserStatus;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 
 /**
@@ -352,6 +355,157 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     assertEquals(0, userServiceImpl.getAffordableQueueAddCount("new@example.com", 42, 1, false));
     assertThrows(InsufficientCreditsException.class,
         () -> userServiceImpl.requireAffordableQueueAdd("new@example.com", 42, 1, false));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EMAIL VERIFICATION — register (PENDING) / login / verifyAccount / resendVerification
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private UserServiceImpl verifyingService(java.time.Duration tokenTtl) {
+    return new UserServiceImpl(userRepository, passwordEncoder, jwtUtil, eventPublisher,
+        songLibraryService, pricingService, false, paymentGateway, false,
+        new EmailVerificationPolicy(true, null, tokenTtl));
+  }
+
+  /** Registers {@code email} PENDING and returns the raw token from the emailed link. */
+  private String registerPending(UserServiceImpl service, String email) {
+
+    clearInvocations(eventPublisher);
+    AuthResponse response = service.register(
+        new RegisterRequest("New", "Patron", email, "password123"), "http://jukebox.test/");
+    assertNull(response.token(), "a PENDING account is not logged in");
+    assertEquals(email, response.emailAddress());
+    return tokenFromLastVerificationEmail();
+  }
+
+  private String tokenFromLastVerificationEmail() {
+
+    org.mockito.ArgumentCaptor<Object> captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(captor.capture());
+    VerificationEmailRequestedEvent event = captor.getAllValues().stream()
+        .filter(VerificationEmailRequestedEvent.class::isInstance)
+        .map(VerificationEmailRequestedEvent.class::cast)
+        .reduce((first, second) -> second)
+        .orElseThrow();
+    String prefix = "http://jukebox.test/api/users/verify?token=";
+    assertTrue(event.verificationUrl().startsWith(prefix), event.verificationUrl());
+    return event.verificationUrl().substring(prefix.length());
+  }
+
+  @Test
+  void register_withVerification_createsPendingAccountAndEmailsLink() {
+
+    UserServiceImpl service = verifyingService(java.time.Duration.ofHours(24));
+    String token = registerPending(service, "new@example.com");
+
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists("new@example.com");
+    assertEquals(UserStatus.PENDING, user.getStatus());
+    assertNotNull(user.getVerificationTokenHash());
+    assertFalse(user.getVerificationTokenHash().contains(token), "only the hash is stored");
+    verify(jwtUtil, never()).generateToken(anyString(), anyString());
+  }
+
+  @Test
+  void login_refusesPendingAccountUntilVerified() throws Exception {
+
+    when(passwordEncoder.encode(anyString())).thenReturn("hash");
+    when(passwordEncoder.matches("password123", "hash")).thenReturn(true);
+    when(jwtUtil.generateToken(anyString(), anyString())).thenReturn("token");
+    UserServiceImpl service = verifyingService(java.time.Duration.ofHours(24));
+    String token = registerPending(service, "new@example.com");
+
+    LoginRequest login = new LoginRequest("new@example.com", "password123");
+    assertThrows(AccountNotVerifiedException.class, () -> service.login(login));
+
+    assertEquals(VerificationResult.VERIFIED, service.verifyAccount(token));
+    assertEquals(UserStatus.ACTIVE,
+        userRoot.getUserByEmailAddressNullIfNotExists("new@example.com").getStatus());
+    assertEquals("token", service.login(login).token());
+
+    // The link is single-use.
+    assertEquals(VerificationResult.INVALID, service.verifyAccount(token));
+  }
+
+  @Test
+  void login_wrongPasswordOnPendingAccountIsPlainInvalidCredentials() {
+
+    when(passwordEncoder.encode(anyString())).thenReturn("hash");
+    when(passwordEncoder.matches("wrong", "hash")).thenReturn(false);
+    UserServiceImpl service = verifyingService(java.time.Duration.ofHours(24));
+    registerPending(service, "new@example.com");
+
+    InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
+        () -> service.login(new LoginRequest("new@example.com", "wrong")));
+    assertFalse(ex instanceof AccountNotVerifiedException);
+  }
+
+  @Test
+  void verifyAccount_expiredOrUnknownToken() {
+
+    UserServiceImpl service = verifyingService(java.time.Duration.ofSeconds(-1));
+    String token = registerPending(service, "new@example.com");
+
+    assertEquals(VerificationResult.EXPIRED, service.verifyAccount(token));
+    assertEquals(VerificationResult.INVALID, service.verifyAccount("not-a-real-token"));
+    assertEquals(VerificationResult.INVALID, service.verifyAccount(null));
+    assertTrue(userRoot.getUserByEmailAddressNullIfNotExists("new@example.com").isPending());
+  }
+
+  @Test
+  void resendVerification_replacesTheTokenOnlyForPendingAccounts() {
+
+    UserServiceImpl service = verifyingService(java.time.Duration.ofHours(24));
+    String firstToken = registerPending(service, "new@example.com");
+
+    clearInvocations(eventPublisher);
+    service.resendVerification("NEW@example.com", "http://jukebox.test");
+    String secondToken = tokenFromLastVerificationEmail();
+
+    assertEquals(VerificationResult.INVALID, service.verifyAccount(firstToken));
+    assertEquals(VerificationResult.VERIFIED, service.verifyAccount(secondToken));
+
+    // Neither an ACTIVE nor an unknown account gets an email.
+    clearInvocations(eventPublisher);
+    service.resendVerification("new@example.com", "http://jukebox.test");
+    service.resendVerification("nobody@example.com", "http://jukebox.test");
+    verify(eventPublisher, never()).publishEvent(any(VerificationEmailRequestedEvent.class));
+  }
+
+  @Test
+  void register_pendingEmailAgainIsRejected() {
+
+    UserServiceImpl service = verifyingService(java.time.Duration.ofHours(24));
+    registerPending(service, "new@example.com");
+
+    assertThrows(EmailAlreadyRegisteredException.class, () -> service.register(
+        new RegisterRequest("New", "Patron", "new@example.com", "password123"), "http://x"));
+  }
+
+  @Test
+  void addAdminUser_isActiveEvenWhenVerificationIsRequired() {
+
+    when(jwtUtil.generateToken(anyString(), anyString())).thenReturn("token");
+    UserServiceImpl service = verifyingService(java.time.Duration.ofHours(24));
+
+    AuthResponse response =
+        service.addAdminUser(new RegisterRequest("Ad", "Min", "admin@example.com", "password123"));
+
+    assertEquals("token", response.token());
+    assertEquals(UserStatus.ACTIVE,
+        userRoot.getUserByEmailAddressNullIfNotExists("admin@example.com").getStatus());
+  }
+
+  @Test
+  void register_withoutVerification_logsStraightIn() {
+
+    when(jwtUtil.generateToken(anyString(), anyString())).thenReturn("token");
+
+    AuthResponse response = userServiceImpl.register(
+        new RegisterRequest("New", "Patron", "new@example.com", "password123"));
+
+    assertEquals("token", response.token());
+    assertEquals(UserStatus.ACTIVE,
+        userRoot.getUserByEmailAddressNullIfNotExists("new@example.com").getStatus());
   }
 
   @Test

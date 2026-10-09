@@ -106,8 +106,12 @@ braintree:
   public-key: test-public-key
   private-key: test-private-key
 
-receipt:
-  from-address: ${MAIL_FROM_ADDRESS:tmyers@jukeanator.com}
+email:
+  from-address: tmyers1@yahoo.com
+  financial-ledger-recipients: tmyers1@yahoo.com
+  verification-required: false   # lifecycle tests register and sign straight in; UserServiceTest covers verification
+  verification-base-url: http://localhost
+  verification-token-ttl: 24h
 
 user-interface:
   always-on-top: false

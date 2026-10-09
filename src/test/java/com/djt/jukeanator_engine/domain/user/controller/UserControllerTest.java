@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.user.controller;
 
+import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import java.math.BigDecimal;
@@ -46,6 +48,7 @@ import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
+import com.djt.jukeanator_engine.domain.user.service.VerificationResult;
 
 class UserControllerTest extends AbstractControllerTest {
 
@@ -77,7 +80,7 @@ class UserControllerTest extends AbstractControllerTest {
   void register_returnsAuthResponse() throws Exception {
     RegisterRequest request = new RegisterRequest("Jane", "Doe", "jane@example.com", "password");
     AuthResponse response = new AuthResponse("token123", "jane@example.com", "USER");
-    when(userService.register(any(RegisterRequest.class))).thenReturn(response);
+    when(userService.register(any(RegisterRequest.class), any())).thenReturn(response);
 
     mockMvc.perform(post("/api/users/register")
             .contentType(MediaType.APPLICATION_JSON)
@@ -85,6 +88,30 @@ class UserControllerTest extends AbstractControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.token", is("token123")))
         .andExpect(jsonPath("$.emailAddress", is("jane@example.com")));
+  }
+
+  @Test
+  void verify_redirectsToWebUiWithOutcome() throws Exception {
+    when(userService.verifyAccount("abc")).thenReturn(VerificationResult.VERIFIED);
+    when(userService.verifyAccount("old")).thenReturn(VerificationResult.EXPIRED);
+
+    mockMvc.perform(get("/api/users/verify").param("token", "abc"))
+        .andExpect(status().isFound())
+        .andExpect(header().string("Location", endsWith("/?verify=success")));
+    mockMvc.perform(get("/api/users/verify").param("token", "old"))
+        .andExpect(status().isFound())
+        .andExpect(header().string("Location", endsWith("/?verify=expired")));
+  }
+
+  @Test
+  void resendVerification_delegatesAndReturns200() throws Exception {
+    mockMvc.perform(post("/api/users/resend-verification")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"emailAddress\":\"jane@example.com\"}"))
+        .andExpect(status().isOk());
+
+    verify(userService).resendVerification(org.mockito.ArgumentMatchers.eq("jane@example.com"),
+        any());
   }
 
   @Test

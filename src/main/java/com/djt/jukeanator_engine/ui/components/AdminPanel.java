@@ -98,6 +98,7 @@ public class AdminPanel extends JPanel {
   private final CreditManager creditManager;
   private final Frame ownerFrame;
   private final ImageLoader imageLoader;
+  private final List<String> splitSummaryRecipients; // email.financial-ledger-recipients
 
   // ── Album list ────────────────────────────────────────────────────────────
   private final DefaultListModel<AlbumDto> albumListModel = new DefaultListModel<>();
@@ -149,7 +150,7 @@ public class AdminPanel extends JPanel {
       SongQueueService songQueueService, SongPlayerService songPlayerService,
       UserService userService, LocationService locationService,
       FinancialLedgerService financialLedgerService, UserActivityService userActivityService,
-      CreditManager creditManager, ImageLoader imageLoader) {
+      CreditManager creditManager, ImageLoader imageLoader, List<String> splitSummaryRecipients) {
 
     this.ownerFrame = ownerFrame;
     this.songLibraryService = songLibraryService;
@@ -161,6 +162,7 @@ public class AdminPanel extends JPanel {
     this.userActivityService = userActivityService;
     this.creditManager = creditManager;
     this.imageLoader = imageLoader;
+    this.splitSummaryRecipients = List.copyOf(splitSummaryRecipients);
 
     initOverlay();
 
@@ -1231,10 +1233,12 @@ public class AdminPanel extends JPanel {
         SwingSecurityUtil.runAsync(() -> {
           try {
             financialLedgerService.addSplit();
-            SwingUtilities.invokeLater(() -> {
-              statusLabel.setText(" ");
-              reload();
-            });
+            // The summary itself is emailed in the background (FinancialLedgerSplitEmailListener).
+            int recipients = splitSummaryRecipients.size();
+            String doneMessage = recipients == 0 ? "Split finalized."
+                : "Split finalized. Emailing the summary to " + recipients
+                    + (recipients == 1 ? " recipient." : " recipients.");
+            SwingUtilities.invokeLater(() -> reload(doneMessage));
           } catch (Exception ex) {
             SwingUtilities.invokeLater(() -> statusLabel.setText(
                 ex.getMessage() != null ? ex.getMessage() : "Could not finalize the split."));
@@ -1273,6 +1277,11 @@ public class AdminPanel extends JPanel {
     }
 
     private void reload() {
+      reload(" ");
+    }
+
+    /** @param doneMessage shown on the status line once the periods have loaded */
+    private void reload(String doneMessage) {
 
       statusLabel.setText("Loading...");
       SwingSecurityUtil.runAsync(() -> {
@@ -1280,7 +1289,7 @@ public class AdminPanel extends JPanel {
           List<JukeboxSplitPeriodDto> periods = financialLedgerService.getAllPeriods();
           SwingUtilities.invokeLater(() -> {
             tableModel.setPeriods(periods);
-            statusLabel.setText(" ");
+            statusLabel.setText(doneMessage);
           });
         } catch (Exception ex) {
           SwingUtilities.invokeLater(() -> statusLabel.setText(

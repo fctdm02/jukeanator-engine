@@ -132,8 +132,13 @@ braintree:
   public-key: ${BRAINTREE_PUBLIC_KEY:}
   private-key: ${BRAINTREE_PRIVATE_KEY:}
 
-receipt:
-  from-address: ${MAIL_FROM_ADDRESS:tmyers@jukeanator.com}
+# Outbound email (account verification, Add Funds receipts, Financial Ledger split summaries); SMTP settings are under spring.mail
+email:
+  from-address: ${MAIL_FROM_ADDRESS:${receipt.from-address:tmyers1@yahoo.com}}   # sender for every email; still honors a legacy receipt.from-address
+  financial-ledger-recipients: tmyers1@yahoo.com   # comma-separated list that receives the Financial Ledger split summary; blank = none
+  verification-required: true   # Create Account must verify its email address before it can sign in
+  verification-base-url: ~   # public URL of the web UI used in verification links (e.g. https://jukeanator.com); blank = the URL the request arrived on
+  verification-token-ttl: 24h   # how long a verification link stays valid
 
 financial-ledger:
   jukebox-split-percentage: 50   # % of each period's total earnings due to the location owner; the operator gets the rest

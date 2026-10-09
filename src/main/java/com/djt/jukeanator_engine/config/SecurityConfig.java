@@ -54,7 +54,9 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
 
             // ── Public: auth endpoints ────────────────────────────────────────
-            .requestMatchers("/api/users/register", "/api/users/login").permitAll()
+            .requestMatchers("/api/users/register", "/api/users/login",
+                "/api/users/resend-verification").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/users/verify").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/users/credit-packages", "/api/users/home-public",
                 "/api/users/own-location-id", "/api/users/own-location",
                 "/api/users/pricing-config").permitAll()

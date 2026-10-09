@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +28,7 @@ import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
+import com.djt.jukeanator_engine.domain.email.config.EmailProperties;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
 import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
@@ -65,13 +65,11 @@ import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryJpaImpl;
 import com.djt.jukeanator_engine.domain.user.service.BraintreePaymentGateway;
-import com.djt.jukeanator_engine.domain.user.service.EmailService;
-import com.djt.jukeanator_engine.domain.user.service.EmailServiceImpl;
+import com.djt.jukeanator_engine.domain.user.service.EmailVerificationPolicy;
 import com.djt.jukeanator_engine.domain.user.service.NoOpPaymentGateway;
 import com.djt.jukeanator_engine.domain.user.service.PaymentGateway;
 import com.djt.jukeanator_engine.domain.user.service.PricingService;
 import com.djt.jukeanator_engine.domain.user.service.PricingServiceImpl;
-import com.djt.jukeanator_engine.domain.user.service.PurchaseReceiptEmailListener;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
@@ -359,7 +357,8 @@ public class AppConfig {
       org.springframework.context.ApplicationEventPublisher eventPublisher,
       SongLibraryService songLibraryService,
       PricingService pricingService,
-      PaymentGateway paymentGateway) {
+      PaymentGateway paymentGateway,
+      EmailProperties emailProperties) {
 
     return new UserServiceImpl(
         userRepository,
@@ -370,10 +369,14 @@ public class AppConfig {
         pricingService,
         appProperties.isSlave(),
         paymentGateway,
-        appProperties.isAllowSlaveUrlQueueOperations());
+        appProperties.isAllowSlaveUrlQueueOperations(),
+        new EmailVerificationPolicy(
+            emailProperties.isVerificationRequired(),
+            emailProperties.getVerificationBaseUrl(),
+            emailProperties.getVerificationTokenTtl()));
   }
 
-  // ── Payments / email ─────────────────────────────────────────────────────
+  // ── Payments ─────────────────────────────────────────────────────────────
   // Payment processing is centralized to one master-mode Braintree merchant account for the
   // whole multi-location business -- a standalone/slave instance never holds Braintree
   // credentials and never even constructs a com.braintreegateway.BraintreeGateway. These two
@@ -402,18 +405,6 @@ public class AppConfig {
   @Conditional(NotMasterModeCondition.class)
   public PaymentGateway noOpPaymentGateway() {
     return new NoOpPaymentGateway();
-  }
-
-  @Bean
-  public EmailService emailService(JavaMailSender mailSender,
-      @org.springframework.beans.factory.annotation.Value("${receipt.from-address:noreply@jukeanator.com}") String fromAddress) {
-
-    return new EmailServiceImpl(mailSender, fromAddress);
-  }
-
-  @Bean
-  public PurchaseReceiptEmailListener purchaseReceiptEmailListener(EmailService emailService) {
-    return new PurchaseReceiptEmailListener(emailService);
   }
 
   @Bean

@@ -3,8 +3,14 @@ package com.djt.jukeanator_engine.domain.user.service;
 import static java.util.Objects.requireNonNull;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -49,6 +55,8 @@ import com.djt.jukeanator_engine.domain.user.event.LocationSongCreditUsageRecord
 import com.djt.jukeanator_engine.domain.user.event.PurchaseCompletedEvent;
 import com.djt.jukeanator_engine.domain.user.event.RecentPlayAddedEvent;
 import com.djt.jukeanator_engine.domain.user.event.UserCreditsChangedEvent;
+import com.djt.jukeanator_engine.domain.user.event.VerificationEmailRequestedEvent;
+import com.djt.jukeanator_engine.domain.user.exception.AccountNotVerifiedException;
 import com.djt.jukeanator_engine.domain.user.exception.EmailAlreadyRegisteredException;
 import com.djt.jukeanator_engine.domain.user.exception.IncorrectPasswordException;
 import com.djt.jukeanator_engine.domain.user.exception.InsufficientCreditsException;
@@ -84,6 +92,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private final boolean slaveMode;
   private final PaymentGateway paymentGateway;
   private final boolean allowSlaveUrlQueueOperations;
+  private final EmailVerificationPolicy emailVerificationPolicy;
+  private final SecureRandom secureRandom = new SecureRandom();
 
   private UserRootEntity userRoot;
 
@@ -104,6 +114,20 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
       SongLibraryService songLibraryService, PricingService pricingService, boolean slaveMode,
       PaymentGateway paymentGateway, boolean allowSlaveUrlQueueOperations) {
+    this(userRepository, passwordEncoder, jwtUtil, eventPublisher, songLibraryService,
+        pricingService, slaveMode, paymentGateway, allowSlaveUrlQueueOperations,
+        EmailVerificationPolicy.DISABLED);
+  }
+
+  /**
+   * @param emailVerificationPolicy whether (and how) a Web/Mobile UI registration must verify its
+   *        email address before it can log in
+   */
+  public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder,
+      JwtUtil jwtUtil, ApplicationEventPublisher eventPublisher,
+      SongLibraryService songLibraryService, PricingService pricingService, boolean slaveMode,
+      PaymentGateway paymentGateway, boolean allowSlaveUrlQueueOperations,
+      EmailVerificationPolicy emailVerificationPolicy) {
 
     requireNonNull(userRepository, "userRepository cannot be null");
     requireNonNull(passwordEncoder, "passwordEncoder cannot be null");
@@ -112,6 +136,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
     requireNonNull(pricingService, "pricingService cannot be null");
     requireNonNull(paymentGateway, "paymentGateway cannot be null");
+    requireNonNull(emailVerificationPolicy, "emailVerificationPolicy cannot be null");
 
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
@@ -122,6 +147,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     this.slaveMode = slaveMode;
     this.paymentGateway = paymentGateway;
     this.allowSlaveUrlQueueOperations = allowSlaveUrlQueueOperations;
+    this.emailVerificationPolicy = emailVerificationPolicy;
     if (slaveMode && allowSlaveUrlQueueOperations) {
       log.warn("app.allow-slave-url-queue-operations is true: web users can queue songs on this "
           + "slave's own endpoints without being charged -- for local/testing use only");
@@ -135,16 +161,28 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   // Service methods
   @Override
   public AuthResponse register(RegisterRequest request) {
-    return registerWithRole(request, UserRole.ROLE_USER);
+    return register(request, null);
+  }
+
+  @Override
+  public AuthResponse register(RegisterRequest request, String requestBaseUrl) {
+    return registerWithRole(request, UserRole.ROLE_USER, emailVerificationPolicy.required(),
+        requestBaseUrl);
   }
 
   @Override
   public AuthResponse addAdminUser(RegisterRequest request) {
-    return registerWithRole(request, UserRole.ROLE_ADMIN);
+    // Created by an operator already logged into the Swing admin panel: never PENDING.
+    return registerWithRole(request, UserRole.ROLE_ADMIN, false, null);
   }
 
-  /** Validates the request against {@link AccountValidator}'s rules before creating the account. */
-  private synchronized AuthResponse registerWithRole(RegisterRequest request, UserRole role) {
+  /**
+   * Validates the request against {@link AccountValidator}'s rules before creating the account.
+   * With {@code requireVerification}, the account is created PENDING, its verification link is
+   * emailed, and the returned {@link AuthResponse} carries no token.
+   */
+  private synchronized AuthResponse registerWithRole(RegisterRequest request, UserRole role,
+      boolean requireVerification, String requestBaseUrl) {
 
     String emailAddress = AccountValidator.requireValidEmail(request.emailAddress());
     if (emailAddress.endsWith(UserEntity.CLOSED_ACCOUNT_EMAIL_DOMAIN)) {
@@ -154,14 +192,115 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     String lastName = AccountValidator.requireValidName(request.lastName(), "last name");
     AccountValidator.requireValidPassword(request.password());
 
-    if (userRoot.getUserByEmailAddressNullIfNotExists(emailAddress) != null) {
+    UserEntity existing = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
+    if (existing != null && existing.isPending()) {
+      throw new EmailAlreadyRegisteredException("An account for " + emailAddress
+          + " is waiting for email verification. Please use the link we emailed you, or sign in "
+          + "to have a new link sent.");
+    }
+    if (existing != null) {
       throw new EmailAlreadyRegisteredException(
           "An account already exists for " + emailAddress + ". Please sign in instead.");
     }
 
-    UserEntity user = createUser(firstName, lastName, emailAddress, request.password(), role);
-    String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole().name());
-    return new AuthResponse(token, user.getEmailAddress(), user.getRole().name());
+    if (!requireVerification) {
+      UserEntity user = createUser(firstName, lastName, emailAddress, request.password(), role);
+      String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole().name());
+      return new AuthResponse(token, user.getEmailAddress(), user.getRole().name());
+    }
+
+    String baseUrl = resolveVerificationBaseUrl(requestBaseUrl);
+    UserEntity user = newUser(firstName, lastName, emailAddress, request.password(), role);
+    String rawToken = issueVerificationToken(user);
+    this.userRoot.addUser(user);
+    this.userRepository.storeAggregateRoot(this.userRoot);
+    publishVerificationEmail(user, baseUrl, rawToken);
+    return new AuthResponse(null, user.getEmailAddress(), user.getRole().name());
+  }
+
+  @Override
+  public synchronized VerificationResult verifyAccount(String token) {
+
+    if (token == null || token.isBlank()) {
+      return VerificationResult.INVALID;
+    }
+    String tokenHash = sha256Hex(token);
+    UserEntity user = userRoot.getUsers().stream()
+        .filter(u -> tokenHash.equals(u.getVerificationTokenHash()))
+        .findFirst()
+        .orElse(null);
+    if (user == null || !user.isPending()) {
+      return VerificationResult.INVALID;
+    }
+    if (user.getVerificationTokenExpiresAt() == null
+        || Instant.now().isAfter(user.getVerificationTokenExpiresAt())) {
+      return VerificationResult.EXPIRED;
+    }
+
+    user.markVerified();
+    this.userRepository.storeAggregateRoot(this.userRoot);
+    log.info("Verified account {}", user.getEmailAddress());
+    return VerificationResult.VERIFIED;
+  }
+
+  @Override
+  public synchronized void resendVerification(String emailAddress, String requestBaseUrl) {
+
+    if (emailAddress == null) {
+      return;
+    }
+    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(
+        AccountValidator.normalizeEmail(emailAddress));
+    // Deliberately silent otherwise, so the endpoint never reveals whether an email is registered.
+    if (user == null || !user.isPending()) {
+      return;
+    }
+
+    String baseUrl = resolveVerificationBaseUrl(requestBaseUrl);
+    String rawToken = issueVerificationToken(user);
+    this.userRepository.storeAggregateRoot(this.userRoot);
+    publishVerificationEmail(user, baseUrl, rawToken);
+  }
+
+  /** Replaces any outstanding token on {@code user}; returns the raw token for the email link. */
+  private String issueVerificationToken(UserEntity user) {
+
+    byte[] bytes = new byte[32];
+    secureRandom.nextBytes(bytes);
+    String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    user.issueVerificationToken(sha256Hex(rawToken),
+        Instant.now().plus(emailVerificationPolicy.tokenTtl()));
+    return rawToken;
+  }
+
+  private void publishVerificationEmail(UserEntity user, String baseUrl, String rawToken) {
+
+    String verificationUrl = baseUrl + "/api/users/verify?token=" + rawToken;
+    eventPublisher.publishEvent(new VerificationEmailRequestedEvent(user.getEmailAddress(),
+        user.getFirstName(), verificationUrl, user.getVerificationTokenExpiresAt()));
+  }
+
+  /** {@code email.verification-base-url} when set, else the URL the request arrived on. */
+  private String resolveVerificationBaseUrl(String requestBaseUrl) {
+
+    String baseUrl = emailVerificationPolicy.baseUrl();
+    if (baseUrl == null || baseUrl.isBlank()) {
+      baseUrl = requestBaseUrl;
+    }
+    if (baseUrl == null || baseUrl.isBlank()) {
+      throw new IllegalStateException(
+          "No base URL for the verification link: set email.verification-base-url");
+    }
+    return baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+  }
+
+  private static String sha256Hex(String value) {
+    try {
+      return HexFormat.of().formatHex(
+          MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 unavailable", e); // guaranteed by every JRE
+    }
   }
 
   /**
@@ -171,17 +310,23 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private UserEntity createUser(String firstName, String lastName, String emailAddress,
       String password, UserRole role) {
 
+    UserEntity user = newUser(firstName, lastName, emailAddress, password, role);
+    this.userRoot.addUser(user);
+    this.userRepository.storeAggregateRoot(this.userRoot);
+    return user;
+  }
+
+  /** An ACTIVE, not-yet-stored account. */
+  private UserEntity newUser(String firstName, String lastName, String emailAddress,
+      String password, UserRole role) {
+
     Integer persistentIdentity = this.userRoot.nextUserPersistentIdentity();
 
     // A new account starts with no credits: every credit a web user spends must have been bought
     // through Add Funds, since each one spent is paid out to the location as mobile revenue.
     // The UserEntity constructor gives every new account its My Favorites playlist.
-    UserEntity user = new UserEntity(persistentIdentity, firstName, lastName, emailAddress,
+    return new UserEntity(persistentIdentity, firstName, lastName, emailAddress,
         passwordEncoder.encode(password), STARTING_CREDITS, role);
-
-    this.userRoot.addUser(user);
-    this.userRepository.storeAggregateRoot(this.userRoot);
-    return user;
   }
 
   @Override
@@ -198,6 +343,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
       throw new InvalidCredentialsException("Invalid credentials");
+    }
+    // Checked only after the password, so this never reveals that an email is registered.
+    if (user.isPending()) {
+      throw new AccountNotVerifiedException("Please verify your email address before signing in. "
+          + "Check your inbox for the link we sent to " + user.getEmailAddress() + ".");
     }
 
     String token = jwtUtil.generateToken(user.getEmailAddress(), user.getRole().name());

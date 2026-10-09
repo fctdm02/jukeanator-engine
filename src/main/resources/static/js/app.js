@@ -1245,14 +1245,23 @@
   }
 
   // ── Auth screens ────────────────────────────────────────────────────────
-  function renderLogin(errorMessage) {
+  /**
+   * @param errorMessage shown in red above the form
+   * @param options.notice shown in green above the form (e.g. "Your email is verified")
+   * @param options.resendEmail an unverified account's address: adds a "Resend verification
+   *        email" button and pre-fills the email field
+   */
+  function renderLogin(errorMessage, options = {}) {
+    const { notice, resendEmail } = options;
     contentPanel.innerHTML = `
       <div class="centered-view">
         <div class="auth-box">
           <div class="auth-logo"><img src="/images/JukeANatorLogo.png" alt="JukeANator"></div>
           <h1>Login</h1>
           <form id="loginForm">
-            ${errorMessage ? `<div class="error-msg">${errorMessage}</div>` : ''}
+            ${notice ? `<div class="notice-msg" id="loginNotice">${escHtml(notice)}</div>` : ''}
+            ${errorMessage ? `<div class="error-msg">${escHtml(errorMessage)}</div>` : ''}
+            ${resendEmail ? '<button type="button" id="loginResendBtn" class="auth-btn">Resend Verification Email</button>' : ''}
             <label>Email <input type="email" id="loginEmail" autocomplete="email" required></label>
             <label>Password ${peekablePassword('loginPassword', { autocomplete: 'current-password' })}</label>
             <button type="submit" class="auth-btn">Login</button>
@@ -1267,23 +1276,101 @@
       renderMain(state.currentMainTab);
     });
     wirePasswordPeeks(contentPanel);
+    if (resendEmail) {
+      document.getElementById('loginEmail').value = resendEmail;
+      document.getElementById('loginResendBtn').addEventListener('click', async () => {
+        const sent = await resendVerificationEmail(resendEmail);
+        renderLogin(sent ? null : 'Could not send the email. Please try again.', sent
+          ? { notice: `We sent a new verification link to ${resendEmail}.` }
+          : { resendEmail });
+      });
+    }
     document.getElementById('showRegisterBtn').addEventListener('click', () => renderRegister());
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const emailAddress = document.getElementById('loginEmail').value;
       try {
         const auth = await api('/api/users/login', {
           method: 'POST',
           body: JSON.stringify({
-            emailAddress: document.getElementById('loginEmail').value,
+            emailAddress,
             password: document.getElementById('loginPassword').value,
           }),
         });
         setAuth(auth);
         afterLogin();
-      } catch {
+      } catch (err) {
+        if (err.status === 403) {
+          // Right password, but the account has not been verified yet.
+          renderLogin(err.serverMessage || 'Please verify your email address before signing in.',
+            { resendEmail: emailAddress });
+          return;
+        }
         renderLogin('Login failed. Check your email and password.');
       }
     });
+  }
+
+  /** Asks the server to email a fresh verification link; true unless the request failed. */
+  async function resendVerificationEmail(emailAddress) {
+    try {
+      await api('/api/users/resend-verification', {
+        method: 'POST',
+        body: JSON.stringify({ emailAddress }),
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Shown after Create Account when the new account must verify its email before signing in. */
+  function renderCheckYourEmail(emailAddress, notice) {
+    contentPanel.innerHTML = `
+      <div class="centered-view">
+        <div class="auth-box">
+          <div class="auth-logo"><img src="/images/JukeANatorLogo.png" alt="JukeANator"></div>
+          <h1>Check Your Email</h1>
+          ${notice ? `<div class="notice-msg">${escHtml(notice)}</div>` : ''}
+          <p class="verify-email-text">We sent a verification link to
+            <strong>${escHtml(emailAddress)}</strong>. Open it to activate your account, then sign in.</p>
+          <div class="verify-email-actions">
+            <button type="button" id="verifyResendBtn" class="auth-btn">Resend Email</button>
+            <button type="button" id="verifySignInBtn" class="auth-btn">Back to Sign In</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('verifyResendBtn').addEventListener('click', async () => {
+      const sent = await resendVerificationEmail(emailAddress);
+      renderCheckYourEmail(emailAddress, sent ? 'A new link is on its way.'
+        : 'Could not send the email. Please try again.');
+    });
+    document.getElementById('verifySignInBtn').addEventListener('click', () => renderLogin());
+  }
+
+  /**
+   * The verification email's link lands on "/?verify=success|expired|invalid" (see
+   * UserController.verify): strip it from the address bar and show the outcome on the login screen.
+   * Returns true when it rendered that screen.
+   */
+  function handleVerificationRedirect() {
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get('verify');
+    if (!outcome) return false;
+    params.delete('verify');
+    const query = params.toString();
+    history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : '')
+      + window.location.hash);
+
+    if (outcome === 'success') {
+      renderLogin(null, { notice: 'Your email address is verified. Please sign in.' });
+    } else if (outcome === 'expired') {
+      renderLogin('That verification link has expired. Sign in to have a new one sent.');
+    } else {
+      renderLogin('That verification link is not valid. It may have already been used.');
+    }
+    return true;
   }
 
   function renderRegister(errorMessage) {
@@ -1332,6 +1419,11 @@
             password,
           }),
         });
+        if (!auth.token) {
+          // The account is PENDING until the emailed verification link is opened.
+          renderCheckYourEmail(auth.emailAddress);
+          return;
+        }
         setAuth(auth);
         afterLogin();
       } catch (err) {
@@ -3615,6 +3707,7 @@
     }
     await Promise.all([loadPricingConfig(), loadGeoFenceStatus()]);
     renderMain('music');
+    handleVerificationRedirect();
     connectWebSocket();
   })();
 })();

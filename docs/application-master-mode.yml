@@ -126,10 +126,14 @@ braintree:
   public-key: ${BRAINTREE_PUBLIC_KEY:}
   private-key: ${BRAINTREE_PRIVATE_KEY:}
 
-receipt:
-  from-address: ${MAIL_FROM_ADDRESS:noreply@jukeanator.com}
+email:
+  from-address: ${MAIL_FROM_ADDRESS:tmyers1@yahoo.com}
+  financial-ledger-recipients: tmyers1@yahoo.com
+  verification-required: true
+  verification-base-url: https://jukeanator.com   # public URL of the web UI used in verification links
+  verification-token-ttl: 24h
 
-  user-interface:
+user-interface:
   always-on-top: false
   enable-screen-saver: true
   # HIBERNATE CONFIGURATION  

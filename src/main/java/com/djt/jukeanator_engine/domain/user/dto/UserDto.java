@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.user.dto;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
@@ -13,8 +14,8 @@ public record UserDto(Integer persistentIdentity, String firstName, String lastN
     String emailAddress, String passwordHash, Integer numCredits,
     List<SongIdentifier> songPlayHistory, List<String> searchHistory, List<PlaylistDto> playlists,
     List<UserSongCreditUsageEntryDto> userSongCreditUsages,
-    List<UserAddFundsTransactionEntryDto> userAddFundsTransactions, String role)
-    implements Serializable {
+    List<UserAddFundsTransactionEntryDto> userAddFundsTransactions, String role, String status,
+    String verificationTokenHash, Instant verificationTokenExpiresAt) implements Serializable {
 
   public List<String> searchHistory() {
     return searchHistory == null ? List.of() : searchHistory;
@@ -39,6 +40,6 @@ public record UserDto(Integer persistentIdentity, String firstName, String lastN
   public String toString() {
     return "UserDto [persistentIdentity=" + persistentIdentity + ", firstName=" + firstName
         + ", lastName=" + lastName + ", emailAddress=" + emailAddress + ", numCredits="
-        + numCredits + ", role=" + role + "]";
+        + numCredits + ", role=" + role + ", status=" + status + "]";
   }
 }

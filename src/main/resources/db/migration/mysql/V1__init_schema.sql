@@ -21,6 +21,11 @@ CREATE TABLE user_account (
     password_hash          VARCHAR(255) NOT NULL,
     num_credits              INT NOT NULL,
     role                       VARCHAR(255) NOT NULL,
+    -- Email verification for Web/Mobile UI registrations (see UserEntity.status): PENDING until
+    -- the emailed link is opened. verification_token_hash is the SHA-256 (hex) of the raw token.
+    status                       VARCHAR(255) NOT NULL DEFAULT 'ACTIVE',
+    verification_token_hash        VARCHAR(64) NULL UNIQUE,
+    verification_token_expires_at    TIMESTAMP NULL,
     version                     INT NOT NULL DEFAULT 1,
     date_added                    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     date_updated                    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

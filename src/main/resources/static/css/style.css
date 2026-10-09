@@ -94,6 +94,27 @@ html, body {
   font-size: 0.85rem;
 }
 
+.auth-box .notice-msg {
+  color: #3cb371;
+  font-size: 0.85rem;
+}
+
+/* "Check your email" screen shown after Create Account while the account awaits verification */
+.auth-box .verify-email-text {
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin: 0 0 1rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.auth-box .verify-email-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .password-hint {
   color: var(--muted);
   font-size: 0.8rem;

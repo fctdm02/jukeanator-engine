@@ -14,6 +14,7 @@ import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserStatus;
 
 /**
  * @author tmyers
@@ -47,7 +48,10 @@ public final class UserMapper {
         toPlaylistDtos(entity.getPlaylists()),
         toUserSongCreditUsageDtos(entity.getUserSongCreditUsages()),
         toUserAddFundsTransactionDtos(entity.getUserAddFundsTransactions()),
-        entity.getRole().name());
+        entity.getRole().name(),
+        entity.getStatus().name(),
+        entity.getVerificationTokenHash(),
+        entity.getVerificationTokenExpiresAt());
   }
 
   public static List<PlaylistDto> toPlaylistDtos(List<PlaylistEntity> entities) {
@@ -128,6 +132,11 @@ public final class UserMapper {
 
     user.setSongPlayHistory(dto.songPlayHistory());
     user.setSearchHistory(dto.searchHistory());
+
+    // A user file written before verification existed has no status: treat it as ACTIVE.
+    user.setStatus(dto.status() == null ? UserStatus.ACTIVE : UserStatus.valueOf(dto.status()));
+    user.setVerificationTokenHash(dto.verificationTokenHash());
+    user.setVerificationTokenExpiresAt(dto.verificationTokenExpiresAt());
 
     // The UserEntity constructor above already seeded a fresh "My Favorites" playlist; discard
     // it in favor of the persisted playlists, which already include it.

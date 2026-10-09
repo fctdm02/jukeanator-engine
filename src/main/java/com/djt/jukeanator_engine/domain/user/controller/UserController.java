@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.location.dto.OwnLocationDto;
@@ -52,10 +53,44 @@ public class UserController {
     this.songLibraryService = songLibraryService;
   }
 
+  /**
+   * A {@code null} token in the response means the account is PENDING email verification: the
+   * user signs in after opening the emailed link.
+   */
   @PostMapping("/register")
   public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest request) {
 
-    return ResponseEntity.ok(userService.register(request));
+    return ResponseEntity.ok(userService.register(request, requestBaseUrl()));
+  }
+
+  /**
+   * The link in the verification email. Redirects to the web UI, which reads {@code verify} to
+   * tell the user whether they can now sign in.
+   */
+  @GetMapping("/verify")
+  public ResponseEntity<Void> verify(@RequestParam(required = false) String token) {
+
+    String outcome = switch (userService.verifyAccount(token)) {
+      case VERIFIED -> "success";
+      case EXPIRED -> "expired";
+      case INVALID -> "invalid";
+    };
+    return ResponseEntity.status(HttpStatus.FOUND)
+        .location(ServletUriComponentsBuilder.fromCurrentContextPath().path("/")
+            .queryParam("verify", outcome).build().toUri())
+        .build();
+  }
+
+  /** Always 200, whether or not the address belongs to a PENDING account. */
+  @PostMapping("/resend-verification")
+  public ResponseEntity<Void> resendVerification(@RequestBody Map<String, String> body) {
+
+    userService.resendVerification(body.get("emailAddress"), requestBaseUrl());
+    return ResponseEntity.ok().build();
+  }
+
+  private static String requestBaseUrl() {
+    return ServletUriComponentsBuilder.fromCurrentContextPath().toUriString();
   }
 
   @PostMapping("/login")

@@ -15,6 +15,7 @@ import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalExceptio
 import com.djt.jukeanator_engine.domain.location.exception.GeoFenceViolationException;
 import com.djt.jukeanator_engine.domain.location.exception.LocationOfflineException;
 import com.djt.jukeanator_engine.domain.songqueue.exception.SongNotEligibleException;
+import com.djt.jukeanator_engine.domain.user.exception.AccountNotVerifiedException;
 import com.djt.jukeanator_engine.domain.user.exception.EmailAlreadyRegisteredException;
 import com.djt.jukeanator_engine.domain.user.exception.IncorrectPasswordException;
 import com.djt.jukeanator_engine.domain.user.exception.InsufficientCreditsException;
@@ -105,6 +106,14 @@ public class GlobalExceptionHandler {
     public void handleSongNotEligible(SongNotEligibleException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
         logExpected(HttpStatus.CONFLICT, ex, request);
         write(HttpStatus.CONFLICT, ex, response);
+    }
+
+    // 403, never 401: the Web/Mobile UI treats a 401 as an expired session and signs out. More
+    // specific than the InvalidCredentialsException handler, so Spring picks this one.
+    @ExceptionHandler(AccountNotVerifiedException.class)
+    public void handleAccountNotVerified(AccountNotVerifiedException ex, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logExpected(HttpStatus.FORBIDDEN, ex, request);
+        write(HttpStatus.FORBIDDEN, ex, response);
     }
 
     @ExceptionHandler(EmailAlreadyRegisteredException.class)

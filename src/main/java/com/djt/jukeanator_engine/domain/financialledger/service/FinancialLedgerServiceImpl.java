@@ -372,7 +372,8 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
 
     financialLedgerRepository.storeAggregateRoot(ledgerRoot);
 
-    // Harmless on standalone -- only a slave's FinancialLedgerSyncService listens.
+    // A slave's FinancialLedgerSyncService pushes the period to master; on every instance the
+    // email domain's FinancialLedgerSplitEmailListener emails the split summary.
     eventPublisher.publishEvent(new JukeboxSplitFinalizedEvent(currentPeriod.getLocationId(),
         currentPeriod.getPersistentIdentity()));
   }

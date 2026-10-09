@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.user.model;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -91,6 +92,20 @@ public class UserEntity extends AbstractPersistentEntity {
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private UserRole role = UserRole.ROLE_USER;
+
+  // PENDING from Web/Mobile UI registration until the emailed verification link is opened; every
+  // other account (admins, the kiosk's internal user, and any account stored before this field
+  // existed) is ACTIVE.
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private UserStatus status = UserStatus.ACTIVE;
+
+  // SHA-256 (hex) of the outstanding verification token -- the raw token exists only in the email.
+  @Column(name = "verification_token_hash", length = 64)
+  private String verificationTokenHash;
+
+  @Column(name = "verification_token_expires_at")
+  private Instant verificationTokenExpiresAt;
 
   protected UserEntity() {} // for JPA
 
@@ -520,6 +535,8 @@ public class UserEntity extends AbstractPersistentEntity {
     this.songPlayHistory = new ArrayList<>();
     this.searchHistory = new ArrayList<>();
     this.playlists = new ArrayList<>();
+    this.verificationTokenHash = null;
+    this.verificationTokenExpiresAt = null;
   }
 
   public boolean isClosed() {
@@ -532,6 +549,48 @@ public class UserEntity extends AbstractPersistentEntity {
 
   public void setRole(UserRole role) {
     this.role = role;
+  }
+
+  /** Never null: an account stored before this field existed reads as ACTIVE. */
+  public UserStatus getStatus() {
+    return status == null ? UserStatus.ACTIVE : status;
+  }
+
+  public void setStatus(UserStatus status) {
+    this.status = status;
+  }
+
+  public boolean isPending() {
+    return getStatus() == UserStatus.PENDING;
+  }
+
+  public String getVerificationTokenHash() {
+    return verificationTokenHash;
+  }
+
+  public void setVerificationTokenHash(String verificationTokenHash) {
+    this.verificationTokenHash = verificationTokenHash;
+  }
+
+  public Instant getVerificationTokenExpiresAt() {
+    return verificationTokenExpiresAt;
+  }
+
+  public void setVerificationTokenExpiresAt(Instant verificationTokenExpiresAt) {
+    this.verificationTokenExpiresAt = verificationTokenExpiresAt;
+  }
+
+  /** Replaces any outstanding verification token; the account stays (or becomes) PENDING. */
+  public void issueVerificationToken(String tokenHash, Instant expiresAt) {
+    this.status = UserStatus.PENDING;
+    this.verificationTokenHash = Objects.requireNonNull(tokenHash);
+    this.verificationTokenExpiresAt = Objects.requireNonNull(expiresAt);
+  }
+
+  public void markVerified() {
+    this.status = UserStatus.ACTIVE;
+    this.verificationTokenHash = null;
+    this.verificationTokenExpiresAt = null;
   }
 
   @Override

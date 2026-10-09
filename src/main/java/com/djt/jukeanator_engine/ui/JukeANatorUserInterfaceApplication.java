@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import com.djt.jukeanator_engine.config.AppProperties;
+import com.djt.jukeanator_engine.domain.email.config.EmailProperties;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
@@ -39,6 +40,7 @@ public class JukeANatorUserInterfaceApplication {
   private final FinancialLedgerService financialLedgerService;
   private final UserActivityService userActivityService;
   private final JukeANatorEventListener jukeANatorEventListener;
+  private final EmailProperties emailProperties;
 
   private JukeANatorFrame frame;
 
@@ -52,7 +54,8 @@ public class JukeANatorUserInterfaceApplication {
       LocationService locationService,
       FinancialLedgerService financialLedgerService,
       UserActivityService userActivityService,
-      JukeANatorEventListener jukeANatorEventListener) {
+      JukeANatorEventListener jukeANatorEventListener,
+      EmailProperties emailProperties) {
 
     this.jukeANatorUserInterfaceProperties = jukeANatorUserInterfaceProperties;
     this.appProperties = appProperties;
@@ -64,6 +67,7 @@ public class JukeANatorUserInterfaceApplication {
     this.financialLedgerService = financialLedgerService;
     this.userActivityService = userActivityService;
     this.jukeANatorEventListener = jukeANatorEventListener;
+    this.emailProperties = emailProperties;
   }
 
   public void launch() {
@@ -77,7 +81,8 @@ public class JukeANatorUserInterfaceApplication {
         locationService,
         financialLedgerService,
         userActivityService,
-        appProperties.getDataDir());
+        appProperties.getDataDir(),
+        emailProperties.getFinancialLedgerRecipients());
 
     this.jukeANatorEventListener.setFrame(frame);
     this.jukeANatorEventListener.setSongLibraryService(songLibraryService);
