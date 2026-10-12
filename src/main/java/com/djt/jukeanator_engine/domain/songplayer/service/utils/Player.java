@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.songplayer.service.utils;
 
+import java.util.function.Consumer;
 import com.djt.jukeanator_engine.domain.songplayer.dto.SongPlayerStatus;
 
 public interface Player {
@@ -35,4 +36,12 @@ public interface Player {
   void release();
 
   void setOnFinished(Runnable callback);
+
+  /**
+   * Registers a callback invoked with the song path when the player detects that the song broke
+   * playback after it started (e.g. it crashed, hung, or stalled the underlying player). Players
+   * that cannot detect this ignore the callback.
+   */
+  default void setOnPlaybackFailed(Consumer<String> callback) {
+  }
 }

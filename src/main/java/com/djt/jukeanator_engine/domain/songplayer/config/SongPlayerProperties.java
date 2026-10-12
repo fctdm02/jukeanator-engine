@@ -9,9 +9,11 @@ public class SongPlayerProperties {
 
   private String playerType = "vlc";
   private String winampExePath = "C:\\\\Program Files (x86)\\\\Winamp\\\\winamp.exe";
+  private int winampIpcTimeoutMs = 2000;
+  private int winampStallSeconds = 15;
   private int playerVolume = 100;
   private int masterVolume = 100;
-  
+
   // LINE IN MUSIC (MUTUALLY EXCLUSIVE TO BACKGROUND MUSIC), WILL BE ON WHEN NOTHING IN THE QUEUE
   private boolean enableLineInOnSilence = false; // mutually exclusive with enable-background-music
   private String preferredMixerName = "Line In";
@@ -31,6 +33,22 @@ public class SongPlayerProperties {
 
   public void setWinampExePath(String winampExePath) {
     this.winampExePath = winampExePath;
+  }
+
+  public int getWinampIpcTimeoutMs() {
+    return winampIpcTimeoutMs;
+  }
+
+  public void setWinampIpcTimeoutMs(int winampIpcTimeoutMs) {
+    this.winampIpcTimeoutMs = winampIpcTimeoutMs;
+  }
+
+  public int getWinampStallSeconds() {
+    return winampStallSeconds;
+  }
+
+  public void setWinampStallSeconds(int winampStallSeconds) {
+    this.winampStallSeconds = winampStallSeconds;
   }
 
   public int getPlayerVolume() {

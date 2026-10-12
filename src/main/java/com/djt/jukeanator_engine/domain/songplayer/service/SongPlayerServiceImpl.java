@@ -5,6 +5,8 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -33,6 +35,7 @@ import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackPausedEvent
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackShutdownEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStartedEvent;
 import com.djt.jukeanator_engine.domain.songplayer.event.SongPlaybackStoppedEvent;
+import com.djt.jukeanator_engine.domain.songplayer.exception.PlayerUnavailableException;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.Player;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.VideoVlcMediaPlayer;
 import com.djt.jukeanator_engine.domain.songplayer.service.utils.VlcMediaPlayer;
@@ -89,12 +92,26 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   private final Player player;
 
   /**
+   * Paths of songs that failed to play or broke playback (crashed, hung, or stalled the player)
+   * during this run; they are skipped when dequeued. Written from player threads.
+   */
+  private final Set<String> badSongPaths = ConcurrentHashMap.newKeySet();
+
+  /**
    * Everything below is confined to the queueExecutor thread, with the exception of
    * {@code queueLocked}, which is written from external callers (e.g. the hibernation timer on the
    * Swing EDT) and read on the queue executor thread, so it must be volatile.
    */
   private SongQueueEntryDto nowPlayingSong;
   private SongPlayerStatus songPlayerStatus;
+
+  /**
+   * A dequeued song that could not be started because the player was unavailable (e.g. Winamp
+   * could not be relaunched). It is retried before anything else is dequeued, so a player outage
+   * does not drain the queue.
+   */
+  private SongQueueEntryDto pendingRetrySong;
+  private int pendingRetryAttempts;
 
   /**
    * When {@code true}, {@link #processQueue()} will not dequeue or start any new song. Set via
@@ -143,6 +160,19 @@ public class SongPlayerServiceImpl implements SongPlayerService {
      * thread.
      */
     this.player.setOnFinished(this::submitQueueProcessing);
+    this.player.setOnPlaybackFailed(this::markSongBad);
+  }
+
+  /**
+   * Remembers a song that broke playback so it is skipped for the rest of this run, instead of
+   * being able to repeatedly crash or hang the player (e.g. a corrupt background music file).
+   */
+  private void markSongBad(String songPath) {
+
+    if (songPath != null && badSongPaths.add(songPath)) {
+      log.error("Song broke playback and will be skipped until the application restarts: {}",
+          songPath);
+    }
   }
 
   /**
@@ -158,7 +188,9 @@ public class SongPlayerServiceImpl implements SongPlayerService {
     if (configuredPlayerType.equals("winamp") && osType == OSType.WINDOWS) {
 
       String winampPath = songPlayerProperties.getWinampExePath();
-      return new WinampMediaPlayer(winampPath, this.playerVolume);
+      return new WinampMediaPlayer(winampPath, this.playerVolume,
+          songPlayerProperties.getWinampIpcTimeoutMs(),
+          songPlayerProperties.getWinampStallSeconds());
     }
 
     try {
@@ -182,7 +214,9 @@ public class SongPlayerServiceImpl implements SongPlayerService {
       log.warn("Unable to initialize VLC (player-type: {}); falling back to Winamp at {}",
           configuredPlayerType, winampPath, vlcError);
 
-      Player winampPlayer = new WinampMediaPlayer(winampPath, this.playerVolume);
+      Player winampPlayer = new WinampMediaPlayer(winampPath, this.playerVolume,
+          songPlayerProperties.getWinampIpcTimeoutMs(),
+          songPlayerProperties.getWinampStallSeconds());
 
       songPlayerProperties.setPlayerType("winamp");
       songPlayerProperties.setWinampExePath(winampPath);
@@ -400,7 +434,11 @@ public class SongPlayerServiceImpl implements SongPlayerService {
        * Ask the queue service for the next song. The queue service owns: - queue mutation - queue
        * persistence - queue events
        */
-      SongQueueEntryDto nextSong = songQueueService.dequeueNextSong();
+      SongQueueEntryDto nextSong = pendingRetrySong;
+      pendingRetrySong = null;
+      if (nextSong == null) {
+        nextSong = dequeueNextPlayableSong();
+      }
       if (nextSong == null) {
 
         nowPlayingSong = null;
@@ -409,14 +447,56 @@ public class SongPlayerServiceImpl implements SongPlayerService {
         return;
       }
 
-      nowPlayingSong = nextSong;
       String songPath = nextSong.songPath();
       log.info("Playing song: {}", songPath);
-      player.playSongMedia(songPath);
+      boolean started;
+      try {
+        started = player.playSongMedia(songPath);
+      } catch (PlayerUnavailableException e) {
+
+        // Not the song's fault: keep it and retry it on the next pass (the watchdog re-runs this
+        // every few seconds). Logged sparingly, since an outage can last a long time.
+        nowPlayingSong = null;
+        pendingRetrySong = nextSong;
+        pendingRetryAttempts++;
+        if (pendingRetryAttempts == 1 || pendingRetryAttempts % 100 == 0) {
+          log.error("Player unavailable (attempt {}); will retry {}", pendingRetryAttempts,
+              songPath, e);
+        }
+        return;
+      } catch (RuntimeException e) {
+
+        log.error("Unable to play song; skipping it: {}", songPath, e);
+        started = false;
+      }
+      pendingRetryAttempts = 0;
+
+      if (!started) {
+        // Leave nowPlayingSong null so the failed song is not recorded in playback history; the
+        // watchdog moves on to the next song.
+        markSongBad(songPath);
+        nowPlayingSong = null;
+        return;
+      }
+
+      nowPlayingSong = nextSong;
       eventPublisher.publishEvent(new SongPlaybackStartedEvent(nextSong));
 
     } catch (Exception e) {
       log.error("Queue processing failed", e);
     }
+  }
+
+  /**
+   * Dequeues the next song, discarding any that previously broke playback during this run.
+   */
+  private SongQueueEntryDto dequeueNextPlayableSong() {
+
+    SongQueueEntryDto nextSong = songQueueService.dequeueNextSong();
+    while (nextSong != null && badSongPaths.contains(nextSong.songPath())) {
+      log.warn("Skipping song that previously broke playback: {}", nextSong.songPath());
+      nextSong = songQueueService.dequeueNextSong();
+    }
+    return nextSong;
   }
 }
