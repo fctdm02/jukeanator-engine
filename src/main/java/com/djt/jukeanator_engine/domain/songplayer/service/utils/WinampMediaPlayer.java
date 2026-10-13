@@ -1,6 +1,8 @@
 package com.djt.jukeanator_engine.domain.songplayer.service.utils;
 
 import java.io.File;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -24,6 +26,8 @@ import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
 import com.sun.jna.platform.win32.BaseTSD.ULONG_PTR;
 import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.VerRsrc.VS_FIXEDFILEINFO;
+import com.sun.jna.platform.win32.VersionUtil;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.platform.win32.WinDef.LPARAM;
@@ -119,8 +123,12 @@ public class WinampMediaPlayer implements Player {
   // -----------------------------------------------------------------------
   // WM_WA_IPC command values (lParam)
   // -----------------------------------------------------------------------
-  private static final int IPC_PLAYFILE = 100; // sent via WM_COPYDATA — enqueues a file only;
-                                                // does NOT change playback state on its own
+  // Both are sent via WM_COPYDATA with a null-terminated path, and only enqueue the file; neither
+  // changes playback state on its own. IPC_PLAYFILEW (Winamp 5.3+) takes a UTF-16 path, so file
+  // names with accented/non-English characters survive; IPC_PLAYFILE takes an ANSI path and is
+  // only used for older Winamp versions.
+  private static final int IPC_PLAYFILE = 100;
+  private static final int IPC_PLAYFILEW = 1100;
   private static final int IPC_DELETE = 101; // clears Winamp's internal playlist
   private static final int IPC_STARTPLAY = 102; // starts playback — equivalent to pressing Play
   private static final int IPC_ISPLAYING = 104; // 0=stopped, 1=playing, 3=paused
@@ -131,6 +139,12 @@ public class WinampMediaPlayer implements Player {
   // Polling
   // -----------------------------------------------------------------------
   private static final long POLL_INTERVAL_MS = 750L;
+
+  /**
+   * The Windows ANSI code page (e.g. windows-1252), which Winamp versions before 5.3 expect paths
+   * in. {@code sun.jnu.encoding} reflects it regardless of {@code -Dfile.encoding}.
+   */
+  private static final Charset ANSI_CHARSET = ansiCharset();
 
   private static final int DEFAULT_IPC_TIMEOUT_MS = 2000;
   private static final int DEFAULT_STALL_SECONDS = 15;
@@ -187,6 +201,9 @@ public class WinampMediaPlayer implements Player {
   private final int ipcTimeoutMs;
   private final long stallMs;
 
+  /** Whether winamp.exe is 5.3+ and so takes Unicode paths; checked once, at startup. */
+  private final boolean supportsUnicodePaths;
+
   private final ScheduledExecutorService scheduler =
       Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "winamp-poll");
@@ -237,7 +254,7 @@ public class WinampMediaPlayer implements Player {
 
   /**
    * Win32 {@code COPYDATASTRUCT}, used to pass a file path to a running Winamp instance via
-   * {@code WM_COPYDATA} (see {@link #IPC_PLAYFILE}).
+   * {@code WM_COPYDATA} (see {@link #IPC_PLAYFILEW}).
    */
   public static class COPYDATASTRUCT extends Structure {
     public ULONG_PTR dwData;
@@ -289,6 +306,7 @@ public class WinampMediaPlayer implements Player {
 
     this.winampExePath = file.getPath();
     this.currentVolume = clampVolume(initialVolume);
+    this.supportsUnicodePaths = supportsUnicodePaths(file);
 
     try {
       // If winamp.exe is already running (e.g. left over from a previous app run), attach to
@@ -313,6 +331,40 @@ public class WinampMediaPlayer implements Player {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException("Interrupted while launching winamp.exe at startup", e);
+    }
+  }
+
+  private static Charset ansiCharset() {
+    try {
+      return Charset.forName(System.getProperty("sun.jnu.encoding", "windows-1252"));
+    } catch (RuntimeException e) {
+      return Charset.forName("windows-1252");
+    }
+  }
+
+  /**
+   * One-time check, at startup, of whether this winamp.exe understands {@link #IPC_PLAYFILEW}
+   * (Winamp 5.3 and later), based on the file version in its version resource. If the version
+   * cannot be read, a modern Winamp is assumed.
+   */
+  private static boolean supportsUnicodePaths(File winampExe) {
+    try {
+      VS_FIXEDFILEINFO info = VersionUtil.getFileVersionInfo(winampExe.getPath());
+      int major = info.getFileVersionMajor();
+      int minor = info.getFileVersionMinor();
+      if (major > 5 || (major == 5 && minor >= 3)) {
+        LOG.info("Winamp " + major + "." + minor + " detected at " + winampExe
+            + "; song paths are sent as Unicode (IPC_PLAYFILEW).");
+        return true;
+      }
+      LOG.severe("An old version of Winamp (" + major + "." + minor + ") was detected at "
+          + winampExe + ". Song files whose names contain accented or other non-English "
+          + "characters won't be playable. Install Winamp 5.3 or later to play them.");
+      return false;
+    } catch (RuntimeException e) {
+      LOG.log(Level.WARNING, "Unable to read the version of " + winampExe
+          + "; assuming Winamp 5.3 or later (Unicode song paths).", e);
+      return true;
     }
   }
 
@@ -405,7 +457,7 @@ public class WinampMediaPlayer implements Player {
    * <li>If Winamp is not running (e.g. the window was closed externally), relaunch it. Otherwise
    * reuse the already-running process — restarting it for every song was the slow part.</li>
    * <li>Clear the playlist via {@code IPC_DELETE} so only the requested song plays.</li>
-   * <li>Load and play the file via {@code WM_COPYDATA} / {@code IPC_PLAYFILE}.</li>
+   * <li>Load and play the file via {@code WM_COPYDATA} / {@code IPC_PLAYFILEW}.</li>
    * <li>Start polling.</li>
    * </ol>
    *
@@ -438,7 +490,7 @@ public class WinampMediaPlayer implements Player {
             "Winamp is not running and could not be relaunched; unable to play: " + songPath);
       }
 
-      // Clear the playlist, load the new file, then explicitly start playback — IPC_PLAYFILE
+      // Clear the playlist, load the new file, then explicitly start playback — IPC_PLAYFILEW
       // only enqueues the file and does not change Winamp's playback state on its own.
       sendIPC(hwnd, 0, IPC_DELETE);
       songLoaded = true;
@@ -708,11 +760,16 @@ public class WinampMediaPlayer implements Player {
 
   /**
    * Loads {@code songPath} into the given (already-running) Winamp instance's playlist via
-   * {@code WM_COPYDATA} / {@code IPC_PLAYFILE}. This only enqueues the file — it does not start
+   * {@code WM_COPYDATA} / {@code IPC_PLAYFILEW}. This only enqueues the file — it does not start
    * playback, so callers must follow up with {@code IPC_STARTPLAY}.
    */
   private void sendPlayFile(HWND hwnd, String songPath) {
-    byte[] pathBytes = (songPath + "\0").getBytes();
+    // Never the JVM's default charset: with -Dfile.encoding=UTF-8, an 'ö' became two bytes and
+    // Winamp could not find the file. UTF-16LE is Windows' wchar_t encoding; old Winamp versions
+    // only take the system ANSI code page.
+    int ipc = supportsUnicodePaths ? IPC_PLAYFILEW : IPC_PLAYFILE;
+    byte[] pathBytes = (songPath + "\0")
+        .getBytes(supportsUnicodePaths ? StandardCharsets.UTF_16LE : ANSI_CHARSET);
 
     // Windows copies WM_COPYDATA data into Winamp's address space when the message is sent, so it
     // is safe to free the native memory as soon as the call returns (even on a timeout).
@@ -720,7 +777,7 @@ public class WinampMediaPlayer implements Player {
       mem.write(0, pathBytes, 0, pathBytes.length);
 
       COPYDATASTRUCT cds = new COPYDATASTRUCT();
-      cds.dwData = new ULONG_PTR(IPC_PLAYFILE);
+      cds.dwData = new ULONG_PTR(ipc);
       cds.cbData = pathBytes.length;
       cds.lpData = mem;
 
@@ -728,7 +785,7 @@ public class WinampMediaPlayer implements Player {
       LRESULT ok = User32Ex.INSTANCE.SendMessageTimeout(hwnd, WM_COPYDATA, new WPARAM(0), cds,
           SMTO_BLOCK | SMTO_ABORTIFHUNG, ipcTimeoutMs, result);
       if (ok.longValue() == 0) {
-        handleFailedSend(hwnd, "IPC_PLAYFILE");
+        handleFailedSend(hwnd, supportsUnicodePaths ? "IPC_PLAYFILEW" : "IPC_PLAYFILE");
       }
     }
   }

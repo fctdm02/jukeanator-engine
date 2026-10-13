@@ -389,11 +389,13 @@ public class SongQueueServiceImpl
       return requireGateway(locationId).sendCommand(locationId, "getHighestPriority", null,
           Integer.class);
     }
-    List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
-    if (songs.isEmpty()) {
-      return Integer.valueOf(2);
+    synchronized (this) {
+      List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
+      if (songs.isEmpty()) {
+        return Integer.valueOf(2);
+      }
+      return Integer.valueOf(songs.getFirst().getPriority().intValue() + 1);
     }
-    return Integer.valueOf(songs.getFirst().getPriority().intValue() + 1);
   }
 
   @Override
@@ -402,7 +404,11 @@ public class SongQueueServiceImpl
       return requireGateway(locationId).sendCommand(locationId, "getQueuedSongs", null,
           new TypeReference<List<SongQueueEntryDto>>() {});
     }
-    return SongQueueMapper.toDto(songQueueRoot.getSongs());
+    // The queue is a plain ArrayList mutated under this monitor (e.g. dequeueNextSong() on the
+    // song-queue thread); copying it without the monitor throws ConcurrentModificationException.
+    synchronized (this) {
+      return SongQueueMapper.toDto(songQueueRoot.getSongs());
+    }
   }
 
   @Override
@@ -791,10 +797,14 @@ public class SongQueueServiceImpl
       return requireGateway(locationId).sendCommand(locationId, "randomizeQueue", null,
           Integer.class);
     }
-    Integer numSongsRandomized = songQueueRoot.randomizeQueue();
-    songQueueRepository.storeAggregateRoot(songQueueRoot);
-    eventPublisher
-        .publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
+    Integer numSongsRandomized;
+    List<SongQueueEntryDto> queuedSongs;
+    synchronized (this) {
+      numSongsRandomized = songQueueRoot.randomizeQueue();
+      songQueueRepository.storeAggregateRoot(songQueueRoot);
+      queuedSongs = SongQueueMapper.toDto(songQueueRoot.getSongs());
+    }
+    eventPublisher.publishEvent(new SongQueueChangedEvent(queuedSongs));
     return numSongsRandomized;
   }
 
@@ -817,11 +827,16 @@ public class SongQueueServiceImpl
           int preferredIndex = changeSongQueueRequest.queuePosition() != null
               ? changeSongQueueRequest.queuePosition()
               : -1;
-          numSongsInQueue = songQueueRoot.moveSongUpInQueue(song, preferredIndex);
-          if (numSongsInQueue.intValue() > 0) {
-            songQueueRepository.storeAggregateRoot(songQueueRoot);
-            eventPublisher.publishEvent(
-                new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
+          List<SongQueueEntryDto> queuedSongs = null;
+          synchronized (this) {
+            numSongsInQueue = songQueueRoot.moveSongUpInQueue(song, preferredIndex);
+            if (numSongsInQueue.intValue() > 0) {
+              songQueueRepository.storeAggregateRoot(songQueueRoot);
+              queuedSongs = SongQueueMapper.toDto(songQueueRoot.getSongs());
+            }
+          }
+          if (queuedSongs != null) {
+            eventPublisher.publishEvent(new SongQueueChangedEvent(queuedSongs));
           }
         } else {
           throw new ResourceNotFoundException("Could not add move song up in queue, albumId: "
@@ -857,11 +872,16 @@ public class SongQueueServiceImpl
           int preferredIndex = changeSongQueueRequest.queuePosition() != null
               ? changeSongQueueRequest.queuePosition()
               : -1;
-          numSongsInQueue = songQueueRoot.moveSongDownInQueue(song, preferredIndex);
-          if (numSongsInQueue.intValue() > 0) {
-            songQueueRepository.storeAggregateRoot(songQueueRoot);
-            eventPublisher.publishEvent(
-                new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
+          List<SongQueueEntryDto> queuedSongs = null;
+          synchronized (this) {
+            numSongsInQueue = songQueueRoot.moveSongDownInQueue(song, preferredIndex);
+            if (numSongsInQueue.intValue() > 0) {
+              songQueueRepository.storeAggregateRoot(songQueueRoot);
+              queuedSongs = SongQueueMapper.toDto(songQueueRoot.getSongs());
+            }
+          }
+          if (queuedSongs != null) {
+            eventPublisher.publishEvent(new SongQueueChangedEvent(queuedSongs));
           }
         } else {
           throw new ResourceNotFoundException("Could not add move song down in queue, albumId: "
