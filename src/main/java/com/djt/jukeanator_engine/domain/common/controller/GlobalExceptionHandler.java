@@ -170,7 +170,14 @@ public class GlobalExceptionHandler {
                 status = resolved;
             }
         }
-        if (status.is5xxServerError()) {
+        if (response.isCommitted()) {
+            // The response was already streaming (typically a SockJS xhr_streaming client that
+            // disconnected, surfacing through Tomcat's async error dispatch). This is routine, and
+            // no error body can be sent, so log one line rather than an ERROR stack trace.
+            log.warn("[{}] {} {} — {} on already-committed response (client likely disconnected): {}",
+                    status.value(), request.getMethod(), request.getRequestURI(),
+                    ex.getClass().getSimpleName(), ex.getMessage());
+        } else if (status.is5xxServerError()) {
             logUnexpected(ex, request);
         } else {
             logExpected(status, ex, request);
@@ -199,10 +206,14 @@ public class GlobalExceptionHandler {
     // treat that as a fixed "preset" type and refuse to write Jackson/ApiError into it even if the
     // ResponseEntity requests application/json, throwing HttpMessageNotWritableException and
     // masking the real error. Resetting the response before writing clears any such stale header.
+    // A committed response (e.g. a SockJS xhr_streaming connection that dropped mid-stream) has
+    // already sent its status and headers, and may already be using getOutputStream(), so
+    // getWriter() would throw IllegalStateException. Nothing more can reach the client; skip the body.
     private void write(HttpStatus status, Exception ex, HttpServletResponse response) throws IOException {
-        if (!response.isCommitted()) {
-            response.reset();
+        if (response.isCommitted()) {
+            return;
         }
+        response.reset();
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         ApiError error = new ApiError(
