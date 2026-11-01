@@ -70,6 +70,7 @@ public class LoginToAdminPanelCard extends JPanel {
   private final SongLibraryService songLibraryService;
   private final Runnable onSuccess;
   private final Runnable onDismiss;
+  private final KeyboardPanel keyboardPanel;
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -96,7 +97,7 @@ public class LoginToAdminPanelCard extends JPanel {
     center.add(buildCredentialPanel());
 
     // ── Keyboard ──────────────────────────────────────────────────────────
-    KeyboardPanel keyboard = new KeyboardPanel(new KeyboardPanel.KeyboardListener() {
+    keyboardPanel = new KeyboardPanel(new KeyboardPanel.KeyboardListener() {
       @Override
       public void onCharacter(String ch) {
         activeBuffer().append(ch);
@@ -127,7 +128,7 @@ public class LoginToAdminPanelCard extends JPanel {
     });
 
     add(center, BorderLayout.CENTER);
-    add(keyboard, BorderLayout.SOUTH);
+    add(keyboardPanel, BorderLayout.SOUTH);
 
     // ── Countdown timer ───────────────────────────────────────────────────
     countdownTimer = new Timer(1000, e -> {
@@ -421,10 +422,13 @@ public class LoginToAdminPanelCard extends JPanel {
         onSuccess.run();
       } else {
         errorLabel.setText("Invalid credentials. Please try again.");
-        // Clear password field on failure, keep username
+        // Bad userid, bad password, or both — clear both fields, reset the
+        // keyboard to its default state, and send focus back to username.
+        usernameBuffer.setLength(0);
         passwordBuffer.setLength(0);
         syncLabels();
-        activeField = ActiveField.PASSWORD;
+        keyboardPanel.resetMode();
+        activeField = ActiveField.USERNAME;
         refreshFieldBorders();
       }
     } catch (Exception ex) {
