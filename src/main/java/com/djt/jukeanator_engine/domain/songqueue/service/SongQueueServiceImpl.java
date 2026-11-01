@@ -66,6 +66,16 @@ public class SongQueueServiceImpl
 
   private static final Logger log = LoggerFactory.getLogger(SongQueueServiceImpl.class);
 
+  /**
+   * Patrons at this location repeatedly "troll" the jukebox by queuing as much Creed as possible.
+   * Rather than lowering {@code minimum-minutes-between-song-plays} and
+   * {@code maximum-consecutive-song-plays-by-artist} for every artist, Creed specifically gets
+   * twice the wait and half the consecutive plays.
+   */
+  private static final String CREED_ARTIST_NAME = "Creed";
+  private static final int CREED_MINUTES_BETWEEN_PLAYS_MULTIPLIER = 2;
+  private static final int CREED_MAX_CONSECUTIVE_PLAYS_DIVISOR = 2;
+
   private final ApplicationEventPublisher eventPublisher;
   private final SongLibraryService songLibraryService;
   private final BackgroundMusicService backgroundMusicService;
@@ -150,8 +160,12 @@ public class SongQueueServiceImpl
     this.allowExplicitSongsAtAllTimes = songQueueProperties.isAllowExplicitSongsAtAllTimes();
     this.allowExplicitSongsBegin = songQueueProperties.getAllowExplicitSongsBegin();
     this.allowExplicitSongsEnd = songQueueProperties.getAllowExplicitSongsEnd();
+    // Retain plays for as long as the longest effective wait needs (Creed's, doubled) -- Rule A
+    // below still enforces the normal, shorter wait for every other artist against this history.
     this.recentSongPlays = new RecentSongPlays(
-        Duration.ofMinutes(this.minimumMinutesBetweenSongPlays), recentSongPlaysFile);
+        Duration.ofMinutes((long) this.minimumMinutesBetweenSongPlays
+            * CREED_MINUTES_BETWEEN_PLAYS_MULTIPLIER),
+        recentSongPlaysFile);
 
     initialize();
   }
@@ -448,11 +462,23 @@ public class SongQueueServiceImpl
 
       Optional<Instant> lastPlayed = recentSongPlays.lastPlayedWithinWindow(targetSong, now);
       if (lastPlayed.isPresent()) {
-        long secondsRemaining = Duration.ofMinutes(minimumMinutesBetweenSongPlays)
-            .minus(Duration.between(lastPlayed.get(), now)).toSeconds();
-        long minutesRemaining = Math.max(1, (secondsRemaining + 59) / 60);
-        return "has already been played in the last " + minimumMinutesBetweenSongPlays
-            + " min. Try again in " + minutesRemaining + " min";
+        int effectiveMinutesBetweenSongPlays = isCreed(targetSong.getArtistName())
+            ? minimumMinutesBetweenSongPlays * CREED_MINUTES_BETWEEN_PLAYS_MULTIPLIER
+            : minimumMinutesBetweenSongPlays;
+        Duration elapsedSincePlayed = Duration.between(lastPlayed.get(), now);
+        if (elapsedSincePlayed.compareTo(Duration.ofMinutes(effectiveMinutesBetweenSongPlays)) < 0) {
+          long secondsRemaining = Duration.ofMinutes(effectiveMinutesBetweenSongPlays)
+              .minus(elapsedSincePlayed).toSeconds();
+          long minutesRemaining = Math.max(1, (secondsRemaining + 59) / 60);
+          if (isCreed(targetSong.getArtistName())) {
+            log.info(
+                "Creed override triggered (Rule A): '{}' blocked with doubled wait of {} min, "
+                    + "try again in {} min",
+                targetSong.getSongName(), effectiveMinutesBetweenSongPlays, minutesRemaining);
+          }
+          return "has already been played in the last " + effectiveMinutesBetweenSongPlays
+              + " min. Try again in " + minutesRemaining + " min";
+        }
       }
 
 
@@ -505,7 +531,17 @@ public class SongQueueServiceImpl
           lastArtist = currentArtist;
         }
 
-        if (consecutiveCount > maximumConsecutiveSongPlaysByArtist) {
+        int effectiveMaxConsecutiveSongPlaysByArtist = isCreed(currentArtist)
+            ? Math.max(1, maximumConsecutiveSongPlaysByArtist / CREED_MAX_CONSECUTIVE_PLAYS_DIVISOR)
+            : maximumConsecutiveSongPlaysByArtist;
+
+        if (consecutiveCount > effectiveMaxConsecutiveSongPlaysByArtist) {
+          if (isCreed(currentArtist)) {
+            log.info(
+                "Creed override triggered (Rule B): blocked after {} consecutive plays, "
+                    + "halved max is {}",
+                consecutiveCount, effectiveMaxConsecutiveSongPlaysByArtist);
+          }
           return "the consecutive play count for '" + currentArtist + "' has been exceeded";
         }
       }
@@ -636,6 +672,10 @@ public class SongQueueServiceImpl
     } catch (RuntimeException e) {
       return null;
     }
+  }
+
+  private static boolean isCreed(String artistName) {
+    return CREED_ARTIST_NAME.equalsIgnoreCase(artistName);
   }
 
   /** Phrased for the patron the same way the web UI's Multi-Select Mode phrases a reason. */
