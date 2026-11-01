@@ -321,9 +321,17 @@ public class KeyboardPanel extends JPanel {
         int h = getHeight();
         int arc = 7;
 
-        // Reserve bottom pixels for the shadow; the visible key sits in [0, visH)
-        int shadowH = 4;
+        boolean pressed = getModel().isArmed();
+
+        // Reserve bottom pixels for the shadow; the visible key sits in [0, visH).
+        // A pressed key sinks toward the shelf, so its drop-shadow shrinks.
+        int shadowH = pressed ? 1 : 4;
         int visH = h - shadowH;
+
+        // A pressed key visually sinks a couple of pixels into its housing, which
+        // is what makes the "button down" state read clearly to a touchscreen user.
+        int pressDrop = pressed ? 2 : 0;
+        g2.translate(0, pressDrop);
 
         // ── Drop-shadow slab ──────────────────────────────────────────────
         g2.setColor(ColorTheme.get().keyShadow);
@@ -337,7 +345,6 @@ public class KeyboardPanel extends JPanel {
         g2.fillRoundRect(1, faceH, w - 2, shelfH + arc / 2, arc, arc);
 
         // ── Face gradient ─────────────────────────────────────────────────
-        boolean pressed = getModel().isArmed();
         Color fTop = pressed ? ColorTheme.get().keyFaceBottom : ColorTheme.get().keyFaceTop;
         Color fMid = ColorTheme.get().keyFaceMid;
         Color fBot = pressed ? ColorTheme.get().keyFaceTop : ColorTheme.get().keyFaceBottom;
@@ -345,10 +352,12 @@ public class KeyboardPanel extends JPanel {
             new Color[] {fTop, fMid, fBot}));
         g2.fillRoundRect(1, 0, w - 2, faceH + arc / 2, arc, arc);
 
-        // ── Specular top-edge highlight ────────────────────────────────────
-        g2.setColor(ColorTheme.get().keyHighlight);
-        g2.setStroke(new java.awt.BasicStroke(1.2f));
-        g2.drawLine(arc, 1, w - arc - 1, 1);
+        // ── Specular top-edge highlight — a sunken key doesn't catch the light ──
+        if (!pressed) {
+          g2.setColor(ColorTheme.get().keyHighlight);
+          g2.setStroke(new java.awt.BasicStroke(1.2f));
+          g2.drawLine(arc, 1, w - arc - 1, 1);
+        }
 
         // ── Side-edge sheens ──────────────────────────────────────────────
         g2.setColor(ColorTheme.get().keySide);
