@@ -10,10 +10,15 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.LinearGradientPaint;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.geom.Point2D;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -21,11 +26,15 @@ import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
+import javax.swing.JViewport;
+import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongPlayHistoryEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
@@ -97,8 +106,24 @@ public class QueuePanel extends JPanel {
   // applied optimistically before the authoritative server round-trip arrives.
   private final List<SongQueueEntryDto> displayedQueue = new ArrayList<>();
   private JPanel queueRowsPanel;
+  private JScrollPane queueRowsScroll;
+  /** Holds the column-name header row, which is rebuilt when switching queue/history views. */
+  private JPanel columnHeaderHolder;
+
+  // ── "Show History" view ───────────────────────────────────────────────────
+  /** Start times in the history view, e.g. "9:30PM". */
+  private static final DateTimeFormatter HISTORY_TIME_FORMAT =
+      DateTimeFormatter.ofPattern("h:mma", Locale.US).withZone(ZoneId.systemDefault());
+
+  private ToggleSwitch historyToggle;
+  /** {@code true} while the table shows play history instead of the queue. Defaults off. */
+  private volatile boolean showingHistory = false; // read by setQueue() off the EDT
+  /** Latest play-history snapshot (newest first), fetched while {@link #showingHistory} is on. */
+  private List<SongPlayHistoryEntryDto> history = List.of();
 
   // ── Action buttons ────────────────────────────────────────────────────────
+  /** Move/Remove button area — hidden in the history view, where it does not apply. */
+  private JPanel actionArea;
   private JButton moveUpButton;
   private JButton moveDownButton;
   private JButton removeButton;
@@ -139,24 +164,84 @@ public class QueuePanel extends JPanel {
    */
   public void setQueue(List<SongQueueEntryDto> queue) {
     this.queue = queue;
-    SwingUtilities.invokeLater(this::rebuildQueueRows);
+    if (showingHistory) {
+      // A dequeue publishes SongQueueChangedEvent too, so this is also when history grows.
+      refreshHistory(true);
+    } else {
+      SwingUtilities.invokeLater(() -> rebuildRows(true));
+    }
   }
 
-  /** Called by the tab {@code ChangeListener} whenever this tab is selected. Refreshes the queue list. */
+  /** Called by the tab {@code ChangeListener} whenever this tab is selected. Refreshes the list. */
   public void onShown() {
-    rebuildQueueRows();
+    if (showingHistory) {
+      refreshHistory(true);
+    } else {
+      rebuildRows(true);
+    }
     requestFocusInWindow();
   }
 
   /**
-   * Resets the Queue tab to its default view: clears the current row selection and refreshes the
-   * queue list. Called after 10 minutes of inactivity, as part of resetting every tab to its
-   * default state.
+   * Resets the Queue tab to its default view: turns "Show History" off, clears the current row
+   * selection and refreshes the queue list. Called after 10 minutes of inactivity, as part of
+   * resetting every tab to its default state.
    */
   public void resetToDefaultView() {
-    selectedIndex = -1;
-    rebuildQueueRows();
+    if (historyToggle != null) {
+      historyToggle.setOn(false);
+    }
+    applyHistoryMode(false);
     requestFocusInWindow();
+  }
+
+  // ── Queue / history view switching ─────────────────────────────────────────
+
+  /** "Show History" toggle listener (and reset path): swaps the table between queue and history. */
+  private void applyHistoryMode(boolean on) {
+    showingHistory = on;
+    selectedIndex = -1;
+
+    columnHeaderHolder.removeAll();
+    columnHeaderHolder.add(buildColumnHeaderPanel(on), BorderLayout.CENTER);
+    columnHeaderHolder.revalidate();
+    columnHeaderHolder.repaint();
+
+    actionArea.setVisible(!on);
+
+    if (on) {
+      history = List.of();
+      rebuildRows(false); // clear the queue rows right away; history fills in when fetched
+      refreshHistory(false);
+    } else {
+      rebuildRows(false);
+    }
+  }
+
+  /**
+   * Fetches the play history off the EDT, then rebuilds the rows with it.
+   *
+   * @param keepScroll keep the current scroll position (a live refresh) rather than jumping to the
+   *        top (a fresh switch into the history view)
+   */
+  private void refreshHistory(boolean keepScroll) {
+    SwingSecurityUtil.runAsync(() -> {
+      List<SongPlayHistoryEntryDto> fetched;
+      try {
+        fetched = songQueueService.getSongPlayHistory();
+      } catch (Exception ex) {
+        ex.printStackTrace();
+        return;
+      }
+      SwingUtilities.invokeLater(() -> {
+        // Toggled back off while the fetch was in flight — the queue view owns the rows now.
+        if (!showingHistory) {
+          return;
+        }
+        history = fetched;
+        rebuildRows(keepScroll);
+      });
+    });
   }
 
   // ── Layout ────────────────────────────────────────────────────────────────
@@ -177,23 +262,42 @@ public class QueuePanel extends JPanel {
 
   /**
    * Builds the "Song Queue" header — same {@link DetailHeaderPanel} style as Home / Hot Here /
-   * Genre Details, with the priority legend (formerly its own "Queued Songs:" row) moved into the
-   * header's east slot. No back button and no artist/album/song subtitle — there's nothing to
-   * navigate back from and nothing meaningful to count here.
+   * Genre Details, with the "Show History" toggle and the priority legend (formerly its own
+   * "Queued Songs:" row) in the header's east slot. No back button and no artist/album/song
+   * subtitle — there's nothing to navigate back from and nothing meaningful to count here.
    */
   private DetailHeaderPanel buildHeaderPanel() {
     int iconSize = LayoutTheme.get().detailHeaderImageW;
     ImageIcon queueIcon = imageLoader.loadImage("Queue_Header_Image.png", iconSize, iconSize);
 
-    // BorderLayout.EAST stretches the legend panel to the header's full height, and its
-    // own FlowLayout then lays the row out starting from the top — pinning it level with
-    // the title instead of the (taller) image. Vertical glue above pushes the row down to
-    // sit level with the bottom of the header instead.
+    // "Show History:" label + toggle, styled exactly like the Home tab's "Legacy:" toggle,
+    // followed by the priority legend on the same row.
+    JPanel eastRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
+    eastRow.setOpaque(false);
+
+    JLabel historyLabel = new JLabel("Show History: ");
+    historyLabel.setForeground(ColorTheme.get().textPrimary);
+    historyLabel
+        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeSortLabel));
+    eastRow.add(historyLabel);
+
+    historyToggle = new ToggleSwitch(false);
+    historyToggle.setName(UiComponentNames.QUEUE_HISTORY_TOGGLE);
+    historyToggle.setToggleListener(this::applyHistoryMode);
+    eastRow.add(historyToggle);
+
+    eastRow.add(Box.createHorizontalStrut(14));
+    eastRow.add(SongTrackCellRenderer.buildPriorityLegend());
+
+    // BorderLayout.EAST stretches the east panel to the header's full height, and the row's
+    // own FlowLayout then lays it out starting from the top — pinning it level with the title
+    // instead of the (taller) image. Vertical glue above pushes the row down to sit level with
+    // the bottom of the header instead.
     JPanel legendWrapper = new JPanel();
     legendWrapper.setOpaque(false);
     legendWrapper.setLayout(new BoxLayout(legendWrapper, BoxLayout.Y_AXIS));
     legendWrapper.add(Box.createVerticalGlue());
-    legendWrapper.add(SongTrackCellRenderer.buildPriorityLegend());
+    legendWrapper.add(eastRow);
 
     DetailHeaderPanel header = new DetailHeaderPanel(null, null, queueIcon, "♫", "Song Queue", null,
         legendWrapper, ColorTheme.get().frameTabAccentQueue);
@@ -219,7 +323,10 @@ public class QueuePanel extends JPanel {
 
     JPanel wrapper = new JPanel(new BorderLayout());
     wrapper.setOpaque(false);
-    wrapper.add(buildColumnHeaderPanel(), BorderLayout.NORTH);
+    columnHeaderHolder = new JPanel(new BorderLayout());
+    columnHeaderHolder.setOpaque(false);
+    columnHeaderHolder.add(buildColumnHeaderPanel(false), BorderLayout.CENTER);
+    wrapper.add(columnHeaderHolder, BorderLayout.NORTH);
 
     // Rounded gradient card backdrop — identical paint to AlbumViewCard's track-list body,
     // so the queue list reads exactly like the album track listing.
@@ -240,29 +347,81 @@ public class QueuePanel extends JPanel {
     };
     body.setOpaque(false);
 
-    queueRowsPanel = new JPanel();
+    queueRowsPanel = new RowsPanel();
     queueRowsPanel.setOpaque(false);
     queueRowsPanel.setLayout(new BoxLayout(queueRowsPanel, BoxLayout.Y_AXIS));
     queueRowsPanel.setBorder(new EmptyBorder(4, 0, 4, 0));
-    body.add(queueRowsPanel, BorderLayout.CENTER);
+
+    // Scrolls only in the history view — the queue never holds more than songQueueMaxVisible
+    // rows, so no scroll bar appears there and it looks exactly as before. Transparent so the
+    // gradient card above shows through.
+    queueRowsScroll = new JScrollPane(queueRowsPanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+        JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+    queueRowsScroll.setOpaque(false);
+    queueRowsScroll.getViewport().setOpaque(false);
+    queueRowsScroll.setBorder(null);
+    queueRowsScroll.getVerticalScrollBar().setUnitIncrement(LayoutTheme.get().albumViewRowH);
+    // Touch screens need a much wider, easier-to-grab scroll bar than the look and feel's
+    // mouse-sized default (same as LegacyAlbumGridPanel's track list).
+    queueRowsScroll.getVerticalScrollBar().setUI(new TouchScrollBarUI());
+    body.add(queueRowsScroll, BorderLayout.CENTER);
 
     wrapper.add(body, BorderLayout.CENTER);
 
     // Populate rows (up to songQueueMaxVisible entries)
-    rebuildQueueRows();
+    rebuildRows(false);
 
     section.add(wrapper, BorderLayout.CENTER);
-    section.add(buildActionArea(), BorderLayout.SOUTH);
+    actionArea = buildActionArea();
+    section.add(actionArea, BorderLayout.SOUTH);
 
     return section;
   }
 
   /**
+   * The rows container inside {@link #queueRowsScroll}. Rows ask for {@code Integer.MAX_VALUE}
+   * width, so it must track the viewport's width (or it would scroll sideways), and it fills the
+   * viewport's height when the rows are shorter than it, as it did before the scroll pane existed.
+   */
+  private static final class RowsPanel extends JPanel implements Scrollable {
+
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public Dimension getPreferredScrollableViewportSize() {
+      return getPreferredSize();
+    }
+
+    @Override
+    public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+      return LayoutTheme.get().albumViewRowH;
+    }
+
+    @Override
+    public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+      return Math.max(visibleRect.height - LayoutTheme.get().albumViewRowH,
+          LayoutTheme.get().albumViewRowH);
+    }
+
+    @Override
+    public boolean getScrollableTracksViewportWidth() {
+      return true;
+    }
+
+    @Override
+    public boolean getScrollableTracksViewportHeight() {
+      return getParent() instanceof JViewport viewport
+          && viewport.getHeight() > getPreferredSize().height;
+    }
+  }
+
+  /**
    * Builds the column-name header row above the queue rows — same layout and style as
    * {@code AlbumViewCard}'s track-list header, using the "Artist" / "Song" compilation columns
-   * since queue entries typically span multiple artists/albums.
+   * since queue entries typically span multiple artists/albums. The history view adds a "Time"
+   * column to the left of "Plays".
    */
-  private JPanel buildColumnHeaderPanel() {
+  private JPanel buildColumnHeaderPanel(boolean history) {
     JPanel headerPanel = new JPanel(new BorderLayout(10, 0));
     headerPanel.setBackground(Color.BLACK);
     headerPanel.setBorder(new EmptyBorder(8, 16, 8, 16));
@@ -312,21 +471,43 @@ public class QueuePanel extends JPanel {
     headerCenterCluster.add(textCluster, BorderLayout.WEST);
     headerCenterCluster.add(Box.createHorizontalGlue(), BorderLayout.CENTER);
 
-    headerPanel.add(headerLeftCluster, BorderLayout.WEST);
+    if (history) {
+      JLabel timeHeaderLabel = new JLabel("Time");
+      timeHeaderLabel.setForeground(TEXT_SECONDARY);
+      timeHeaderLabel
+          .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
+      timeHeaderLabel
+          .setPreferredSize(new Dimension(LayoutTheme.get().songQueueHistoryTimeColW, 30));
+      timeHeaderLabel.setHorizontalAlignment(SwingConstants.LEFT);
+
+      JPanel timeAndLeft = new JPanel(new BorderLayout(6, 0));
+      timeAndLeft.setOpaque(false);
+      timeAndLeft.add(timeHeaderLabel, BorderLayout.WEST);
+      timeAndLeft.add(headerLeftCluster, BorderLayout.CENTER);
+      headerPanel.add(timeAndLeft, BorderLayout.WEST);
+    } else {
+      headerPanel.add(headerLeftCluster, BorderLayout.WEST);
+    }
     headerPanel.add(headerCenterCluster, BorderLayout.CENTER);
 
     return headerPanel;
   }
 
   /**
-   * Builds a single queue row — same layout, sizing, and popularity-bar widget as
-   * {@code AlbumViewCard.buildTrackRow}'s compilation-album branch (Plays | queue-position |
-   * Artist | Song). The song-name colour is tinted by queue priority (as before), and switches to
-   * the accent colour when the row is the current selection for the move/remove buttons.
+   * Builds a single queue or history row — same layout, sizing, and popularity-bar widget as
+   * {@code AlbumViewCard.buildTrackRow}'s compilation-album branch ([Time] | Plays | Track |
+   * Artist | Song). Track, Artist and Song share one font and are all tinted by the entry's queue
+   * priority (matching the legend), switching to the accent colour when the row is the current
+   * selection for the move/remove buttons.
+   *
+   * @param timeText start time shown in the leading "Time" column (history view), or
+   *        {@code null} for a queue row, which has no such column
+   * @param selectable whether the row can be clicked to select it for the move/remove buttons
    */
-  private JPanel buildQueueRow(SongQueueEntryDto entry, int index) {
+  private JPanel buildRow(SongQueueEntryDto entry, int index, String timeText,
+      boolean selectable) {
     JPanel row = new JPanel(new BorderLayout(10, 0));
-    row.setName(UiComponentNames.QUEUE_ROW);
+    row.setName(selectable ? UiComponentNames.QUEUE_ROW : UiComponentNames.QUEUE_HISTORY_ROW);
     row.setOpaque(false);
     int padV = LayoutTheme.get().albumViewRowPadV;
     row.setBorder(new EmptyBorder(padV, 16, padV, 16));
@@ -335,7 +516,13 @@ public class QueuePanel extends JPanel {
     row.setPreferredSize(rowSize);
     row.setMinimumSize(new Dimension(0, LayoutTheme.get().albumViewRowH));
     row.setMaximumSize(rowSize);
-    row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    if (selectable) {
+      row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    }
+
+    boolean selected = selectable && index == selectedIndex;
+    Color textColor = selected ? ACCENT_BLUE : priorityColor(entry);
+    Font textFont = new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong);
 
     // ── Popularity bars (WEST) ────────────────────────────────────────────
     int plays = entry.song().numPlays() == null ? 0 : entry.song().numPlays();
@@ -350,8 +537,8 @@ public class QueuePanel extends JPanel {
     // ── Queue position ─────────────────────────────────────────────────────
     int trackNumber = entry.song().trackNumber();
     JLabel numLabel = new JLabel(String.format("%02d", trackNumber));
-    numLabel.setForeground(TEXT_SECONDARY);
-    numLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
+    numLabel.setForeground(textColor);
+    numLabel.setFont(textFont);
     numLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewTrkNumColW, 30));
     numLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
@@ -365,7 +552,22 @@ public class QueuePanel extends JPanel {
 
     left.add(barsAlignmentPanel, BorderLayout.WEST);
     left.add(numLabel, BorderLayout.CENTER);
-    row.add(left, BorderLayout.WEST);
+
+    if (timeText != null) {
+      JLabel timeLabel = new JLabel(timeText);
+      timeLabel.setForeground(textColor);
+      timeLabel.setFont(textFont);
+      timeLabel.setPreferredSize(new Dimension(LayoutTheme.get().songQueueHistoryTimeColW, 30));
+      timeLabel.setHorizontalAlignment(SwingConstants.LEFT);
+
+      JPanel timeAndLeft = new JPanel(new BorderLayout(6, 0));
+      timeAndLeft.setOpaque(false);
+      timeAndLeft.add(timeLabel, BorderLayout.WEST);
+      timeAndLeft.add(left, BorderLayout.CENTER);
+      row.add(timeAndLeft, BorderLayout.WEST);
+    } else {
+      row.add(left, BorderLayout.WEST);
+    }
 
     // ── Artist / Song columns (CENTER) ────────────────────────────────────
     JPanel columnsPanel = new JPanel(new BorderLayout(10, 0));
@@ -375,22 +577,14 @@ public class QueuePanel extends JPanel {
     textCluster.setOpaque(false);
 
     JLabel artistLabel = new JLabel(entry.song().artistName());
-    artistLabel.setForeground(TEXT_PRIMARY);
-    artistLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
+    artistLabel.setForeground(textColor);
+    artistLabel.setFont(textFont);
     artistLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationArtistW, 30));
 
     JLabel songLabel = new JLabel(entry.song().songName());
-    songLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
+    songLabel.setForeground(textColor);
+    songLabel.setFont(textFont);
     songLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationSongW, 30));
-
-    boolean selected = index == selectedIndex;
-    if (selected) {
-      songLabel.setForeground(ACCENT_BLUE);
-    } else {
-      int priority = entry.priority() == null ? 0 : entry.priority();
-      int slot = Math.min(priority, SongTrackCellRenderer.PRIORITY_COLORS.length - 1);
-      songLabel.setForeground(SongTrackCellRenderer.PRIORITY_COLORS[slot]);
-    }
 
     textCluster.add(artistLabel, BorderLayout.WEST);
     textCluster.add(songLabel, BorderLayout.CENTER);
@@ -403,6 +597,10 @@ public class QueuePanel extends JPanel {
     if (selected) {
       row.setOpaque(true);
       row.setBackground(ColorTheme.get().bgListSelected);
+    }
+
+    if (!selectable) {
+      return row; // history rows: no hover highlight or click-to-select
     }
 
     // ── Hover + click-to-select ────────────────────────────────────────────
@@ -429,11 +627,18 @@ public class QueuePanel extends JPanel {
       @Override
       public void mouseClicked(java.awt.event.MouseEvent e) {
         selectedIndex = index;
-        rebuildQueueRows();
+        rebuildRows(true);
       }
     });
 
     return row;
+  }
+
+  /** The legend colour for the entry's queue priority (5 and above share the last colour). */
+  private static Color priorityColor(SongQueueEntryDto entry) {
+    int priority = entry.priority() == null ? 0 : entry.priority();
+    int slot = Math.max(0, Math.min(priority, SongTrackCellRenderer.PRIORITY_COLORS.length - 1));
+    return SongTrackCellRenderer.PRIORITY_COLORS[slot];
   }
 
   // ── Action area (buttons + timeout row) ──────────────────────────────────
@@ -495,7 +700,7 @@ public class QueuePanel extends JPanel {
         displayedQueue.set(idx - 1, selected);
         displayedQueue.set(idx, above);
         selectedIndex = idx - 1;
-        rebuildQueueRows();
+        rebuildRows(true);
       }
     });
   }
@@ -522,7 +727,7 @@ public class QueuePanel extends JPanel {
         displayedQueue.set(idx + 1, selected);
         displayedQueue.set(idx, below);
         selectedIndex = idx + 1;
-        rebuildQueueRows();
+        rebuildRows(true);
       }
     });
   }
@@ -546,7 +751,7 @@ public class QueuePanel extends JPanel {
     SwingUtilities.invokeLater(() -> {
       displayedQueue.remove(idx);
       selectedIndex = displayedQueue.isEmpty() ? -1 : Math.min(idx, displayedQueue.size() - 1);
-      rebuildQueueRows();
+      rebuildRows(true);
     });
   }
 
@@ -618,39 +823,88 @@ public class QueuePanel extends JPanel {
   }
 
   /**
-   * Rebuilds {@link #displayedQueue} and the row panels from the (live) queue reference — used at
+   * Rebuilds the row panels for whichever view is showing.
+   *
+   * <p>
+   * Queue view: rebuilds {@link #displayedQueue} from the (live) queue reference — used at
    * construction, onShown(), and every {@link #setQueue(List)} call (including the round trip after
    * a move/remove action, or an externally-triggered {@code SongQueueChangedEvent}). Restores the
    * previously-selected row at {@link #selectedIndex} (clamped to the rebuilt list's bounds) so the
    * same song stays selected across the rebuild.
+   *
+   * <p>
+   * History view: one non-selectable row per {@link #history} entry, newest first, with its start
+   * time in the leading "Time" column.
+   *
+   * @param keepScroll keep the current scroll position; otherwise scroll back to the top
    */
-  private void rebuildQueueRows() {
-    displayedQueue.clear();
-    if (queue != null) {
-      int limit = Math.min(queue.size(), LayoutTheme.get().songQueueMaxVisible);
-      for (int i = 0; i < limit; i++) {
-        displayedQueue.add(queue.get(i));
-      }
-    }
-    if (selectedIndex >= displayedQueue.size()) {
-      selectedIndex = displayedQueue.isEmpty() ? -1 : displayedQueue.size() - 1;
-    }
+  private void rebuildRows(boolean keepScroll) {
+    Point scrollPosition =
+        keepScroll && queueRowsScroll != null ? queueRowsScroll.getViewport().getViewPosition()
+            : new Point(0, 0);
 
     queueRowsPanel.removeAll();
-    for (int i = 0; i < displayedQueue.size(); i++) {
-      queueRowsPanel.add(buildQueueRow(displayedQueue.get(i), i));
-      if (i < displayedQueue.size() - 1) {
-        JSeparator sep = new JSeparator();
-        sep.setForeground(SEPARATOR);
-        sep.setBackground(SEPARATOR);
-        sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
-        queueRowsPanel.add(sep);
+
+    if (showingHistory) {
+      displayedQueue.clear();
+      if (history.isEmpty()) {
+        JLabel empty = new JLabel("No songs have played yet.", SwingConstants.CENTER);
+        empty.setForeground(TEXT_SECONDARY);
+        empty.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong));
+        empty.setAlignmentX(CENTER_ALIGNMENT);
+        empty.setMaximumSize(new Dimension(Integer.MAX_VALUE, LayoutTheme.get().albumViewRowH));
+        empty.setPreferredSize(new Dimension(0, LayoutTheme.get().albumViewRowH));
+        queueRowsPanel.add(empty);
+      }
+      for (int i = 0; i < history.size(); i++) {
+        SongPlayHistoryEntryDto played = history.get(i);
+        queueRowsPanel.add(buildRow(played.entry(), i,
+            HISTORY_TIME_FORMAT.format(played.startedAt()), false));
+        if (i < history.size() - 1) {
+          queueRowsPanel.add(buildSeparator());
+        }
+      }
+    } else {
+      displayedQueue.clear();
+      if (queue != null) {
+        int limit = Math.min(queue.size(), LayoutTheme.get().songQueueMaxVisible);
+        for (int i = 0; i < limit; i++) {
+          displayedQueue.add(queue.get(i));
+        }
+      }
+      if (selectedIndex >= displayedQueue.size()) {
+        selectedIndex = displayedQueue.isEmpty() ? -1 : displayedQueue.size() - 1;
+      }
+
+      for (int i = 0; i < displayedQueue.size(); i++) {
+        queueRowsPanel.add(buildRow(displayedQueue.get(i), i, null, true));
+        if (i < displayedQueue.size() - 1) {
+          queueRowsPanel.add(buildSeparator());
+        }
       }
     }
+
     queueRowsPanel.revalidate();
     queueRowsPanel.repaint();
 
+    // Restore the scroll position once the new rows have been laid out.
+    if (queueRowsScroll != null) {
+      SwingUtilities.invokeLater(() -> {
+        JViewport viewport = queueRowsScroll.getViewport();
+        int maxY = Math.max(0, queueRowsPanel.getHeight() - viewport.getHeight());
+        viewport.setViewPosition(new Point(0, Math.min(scrollPosition.y, maxY)));
+      });
+    }
+
     updateButtonStates();
+  }
+
+  private static JSeparator buildSeparator() {
+    JSeparator sep = new JSeparator();
+    sep.setForeground(SEPARATOR);
+    sep.setBackground(SEPARATOR);
+    sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+    return sep;
   }
 
   // ── Button factories ──────────────────────────────────────────────────────

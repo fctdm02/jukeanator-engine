@@ -6,7 +6,9 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -43,6 +45,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.CheckSongsEligibilityReque
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongEligibilityDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongPlayHistoryEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.MultipleSongsAddedToQueueEvent;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
@@ -107,6 +110,16 @@ public class SongQueueServiceImpl
 
   /** Reference to the track that is currently playing on the output system */
   private SongFileEntity currentlyPlayingSong;
+
+  // ── Play history (shown by the Song Queue tab) ───────────────────────────
+  /** How many dequeued songs {@link #songPlayHistoryLog} keeps. */
+  private static final int SONG_PLAY_HISTORY_MAX = 100;
+
+  /**
+   * Every song dequeued for playback, newest first (the currently playing song is at the head).
+   * In memory only. Separate from {@link #songPlayHistory}, which Rule B trims to a few entries.
+   */
+  private final Deque<SongPlayHistoryEntryDto> songPlayHistoryLog = new ArrayDeque<>();
 
   // ── Rule A State Tracking ────────────────────────────────────────────────
   /** When each song last started playing, within the minimum-minutes-between-plays window. */
@@ -276,14 +289,29 @@ public class SongQueueServiceImpl
     currentlyPlayingSong = nextSong.getSong();
 
     // ── Rule A State Tracking ────────────────────────────────────────────────
-    recentSongPlays.recordPlay(currentlyPlayingSong, Instant.now());
+    Instant startedAt = Instant.now();
+    recentSongPlays.recordPlay(currentlyPlayingSong, startedAt);
+
+    // ── Play history (Song Queue tab's "Show History" view) ─────────────────
+    // Recorded before SongQueueChangedEvent is published, so the UI's refresh on that event
+    // already sees this song at the top.
+    SongQueueEntryDto nextSongDto = SongQueueMapper.toDto(nextSong);
+    songPlayHistoryLog.addFirst(new SongPlayHistoryEntryDto(nextSongDto, startedAt));
+    while (songPlayHistoryLog.size() > SONG_PLAY_HISTORY_MAX) {
+      songPlayHistoryLog.removeLast();
+    }
 
     autoPopulateQueue();
 
     eventPublisher
         .publishEvent(new SongQueueChangedEvent(SongQueueMapper.toDto(songQueueRoot.getSongs())));
 
-    return SongQueueMapper.toDto(nextSong);
+    return nextSongDto;
+  }
+
+  @Override
+  public synchronized List<SongPlayHistoryEntryDto> getSongPlayHistory() {
+    return List.copyOf(songPlayHistoryLog);
   }
 
   @Override

@@ -17,6 +17,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongPlayHistoryEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 
 /**
@@ -142,6 +143,49 @@ public class SongQueueServiceTest extends AbstractServiceIntegrationTest {
     SongQueueEntryDto dequeuedSong = songQueueService.dequeueNextSong();
     assertNotNull(dequeuedSong, "dequeueNextSong() should work again once the queue is unlocked");
     assertEquals(song.songName(), dequeuedSong.song().songName(), "Song name is incorrect");
+  }
+
+  @Test
+  void dequeuedSongIsRecordedAtTopOfPlayHistory() throws IOException {
+
+    ScanRequest scanRequest = new ScanRequest(
+        "src/test/resources/com/djt/jukeanator_engine/domain/songlibrary/service/"
+            + "utils/SongScannerTest/RequireMetadataUseGenreTopFolder");
+    songLibraryService.scanFileSystemForSongs(scanRequest);
+    List<AlbumDto> albums = songLibraryService.getAlbums(songLibraryService.getOwnLocationId());
+    // The other tests queue the first song of the first album; use a different one so the
+    // minimum-minutes-between-plays rule does not reject it when the tests share a context.
+    AlbumDto album = albums.get(albums.size() - 1);
+    SongDto song = album.songs().get(album.songs().size() - 1);
+
+    // Locked so SongPlayerServiceImpl's background thread does not dequeue it first.
+    songQueueService.lock();
+    try {
+      songQueueService.addSongToQueue(songLibraryService.getOwnLocationId(),
+          new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, album.albumId(),
+              song.songId(), Integer.valueOf(2), false));
+    } finally {
+      songQueueService.unlock();
+    }
+    SongQueueEntryDto dequeued = songQueueService.dequeueNextSong();
+
+    List<SongPlayHistoryEntryDto> history = songQueueService.getSongPlayHistory();
+    assertFalse(history.isEmpty(), "History should hold the dequeued song");
+    assertTrue(history.size() <= 100, "History should stay within its cap");
+
+    // Whichever thread dequeued it, it is the most recent play, so it is first.
+    SongPlayHistoryEntryDto newest = history.get(0);
+    assertEquals(song.songName(), newest.entry().song().songName(), "Newest entry is wrong");
+    assertEquals(Integer.valueOf(2), newest.entry().priority(), "Priority should be kept");
+    assertNotNull(newest.startedAt(), "Start time should be recorded");
+    if (dequeued != null) {
+      assertEquals(dequeued, newest.entry(), "Newest entry should be the dequeued song");
+    }
+
+    for (int i = 1; i < history.size(); i++) {
+      assertFalse(history.get(i).startedAt().isAfter(history.get(i - 1).startedAt()),
+          "History should be newest first");
+    }
   }
 
   @Test

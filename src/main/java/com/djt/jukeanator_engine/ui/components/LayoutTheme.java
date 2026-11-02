@@ -284,6 +284,7 @@ public class LayoutTheme {
     albumViewCompilationSongW = 520;
     fontSizeTrackSong = 17;
     fontSizeTrackArtist = 14;
+    songQueueHistoryTimeColW = 100;
 
     // ── Derived Dimension fields ───────────────────────────────────────────────
     // Must be initialised after the primitives they depend on.
@@ -449,6 +450,7 @@ public class LayoutTheme {
       albumViewCompilationSongW = 520;
       fontSizeTrackSong = 17;
       fontSizeTrackArtist = 14;
+      songQueueHistoryTimeColW = 100;
 
     } else {
       // ── SMALL_LANDSCAPE (1024 × 768 and similar) ────────────────────────────
@@ -732,6 +734,7 @@ public class LayoutTheme {
       // that space for the song/artist columns.
       //
       albumViewPlaysColW = 32; // landscape default: 64
+      songQueueHistoryTimeColW = 72; // landscape default: 100 (fits "12:45PM" at the 13pt font)
       albumViewTrkNumColW = 48; // unchanged
       //
       // Task 2 — Compilation artist column: reduced by 30 % (260 × 0.70 = 182 px).
@@ -1713,6 +1716,12 @@ public class LayoutTheme {
 
   /** Width allocated for the "# Plays" (popularity bars) column header and cells. */
   public final int albumViewPlaysColW;
+
+  /**
+   * Width of the "Time" column (e.g. "9:30PM") that the Song Queue tab's "Show History" view
+   * adds to the left of "Plays".
+   */
+  public final int songQueueHistoryTimeColW;
 
   /** Width allocated for the track-number column. */
   public final int albumViewTrkNumColW;

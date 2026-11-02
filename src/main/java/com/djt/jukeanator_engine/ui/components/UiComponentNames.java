@@ -89,6 +89,8 @@ public final class UiComponentNames {
   public static final String QUEUE_MOVE_UP_BUTTON = "QueuePanel.moveUpButton";
   public static final String QUEUE_MOVE_DOWN_BUTTON = "QueuePanel.moveDownButton";
   public static final String QUEUE_REMOVE_BUTTON = "QueuePanel.removeButton";
+  public static final String QUEUE_HISTORY_TOGGLE = "QueuePanel.historyToggle";
+  public static final String QUEUE_HISTORY_ROW = "QueuePanel.historyRow";
 
   // ── LoginToAdminPanelCard ───────────────────────────────────────────────────
   public static final String LOGIN_USERNAME_FIELD = "LoginToAdminPanelCard.usernameField";

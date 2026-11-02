@@ -10,6 +10,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.LoadPlaylistIntoQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongEligibilityDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongPlayHistoryEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 
 /**
@@ -158,6 +159,15 @@ public interface SongQueueService {
    *         false} otherwise.
    */
   boolean isLocked();
+
+  /**
+   * The songs this instance has dequeued for playback, newest first, starting with the song that
+   * is playing now. Kept in memory only (empty after a restart) and capped to the most recent
+   * entries. Local to this instance, so it takes no locationId and is never forwarded.
+   *
+   * @return the play history, newest first
+   */
+  List<SongPlayHistoryEntryDto> getSongPlayHistory();
 
   /**
    *
