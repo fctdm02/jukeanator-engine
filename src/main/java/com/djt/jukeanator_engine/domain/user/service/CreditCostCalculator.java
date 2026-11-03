@@ -7,6 +7,11 @@ package com.djt.jukeanator_engine.domain.user.service;
  * ({@code AddSongToQueueCard}, {@code QueuePanel}) and can't be called directly from here (master
  * runs no Swing code at all), so they're mirrored below -- keep both sides in sync if either
  * changes.
+ *
+ * <p>The priority level fed in here is not always the queue's next available level: once a user has
+ * made a priority play, their later ones reuse its level (same cost, queued behind it). That rule
+ * lives in {@code AddSongToQueueCard}/{@code CreditManager} (JFC/Swing, per credit session) and
+ * {@code SongQueueController} (web, while the user's priority play is still queued).
  */
 public final class CreditCostCalculator {
 
@@ -21,14 +26,15 @@ public final class CreditCostCalculator {
   /**
    * Cost to add a song to the queue. {@code priorityPlay} mirrors which button the caller
    * pressed -- normal play uses AddSongToQueueCard's fixed {@code normalPlayCost}; priority play
-   * uses {@code priority * priorityCostMultiplier}. This can't be inferred from {@code priority}
-   * alone: {@code getHighestPriority()} returns {@code 1} whenever the queue's current top entry
-   * is a priority-0 background song, so a genuine priority play can submit the exact same
-   * {@code priority == 1} a normal play always does.
+   * is priced by the level it jumps, not the level it queues at: it queues one above the song it
+   * jumps, so it costs {@code (priority - 1) * priorityCostMultiplier} -- mirroring
+   * AddSongToQueueCard.priorityPlayCost. A priority play is only allowed over another user's
+   * priority-1-or-higher song (see {@code SongQueueService.isPriorityPlayAllowed}), so it always
+   * queues at priority 2 or higher.
    */
   public static int webQueueAddCost(PricingConfig config, int priority, boolean priorityPlay) {
-    int swingCost =
-        priorityPlay ? priority * config.priorityCostMultiplier() : SWING_NORMAL_PLAY_COST;
+    int swingCost = priorityPlay ? Math.max(1, priority - 1) * config.priorityCostMultiplier()
+        : SWING_NORMAL_PLAY_COST;
     return swingCost * config.webCostMultiplier();
   }
 

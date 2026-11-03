@@ -91,6 +91,83 @@ class SongQueueControllerTest extends AbstractControllerTest {
         .andExpect(jsonPath("$", is(7)));
   }
 
+  // ── Priority-play session: a web user's later priority plays reuse their queued level ──
+
+  private static SongQueueEntryDto queuedEntry(String username, int songId, int priority) {
+    SongDto song =
+        new SongDto(1, "Genre", 2, "Artist", 3, "Album", "/cover.jpg", songId, "Song", 1, 0);
+    return new SongQueueEntryDto(username, song, priority, "/music/song" + songId + ".mp3");
+  }
+
+  @Test
+  void getHighestPriority_webUserWithAQueuedPriorityPlay_returnsThatLevel() throws Exception {
+    // A, B, C as background; the user's normal play at 1; their priority play D at 2; someone
+    // else's priority play at 3 queued since.
+    when(songQueueService.getQueuedSongs(LOCATION_ID)).thenReturn(List.of(
+        queuedEntry("other@domain.com", 12, 3),
+        queuedEntry(WEB_USER, 10, 2),
+        queuedEntry(WEB_USER, 13, 1),
+        queuedEntry("LOCAL", 11, 0)));
+
+    mockMvc.perform(get(BASE_PATH + "/highestPriority").principal(webUser()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$", is(2)));
+
+    verify(songQueueService, never()).getHighestPriority(any());
+  }
+
+  @Test
+  void getHighestPriority_webUserWithOnlyNormalPlaysOrOthersPriorityPlays_isPricedFresh()
+      throws Exception {
+    when(songQueueService.getQueuedSongs(LOCATION_ID)).thenReturn(List.of(
+        queuedEntry("other@domain.com", 10, 3),
+        queuedEntry(WEB_USER, 11, 1)));
+    when(songQueueService.getHighestPriority(LOCATION_ID)).thenReturn(4);
+
+    mockMvc.perform(get(BASE_PATH + "/highestPriority").principal(webUser()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$", is(4)));
+  }
+
+  @Test
+  void addSong_webUserPriorityPlayWithAQueuedPriorityPlay_queuesAtThatLevel() throws Exception {
+    when(songQueueService.getQueuedSongs(LOCATION_ID)).thenReturn(List.of(
+        queuedEntry("other@domain.com", 12, 3),
+        queuedEntry(WEB_USER, 10, 2)));
+    when(songQueueService.addSongToQueue(any(), any(AddSongToQueueRequest.class)))
+        .thenReturn(aQueueEntry());
+
+    // The client asks for level 4 (the queue's top + 1), but the user's session level wins.
+    postAsWebUser("addSong", new AddSongToQueueRequest(null, 3, 4, 4, true))
+        .andExpect(status().isOk());
+
+    verify(userService).requireAffordableQueueAdd(WEB_USER, LOCATION_ID, 2, true);
+    verify(songQueueService).addSongToQueue(LOCATION_ID,
+        new AddSongToQueueRequest(WEB_USER, 3, 4, 2, true));
+  }
+
+  @Test
+  void addSong_webUserPriorityPlayBelowPriority2_isRefusedWith400() throws Exception {
+    postAsWebUser("addSong", new AddSongToQueueRequest(null, 3, 4, 1, true))
+        .andExpect(status().isBadRequest());
+
+    verify(songQueueService, never()).addSongToQueue(any(), any());
+  }
+
+  @Test
+  void addSong_webUserNormalPlay_ignoresTheSessionLevel() throws Exception {
+    when(songQueueService.getQueuedSongs(LOCATION_ID))
+        .thenReturn(List.of(queuedEntry(WEB_USER, 10, 3)));
+    when(songQueueService.addSongToQueue(any(), any(AddSongToQueueRequest.class)))
+        .thenReturn(aQueueEntry());
+
+    postAsWebUser("addSong", new AddSongToQueueRequest(null, 3, 4, 1, false))
+        .andExpect(status().isOk());
+
+    verify(songQueueService).addSongToQueue(LOCATION_ID,
+        new AddSongToQueueRequest(WEB_USER, 3, 4, 1, false));
+  }
+
   @Test
   void getQueuedSongs_returnsListFromService() throws Exception {
     when(songQueueService.getQueuedSongs(LOCATION_ID)).thenReturn(List.of(aQueueEntry()));

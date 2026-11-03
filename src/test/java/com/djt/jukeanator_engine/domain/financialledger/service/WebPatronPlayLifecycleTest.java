@@ -113,8 +113,9 @@ class WebPatronPlayLifecycleTest {
 
   /**
    * The bar's pricing, as in application.yml: priorityCostMultiplier 2, creditsPerDollar 3 (the
-   * kiosk's bill-acceptor rate), webCostMultiplier 2. A normal play costs 2 credits, a priority-2
-   * play 2 * 2 * 2 = 8, and moving a priority-1 song max(1, 1 * 3) * 2 = 6.
+   * kiosk's bill-acceptor rate), webCostMultiplier 2. A normal play costs 2 credits, a priority-3
+   * play (jumping a priority-2 song) (3 - 1) * 2 * 2 = 8, and moving a priority-1 song
+   * max(1, 1 * 3) * 2 = 6.
    */
   private static final PricingConfig BAR_PRICING = new PricingConfig(2, 3, 3, 10, 2, false);
 
@@ -212,7 +213,7 @@ class WebPatronPlayLifecycleTest {
     // ── 3. Playing at the bar, until the balance runs out ─────────────────────────────────
     play(BAR, 1, 1, false); // normal play: 2 credits
     assertEquals(11, balance());
-    play(BAR, 2, 2, true); // priority-2 play: 8 credits
+    play(BAR, 2, 3, true); // priority-3 play: 8 credits
     assertEquals(3, balance());
 
     // Moving song 1 up costs 6; only 3 are held -- refused, and the queue is untouched.
@@ -363,10 +364,10 @@ class WebPatronPlayLifecycleTest {
 
     ExecutorService executor = Executors.newFixedThreadPool(2);
     try {
-      // A priority-2 play costs 8: 13 credits cover one, not two.
-      Future<SongQueueEntryDto> firstTap = executor.submit(() -> play(BAR, 1, 2, true));
+      // A priority-3 play costs 8: 13 credits cover one, not two.
+      Future<SongQueueEntryDto> firstTap = executor.submit(() -> play(BAR, 1, 3, true));
       assertTrue(firstAddInFlight.await(10, TimeUnit.SECONDS));
-      Future<SongQueueEntryDto> secondTap = executor.submit(() -> play(BAR, 1, 2, true));
+      Future<SongQueueEntryDto> secondTap = executor.submit(() -> play(BAR, 1, 3, true));
 
       firstTap.get(10, TimeUnit.SECONDS);
       ExecutionException secondFailure =

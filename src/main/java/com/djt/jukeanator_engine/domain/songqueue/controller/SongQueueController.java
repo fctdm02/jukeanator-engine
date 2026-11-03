@@ -135,10 +135,39 @@ public class SongQueueController {
     return userLocks.computeIfAbsent(email, key -> new Object());
   }
 
+  /**
+   * The level a priority play would queue at (and is priced from). For a web user who still has one
+   * of their own priority plays waiting in this location's queue, that is the level of those
+   * entries -- so their later priority plays cost the same and line up behind the earlier ones in
+   * the order added. Otherwise it is the queue's next available level.
+   */
   @GetMapping("/highestPriority")
-  public Integer getHighestPriority(@PathVariable Integer locationId) {
+  public Integer getHighestPriority(@PathVariable Integer locationId,
+      Authentication authentication) {
 
+    if (authentication != null && authentication.getPrincipal() instanceof String email) {
+      Integer sessionLevel = webPrioritySessionLevel(locationId, email);
+      if (sessionLevel != null) {
+        return sessionLevel;
+      }
+    }
     return songQueueService.getHighestPriority(locationId);
+  }
+
+  /**
+   * The priority of the web user's own priority-play entries still waiting in this location's
+   * queue, or {@code null} if they have none -- in which case their next priority play is priced
+   * fresh from the queue. A priority play is only allowed above a priority-1 song (see {@link
+   * SongQueueService#isPriorityPlayAllowed}), so it always queues at priority 2 or higher; any
+   * entry above priority 1 is therefore a priority play.
+   */
+  private Integer webPrioritySessionLevel(Integer locationId, String email) {
+    return songQueueService.getQueuedSongs(locationId).stream()
+        .filter(entry -> email.equals(entry.username()) && entry.priority() != null
+            && entry.priority() > 1)
+        .map(SongQueueEntryDto::priority)
+        .max(Integer::compare)
+        .orElse(null);
   }
 
   @GetMapping("/queuedSongs")
@@ -213,15 +242,26 @@ public class SongQueueController {
 
     // For JWT-authenticated web users the principal is the email string; override the request body
     // username so that the server is authoritative and clients cannot impersonate other users.
-    int priority = webUserPriority(addSongToQueueRequest);
-    AddSongToQueueRequest webUserRequest = new AddSongToQueueRequest(
-        email,
-        addSongToQueueRequest.albumId(),
-        addSongToQueueRequest.songId(),
-        priority,
-        addSongToQueueRequest.priorityPlay());
+    int clientPriority = webUserPriority(addSongToQueueRequest);
 
     synchronized (lockFor(email)) {
+      // Once this user has a priority play waiting in the queue, later priority plays reuse its
+      // level (same cost, queued behind it in the order added). Read under the user's lock so a
+      // double tap can't land the two plays at different levels.
+      int priority = clientPriority;
+      if (addSongToQueueRequest.priorityPlay()) {
+        Integer sessionLevel = webPrioritySessionLevel(locationId, email);
+        if (sessionLevel != null) {
+          priority = sessionLevel;
+        }
+      }
+      AddSongToQueueRequest webUserRequest = new AddSongToQueueRequest(
+          email,
+          addSongToQueueRequest.albumId(),
+          addSongToQueueRequest.songId(),
+          priority,
+          addSongToQueueRequest.priorityPlay());
+
       userService.requireAffordableQueueAdd(email, locationId, priority,
           webUserRequest.priorityPlay());
 
@@ -238,8 +278,9 @@ public class SongQueueController {
   /**
    * The priority a web user's song is queued at decides its place in the queue and, for a priority
    * play, its price -- so it is never taken from the client on trust. A normal play has a fixed
-   * price and always queues at priority 1; a priority play below priority 1 would be free (or
-   * negatively priced) and is refused.
+   * price and always queues at priority 1. A priority play is only offered above a priority-1 song
+   * (see {@link SongQueueService#isPriorityPlayAllowed}), so it always queues at priority 2 or
+   * higher; anything lower is refused.
    */
   private static int webUserPriority(AddSongToQueueRequest addSongToQueueRequest) {
 
@@ -247,9 +288,9 @@ public class SongQueueController {
       return 1;
     }
     Integer priority = addSongToQueueRequest.priority();
-    if (priority == null || priority < 1) {
+    if (priority == null || priority < 2) {
       throw new IllegalArgumentException(
-          "A priority play must be queued at priority 1 or higher, not: " + priority);
+          "A priority play must be queued at priority 2 or higher, not: " + priority);
     }
     return priority;
   }

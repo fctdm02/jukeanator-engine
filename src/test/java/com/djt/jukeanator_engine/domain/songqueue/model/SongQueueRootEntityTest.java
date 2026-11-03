@@ -140,6 +140,23 @@ public class SongQueueRootEntityTest extends AbstractSongLibraryEntityTest {
     assertEquals(songMaterialGirl, songs.get(3).getSong(),"LOW last");
   }
 
+  @Test
+  void addSongToQueue_samePriorityPlayLevel_queuesInOrderAddedAheadOfNormalPlays() {
+    // A, B as background (0) and C as a normal play (1); one user then priority-plays D and E,
+    // both at their session level of 2.
+    queue.addSongToQueue(USER_A, songBlackDog, 0);
+    queue.addSongToQueue(USER_A, songKashmir, 0);
+    queue.addSongToQueue(USER_A, songMaterialGirl, 1);
+    queue.addSongToQueue(USER_B, songRockAndRoll, 2);
+    queue.addSongToQueue(USER_B, songBlackDog, 2);
+
+    List<SongQueueEntryEntity> songs = queue.getSongs();
+    assertEquals(songRockAndRoll, songs.get(0).getSong(), "D first");
+    assertEquals(songBlackDog, songs.get(1).getSong(), "E second");
+    assertEquals(USER_B, songs.get(1).getUsername());
+    assertEquals(songMaterialGirl, songs.get(2).getSong(), "then the normal play");
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // flushQueue
   // ─────────────────────────────────────────────────────────────────────────

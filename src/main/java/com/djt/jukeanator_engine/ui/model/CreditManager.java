@@ -20,6 +20,14 @@ public class CreditManager {
   // Resets to the base rate when the balance (and totalDollarsInserted) hits zero, ready for the
   // next customer.
   private double effectiveCreditsPerDollar;
+  // The priority level of the current user's first priority play this session (credits 0 ->
+  // positive -> 0). Every later priority play in the same session reuses this level, so it costs
+  // the same and queues behind the earlier ones in the order added. Cleared when credits hit 0.
+  private Integer sessionPriorityLevel;
+  // The songs ("albumId/songId") the current user has queued this session. Every jukebox song is
+  // queued as LOCAL, so this is how the current user's selections are told apart from earlier
+  // users' -- a priority play is only offered to jump someone else's. Cleared when credits hit 0.
+  private final java.util.Set<String> sessionQueuedSongs = new java.util.HashSet<>();
   private final java.util.List<Runnable> listeners = new java.util.ArrayList<>();
 
   public CreditManager(int numCredits, int creditsPerDollar, int fiveDollarBonus,
@@ -115,11 +123,50 @@ public class CreditManager {
         rawCreditCardCredits = 0;
         creditCardCreditsAwarded = 0;
         effectiveCreditsPerDollar = creditsPerDollar;
+        sessionPriorityLevel = null;
+        sessionQueuedSongs.clear();
       }
       notifyListeners();
       return true;
     }
     return false;
+  }
+
+  /**
+   * The priority level locked in by the current user's first priority play, or {@code null} if
+   * they have not made one this session.
+   */
+  public synchronized Integer getSessionPriorityLevel() {
+    return sessionPriorityLevel;
+  }
+
+  /**
+   * Records the level of a priority play just paid for. Only the first one in a session is kept,
+   * and only while credits remain -- a priority play that spends the last credit ends the session.
+   */
+  public synchronized void recordPriorityPlayLevel(int level) {
+    if (sessionPriorityLevel == null && numCredits > 0) {
+      sessionPriorityLevel = level;
+    }
+  }
+
+  /**
+   * Records a song the current user has just paid to queue (normal or priority play). Ignored when
+   * that play spent the last credit, since the session -- and the user -- has ended.
+   */
+  public synchronized void recordSongQueued(Integer albumId, Integer songId) {
+    if (numCredits > 0) {
+      sessionQueuedSongs.add(songKey(albumId, songId));
+    }
+  }
+
+  /** Whether the current user queued this song during the current credit session. */
+  public synchronized boolean isSongQueuedThisSession(Integer albumId, Integer songId) {
+    return sessionQueuedSongs.contains(songKey(albumId, songId));
+  }
+
+  private static String songKey(Integer albumId, Integer songId) {
+    return albumId + "/" + songId;
   }
 
   /**

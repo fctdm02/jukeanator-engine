@@ -35,6 +35,10 @@ public class AddSongToQueueCard extends JPanel {
 
   private static final long serialVersionUID = 1L;
 
+  /** Client property holding the text a queue button shows when disabled for a non-credit reason. */
+  private static final String UNAVAILABLE_TEXT_PROPERTY = "jukeanator.unavailableText";
+  private static final String PRIORITY_PLAY_UNAVAILABLE_TEXT = "NOT AVAILABLE";
+
   private final ImageLoader imageLoader;
   private final SongDto song;
   private final int priorityCostMultiplier;
@@ -342,13 +346,14 @@ public class AddSongToQueueCard extends JPanel {
     JPanel buttons = new JPanel(new GridLayout(1, 2, 16, 0));
     buttons.setOpaque(false);
 
-    int highestPriority = songQueueService.getHighestPriority(songQueueService.getOwnLocationId());
-    int priorityCost = highestPriority * priorityCostMultiplier;
+    int priorityLevel = priorityPlayLevel();
+    int priorityCost = priorityPlayCost(priorityLevel);
 
     this.normalButton =
         createQueueButton("Play Song", normalPlayCost, ColorTheme.get().accentBlue, e -> {
           if (creditManager.deductCredits(normalPlayCost)) {
 
+            creditManager.recordSongQueued(song.albumId(), song.songId());
             SwingSecurityUtil.runAsync(() -> songQueueService.addSongToQueue(
                 songQueueService.getOwnLocationId(), new AddSongToQueueRequest(
                     SongQueueService.LOCAL_USERNAME, song.albumId(), song.songId(), 1, false)));
@@ -359,12 +364,19 @@ public class AddSongToQueueCard extends JPanel {
 
     this.priorityButton =
         createQueueButton("Priority Play Song", priorityCost, ColorTheme.get().accentGold, e -> {
+          // Re-checked at the tap: the queue may have changed since the card was opened.
+          if (!isPriorityPlayAllowed()) {
+            updateButtonStates();
+            return;
+          }
           if (creditManager.deductCredits(priorityCost)) {
 
+            creditManager.recordPriorityPlayLevel(priorityLevel);
+            creditManager.recordSongQueued(song.albumId(), song.songId());
             SwingSecurityUtil.runAsync(() -> songQueueService.addSongToQueue(
                 songQueueService.getOwnLocationId(),
                 new AddSongToQueueRequest(SongQueueService.LOCAL_USERNAME, song.albumId(),
-                    song.songId(), highestPriority, true)));
+                    song.songId(), priorityLevel, true)));
 
             dismiss();
           }
@@ -399,15 +411,53 @@ public class AddSongToQueueCard extends JPanel {
     }
   }
 
+  /**
+   * The level a priority play queues at (and is priced from): once the current user has made a
+   * priority play this session, every later one reuses that level so it costs the same and lines up
+   * behind the earlier ones; otherwise it is the queue's next available level.
+   */
+  private int priorityPlayLevel() {
+    Integer sessionLevel = creditManager.getSessionPriorityLevel();
+    if (sessionLevel != null) {
+      return sessionLevel;
+    }
+    return songQueueService.getHighestPriority(songQueueService.getOwnLocationId());
+  }
+
+  /**
+   * A priority play is priced by the level it jumps, not the level it queues at: it queues one
+   * above the song it jumps (level), so it costs {@code (level - 1) * priorityCostMultiplier} --
+   * e.g. 2 credits to jump a normal play (queued at 2), 4 to jump a priority-2 play (queued at 3).
+   * Mirrored by {@code CreditCostCalculator.webQueueAddCost} and app.js's {@code queueAddCost}.
+   */
+  private int priorityPlayCost(int level) {
+    return Math.max(1, level - 1) * priorityCostMultiplier;
+  }
+
+  /**
+   * See {@link SongQueueService#isPriorityPlayAllowed}. Every jukebox song is queued as
+   * {@code LOCAL}, so the current user's own songs are the {@code LOCAL} ones queued during this
+   * credit session; earlier jukebox users' and web users' songs count as someone else's.
+   */
+  private boolean isPriorityPlayAllowed() {
+    return SongQueueService.isPriorityPlayAllowed(
+        songQueueService.getQueuedSongs(songQueueService.getOwnLocationId()),
+        entry -> SongQueueService.LOCAL_USERNAME.equals(entry.username())
+            && creditManager.isSongQueuedThisSession(entry.song().albumId(),
+                entry.song().songId()));
+  }
+
   private void updateButtonStates() {
 
     int currentCredits = creditManager.getCredits();
 
-    int highestPriority = songQueueService.getHighestPriority(songQueueService.getOwnLocationId());
-    int priorityCost = highestPriority * priorityCostMultiplier;
+    int priorityCost = priorityPlayCost(priorityPlayLevel());
+    boolean priorityPlayAllowed = isPriorityPlayAllowed();
 
     normalButton.setEnabled(currentCredits >= normalPlayCost);
-    priorityButton.setEnabled(currentCredits >= priorityCost);
+    priorityButton.setEnabled(priorityPlayAllowed && currentCredits >= priorityCost);
+    priorityButton.putClientProperty(UNAVAILABLE_TEXT_PROPERTY,
+        priorityPlayAllowed ? null : PRIORITY_PLAY_UNAVAILABLE_TEXT);
 
     normalButton.repaint();
     priorityButton.repaint();
@@ -526,8 +576,11 @@ public class AddSongToQueueCard extends JPanel {
           g2.setColor(ColorTheme.get().accentGold);
           g2.drawString(costText, (w - fm2.stringWidth(costText)) / 2, line2Y);
         } else {
-          int needed = cost - creditManager.getCredits();
-          String warnText = creditManager.formatShortfall(needed);
+          // Disabled for a reason other than credits (e.g. priority play with only background
+          // music queued) -- say so rather than asking for more money.
+          Object unavailableText = getClientProperty(UNAVAILABLE_TEXT_PROPERTY);
+          String warnText = unavailableText != null ? unavailableText.toString()
+              : creditManager.formatShortfall(cost - creditManager.getCredits());
           g2.setColor(ColorTheme.get().btn3dWarnBorder);
           g2.drawString(warnText, (w - fm2.stringWidth(warnText)) / 2, line2Y);
         }

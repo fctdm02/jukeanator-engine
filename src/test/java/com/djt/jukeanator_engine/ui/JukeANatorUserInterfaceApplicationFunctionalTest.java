@@ -431,9 +431,15 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     click(genres, UiComponentNames.GENRE_DETAIL_SORT_ALBUM_BUTTON);
     click(genres, UiComponentNames.GENRE_DETAIL_SORT_POPULARITY_BUTTON);
 
-    // Priority play costs the next free priority × priority-cost-multiplier
+    // Priority Play is only offered to jump another user's selection, so the user who queued
+    // homeSong (step 3) walks away and a new user inserts money.
+    endCurrentUsersSession();
+    assertEquals(0, credits());
+
+    // Priority play queues at the next free priority, priced by the level it jumps:
+    // (priority - 1) × priority-cost-multiplier
     int priority = songQueueService.getHighestPriority(locationId());
-    int cost = priority * userInterfaceProperties.getPriorityCostMultiplier();
+    int cost = (priority - 1) * userInterfaceProperties.getPriorityCostMultiplier();
     insertDollarsUntil(cost);
     int creditsBefore = credits();
 
@@ -935,6 +941,19 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     while (credits() < minimumCredits) {
       insertDollar();
     }
+  }
+
+  /**
+   * Spends the remaining credits, ending the current user's session as if they walked away with
+   * their credits used up. The kiosk has no patron control for this, so the frame's
+   * {@code CreditManager} is reached directly.
+   */
+  private static void endCurrentUsersSession() throws Exception {
+    java.lang.reflect.Field field = JukeANatorFrame.class.getDeclaredField("creditManager");
+    field.setAccessible(true);
+    com.djt.jukeanator_engine.ui.model.CreditManager creditManager =
+        (com.djt.jukeanator_engine.ui.model.CreditManager) field.get(frame());
+    creditManager.deductCredits(creditManager.getCredits());
   }
 
   private static void pressEscape() throws Exception {

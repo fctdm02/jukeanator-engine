@@ -951,17 +951,14 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   }
 
   @Test
-  void handleSongAddedToQueueEvent_chargesPriorityPlayRateEvenWhenPriorityIsOne() {
+  void handleSongAddedToQueueEvent_chargesAPriorityPlayByTheLevelItJumps() {
 
-    // getHighestPriority() returns 1 whenever the queue's current top entry is a priority-0
-    // background song -- a genuine priority play can therefore carry the exact same priority (1)
-    // a normal play always does. The priorityPlay flag, not the priority value, must decide cost.
-    SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(7, 700), 1, null);
+    // A priority play queued at priority 2 jumped a priority-1 song, so it is priced at level 1.
+    SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(7, 700), 2, null);
 
     userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, true));
 
-    // 6 - (priority 1 * priorityCostMultiplier 2 * webCostMultiplier 2) = 2, not the
-    // normal-play-priced 4 a naive "priority <= 1" check would produce.
+    // 6 - ((priority 2 - 1) * priorityCostMultiplier 2 * webCostMultiplier 2) = 2
     assertEquals(2, registeredUser().getNumCredits());
   }
 
@@ -1081,9 +1078,9 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void requireAffordableQueueAdd_passesWhenTheBalanceCoversTheCost() {
 
-    // normal play: 1 * webCostMultiplier 2 = 2; priority 1 play: 1 * 2 * 2 = 4; balance 6
+    // normal play: 1 * webCostMultiplier 2 = 2; priority 2 play: (2 - 1) * 2 * 2 = 4; balance 6
     userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 1, false);
-    userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 1, true);
+    userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 2, true);
 
     registeredUser().setNumCredits(2);
     userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 1, false); // exactly enough
@@ -1097,9 +1094,9 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     registeredUser().setNumCredits(3);
 
-    // priority 1 play: 1 * priorityCostMultiplier 2 * webCostMultiplier 2 = 4
+    // priority 2 play: (2 - 1) * priorityCostMultiplier 2 * webCostMultiplier 2 = 4
     InsufficientCreditsException e = assertThrows(InsufficientCreditsException.class,
-        () -> userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 1, true));
+        () -> userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 2, true));
     assertEquals(4, e.getCost());
     assertEquals(3, e.getBalance());
 

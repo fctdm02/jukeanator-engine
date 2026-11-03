@@ -69,6 +69,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.exception.SongNotEligibleException;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryFileSystemImpl;
+import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
@@ -117,6 +118,8 @@ class WebUiMasterConnectedSlaveLifecycleTest {
   private static final int SONG_B_ALBUM = 502, SONG_B = 9002;
   private static final int SONG_C_ALBUM = 503, SONG_C = 9003;
   private static final int SONG_D_ALBUM = 504, SONG_D = 9004;
+  /** Queued at the bar's kiosk, so a patron's Priority Play has another user's selection to jump. */
+  private static final int SONG_E_ALBUM = 505, SONG_E = 9005;
 
   @LocalServerPort
   private int port;
@@ -230,12 +233,26 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     assertEquals(1, slave.queueKeys().size());
 
     // ── A priority play jumps the queue ──────────────────────────────────────────────────
+    // Only the patron's own song is queued: the jukebox refuses a Priority Play, uncharged.
+    Response selfJump = ui.post(token, queuePath("addSong"),
+        addSongBody(SONG_B_ALBUM, SONG_B, 2, true));
+    selfJump.expect(409);
+    assertTrue(selfJump.json().path("message").asText().startsWith("Priority Play is only"),
+        selfJump.body());
+    assertEquals(balance, balance(token));
+
+    // Someone at the bar's kiosk queues a song -- now there is another user's selection to jump.
+    slave.queueAtKiosk(SONG_E_ALBUM, SONG_E);
     int priority = ui.get(token, queuePath("highestPriority")).expect(200).json().asInt();
     assertEquals(2, priority);
     ui.post(token, queuePath("addSong"), addSongBody(SONG_B_ALBUM, SONG_B, priority, true))
         .expect(200);
     balance -= queueAddCost(priority, true);
     assertEquals(balance, balance(token));
+    assertEquals(List.of(SONG_B_ALBUM + "/" + SONG_B, SONG_A_ALBUM + "/" + SONG_A,
+        SONG_E_ALBUM + "/" + SONG_E), slave.queueKeys());
+    // Taken back out so the rest of the narrative sees only this patron's songs.
+    slave.removeFromQueue(SONG_E_ALBUM, SONG_E);
     assertEquals(List.of(SONG_B_ALBUM + "/" + SONG_B, SONG_A_ALBUM + "/" + SONG_A),
         slave.queueKeys());
 
@@ -277,8 +294,10 @@ class WebUiMasterConnectedSlaveLifecycleTest {
 
     // ── A play the balance does not cover is refused before it reaches the jukebox ───────
     int addsBefore = slave.commandCount("addSongToQueue");
+    // A priority play at level p costs (p - 1) * multipliers, so this level is one beyond affordable.
     int unaffordable = balance / pricing.path("priorityCostMultiplier").asInt()
-        / pricing.path("webCostMultiplier").asInt() + 1;
+        / pricing.path("webCostMultiplier").asInt() + 2;
+    assertTrue(queueAddCost(unaffordable, true) > balance);
     ui.post(token, queuePath("addSong"), addSongBody(SONG_C_ALBUM, SONG_C, unaffordable, true))
         .expect(402);
     assertEquals(addsBefore, slave.commandCount("addSongToQueue"));
@@ -370,7 +389,8 @@ class WebUiMasterConnectedSlaveLifecycleTest {
 
   /** Mirrors app.js's queueAddCost(), priced from /api/users/pricing-config. */
   private int queueAddCost(int priority, boolean priorityPlay) {
-    int swingCost = priorityPlay ? priority * pricing.path("priorityCostMultiplier").asInt() : 1;
+    int swingCost = priorityPlay
+        ? Math.max(1, priority - 1) * pricing.path("priorityCostMultiplier").asInt() : 1;
     return swingCost * pricing.path("webCostMultiplier").asInt();
   }
 
@@ -578,6 +598,16 @@ class WebUiMasterConnectedSlaveLifecycleTest {
           new LocationEventMessage(LocationTopics.NOW_PLAYING, nowPlaying));
     }
 
+    /** Someone at the bar's kiosk queues a normal play (as LOCAL). */
+    void queueAtKiosk(int albumId, int songId) {
+      songQueue.addSongToQueue(locationId, new AddSongToQueueRequest(
+          SongQueueService.LOCAL_USERNAME, albumId, songId, 1, false));
+    }
+
+    void removeFromQueue(int albumId, int songId) {
+      songQueue.removeSongDownFromQueue(locationId, new ChangeSongQueueRequest(albumId, songId));
+    }
+
     List<String> queueKeys() {
       return songQueue.getQueuedSongs(locationId).stream()
           .map(e -> e.song().albumId() + "/" + e.song().songId()).toList();
@@ -667,7 +697,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     }
   }
 
-  /** Four songs, each by a different artist, so queueing never trips the consecutive-artist rule. */
+  /** Five songs, each by a different artist, so queueing never trips the consecutive-artist rule. */
   private static RootFolderEntity buildLibrary() throws Exception {
 
     RootFolderEntity root = new RootFolderEntity("/fixture/connected-tavern");
@@ -676,7 +706,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     root.addChildFolder(genre);
 
     int[][] songs = { { SONG_A_ALBUM, SONG_A }, { SONG_B_ALBUM, SONG_B }, { SONG_C_ALBUM, SONG_C },
-        { SONG_D_ALBUM, SONG_D } };
+        { SONG_D_ALBUM, SONG_D }, { SONG_E_ALBUM, SONG_E } };
     for (int i = 0; i < songs.length; i++) {
       String artistName = "Artist " + (char) ('A' + i);
       ArtistFolderEntity artist = new ArtistFolderEntity(genre, artistName);

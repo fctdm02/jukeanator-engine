@@ -42,6 +42,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
@@ -516,6 +517,14 @@ class WebUiPatronLifecycleTest {
     assertFalse(recheck.get(0).path("ineligibleReason").isNull(), recheck.toString());
 
     // ── 9. A priority play from the song popup, at the next free priority level ──────────
+    // Priority Play only jumps another user's selection -- with only this patron's own songs
+    // queued it is refused.
+    ui.post(token, queuePath("addSong"), addSongBody(songA, 2, true)).expect(409);
+    assertEquals(expectedBalance, balance(token), "a refused priority play is never charged");
+
+    // Someone at the kiosk queues a song, so now there is another user's selection to jump.
+    String kioskSong = queueKioskSongOtherThan(List.of(songA, songB, songC, songD));
+
     int priorityLevel = ui.get(token, queuePath("highestPriority")).expect(200).json().asInt();
     assertEquals(2, priorityLevel, "one above the queue's top (priority-1) entry");
 
@@ -524,17 +533,22 @@ class WebUiPatronLifecycleTest {
         addSongBody(songA, priorityLevel, true)).expect(200).json();
     assertEquals(email, priorityPlay.path("username").asText());
     assertEquals(2, priorityPlay.path("priority").asInt());
-    expectedBalance -= queueAddCost(2, true); // 25 - 8 = 17
+    expectedBalance -= queueAddCost(2, true); // jumps a priority-1 song: 25 - 4 = 21
     assertEquals(expectedBalance, balance(token));
-    assertEquals(List.of(key(songA), key(songD), key(songB), key(songC)), keys(queuedSongs()),
-        "a priority play jumps the normal plays");
-    assertEquals(3, ui.get(token, queuePath("highestPriority")).expect(200).json().asInt());
+    assertEquals(List.of(key(songA), key(songD), key(songB), key(songC), kioskSong),
+        keys(queuedSongs()), "a priority play jumps the normal plays");
+    // While this patron's priority play is waiting, their next one is offered at the same level.
+    assertEquals(2, ui.get(token, queuePath("highestPriority")).expect(200).json().asInt());
 
     stomp.await(userDestination(email, "/queue/recent-plays"),
         message -> key(message).equals(key(songA)));
     stomp.await(userDestination(email, "/queue/credits"),
-        message -> message.path("numCredits").asInt() == 17);
-    stomp.await(LocationTopics.queue(locationId), message -> message.size() == 4);
+        message -> message.path("numCredits").asInt() == 21);
+    stomp.await(LocationTopics.queue(locationId), message -> message.size() == 5);
+
+    // The kiosk song is taken back out so the Song Queue screen below sees only this patron's.
+    removeKioskSong(kioskSong);
+    assertEquals(List.of(key(songA), key(songD), key(songB), key(songC)), keys(queuedSongs()));
 
     JsonNode recentPlays = ui.get(token, "/api/users/home").expect(200).json()
         .path("myRecentPlays");
@@ -544,16 +558,16 @@ class WebUiPatronLifecycleTest {
 
     // ── 10. Reordering and removing on the Song Queue screen ──────────────────────────────
     ui.post(token, queuePath("moveSongUpInQueue"), moveBody(songC)).expect(200);
-    expectedBalance -= queueActionCost(1); // 17 - 6 = 11
+    expectedBalance -= queueActionCost(1); // 21 - 6 = 15
     assertEquals(expectedBalance, balance(token));
     assertEquals(List.of(key(songA), key(songD), key(songC), key(songB)), keys(queuedSongs()));
 
     ui.post(token, queuePath("moveSongDownInQueue"), moveBody(songD)).expect(200);
-    expectedBalance -= queueActionCost(1); // 11 - 6 = 5
+    expectedBalance -= queueActionCost(1); // 15 - 6 = 9
     assertEquals(expectedBalance, balance(token));
     assertEquals(List.of(key(songA), key(songC), key(songD), key(songB)), keys(queuedSongs()));
 
-    // Moving the priority-2 song costs 12; only 5 are held -- refused, the queue untouched.
+    // Moving the priority-2 song costs 12; only 9 are held -- refused, the queue untouched.
     Response cannotAfford = ui.post(token, queuePath("moveSongDownInQueue"), moveBody(songA));
     cannotAfford.expect(402);
     assertEquals("InsufficientCreditsException", cannotAfford.error());
@@ -563,7 +577,7 @@ class WebUiPatronLifecycleTest {
     // Top up with the smallest package.
     ui.post(token, "/api/users/add-funds", new AddFundsRequest("pkg-7", "fake-nonce"))
         .expect(200);
-    expectedBalance += 13; // 18
+    expectedBalance += 13; // 22
 
     // Moving the bottom song down changes nothing, and so costs nothing.
     ui.post(token, queuePath("moveSongDownInQueue"), moveBody(songB)).expect(200);
@@ -571,7 +585,7 @@ class WebUiPatronLifecycleTest {
     assertEquals(List.of(key(songA), key(songC), key(songD), key(songB)), keys(queuedSongs()));
 
     ui.post(token, queuePath("removeSongDownFromQueue"), moveBody(songB)).expect(200);
-    expectedBalance -= queueActionCost(1); // 12
+    expectedBalance -= queueActionCost(1); // 16
     assertEquals(expectedBalance, balance(token));
     assertEquals(List.of(key(songA), key(songC), key(songD)), keys(queuedSongs()));
 
@@ -647,24 +661,60 @@ class WebUiPatronLifecycleTest {
     assertEquals(1, normal.path("priority").asInt());
     assertEquals(13 - queueAddCost(1, false), balance(token));
 
-    // A priority play below priority 1 would cost nothing: refused, not queued, not charged.
-    for (int freePriority : new int[] { 0, -5 }) {
+    // A priority play below priority 2 is never offered (priority play only jumps another user's
+    // priority-1-or-higher selection): refused, not queued, not charged.
+    for (int freePriority : new int[] { 1, 0, -5 }) {
       Response refused = ui.post(token, queuePath("addSong"),
           addSongBody(songs.get(1), freePriority, true));
       refused.expect(400);
     }
-    Map<String, Object> noPriority = new LinkedHashMap<>(addSongBody(songs.get(1), 1, true));
+    Map<String, Object> noPriority = new LinkedHashMap<>(addSongBody(songs.get(1), 2, true));
     noPriority.remove("priority");
     ui.post(token, queuePath("addSong"), noPriority).expect(400);
     assertEquals(List.of(key(songs.get(0))), keys(queuedSongs()));
     assertEquals(13 - queueAddCost(1, false), balance(token));
 
-    // A priority play is charged for exactly the priority it is queued at -- including priority 1,
-    // which is what highestPriority offers while only background (priority-0) songs are queued.
+    // A priority play is charged for exactly the priority it is queued at -- here jumping a song
+    // someone queued at the kiosk.
+    queueKioskSongOtherThan(songs);
     JsonNode priorityPlay = ui.post(token, queuePath("addSong"),
-        addSongBody(songs.get(2), 1, true)).expect(200).json();
-    assertEquals(1, priorityPlay.path("priority").asInt());
-    assertEquals(13 - queueAddCost(1, false) - queueAddCost(1, true), balance(token));
+        addSongBody(songs.get(2), 2, true)).expect(200).json();
+    assertEquals(2, priorityPlay.path("priority").asInt());
+    assertEquals(13 - queueAddCost(1, false) - queueAddCost(2, true), balance(token));
+  }
+
+  @Test
+  void aPriorityPlay_isRefusedWhileOnlyThePatronsOwnSongsAreQueued() throws Exception {
+
+    List<JsonNode> songs = songsByDifferentArtists(2);
+    String token = registerWithCredits(uniqueEmail("self-jumper"), "pkg-7"); // 13 credits
+
+    ui.post(token, queuePath("addSong"), addSongBody(songs.get(0), 1, false)).expect(200);
+    int balanceBefore = balance(token);
+
+    Response refused = ui.post(token, queuePath("addSong"), addSongBody(songs.get(1), 2, true));
+    refused.expect(409);
+    assertEquals("SongNotEligibleException", refused.error());
+    assertTrue(refused.json().path("message").asText().startsWith("Priority Play is only"),
+        refused.body());
+    assertEquals(List.of(key(songs.get(0))), keys(queuedSongs()));
+    assertEquals(balanceBefore, balance(token), "a refused priority play is never charged");
+  }
+
+  @Test
+  void aPriorityPlay_isRefusedWhileOnlyBackgroundMusicOrNothingIsQueued() throws Exception {
+
+    JsonNode song = songsByDifferentArtists(1).get(0);
+    String token = registerWithCredits(uniqueEmail("early-bird"), "pkg-7"); // 13 credits
+
+    assertTrue(queuedSongs().isEmpty());
+    Response refused = ui.post(token, queuePath("addSong"), addSongBody(song, 2, true));
+    refused.expect(409);
+    assertEquals("SongNotEligibleException", refused.error());
+    assertTrue(refused.json().path("message").asText().startsWith("Priority Play is only"),
+        refused.body());
+    assertTrue(queuedSongs().isEmpty());
+    assertEquals(13, balance(token), "a refused priority play is never charged");
   }
 
   @Test
@@ -913,7 +963,8 @@ class WebUiPatronLifecycleTest {
 
   /** Mirrors app.js's queueAddCost(), priced from /api/users/pricing-config. */
   private int queueAddCost(int priority, boolean priorityPlay) {
-    int swingCost = priorityPlay ? priority * pricing.path("priorityCostMultiplier").asInt() : 1;
+    int swingCost = priorityPlay
+        ? Math.max(1, priority - 1) * pricing.path("priorityCostMultiplier").asInt() : 1;
     return swingCost * pricing.path("webCostMultiplier").asInt();
   }
 
@@ -1021,6 +1072,40 @@ class WebUiPatronLifecycleTest {
   @FunctionalInterface
   private interface SystemCall {
     void run() throws Exception;
+  }
+
+  /**
+   * Queues a normal play at the kiosk (as {@code LOCAL}) -- another user's selection, which a web
+   * patron's Priority Play can then jump. Kiosk adds skip the patron eligibility rules, so any
+   * library song not already used by the test will do. Returns its {@code albumId/songId} key.
+   */
+  private String queueKioskSongOtherThan(List<JsonNode> exclude) throws Exception {
+    Set<String> excluded = new HashSet<>();
+    for (JsonNode song : exclude) {
+      excluded.add(key(song));
+    }
+    String[] chosen = new String[1];
+    asSystem(() -> {
+      Integer ownLocationId = songLibraryService.getOwnLocationId();
+      for (AlbumDto album : songLibraryService.getAlbums(ownLocationId)) {
+        for (SongDto song : album.songs()) {
+          String songKey = album.albumId() + "/" + song.songId();
+          if (chosen[0] == null && !excluded.contains(songKey)) {
+            songQueueService.addSongToQueue(ownLocationId, new AddSongToQueueRequest(
+                SongQueueService.LOCAL_USERNAME, album.albumId(), song.songId(), 1, false));
+            chosen[0] = songKey;
+          }
+        }
+      }
+    });
+    assertTrue(chosen[0] != null, "the fixture library is too small");
+    return chosen[0];
+  }
+
+  private void removeKioskSong(String songKey) throws Exception {
+    String[] ids = songKey.split("/");
+    asSystem(() -> songQueueService.removeSongDownFromQueue(songLibraryService.getOwnLocationId(),
+        new ChangeSongQueueRequest(Integer.valueOf(ids[0]), Integer.valueOf(ids[1]))));
   }
 
   /**

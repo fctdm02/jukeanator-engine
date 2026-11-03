@@ -54,14 +54,13 @@
 
   /**
    * isPriorityPlay mirrors which action the user picked -- normal play is JFC/Swing's fixed
-   * 1-credit cost; priority play is priority * priorityCostMultiplier. This can't be inferred
-   * from priority alone: highestPriority is 1 whenever the queue's current top entry is a
-   * priority-0 background song, so a genuine priority play can carry the same priority (1) a
-   * normal play always does.
+   * 1-credit cost. A priority play is priced by the level it jumps, not the level it queues at:
+   * it queues one above the song it jumps, so it costs (priority - 1) * priorityCostMultiplier
+   * (mirrors CreditCostCalculator.webQueueAddCost and AddSongToQueueCard.priorityPlayCost).
    */
   function queueAddCost(priority, isPriorityPlay) {
     const cfg = pricingConfig();
-    const swingCost = isPriorityPlay ? priority * cfg.priorityCostMultiplier : 1;
+    const swingCost = isPriorityPlay ? Math.max(1, priority - 1) * cfg.priorityCostMultiplier : 1;
     return swingCost * cfg.webCostMultiplier;
   }
 
@@ -2324,16 +2323,25 @@
     const credits = state.numCredits;
     // highestPriority already IS the next available priority level (queue's top + 1, or 2 if
     // empty) -- mirrors AddSongToQueueCard, which uses it directly as both the cost basis and
-    // the priority to queue at. Do not add another +1 here.
-    const [priorityLevel, ineligibleReason] = readOnly ? [1, null] : await Promise.all([
+    // the priority to queue at. Do not add another +1 here. While this user still has a priority
+    // play waiting in the queue, the server returns that play's level instead, so later priority
+    // plays cost the same and queue behind it.
+    // Priority Play is offered only when another user's selection (priority 1 or higher) is waiting
+    // in the queue -- never over an empty queue, background music alone, or only this user's own
+    // songs. Mirrors SongQueueService.isPriorityPlayAllowed, which the server enforces regardless.
+    const [priorityLevel, ineligibleReason, queuedSongs] = readOnly ? [1, null, []] : await Promise.all([
       api('/api/song-queue/highestPriority').catch(() => 1).then(level => level || 1),
       songIneligibleReason(song),
+      api('/api/song-queue/queuedSongs').catch(() => []),
     ]);
     const ineligible      = ineligibleReason != null;
+    const myEmail         = (state.emailAddress || '').toLowerCase();
+    const priorityAllowed = Array.isArray(queuedSongs) && queuedSongs.some(entry =>
+      (entry.priority ?? 0) >= 1 && (entry.username || '').toLowerCase() !== myEmail);
     const costPlay        = queueAddCost(1, false);
     const costPriority    = queueAddCost(priorityLevel, true);
     const canPlay         = !ineligible && credits >= costPlay;
-    const canPriority     = !ineligible && credits >= costPriority;
+    const canPriority     = !ineligible && priorityAllowed && credits >= costPriority;
 
     const name      = escHtml(song.songName || song.title || '');
     const albumName = escHtml(song.albumName || '');
@@ -2350,9 +2358,11 @@
     const actionClass = (can) => ineligible ? 'song-popup-action song-popup-action--disabled'
       : can ? 'song-popup-action' : 'song-popup-action song-popup-action--warn';
     const creditClass = (can) => ineligible || can ? 'spa-credits' : 'spa-credits spa-credits--warn';
-    const priorityClass       = actionClass(canPriority);
+    // Unavailable (not a credits problem) is greyed out like an ineligible song.
+    const priorityClass       = priorityAllowed ? actionClass(canPriority)
+      : 'song-popup-action song-popup-action--disabled';
     const playClass           = actionClass(canPlay);
-    const priorityCreditClass = creditClass(canPriority);
+    const priorityCreditClass = priorityAllowed ? creditClass(canPriority) : 'spa-credits';
     const playCreditClass     = creditClass(canPlay);
     const warnMark = (can) => ineligible || can ? '' : ' ⚠';
 
@@ -2382,7 +2392,7 @@
         </div>
         <div class="${priorityClass}" id="spaPlayPriority">
           <span class="spa-label">Play Priority Song</span>
-          <span class="${priorityCreditClass}">${formatCredits(costPriority, 'Credits')}${warnMark(canPriority)}</span>
+          <span class="${priorityCreditClass}">${priorityAllowed ? `${formatCredits(costPriority, 'Credits')}${warnMark(canPriority)}` : 'Not available'}</span>
         </div>`}
         <div class="song-popup-action song-popup-action--icon" id="spaArtist">
           <span class="spa-icon">&#128100;</span>

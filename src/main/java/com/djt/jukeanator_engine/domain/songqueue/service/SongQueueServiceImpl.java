@@ -76,6 +76,9 @@ public class SongQueueServiceImpl
    * twice the wait and half the consecutive plays.
    */
   private static final String CREED_ARTIST_NAME = "Creed";
+
+  static final String PRIORITY_PLAY_UNAVAILABLE_MESSAGE = "Priority Play is only available when "
+      + "another user's selection is waiting in the queue. Please use Play Song instead.";
   private static final int CREED_MINUTES_BETWEEN_PLAYS_MULTIPLIER = 2;
   private static final int CREED_MAX_CONSECUTIVE_PLAYS_DIVISOR = 2;
 
@@ -747,6 +750,14 @@ public class SongQueueServiceImpl
     String ineligibleReason = isSongEligibleForQueue(locationId, albumId, songId, priority);
     if (ineligibleReason != null) {
       throw new SongNotEligibleException(ineligibleMessage(song.getSongName(), ineligibleReason));
+    }
+
+    // Checked after the song's own rules, so a song that can't be queued at all says why.
+    String patron = addSongToQueueRequest.username();
+    if (addSongToQueueRequest.priorityPlay()
+        && !SongQueueService.isPriorityPlayAllowed(SongQueueMapper.toDto(songQueueRoot.getSongs()),
+            entry -> patron.equals(entry.username()))) {
+      throw new SongNotEligibleException(PRIORITY_PLAY_UNAVAILABLE_MESSAGE);
     }
   }
 

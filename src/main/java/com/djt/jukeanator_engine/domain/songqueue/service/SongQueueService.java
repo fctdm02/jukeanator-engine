@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.songqueue.service;
 
 import java.util.List;
+import java.util.function.Predicate;
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddAlbumToQueueRequest;
@@ -22,6 +23,25 @@ public interface SongQueueService {
    * 
    */
   String LOCAL_USERNAME = "LOCAL";
+
+  /**
+   * A priority play exists to put the current user's songs ahead of other users' selections, so it
+   * is offered only when the queue holds at least one user-selected song (priority 1 or higher)
+   * that is not the current user's own. Never over an empty queue or background music alone
+   * (priority 0), and never just to jump the current user's own songs. A priority play therefore
+   * always queues at priority 2 or higher, and any entry above priority 1 is a priority play.
+   *
+   * @param isCurrentUsers whether a queued entry was selected by the current user (on the web,
+   *        their email address; on the jukebox, a song queued during the current credit session)
+   */
+  static boolean isPriorityPlayAllowed(List<SongQueueEntryDto> queuedSongs,
+      Predicate<SongQueueEntryDto> isCurrentUsers) {
+    if (queuedSongs == null) {
+      return false;
+    }
+    return queuedSongs.stream().anyMatch(entry -> entry.priority() != null
+        && entry.priority() >= 1 && !isCurrentUsers.test(entry));
+  }
 
   /**
    * NOTE: System method, not to be invoked on behalf of a user
