@@ -54,7 +54,7 @@ public class SongTrackCellRenderer extends JPanel
   // ── Priority-based row colours (queue views only) ─────────────────────────
   /** Row background colours keyed by queue priority (index = priority level). */
   public static final Color[] PRIORITY_COLORS = {
-      new Color(130, 130, 130), // 0 — gray
+      new Color(170, 170, 170), // 0 — gray (lightened from 130 for readability on the kiosk display)
       new Color(220, 220, 220), // 1 — white
       new Color(200, 170, 0), // 2 — yellow
       new Color(200, 100, 0), // 3 — orange

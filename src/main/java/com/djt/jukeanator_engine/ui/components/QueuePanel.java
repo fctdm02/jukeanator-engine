@@ -522,7 +522,7 @@ public class QueuePanel extends JPanel {
 
     boolean selected = selectable && index == selectedIndex;
     Color textColor = selected ? ACCENT_BLUE : priorityColor(entry);
-    Font textFont = new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeTrackSong);
+    Font textFont = new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackSong);
 
     // ── Popularity bars (WEST) ────────────────────────────────────────────
     int plays = entry.song().numPlays() == null ? 0 : entry.song().numPlays();
