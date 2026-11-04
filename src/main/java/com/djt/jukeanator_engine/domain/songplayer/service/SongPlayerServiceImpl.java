@@ -11,6 +11,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -120,14 +121,23 @@ public class SongPlayerServiceImpl implements SongPlayerService {
   private volatile boolean queueLocked = false;
 
   /**
+   * {@code false} until {@link #startPlayback()} is called; until then
+   * {@link #submitQueueProcessing()} is a no-op, so no song is played.
+   */
+  private final AtomicBoolean playbackStarted = new AtomicBoolean(false);
+
+  /**
    * @param externalConfigFile the external {@code application.yml} the app was started with (see
    *        {@link ExternalConfigUpdater#resolveExternalConfigFile}), updated if VLC fails to
    *        initialize on Windows and Winamp is used instead; may be {@code null}
+   * @param deferPlaybackUntilUiReady if {@code true} (Swing UI enabled), no song is played until
+   *        {@link #startPlayback()} is called once the UI has finished initializing; otherwise
+   *        playback starts immediately
    */
   public SongPlayerServiceImpl(SongPlayerProperties songPlayerProperties,
       SongQueueService songQueueService, MasterVolumeService masterVolumeService,
       LineInService lineInService, ApplicationEventPublisher eventPublisher,
-      Path externalConfigFile) {
+      Path externalConfigFile, boolean deferPlaybackUntilUiReady) {
 
     requireNonNull(songPlayerProperties, "songPlayerProperties cannot be null");
     requireNonNull(songQueueService, "songQueueService cannot be null");
@@ -147,8 +157,6 @@ public class SongPlayerServiceImpl implements SongPlayerService {
     // Read back after createPlayer(), which may have switched it to "winamp".
     this.playerType = songPlayerProperties.getPlayerType();
 
-    initialize();
-
     log.info("masterVolumeService : " + this.masterVolumeService);
     log.info("lineInService : " + this.lineInService);
     log.info("playerType : " + this.playerType);
@@ -161,6 +169,12 @@ public class SongPlayerServiceImpl implements SongPlayerService {
      */
     this.player.setOnFinished(this::submitQueueProcessing);
     this.player.setOnPlaybackFailed(this::markSongBad);
+
+    if (deferPlaybackUntilUiReady) {
+      log.info("Song playback deferred until the UI has finished initializing");
+    } else {
+      startPlayback();
+    }
   }
 
   /**
@@ -226,7 +240,13 @@ public class SongPlayerServiceImpl implements SongPlayerService {
     }
   }
 
-  private void initialize() {
+  @Override
+  public void startPlayback() {
+
+    if (!playbackStarted.compareAndSet(false, true)) {
+      return;
+    }
+    log.info("Starting song playback");
 
     submitQueueProcessing();
 
@@ -373,6 +393,11 @@ public class SongPlayerServiceImpl implements SongPlayerService {
    * THE ONLY PLACE processQueue() IS EVER INVOKED.
    */
   private void submitQueueProcessing() {
+
+    // Songs queued before startPlayback() stay in the queue; the first pass after it picks them up.
+    if (!playbackStarted.get()) {
+      return;
+    }
 
     // Capture whatever authentication the calling thread currently holds.
     // If there is none (background callback, timer, etc.) fall back to the

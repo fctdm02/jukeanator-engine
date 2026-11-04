@@ -61,6 +61,14 @@ public interface SongPlayerService {
   void unlockQueue(Integer locationId);
 
   /**
+   * Starts queue processing (and the end-of-track watchdog) if it has not been started yet. When the
+   * Swing UI is enabled, playback is deferred until the UI has finished initializing, so that the
+   * media player is not competing with UI startup on underpowered machines (which can leave Winamp
+   * unresponsive). Has no effect if playback has already been started.
+   */
+  void startPlayback();
+
+  /**
    * 
    * @param event
    */

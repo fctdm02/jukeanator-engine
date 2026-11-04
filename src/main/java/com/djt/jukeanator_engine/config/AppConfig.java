@@ -331,7 +331,8 @@ public class AppConfig {
         masterVolumeService,
         lineInService,
         eventPublisher,
-        ExternalConfigUpdater.resolveExternalConfigFile(environment));
+        ExternalConfigUpdater.resolveExternalConfigFile(environment),
+        environment.getProperty("app.ui-enabled", Boolean.class, false));
   }
 
   @Bean(name = "songPlayerService")

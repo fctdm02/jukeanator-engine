@@ -69,6 +69,11 @@ public class SongPlayerServiceMasterImpl implements SongPlayerService {
   }
 
   @Override
+  public void startPlayback() {
+    // Master never plays songs; each slave starts its own player.
+  }
+
+  @Override
   public void handleSongAddedToQueueEvent(SongAddedToQueueEvent event) {
     throw new UnsupportedOperationException(SYSTEM_METHOD_MESSAGE);
   }

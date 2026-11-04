@@ -111,6 +111,8 @@ public class JukeANatorUserInterfaceApplication {
       // CompletableFuture would otherwise swallow this silently -- and with it the bringToFront()
       // calls below, leaving the UI possibly hidden behind the console with nothing in the log.
       log.error("JukeANator UI: initial data load failed", t);
+      // Start playback anyway, so a failed data load does not leave the jukebox silent.
+      SwingUtilities.invokeLater(songPlayerService::startPlayback);
       return null;
     });
   }
@@ -143,6 +145,10 @@ public class JukeANatorUserInterfaceApplication {
       reRaiseTimer.start();
 
       log.info("JukeANator UI: data load complete");
+
+      // Only now start playing songs, so the media player (e.g. Winamp) is not competing with UI
+      // startup for CPU on underpowered machines, where it could stop responding to IPC.
+      songPlayerService.startPlayback();
     });
   }
 }
