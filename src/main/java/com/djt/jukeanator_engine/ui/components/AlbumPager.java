@@ -220,8 +220,14 @@ class AlbumPager {
         int h = getHeight();
         int arc = 7;
 
-        int shadowH = 4;
+        boolean pressed = getModel().isArmed();
+
+        // Pressed state matches KeyboardPanel: the key sinks toward the shelf,
+        // so its drop-shadow shrinks and the face drops a couple of pixels.
+        int shadowH = pressed ? 1 : 4;
         int visH = h - shadowH;
+        int pressDrop = pressed ? 2 : 0;
+        g2.translate(0, pressDrop);
 
         g2.setColor(ColorTheme.get().keyShadow);
         g2.fillRoundRect(1, shadowH, w - 2, visH, arc, arc);
@@ -231,7 +237,6 @@ class AlbumPager {
         g2.setColor(ColorTheme.get().keyShelf);
         g2.fillRoundRect(1, faceH, w - 2, shelfH + arc / 2, arc, arc);
 
-        boolean pressed = getModel().isArmed();
         Color fTop = pressed ? ColorTheme.get().keyFaceBottom : ColorTheme.get().keyFaceTop;
         Color fMid = ColorTheme.get().keyFaceMid;
         Color fBot = pressed ? ColorTheme.get().keyFaceTop : ColorTheme.get().keyFaceBottom;
@@ -239,9 +244,12 @@ class AlbumPager {
             new Color[] {fTop, fMid, fBot}));
         g2.fillRoundRect(1, 0, w - 2, faceH + arc / 2, arc, arc);
 
-        g2.setColor(ColorTheme.get().keyHighlight);
-        g2.setStroke(new java.awt.BasicStroke(1.2f));
-        g2.drawLine(arc, 1, w - arc - 1, 1);
+        // Specular top-edge highlight — a sunken key doesn't catch the light.
+        if (!pressed) {
+          g2.setColor(ColorTheme.get().keyHighlight);
+          g2.setStroke(new java.awt.BasicStroke(1.2f));
+          g2.drawLine(arc, 1, w - arc - 1, 1);
+        }
 
         g2.setColor(ColorTheme.get().keySide);
         g2.setStroke(new java.awt.BasicStroke(1f));
