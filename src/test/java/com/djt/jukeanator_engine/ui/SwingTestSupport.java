@@ -34,7 +34,7 @@ import javax.swing.SwingUtilities;
  *
  * <p>
  * Interactions mirror what a tap does: buttons are pressed with {@link AbstractButton#doClick()},
- * clickable panels have their {@code mouseClicked} listeners fired, and keyboard shortcuts invoke
+ * clickable panels get a press/release pair (they act on {@code mouseReleased}), and keyboard shortcuts invoke
  * the {@link Action} bound to the key stroke in the component's {@code WHEN_IN_FOCUSED_WINDOW}
  * input map, so the real binding for the configured key is exercised.
  */
@@ -231,8 +231,9 @@ public final class SwingTestSupport {
   }
 
   /**
-   * Fires {@code mouseClicked} on {@code component}, or on its nearest ancestor that listens for
-   * mouse events, as a tap on a clickable panel (row, tile, credits panel) would.
+   * Fires {@code mousePressed} then {@code mouseReleased} at the centre of {@code component}, or of
+   * its nearest ancestor that listens for mouse events, as a tap on a clickable panel (row, tile,
+   * credits panel) would. Clickable panels act on release (see {@code TouchInput}).
    */
   public static void clickComponent(Component component) throws Exception {
     runOnEdt(() -> {
@@ -243,10 +244,18 @@ public final class SwingTestSupport {
       if (target == null) {
         throw new AssertionError("No clickable component at or above " + component);
       }
-      MouseEvent click = new MouseEvent(target, MouseEvent.MOUSE_CLICKED,
-          System.currentTimeMillis(), 0, 5, 5, 1, false, MouseEvent.BUTTON1);
+      int x = target.getWidth() / 2;
+      int y = target.getHeight() / 2;
+      long now = System.currentTimeMillis();
+      MouseEvent press = new MouseEvent(target, MouseEvent.MOUSE_PRESSED, now,
+          MouseEvent.BUTTON1_DOWN_MASK, x, y, 1, false, MouseEvent.BUTTON1);
+      MouseEvent release = new MouseEvent(target, MouseEvent.MOUSE_RELEASED, now, 0, x, y, 1,
+          false, MouseEvent.BUTTON1);
       for (MouseListener listener : target.getMouseListeners()) {
-        listener.mouseClicked(click);
+        listener.mousePressed(press);
+      }
+      for (MouseListener listener : target.getMouseListeners()) {
+        listener.mouseReleased(release);
       }
     });
     flushEdt();

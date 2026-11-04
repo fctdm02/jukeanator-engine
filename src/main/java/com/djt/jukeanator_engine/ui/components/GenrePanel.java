@@ -346,8 +346,9 @@ public class GenrePanel extends JPanel implements TabNavigator {
           }
 
           @Override
-          public void mouseClicked(java.awt.event.MouseEvent e) {
-            showGenreAlbums(genre);
+          public void mouseReleased(java.awt.event.MouseEvent e) {
+            if (TouchInput.isTap(e))
+              showGenreAlbums(genre);
           }
         });
       }

@@ -270,8 +270,8 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
     artPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     artPanel.addMouseListener(new java.awt.event.MouseAdapter() {
       @Override
-      public void mouseClicked(java.awt.event.MouseEvent e) {
-        if (albumClickListener != null)
+      public void mouseReleased(java.awt.event.MouseEvent e) {
+        if (TouchInput.isTap(e) && albumClickListener != null)
           albumClickListener.onAlbumClicked(album);
       }
     });
@@ -471,8 +471,8 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
       }
 
       @Override
-      public void mouseClicked(java.awt.event.MouseEvent e) {
-        if (songClickListener != null)
+      public void mouseReleased(java.awt.event.MouseEvent e) {
+        if (TouchInput.isTap(e) && songClickListener != null)
           songClickListener.onSongClicked(song);
       }
     });

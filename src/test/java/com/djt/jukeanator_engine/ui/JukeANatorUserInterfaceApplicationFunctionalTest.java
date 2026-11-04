@@ -101,7 +101,7 @@ import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
  * <h3>How the UI is driven</h3>
  * Programmatically, through {@link SwingTestSupport}: components are found by the names in
  * {@link UiComponentNames}, buttons are pressed with {@code doClick()}, clickable panels have
- * their {@code mouseClicked} listeners fired, and hardware keys (bill acceptor, Esc) invoke the
+ * their {@code mouseReleased} listeners fired, and hardware keys (bill acceptor, Esc) invoke the
  * real key bindings. The mouse and keyboard are never moved, so the laptop stays usable apart from
  * the fullscreen window. The steps run in order against one application instance; once a step
  * fails, the remaining steps are skipped rather than failing for the same reason.

@@ -265,7 +265,9 @@ public class LoginToAdminPanelCard extends JPanel {
     field.setCursor(Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR));
     field.addMouseListener(new java.awt.event.MouseAdapter() {
       @Override
-      public void mouseClicked(java.awt.event.MouseEvent e) {
+      public void mouseReleased(java.awt.event.MouseEvent e) {
+        if (!TouchInput.isTap(e))
+          return;
         activeField = isPassword ? ActiveField.PASSWORD : ActiveField.USERNAME;
         refreshFieldBorders();
         // Reset timeout on interaction

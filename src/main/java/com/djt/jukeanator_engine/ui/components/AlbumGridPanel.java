@@ -439,8 +439,8 @@ public class AlbumGridPanel extends JPanel implements AlbumGridView {
     tile.addMouseListener(new java.awt.event.MouseAdapter() {
 
       @Override
-      public void mouseClicked(java.awt.event.MouseEvent e) {
-        if (listener != null)
+      public void mouseReleased(java.awt.event.MouseEvent e) {
+        if (TouchInput.isTap(e) && listener != null)
           listener.onAlbumClicked(album);
       }
     });

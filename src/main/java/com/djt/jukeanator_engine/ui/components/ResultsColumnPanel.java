@@ -376,7 +376,9 @@ public final class ResultsColumnPanel {
       }
 
       @Override
-      public void mouseClicked(java.awt.event.MouseEvent e) {
+      public void mouseReleased(java.awt.event.MouseEvent e) {
+        if (!TouchInput.isTap(e))
+          return;
         onItemClick.accept(item);
       }
     });

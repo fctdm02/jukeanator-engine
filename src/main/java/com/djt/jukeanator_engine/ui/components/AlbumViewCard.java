@@ -697,8 +697,8 @@ public class AlbumViewCard extends JPanel {
       }
 
       @Override
-      public void mouseClicked(java.awt.event.MouseEvent e) {
-        if (listener != null)
+      public void mouseReleased(java.awt.event.MouseEvent e) {
+        if (TouchInput.isTap(e) && listener != null)
           listener.onSongClicked(song);
       }
     });

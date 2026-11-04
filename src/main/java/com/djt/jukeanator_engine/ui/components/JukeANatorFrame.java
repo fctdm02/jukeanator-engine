@@ -1162,8 +1162,9 @@ public class JukeANatorFrame extends JFrame {
     creditsPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     creditsPanel.addMouseListener(new java.awt.event.MouseAdapter() {
       @Override
-      public void mouseClicked(java.awt.event.MouseEvent e) {
-        showLoginToAdminPanelCard();
+      public void mouseReleased(java.awt.event.MouseEvent e) {
+        if (TouchInput.isTap(e))
+          showLoginToAdminPanelCard();
       }
     });
 
@@ -1324,8 +1325,9 @@ public class JukeANatorFrame extends JFrame {
     panel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     panel.addMouseListener(new java.awt.event.MouseAdapter() {
       @Override
-      public void mouseClicked(java.awt.event.MouseEvent e) {
-        showNowPlayingAlbumCard();
+      public void mouseReleased(java.awt.event.MouseEvent e) {
+        if (TouchInput.isTap(e))
+          showNowPlayingAlbumCard();
       }
     });
 
