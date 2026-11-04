@@ -201,6 +201,20 @@ public class SongScannerTest {
   }
 
   @Test
+  public void scanFileSystemForSongsAlbumDirectlyUnderRootDoesNotCrash(@TempDir Path root)
+      throws IOException {
+
+    writeFile(root.resolve("LooseAlbum"), "Some Artist-01-SongOne.mp3");
+
+    SongScanner scanner = newScanner(false, false, false);
+    RootFolderEntity result = scanner.scanFileSystemForSongs(root.toString());
+
+    List<AlbumFolderEntity> albums = result.getAllAlbums();
+    assertEquals(1, albums.size());
+    assertSame(result, albums.get(0).getParentFolder());
+  }
+
+  @Test
   public void scanFileSystemForSongsUsesTopFolderAsGenre(@TempDir Path root) throws IOException {
 
     writeFile(root.resolve("Rock/ArtistA/AlbumA"), "ArtistA-01-SongOne.mp3");

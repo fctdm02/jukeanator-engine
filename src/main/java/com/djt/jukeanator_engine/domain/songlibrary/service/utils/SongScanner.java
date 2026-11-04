@@ -120,7 +120,8 @@ public final class SongScanner {
       // was originally assumed all albums would be compilations
       FolderEntity parentFolder = album.getParentFolder();
       if (!parentFolder.getName().equalsIgnoreCase("Soundtracks")
-          && parentFolder instanceof ArtistFolderEntity == false) {
+          && parentFolder instanceof ArtistFolderEntity == false
+          && parentFolder instanceof RootFolderEntity == false) {
 
         parentFolder.getParentFolder().convertChildFolderToArtistFolder(parentFolder);
       }

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 
 /**
@@ -27,7 +28,6 @@ public class JAudioTaggerClientTest {
 	private static final Path TEST_DATA_DIR = Path.of("src", "test", "resources", "com", "djt", "jukeanator_engine", "domain", "songlibrary", "service", "utils", "JAudioTaggerClientTest");
 	private static final Path ORIGINAL_SONG_PATH = TEST_DATA_DIR.resolve("01 Rebel Yell.mp3");
 	private static final Path RENAMED_SONG_PATH = TEST_DATA_DIR.resolve("Billy Idol-01-Rebel Yell.mp3");
-	private static final Path COVER_ART_PATH = TEST_DATA_DIR.resolve("cover.jpg");
 
 	@BeforeAll
 	public static void beforeAll() throws IOException {
@@ -49,7 +49,6 @@ public class JAudioTaggerClientTest {
 
 	public static void cleanup() throws IOException {
 
-		Files.deleteIfExists(COVER_ART_PATH);
 		File songFile = RENAMED_SONG_PATH.toFile();
 		if (songFile.exists()) {
 
@@ -96,12 +95,12 @@ public class JAudioTaggerClientTest {
 	}
 
 	@Test
-	public void extractCoverArt() throws IOException {
+	public void extractCoverArt(@TempDir Path tempDir) throws IOException {
 
 		// STEP 1: ARRANGE
 		JAudioTaggerClient jAudioTaggerClient = new JAudioTaggerClient();
 		String songFile = ORIGINAL_SONG_PATH.toString();
-		String coverArtPath = COVER_ART_PATH.toString();
+		String coverArtPath = tempDir.resolve("cover.jpg").toString();
 
 		
 		// STEP 2: ACT
