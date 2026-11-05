@@ -233,25 +233,8 @@ public final class ColorTheme {
   /** Bottom of the navigation button gradient (hover). */
   public final Color navBtnHoverBottom = new Color(0, 100, 160);
 
-  /** Top of the navigation button gradient (pressed) — the idle top blended 25% toward white. */
-  public final Color navBtnPressedTop = towardWhite(navBtnGradTop, 0.5f);
-
-  /** Bottom of the navigation button gradient (pressed) — the idle bottom blended 25% toward white. */
-  public final Color navBtnPressedBottom = towardWhite(navBtnGradBottom, 0.25f);
-
-  /**
-   * Navigation button text color while pressed — the idle border color. (The pressed border, in
-   * turn, is painted with the idle face gradient.)
-   */
-  public final Color navBtnPressedText = accentBlue;
-
-  /** Blends {@code c} toward white by {@code fraction} (0 = unchanged, 1 = white). */
-  private static Color towardWhite(Color c, float fraction) {
-    return new Color(
-        Math.round(c.getRed() + (255 - c.getRed()) * fraction),
-        Math.round(c.getGreen() + (255 - c.getGreen()) * fraction),
-        Math.round(c.getBlue() + (255 - c.getBlue()) * fraction));
-  }
+  // Pressed state: derived at paint time from the idle colours by PressedEffect (darken + inset
+  // shadow), so there are no separate pressed colours here.
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SORT BUTTON PALETTE (GenreDetailPanel)
@@ -314,6 +297,8 @@ public final class ColorTheme {
 
   /** 3-D button hover face gradient — bottom. */
   public final Color btn3dHoverBottom = new Color(16, 30, 56);
+
+  // Pressed state: derived at paint time from the idle face by PressedEffect (darken + inset shadow).
 
   // Warning state (insufficient credits / error)
   /** 3-D warning button face — top. */
@@ -516,6 +501,15 @@ public final class ColorTheme {
    * AlbumViewCard#trackNavButton paintComponent — disabled state color.
    */
   public final Color trackNavDisabledTint = new Color(255, 255, 255, 40);
+
+  /** Faint highlight behind a hovered chevron page button ({@link ChevronButton}). */
+  public final Color chevronHoverBg = new Color(255, 255, 255, 25);
+
+  /**
+   * Recessed face behind a pressed chevron page button ({@link ChevronButton}); the inset shadow
+   * from {@link PressedEffect} is drawn over it.
+   */
+  public final Color chevronPressedBg = new Color(0, 0, 0, 70);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DETAIL HEADER PANEL PALETTE (DetailHeaderPanel)

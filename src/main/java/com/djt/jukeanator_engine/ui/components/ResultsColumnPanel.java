@@ -440,88 +440,9 @@ public final class ResultsColumnPanel {
   // ─────────────────────────────────────────────────────────────────────────
 
   private static JButton navButton(final boolean isUpDirection, LayoutTheme lt) {
-
-    JButton btn = new JButton() {
-      private static final long serialVersionUID = 1L;
-
-      @Override
-      protected void paintComponent(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
-
-        int w = getWidth();
-        int h = getHeight();
-
-        if (isEnabled() && getBackground() != null && getBackground().getAlpha() > 0) {
-          g2.setColor(getBackground());
-          g2.fillRoundRect(0, 0, w, h, 8, 8);
-        }
-
-        if (isEnabled()) {
-          g2.setColor(getForeground());
-        } else {
-          g2.setColor(ColorTheme.get().trackNavDisabledTint);
-        }
-
-        g2.setStroke(new java.awt.BasicStroke(3.0f, java.awt.BasicStroke.CAP_ROUND,
-            java.awt.BasicStroke.JOIN_ROUND));
-
-        int paddingX = Math.round(w * 0.32f);
-        int paddingY = Math.round(h * 0.34f);
-
-        int leftX = paddingX;
-        int rightX = w - paddingX;
-        int centerX = w / 2;
-
-        if (isUpDirection) {
-          int topY = paddingY;
-          int bottomY = h - paddingY;
-          g2.drawLine(leftX, bottomY, centerX, topY);
-          g2.drawLine(centerX, topY, rightX, bottomY);
-        } else {
-          int topY = paddingY;
-          int bottomY = h - paddingY;
-          g2.drawLine(leftX, topY, centerX, bottomY);
-          g2.drawLine(centerX, bottomY, rightX, topY);
-        }
-
-        g2.dispose();
-      }
-    };
-
-    btn.setOpaque(false);
-    btn.setContentAreaFilled(false);
-    btn.setBorderPainted(false);
-    btn.setFocusPainted(false);
-
-    // Previously: new Dimension(75, 45) — hard-coded.
-    // Now: lt.resultNavBtnW × lt.resultNavBtnH.
-    btn.setPreferredSize(new Dimension(lt.resultNavBtnW, lt.resultNavBtnH));
-    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-    btn.setForeground(ColorTheme.get().textPrimary);
-    btn.setBackground(ColorTheme.get().frameTabsTransparent);
-
-    btn.addMouseListener(new java.awt.event.MouseAdapter() {
-      @Override
-      public void mouseEntered(java.awt.event.MouseEvent e) {
-        if (btn.isEnabled()) {
-          btn.setBackground(ColorTheme.get().accentBlue);
-          btn.setForeground(ColorTheme.get().bgFieldDark);
-          btn.repaint();
-        }
-      }
-
-      @Override
-      public void mouseExited(java.awt.event.MouseEvent e) {
-        btn.setBackground(ColorTheme.get().frameTabsTransparent);
-        btn.setForeground(ColorTheme.get().textPrimary);
-        btn.repaint();
-      }
-    });
-
-    return btn;
+    // Shared with AlbumViewCard's track-list footer, so every chevron page button looks and
+    // presses the same.
+    return ChevronButton.create(isUpDirection, new Dimension(lt.resultNavBtnW, lt.resultNavBtnH));
   }
 
 

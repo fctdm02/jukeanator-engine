@@ -477,102 +477,15 @@ public class AlbumViewCard extends JPanel {
   }
 
   /**
-   * Creates a nav caret button for the track list footer, using the same vector-geometry rendering
+   * Creates a nav caret button for the track list footer — the shared {@link ChevronButton}, same
    * as {@code ResultsColumnPanel.navButton}.
    *
    * @param isUpDirection {@code true} for the "previous / up" caret, {@code false} for "next /
    *        down".
    */
   private static JButton trackNavButton(final boolean isUpDirection) {
-    JButton btn = new JButton() {
-      private static final long serialVersionUID = 1L;
-
-      @Override
-      protected void paintComponent(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
-
-        int w = getWidth();
-        int h = getHeight();
-
-        // 1. Draw Hover State Overlay Background (Clear by default when not interactive)
-        if (isEnabled() && getBackground() != null && getBackground().getAlpha() > 0) {
-          g2.setColor(getBackground());
-          g2.fillRoundRect(0, 0, w, h, 8, 8);
-        }
-
-        // 2. Vector-map the Isosceles Triangle path geometry
-        if (isEnabled()) {
-          g2.setColor(getForeground());
-        } else {
-          g2.setColor(new Color(255, 255, 255, 40)); // Clean semi-transparent disabled tint
-        }
-
-        g2.setStroke(new java.awt.BasicStroke(3.0f, java.awt.BasicStroke.CAP_ROUND,
-            java.awt.BasicStroke.JOIN_ROUND));
-
-        // Geometric boundary padding setups to match the AMI open caret shape
-        int paddingX = Math.round(w * 0.32f);
-        int paddingY = Math.round(h * 0.34f);
-
-        int leftX = paddingX;
-        int rightX = w - paddingX;
-        int centerX = w / 2;
-
-        if (isUpDirection) {
-          int topY = paddingY;
-          int bottomY = h - paddingY;
-          // Render wide isosceles pointing upwards
-          g2.drawLine(leftX, bottomY, centerX, topY);
-          g2.drawLine(centerX, topY, rightX, bottomY);
-        } else {
-          int topY = paddingY;
-          int bottomY = h - paddingY;
-          // Render wide isosceles pointing downwards
-          g2.drawLine(leftX, topY, centerX, bottomY);
-          g2.drawLine(centerX, bottomY, rightX, topY);
-        }
-
-        g2.dispose();
-      }
-    };
-
-    // Initialize with a completely transparent alpha background color context to pass visual checks
-    btn.setOpaque(false);
-    btn.setContentAreaFilled(false);
-    btn.setBorderPainted(false);
-    btn.setFocusPainted(false);
-
-    btn.setPreferredSize(
+    return ChevronButton.create(isUpDirection,
         new Dimension(LayoutTheme.get().resultNavBtnW, LayoutTheme.get().resultNavBtnH));
-    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-    // Default visual color rules
-    btn.setForeground(Color.WHITE);
-    btn.setBackground(new Color(255, 255, 255, 0)); // Pure transparent default pass-through state
-
-    btn.addMouseListener(new java.awt.event.MouseAdapter() {
-      @Override
-      public void mouseEntered(java.awt.event.MouseEvent e) {
-        if (btn.isEnabled()) {
-          // Glow custom corporate accent color block only when active hover tracking triggers
-          btn.setBackground(ACCENT_BLUE);
-          btn.setForeground(Color.BLACK);
-          btn.repaint();
-        }
-      }
-
-      @Override
-      public void mouseExited(java.awt.event.MouseEvent e) {
-        // Return instantly back to clear pass-through background environment tracking
-        btn.setBackground(new Color(255, 255, 255, 0));
-        btn.setForeground(Color.WHITE);
-        btn.repaint();
-      }
-    });
-
-    return btn;
   }
 
   // ─────────────────────────────────────────────────────────────────────────

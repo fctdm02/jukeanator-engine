@@ -485,7 +485,7 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     assertTrue(credits() < cost, "this step expects to start short of credits");
     selectQueueRow(bottom);
     assertEquals("WARN", buttonState(moveUp));
-    assertEquals("GREY", buttonState(moveDown), "the last row cannot move down");
+    assertEquals("UNAVAILABLE", buttonState(moveDown), "the last row cannot move down");
     assertEquals("WARN", buttonState(remove));
     assertFalse(onEdt(remove::isEnabled));
 
@@ -499,7 +499,7 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     awaitEquals(List.of(bottom, top), this::storedSongNames, "stored order after Move Up");
     awaitEquals(List.of(bottom, top), this::displayedQueue, "displayed order after Move Up");
     assertEquals(creditsBefore - cost, credits());
-    assertEquals("GREY", buttonState(moveUp), "the selection followed the song to the top");
+    assertEquals("UNAVAILABLE", buttonState(moveUp), "the selection followed the song to the top");
 
     // A disabled (short of credits or locked) button does nothing
     if (credits() < cost) {

@@ -58,38 +58,24 @@ public class QueuePanel extends JPanel {
   private static final long serialVersionUID = 1L;
 
   /**
-   * Three distinct visual states for the action buttons. GREY = no selection (or positional lock) —
-   * fully dimmed, no sub-label. WARN = selected but not enough credits — red border, "ADD N
-   * CREDITS". NORMAL = selected and affordable — accent border, "Ncr" cost label.
+   * Visual states for the action buttons. GREY = no selection — fully dimmed, no sub-label.
+   * UNAVAILABLE = positional lock (Move Up on the first song, Move Down on the last) — red border,
+   * "NOT AVAILABLE". WARN = selected but not enough credits — red border, "ADD N CREDITS". NORMAL =
+   * selected and affordable — accent border, "Ncr" cost label.
    */
   private enum ButtonState {
-    GREY, WARN, NORMAL
+    GREY, UNAVAILABLE, WARN, NORMAL
   }
 
   // ── Colours ───────────────────────────────────────────────────────────────
   private static final Color ACCENT_BLUE = new Color(0, 210, 255);
   private static final Color ACCENT_GOLD = new Color(255, 200, 0);
-  private static final Color TEXT_PRIMARY = Color.WHITE;
-  private static final Color AM_WARN_BORDER = new Color(220, 40, 40);
 
   // ── Track-row palette — identical to AlbumViewCard, so the queue list renders exactly
   // like the album track listing ────────────────────────────────────────────
   private static final Color BG_ROW_HOVER = new Color(255, 255, 255, 25);
   private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
   private static final Color SEPARATOR = new Color(50, 50, 65);
-
-  // ── 3-D button palette (mirrors AddSongToQueueCard) ─────────────────────
-  private static final Color BTN3D_FACE_TOP = new Color(28, 45, 72);
-  private static final Color BTN3D_FACE_MID = new Color(18, 32, 54);
-  private static final Color BTN3D_FACE_BOTTOM = new Color(10, 18, 34);
-  private static final Color BTN3D_SHELF = new Color(6, 10, 20);
-  private static final Color BTN3D_SHADOW = new Color(2, 4, 10);
-  private static final Color BTN3D_HIGHLIGHT = new Color(80, 140, 210, 200);
-  private static final Color BTN3D_SIDE = new Color(40, 80, 130, 90);
-  private static final Color BTN3D_WARN_TOP = new Color(55, 10, 10);
-  private static final Color BTN3D_WARN_MID = new Color(38, 6, 6);
-  private static final Color BTN3D_WARN_BOTTOM = new Color(22, 3, 3);
-  private static final Color BTN3D_WARN_SHELF = new Color(12, 2, 2);
 
   // ── Dependencies ──────────────────────────────────────────────────────────
   private List<SongQueueEntryDto> queue;
@@ -790,16 +776,16 @@ public class QueuePanel extends JPanel {
       int cost = computeCost(selected);
       boolean afford = currentCredits >= cost;
 
-      // Move Up: grey when first item, warn/normal otherwise
+      // Move Up: not available when first item, warn/normal otherwise
       if (idx == 0) {
-        applyState(moveUpButton, ButtonState.GREY, cost);
+        applyState(moveUpButton, ButtonState.UNAVAILABLE, cost);
       } else {
         applyState(moveUpButton, afford ? ButtonState.NORMAL : ButtonState.WARN, cost);
       }
 
-      // Move Down: grey when last item, warn/normal otherwise
+      // Move Down: not available when last item, warn/normal otherwise
       if (idx >= size - 1) {
-        applyState(moveDownButton, ButtonState.GREY, cost);
+        applyState(moveDownButton, ButtonState.UNAVAILABLE, cost);
       } else {
         applyState(moveDownButton, afford ? ButtonState.NORMAL : ButtonState.WARN, cost);
       }
@@ -912,49 +898,29 @@ public class QueuePanel extends JPanel {
   // ── Button factories ──────────────────────────────────────────────────────
 
   /**
-   * Creates an action button with three distinct visual states driven by the {@code "buttonState"}
+   * Creates an action button with four distinct visual states driven by the {@code "buttonState"}
    * client property ({@link ButtonState}):
    *
    * <ul>
-   * <li>{@code GREY} — fully dimmed flat surface, no sub-label. Used when no song is selected or a
-   * positional constraint applies (Move Up on first item).</li>
-   * <li>{@code WARN} — dark-red face, red border, "ADD N CREDITS" sub-label.</li>
-   * <li>{@code NORMAL} — standard 3-D face, accent border, "Ncr" cost sub-label.</li>
+   * <li>{@code GREY} — fully dimmed flat surface, no sub-label. Used when no song is selected.</li>
+   * <li>{@code UNAVAILABLE} — dark-red 3-D body, red border, "NOT AVAILABLE" sub-label (same as
+   * {@link AddSongToQueueCard}'s unavailable Priority Play). Used for Move Up on the first song and
+   * Move Down on the last.</li>
+   * <li>{@code WARN} — dark-red 3-D body, red border, "ADD N CREDITS" sub-label.</li>
+   * <li>{@code NORMAL} — standard 3-D body, accent border, "Ncr" cost sub-label.</li>
    * </ul>
+   *
+   * The 3-D body (including hover and pressed looks) is painted by {@link Button3D}.
    */
   private JButton createActionButton(String actionText, int initialCost, Color accentColor,
       java.awt.event.ActionListener onClick) {
 
-    // Grey palette constants (fully dimmed — no depth or color)
-    final Color BTN_GREY_FACE = new Color(35, 35, 42);
-    final Color BTN_GREY_BORDER = new Color(65, 65, 75);
-    final Color BTN_GREY_TEXT = new Color(90, 90, 100);
-
     JButton button = new JButton() {
       private static final long serialVersionUID = 1L;
-      private boolean hovered = false;
-      {
-        addMouseListener(new java.awt.event.MouseAdapter() {
-          public void mouseEntered(java.awt.event.MouseEvent e) {
-            if (isEnabled()) {
-              hovered = true;
-              repaint();
-            }
-          }
-
-          public void mouseExited(java.awt.event.MouseEvent e) {
-            hovered = false;
-            repaint();
-          }
-        });
-      }
 
       @Override
       protected void paintComponent(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        Graphics2D g2 = Button3D.createGraphics(g);
 
         Object stateProp = getClientProperty("buttonState");
         ButtonState state =
@@ -962,74 +928,29 @@ public class QueuePanel extends JPanel {
         Object costProp = getClientProperty("cost");
         int cost = (costProp instanceof Integer) ? (Integer) costProp : initialCost;
 
-        int w = getWidth(), h = getHeight(), arc = 12;
-        int shadowH = 5, visH = h - shadowH;
-        int shelfH = Math.round(visH * 0.22f);
-        int faceH = visH - shelfH;
-
         if (state == ButtonState.GREY) {
           // ── Flat dimmed surface — no shadow, no depth ──────────────────
-          g2.setColor(BTN_GREY_FACE);
+          int w = getWidth(), visH = getHeight() - 5, arc = Button3D.ARC;
+          g2.setColor(ColorTheme.get().btnGreyFace);
           g2.fillRoundRect(1, 0, w - 2, visH, arc, arc);
-          g2.setColor(BTN_GREY_BORDER);
+          g2.setColor(ColorTheme.get().btnGreyBorder);
           g2.setStroke(new java.awt.BasicStroke(1.5f));
           g2.drawRoundRect(1, 1, w - 3, visH - 2, arc, arc);
 
           // Action text only — muted, no sub-label
           g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeQueueBtn));
           FontMetrics fm = g2.getFontMetrics();
-          g2.setColor(BTN_GREY_TEXT);
-          g2.drawString(actionText, (w - fm.stringWidth(actionText)) / 2,
-              (visH - fm.getHeight()) / 2 + fm.getAscent());
+          g2.setColor(ColorTheme.get().btnGreyText);
+          Button3D.drawCentered(g2, actionText, w, (visH - fm.getHeight()) / 2 + fm.getAscent());
 
         } else {
-          // ── 3-D face (WARN or NORMAL) ──────────────────────────────────
-          boolean warn = (state == ButtonState.WARN);
+          // ── 3-D body (shared with AddSongToQueueCard) ─────────────────
+          boolean normal = (state == ButtonState.NORMAL);
+          Button3D.Face face = Button3D.paintBody(g2, this, !normal, accentColor);
+          int w = face.width();
+          int visH = face.visH();
 
-          // 1. Drop-shadow
-          g2.setColor(BTN3D_SHADOW);
-          g2.fillRoundRect(2, shadowH, w - 4, visH, arc, arc);
-
-          // 2. Shelf
-          g2.setColor(warn ? BTN3D_WARN_SHELF : BTN3D_SHELF);
-          g2.fillRoundRect(1, faceH, w - 2, shelfH + arc / 2, arc, arc);
-
-          // 3. Face gradient
-          Color fTop, fMid, fBot;
-          if (warn) {
-            fTop = BTN3D_WARN_TOP;
-            fMid = BTN3D_WARN_MID;
-            fBot = BTN3D_WARN_BOTTOM;
-          } else if (hovered) {
-            fTop = new Color(40, 65, 105);
-            fMid = new Color(28, 50, 84);
-            fBot = new Color(16, 30, 56);
-          } else {
-            fTop = BTN3D_FACE_TOP;
-            fMid = BTN3D_FACE_MID;
-            fBot = BTN3D_FACE_BOTTOM;
-          }
-          g2.setPaint(new java.awt.LinearGradientPaint(0, 0, 0, faceH, new float[] {0f, 0.5f, 1f},
-              new Color[] {fTop, fMid, fBot}));
-          g2.fillRoundRect(1, 0, w - 2, faceH + arc / 2, arc, arc);
-
-          // 4. Specular highlight
-          g2.setColor(warn ? new Color(200, 60, 60, 160) : BTN3D_HIGHLIGHT);
-          g2.setStroke(new java.awt.BasicStroke(1.2f));
-          g2.drawLine(arc, 1, w - arc - 1, 1);
-
-          // 5. Side sheen
-          g2.setColor(warn ? new Color(160, 30, 30, 70) : BTN3D_SIDE);
-          g2.setStroke(new java.awt.BasicStroke(1f));
-          g2.drawLine(1, 3, 1, faceH - 3);
-          g2.drawLine(w - 2, 3, w - 2, faceH - 3);
-
-          // 6. Border
-          g2.setColor(warn ? AM_WARN_BORDER : (hovered ? accentColor.brighter() : accentColor));
-          g2.setStroke(new java.awt.BasicStroke(2f));
-          g2.drawRoundRect(1, 1, w - 3, visH - 2, arc, arc);
-
-          // 7. Two-line centred label. Both lines are measured by their actual
+          // Two-line centred label. Both lines are measured by their actual
           // ascent+descent (not getHeight(), which also includes font leading) so the
           // tight 4px gap between them is the only space between the lines — then the
           // whole two-line block (as a single tight unit) is centred against the full
@@ -1048,20 +969,22 @@ public class QueuePanel extends JPanel {
           int line2Y = blockTop + line1H + lineGap + fm2.getAscent();
 
           g2.setFont(font1);
-          g2.setColor(TEXT_PRIMARY);
-          g2.drawString(actionText, (w - fm1.stringWidth(actionText)) / 2, line1Y);
+          g2.setColor(ColorTheme.get().textPrimary);
+          Button3D.drawCentered(g2, actionText, w, line1Y);
 
           g2.setFont(font2);
-          if (!warn) {
-            String costText = creditManager.formatCredits(cost);
+          String line2;
+          if (normal) {
+            line2 = creditManager.formatCredits(cost);
             g2.setColor(ACCENT_GOLD);
-            g2.drawString(costText, (w - fm2.stringWidth(costText)) / 2, line2Y);
+          } else if (state == ButtonState.UNAVAILABLE) {
+            line2 = Button3D.NOT_AVAILABLE_TEXT;
+            g2.setColor(ColorTheme.get().btn3dWarnBorder);
           } else {
-            int needed = Math.max(0, cost - creditManager.getCredits());
-            String warnText = creditManager.formatShortfall(needed);
-            g2.setColor(AM_WARN_BORDER);
-            g2.drawString(warnText, (w - fm2.stringWidth(warnText)) / 2, line2Y);
+            line2 = creditManager.formatShortfall(Math.max(0, cost - creditManager.getCredits()));
+            g2.setColor(ColorTheme.get().btn3dWarnBorder);
           }
+          Button3D.drawCentered(g2, line2, w, line2Y);
         }
 
         g2.dispose();
@@ -1070,14 +993,9 @@ public class QueuePanel extends JPanel {
 
     button.putClientProperty("buttonState", ButtonState.GREY);
     button.putClientProperty("cost", initialCost);
-    button.setContentAreaFilled(false);
-    button.setBorderPainted(false);
-    button.setFocusPainted(false);
-    button.setOpaque(false);
     button.setEnabled(false);
-    button.setPreferredSize(new Dimension(LayoutTheme.get().songQueueActionBtnW,
+    Button3D.configure(button, new Dimension(LayoutTheme.get().songQueueActionBtnW,
         LayoutTheme.get().songQueueActionBtnH));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     button.addActionListener(onClick);
 
     return button;

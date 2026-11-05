@@ -8,11 +8,20 @@ import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.util.function.Consumer;
 import javax.swing.AbstractButton;
-import javax.swing.ButtonModel;
 import javax.swing.JButton;
 
 public final class ButtonFactory {
+
+  /** Corner radius of the blue navigation buttons. */
+  private static final int NAV_ARC = 8;
+
+  /**
+   * How far a pressed navigation button's label moves down. The button shape itself stays put —
+   * these buttons have no outer shadow to sink into and a fixed size.
+   */
+  private static final int NAV_LABEL_SHIFT = 1;
 
   public static JButton createNavigationButton(String text) {
 
@@ -44,13 +53,12 @@ public final class ButtonFactory {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         paintNavButtonBackground(g2, this, hovered);
         g2.dispose();
-        super.paintComponent(g);
+        paintLabelShifted(g, this, super::paintComponent);
       }
     };
 
     button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeNavBtn));
     button.setForeground(Color.WHITE);
-    installPressedForeground(button, Color.WHITE);
     button.setContentAreaFilled(false);
     button.setBorderPainted(false);
     button.setFocusPainted(false);
@@ -62,18 +70,9 @@ public final class ButtonFactory {
   }
 
   /**
-   * Returns true while the button is held down with the pointer still over it — the same state in
-   * which releasing would fire the action.
-   */
-  static boolean isPressed(AbstractButton button) {
-    ButtonModel model = button.getModel();
-    return model.isArmed() && model.isPressed();
-  }
-
-  /**
    * Paints the shared blue navigation-button face: rounded gradient fill plus accent border. While
-   * pressed the face lightens 25% toward white and the border takes the idle face gradient, so a
-   * touchscreen tap gives clear visual feedback.
+   * pressed (see {@link PressedEffect}) the face and border darken slightly and an inset shadow
+   * appears inside the top and side edges, so the button reads as pushed into the screen.
    *
    * @param g2 graphics to paint with (anti-aliasing is expected to be enabled by the caller)
    * @param button the button being painted
@@ -82,13 +81,13 @@ public final class ButtonFactory {
   static void paintNavButtonBackground(Graphics2D g2, AbstractButton button, boolean hovered) {
 
     ColorTheme theme = ColorTheme.get();
-    boolean pressed = isPressed(button);
+    boolean pressed = PressedEffect.isPressed(button);
 
     Color top;
     Color bottom;
     if (pressed) {
-      top = theme.navBtnPressedTop;
-      bottom = theme.navBtnPressedBottom;
+      top = PressedEffect.darken(theme.navBtnGradTop);
+      bottom = PressedEffect.darken(theme.navBtnGradBottom);
     } else if (hovered) {
       top = theme.navBtnHoverTop;
       bottom = theme.navBtnHoverBottom;
@@ -100,32 +99,31 @@ public final class ButtonFactory {
     int w = button.getWidth();
     int h = button.getHeight();
     g2.setPaint(new GradientPaint(0, 0, top, 0, h, bottom));
-    g2.fillRoundRect(0, 0, w, h, 8, 8);
+    g2.fillRoundRect(0, 0, w, h, NAV_ARC, NAV_ARC);
 
-    // Pressed: the border takes the idle face gradient, so the lighter face reads as "pushed in".
     if (pressed) {
-      g2.setPaint(new GradientPaint(0, 0, theme.navBtnGradTop, 0, h, theme.navBtnGradBottom));
-    } else {
-      g2.setColor(theme.accentBlue);
+      PressedEffect.paintInsetShadow(g2, 0, 0, w, h, NAV_ARC);
     }
+
+    g2.setColor(pressed ? PressedEffect.darken(theme.accentBlue) : theme.accentBlue);
     g2.setStroke(new java.awt.BasicStroke(1.5f));
-    g2.drawRoundRect(0, 0, w - 1, h - 1, 8, 8);
+    g2.drawRoundRect(0, 0, w - 1, h - 1, NAV_ARC, NAV_ARC);
   }
 
   /**
-   * Swaps the button's text color to {@link ColorTheme#navBtnPressedText} while it is pressed and
-   * back to {@code normalForeground} on release. Done from a model listener rather than inside
-   * {@code paintComponent} so that changing the foreground never triggers a repaint loop.
-   *
-   * @param button the button to watch
-   * @param normalForeground the text color to use when the button is not pressed
+   * Paints a navigation button's look-and-feel label (via {@code superPaint}, normally
+   * {@code super::paintComponent}), moved down by {@link #NAV_LABEL_SHIFT} while the button is
+   * pressed.
    */
-  static void installPressedForeground(AbstractButton button, Color normalForeground) {
-    button.getModel().addChangeListener(e -> {
-      Color wanted = isPressed(button) ? ColorTheme.get().navBtnPressedText : normalForeground;
-      if (!wanted.equals(button.getForeground())) {
-        button.setForeground(wanted);
+  static void paintLabelShifted(Graphics g, AbstractButton button, Consumer<Graphics> superPaint) {
+    Graphics labelGraphics = g.create();
+    try {
+      if (PressedEffect.isPressed(button)) {
+        labelGraphics.translate(0, NAV_LABEL_SHIFT);
       }
-    });
+      superPaint.accept(labelGraphics);
+    } finally {
+      labelGraphics.dispose();
+    }
   }
 }

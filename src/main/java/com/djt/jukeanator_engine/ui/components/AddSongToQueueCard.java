@@ -3,7 +3,6 @@ package com.djt.jukeanator_engine.ui.components;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -37,7 +36,7 @@ public class AddSongToQueueCard extends JPanel {
 
   /** Client property holding the text a queue button shows when disabled for a non-credit reason. */
   private static final String UNAVAILABLE_TEXT_PROPERTY = "jukeanator.unavailableText";
-  private static final String PRIORITY_PLAY_UNAVAILABLE_TEXT = "NOT AVAILABLE";
+  private static final String PRIORITY_PLAY_UNAVAILABLE_TEXT = Button3D.NOT_AVAILABLE_TEXT;
 
   private final ImageLoader imageLoader;
   private final SongDto song;
@@ -468,94 +467,17 @@ public class AddSongToQueueCard extends JPanel {
 
     JButton button = new JButton() {
       private static final long serialVersionUID = 1L;
-      private boolean hovered = false;
-
-      {
-        addMouseListener(new java.awt.event.MouseAdapter() {
-          public void mouseEntered(java.awt.event.MouseEvent e) {
-            if (isEnabled()) {
-              hovered = true;
-              repaint();
-            }
-          }
-
-          public void mouseExited(java.awt.event.MouseEvent e) {
-            hovered = false;
-            repaint();
-          }
-        });
-      }
 
       @Override
       protected void paintComponent(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        Graphics2D g2 = Button3D.createGraphics(g);
 
         boolean enabled = isEnabled();
-        boolean warn = !enabled;
-        int w = getWidth();
-        int h = getHeight();
-        int arc = 12;
+        Button3D.Face face = Button3D.paintBody(g2, this, !enabled, accentColor);
+        int w = face.width();
+        int faceH = face.faceH();
 
-        // Reserve bottom pixels for the shadow slab; the visible button lives
-        // within [0, visH) so it looks like it floats above the surface.
-        int shadowH = 5;
-        int visH = h - shadowH;
-
-        // ── 1. Drop-shadow slab ────────────────────────────────────────────
-        g2.setColor(ColorTheme.get().btn3dShadow);
-        g2.fillRoundRect(2, shadowH, w - 4, visH, arc, arc);
-
-        // ── 2. Shelf band (bottom ~22 % of visible face) ──────────────────
-        int shelfH = Math.round(visH * 0.22f);
-        int faceH = visH - shelfH;
-
-        Color shelfColor = warn ? ColorTheme.get().btn3dWarnShelf : ColorTheme.get().btn3dShelf;
-        g2.setColor(shelfColor);
-        g2.fillRoundRect(1, faceH, w - 2, shelfH + arc / 2, arc, arc);
-
-        // ── 3. Face gradient ──────────────────────────────────────────────
-        Color fTop, fMid, fBot;
-        if (warn) {
-          fTop = ColorTheme.get().btn3dWarnTop;
-          fMid = ColorTheme.get().btn3dWarnMid;
-          fBot = ColorTheme.get().btn3dWarnBottom;
-        } else if (hovered) {
-          // Brighten face slightly on hover
-          fTop = ColorTheme.get().btn3dHoverTop;
-          fMid = ColorTheme.get().btn3dHoverMid;
-          fBot = ColorTheme.get().btn3dHoverBottom;
-        } else {
-          fTop = ColorTheme.get().btn3dFaceTop;
-          fMid = ColorTheme.get().btn3dFaceMid;
-          fBot = ColorTheme.get().btn3dFaceBottom;
-        }
-        g2.setPaint(new java.awt.LinearGradientPaint(0, 0, 0, faceH, new float[] {0f, 0.5f, 1f},
-            new Color[] {fTop, fMid, fBot}));
-        // Extend slightly into the shelf zone so the join is seamless
-        g2.fillRoundRect(1, 0, w - 2, faceH + arc / 2, arc, arc);
-
-        // ── 4. Specular top-edge highlight ────────────────────────────────
-        g2.setColor(warn ? ColorTheme.get().btn3dWarnSpecular : ColorTheme.get().btn3dHighlight);
-        g2.setStroke(new java.awt.BasicStroke(1.2f));
-        g2.drawLine(arc, 1, w - arc - 1, 1);
-
-        // ── 5. Side-edge sheen (subtle vertical lines) ────────────────────
-        g2.setColor(warn ? ColorTheme.get().btn3dWarnSide : ColorTheme.get().btn3dSide);
-        g2.setStroke(new java.awt.BasicStroke(1f));
-        g2.drawLine(1, 3, 1, faceH - 3);
-        g2.drawLine(w - 2, 3, w - 2, faceH - 3);
-
-        // ── 6. Glowing border ─────────────────────────────────────────────
-        Color borderColor = warn ? ColorTheme.get().btn3dWarnBorder
-            : (hovered ? accentColor.brighter() : accentColor);
-        g2.setColor(borderColor);
-        g2.setStroke(new java.awt.BasicStroke(2f));
-        g2.drawRoundRect(1, 1, w - 3, visH - 2, arc, arc);
-
-        // ── 7. Two-line centred label ─────────────────────────────────────
+        // Two-line centred label
         // Line 1: action text
         g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeQueueCancelBtn));
         FontMetrics fm1 = g2.getFontMetrics();
@@ -563,7 +485,7 @@ public class AddSongToQueueCard extends JPanel {
         int blockY = (faceH - totalTextH) / 2 + fm1.getAscent();
 
         g2.setColor(ColorTheme.get().textPrimary);
-        g2.drawString(actionText, (w - fm1.stringWidth(actionText)) / 2, blockY);
+        Button3D.drawCentered(g2, actionText, w, blockY);
 
         // Line 2: cost or warning
         g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeNavBtn));
@@ -572,9 +494,8 @@ public class AddSongToQueueCard extends JPanel {
 
         if (enabled) {
           // AMI-style short format: "2cr" (or "$0.50" when display-currency-for-cost is enabled)
-          String costText = creditManager.formatCredits(cost);
           g2.setColor(ColorTheme.get().accentGold);
-          g2.drawString(costText, (w - fm2.stringWidth(costText)) / 2, line2Y);
+          Button3D.drawCentered(g2, creditManager.formatCredits(cost), w, line2Y);
         } else {
           // Disabled for a reason other than credits (e.g. priority play with only background
           // music queued) -- say so rather than asking for more money.
@@ -582,20 +503,15 @@ public class AddSongToQueueCard extends JPanel {
           String warnText = unavailableText != null ? unavailableText.toString()
               : creditManager.formatShortfall(cost - creditManager.getCredits());
           g2.setColor(ColorTheme.get().btn3dWarnBorder);
-          g2.drawString(warnText, (w - fm2.stringWidth(warnText)) / 2, line2Y);
+          Button3D.drawCentered(g2, warnText, w, line2Y);
         }
 
         g2.dispose();
       }
     };
 
-    button.setContentAreaFilled(false);
-    button.setBorderPainted(false);
-    button.setFocusPainted(false);
-    button.setOpaque(false);
-    button.setPreferredSize(
+    Button3D.configure(button,
         new Dimension(LayoutTheme.get().addSongQueueBtnW, LayoutTheme.get().addSongQueueBtnH));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     button.addActionListener(onClick);
 
     return button;
@@ -605,87 +521,25 @@ public class AddSongToQueueCard extends JPanel {
 
     JButton button = new JButton() {
       private static final long serialVersionUID = 1L;
-      private boolean hovered = false;
-
-      {
-        addMouseListener(new java.awt.event.MouseAdapter() {
-          public void mouseEntered(java.awt.event.MouseEvent e) {
-            hovered = true;
-            repaint();
-          }
-
-          public void mouseExited(java.awt.event.MouseEvent e) {
-            hovered = false;
-            repaint();
-          }
-        });
-      }
 
       @Override
       protected void paintComponent(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-
-        int w = getWidth();
-        int h = getHeight();
-        int arc = 12;
-        int shadowH = 4;
-        int visH = h - shadowH;
-        int shelfH = Math.round(visH * 0.22f);
-        int faceH = visH - shelfH;
-
-        // Drop-shadow
-        g2.setColor(ColorTheme.get().btn3dShadow);
-        g2.fillRoundRect(2, shadowH, w - 4, visH, arc, arc);
-
-        // Shelf
-        g2.setColor(ColorTheme.get().btn3dShelf);
-        g2.fillRoundRect(1, faceH, w - 2, shelfH + arc / 2, arc, arc);
-
-        // Face gradient
-        Color fTop = hovered ? ColorTheme.get().btn3dHoverTop : ColorTheme.get().btn3dFaceTop;
-        Color fMid = hovered ? ColorTheme.get().btn3dHoverMid : ColorTheme.get().btn3dFaceMid;
-        Color fBot = hovered ? ColorTheme.get().btn3dHoverBottom : ColorTheme.get().btn3dFaceBottom;
-        g2.setPaint(new java.awt.LinearGradientPaint(0, 0, 0, faceH, new float[] {0f, 0.5f, 1f},
-            new Color[] {fTop, fMid, fBot}));
-        g2.fillRoundRect(1, 0, w - 2, faceH + arc / 2, arc, arc);
-
-        // Specular top-edge highlight
-        g2.setColor(ColorTheme.get().btn3dHighlight);
-        g2.setStroke(new java.awt.BasicStroke(1.2f));
-        g2.drawLine(arc, 1, w - arc - 1, 1);
-
-        // Side sheen
-        g2.setColor(ColorTheme.get().btn3dSide);
-        g2.setStroke(new java.awt.BasicStroke(1f));
-        g2.drawLine(1, 3, 1, faceH - 3);
-        g2.drawLine(w - 2, 3, w - 2, faceH - 3);
-
-        // Border
-        g2.setColor(hovered ? ColorTheme.get().accentBlue.brighter() : ColorTheme.get().accentBlue);
-        g2.setStroke(new java.awt.BasicStroke(2f));
-        g2.drawRoundRect(1, 1, w - 3, visH - 2, arc, arc);
+        Graphics2D g2 = Button3D.createGraphics(g);
+        Color accent = ColorTheme.get().accentBlue;
+        Button3D.Face face = Button3D.paintBody(g2, this, false, accent);
 
         g2.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeQueueCancelBtn));
         FontMetrics fm = g2.getFontMetrics();
         g2.setColor(ColorTheme.get().textPrimary);
-        int tx = (w - fm.stringWidth(text)) / 2;
-        int ty = (faceH - fm.getHeight()) / 2 + fm.getAscent();
-        g2.drawString(text, tx, ty);
+        Button3D.drawCentered(g2, text, face.width(),
+            (face.faceH() - fm.getHeight()) / 2 + fm.getAscent());
 
         g2.dispose();
       }
     };
 
-    button.setContentAreaFilled(false);
-    button.setBorderPainted(false);
-    button.setFocusPainted(false);
-    button.setOpaque(false);
-    button.setPreferredSize(
+    Button3D.configure(button,
         new Dimension(LayoutTheme.get().addSongCancelBtnW, LayoutTheme.get().addSongCancelBtnH));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     button.addActionListener(e -> dismiss());
 
     return button;

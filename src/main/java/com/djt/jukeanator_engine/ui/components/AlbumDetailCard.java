@@ -130,14 +130,12 @@ public class AlbumDetailCard extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         ButtonFactory.paintNavButtonBackground(g2, this, hovered);
         g2.dispose();
-        super.paintComponent(g);
+        ButtonFactory.paintLabelShifted(g, this, super::paintComponent);
       }
     };
 
     button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeNavBtn));
-    button.setForeground(ColorTheme.get().textPrimary);
-    ButtonFactory.installPressedForeground(button, ColorTheme.get().textPrimary);
-    button.setContentAreaFilled(false);
+    button.setForeground(ColorTheme.get().textPrimary);    button.setContentAreaFilled(false);
     button.setBorderPainted(false);
     button.setFocusPainted(false);
     button.setOpaque(false);
