@@ -233,6 +233,26 @@ public final class ColorTheme {
   /** Bottom of the navigation button gradient (hover). */
   public final Color navBtnHoverBottom = new Color(0, 100, 160);
 
+  /** Top of the navigation button gradient (pressed) — the idle top blended 25% toward white. */
+  public final Color navBtnPressedTop = towardWhite(navBtnGradTop, 0.5f);
+
+  /** Bottom of the navigation button gradient (pressed) — the idle bottom blended 25% toward white. */
+  public final Color navBtnPressedBottom = towardWhite(navBtnGradBottom, 0.25f);
+
+  /**
+   * Navigation button text color while pressed — the idle border color. (The pressed border, in
+   * turn, is painted with the idle face gradient.)
+   */
+  public final Color navBtnPressedText = accentBlue;
+
+  /** Blends {@code c} toward white by {@code fraction} (0 = unchanged, 1 = white). */
+  private static Color towardWhite(Color c, float fraction) {
+    return new Color(
+        Math.round(c.getRed() + (255 - c.getRed()) * fraction),
+        Math.round(c.getGreen() + (255 - c.getGreen()) * fraction),
+        Math.round(c.getBlue() + (255 - c.getBlue()) * fraction));
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // SORT BUTTON PALETTE (GenreDetailPanel)
   // ═══════════════════════════════════════════════════════════════════════════
