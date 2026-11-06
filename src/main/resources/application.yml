@@ -155,8 +155,8 @@ user-interface:
   hibernate-end: 9   # In 24 hour/military time  
   # CREDIT CONFIGURATION
   increment-credits-key: a
-  increment-credits-credit-card-reader-key: b
-  enable-credit-card-processing: false # must be true for the credit-card-reader key to award any credits
+  increment-credits-credit-card-reader-key: b # Nayax VPOS Touch, 1 pulse (keystroke) per $1 -- see docs/credit-card-reader.md
+  enable-credit-card-processing: false # must be true for the credit-card-reader key to award any credits; logs the Nayax Pulse Title 1-6 text at startup
   num-credits: 0
   priority-cost-multiplier: 2
   credits-per-dollar: 3

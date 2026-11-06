@@ -88,4 +88,49 @@ class CreditManagerTest {
 
     assertEquals(Integer.valueOf(3), creditManager.getSessionPriorityLevel());
   }
+
+  /** The kiosk's default pricing: 3 credits per dollar, $5/$10 bonuses of 3/10, card rate / 2. */
+  private static CreditManager newDefaultPricingCreditManager() {
+    return new CreditManager(0, 3, 3, 10, 2, false);
+  }
+
+  @Test
+  void creditCardCreditsFor_matchesTheCardReaderPriceButtons() {
+    CreditManager creditManager = newDefaultPricingCreditManager();
+
+    assertEquals(9, creditManager.creditCardCreditsFor(5));
+    assertEquals(20, creditManager.creditCardCreditsFor(10));
+    assertEquals(29, creditManager.creditCardCreditsFor(15));
+    assertEquals(40, creditManager.creditCardCreditsFor(20));
+  }
+
+  @Test
+  void creditCardCreditsFor_equalsTheCreditsAwardedPulseByPulse() {
+    for (int dollars : new int[] {1, 5, 10, 15, 20}) {
+      CreditManager creditManager = newDefaultPricingCreditManager();
+
+      int creditsAdded = 0;
+      for (int pulse = 0; pulse < dollars; pulse++) {
+        creditsAdded += creditManager.addCreditCardDollar();
+      }
+
+      assertEquals(creditManager.creditCardCreditsFor(dollars), creditsAdded, "$" + dollars);
+      assertEquals(creditsAdded, creditManager.getCredits(), "$" + dollars);
+    }
+  }
+
+  @Test
+  void addDollar_keepsTheBillAcceptorTierCredits() {
+    CreditManager creditManager = newDefaultPricingCreditManager();
+
+    for (int dollar = 0; dollar < 5; dollar++) {
+      creditManager.addDollar();
+    }
+    assertEquals(18, creditManager.getCredits());
+
+    for (int dollar = 0; dollar < 5; dollar++) {
+      creditManager.addDollar();
+    }
+    assertEquals(40, creditManager.getCredits());
+  }
 }

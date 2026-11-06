@@ -46,6 +46,7 @@ import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerS
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
 import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
+import com.djt.jukeanator_engine.ui.model.CardPulseBurstTracker;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 
 public class JukeANatorFrame extends JFrame {
@@ -156,6 +157,11 @@ public class JukeANatorFrame extends JFrame {
   private final JLayeredPane mainLayeredPane = new JLayeredPane();
   private final JPanel addSongGlassPane = new JPanel(new GridBagLayout());
 
+  // Holds the card-purchase "thank you" message. Sits one layer above addSongGlassPane so an open
+  // Add-Song card is left untouched underneath and reappears when the message is dismissed.
+  private final JPanel cardPaymentGlassPane = new JPanel(new BorderLayout());
+  private CardPaymentConfirmationCard cardPaymentConfirmationCard;
+
   // Set by AdminPanel before it calls setState(ICONIFIED) so the window-state
   // listener knows not to fight the intentional minimize.
   private boolean adminMinimizeRequested = false;
@@ -184,6 +190,27 @@ public class JukeANatorFrame extends JFrame {
 
 
   // SONG CREDITS
+  private static final org.slf4j.Logger log =
+      org.slf4j.LoggerFactory.getLogger(JukeANatorFrame.class);
+  private static final String BILL_ACCEPTOR_ACTION = "billAcceptor";
+  private static final String CREDIT_CARD_READER_ACTION = "creditCardReader";
+
+  /**
+   * How long after the card reader's last $1 pulse a purchase is treated as finished. The Nayax
+   * reader is configured for a 150 ms gap between pulses, so 1.5 s of silence is well clear of it.
+   */
+  private static final int CARD_PURCHASE_QUIET_PERIOD_MS = 1_500;
+
+  /** The card amounts offered on the Nayax reader's price-list screen. */
+  private static final int[] CARD_READER_PRICE_DOLLARS = {5, 10, 15, 20};
+
+  /**
+   * The card amounts listed on the credits panel's CARD line -- three of the reader's four, since
+   * the fixed-width panel has no room for a fourth.
+   */
+  private static final int[] CARD_LINE_PRICE_DOLLARS = {5, 10, 20};
+
+  private CardPulseBurstTracker cardPulseBurstTracker;
   private final char incrementCreditsKey;
   private final char incrementCreditsCreditCardReaderKey;
   private final boolean enableCreditCardProcessing;
@@ -339,6 +366,10 @@ public class JukeANatorFrame extends JFrame {
 
     mainLayeredPane.add(overlayRoot, JLayeredPane.DEFAULT_LAYER);
     mainLayeredPane.add(addSongGlassPane, JLayeredPane.PALETTE_LAYER);
+    cardPaymentGlassPane.setOpaque(false);
+    cardPaymentGlassPane.setVisible(false);
+    cardPaymentGlassPane.setName(UiComponentNames.FRAME_CARD_PAYMENT_GLASS_PANE);
+    mainLayeredPane.add(cardPaymentGlassPane, JLayeredPane.POPUP_LAYER);
     mainLayeredPane.addComponentListener(new java.awt.event.ComponentAdapter() {
       @Override
       public void componentResized(java.awt.event.ComponentEvent e) {
@@ -362,7 +393,6 @@ public class JukeANatorFrame extends JFrame {
     // A raw KeyListener on JFrame would silently stop working the moment any
     // child panel calls requestFocusInWindow().
     // Bound case-insensitively so an accidental Caps Lock does not disable the bill acceptor.
-    final String BILL_ACCEPTOR_ACTION = "billAcceptor";
     bindKeyCaseInsensitive(incrementCreditsKey, BILL_ACCEPTOR_ACTION);
     getRootPane().getActionMap().put(BILL_ACCEPTOR_ACTION, new javax.swing.AbstractAction() {
       private static final long serialVersionUID = 1L;
@@ -377,8 +407,12 @@ public class JukeANatorFrame extends JFrame {
     // Hardware Credit Card Reader (e.g. Nayax VPOS Touch, pulse integration) Key Binding.
     // Only registered when enable-credit-card-processing is true, so the key is a pure no-op
     // (never falls back to bill-acceptor pricing) on terminals that haven't opted in.
+    // Each key press is one $1 pulse; a purchase arrives as a burst of them (e.g. 10 for $10).
+    // Credits and the ledger row are recorded per pulse, so nothing paid for is lost if the app
+    // stops mid-burst -- the burst tracker only drives the "thank you" message once it ends.
     if (enableCreditCardProcessing) {
-      final String CREDIT_CARD_READER_ACTION = "creditCardReader";
+      cardPulseBurstTracker = new CardPulseBurstTracker(CARD_PURCHASE_QUIET_PERIOD_MS,
+          this::showCardPaymentConfirmation);
       bindKeyCaseInsensitive(incrementCreditsCreditCardReaderKey, CREDIT_CARD_READER_ACTION);
       getRootPane().getActionMap().put(CREDIT_CARD_READER_ACTION,
           new javax.swing.AbstractAction() {
@@ -386,11 +420,21 @@ public class JukeANatorFrame extends JFrame {
 
             @Override
             public void actionPerformed(java.awt.event.ActionEvent e) {
-              creditManager.addCreditCardDollar();
+              int creditsAdded = creditManager.addCreditCardDollar();
               financialLedgerService.recordLocalCreditCardCredit(1);
+              cardPulseBurstTracker.recordPulse(creditsAdded);
             }
           });
+      log.info("Card reader enabled. Nayax Pulse Title 1-6 for prices {}: {}",
+          java.util.Arrays.toString(CARD_READER_PRICE_DOLLARS), buildNayaxPulseTitles());
     }
+
+    // The bindings above only fire while this frame has keyboard focus. The screen-saver and
+    // hibernation overlays are separate windows that can take focus, and a bill or card pulse
+    // arriving then would charge the patron without crediting them -- so while either overlay is
+    // the focused window, the payment keys are routed to the same actions here instead.
+    java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        .addKeyEventDispatcher(this::dispatchPaymentKeyFromOverlay);
 
     // Physical Escape Key Binding to Toggle/Bypass Admin Panel
     javax.swing.KeyStroke escapeStroke =
@@ -576,6 +620,102 @@ public class JukeANatorFrame extends JFrame {
         getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW);
     inputMap.put(javax.swing.KeyStroke.getKeyStroke(Character.toLowerCase(key)), actionName);
     inputMap.put(javax.swing.KeyStroke.getKeyStroke(Character.toUpperCase(key)), actionName);
+  }
+
+  /**
+   * {@link java.awt.KeyEventDispatcher} that runs the bill-acceptor or card-reader action for a
+   * payment keystroke that arrives while the screen-saver or hibernation window has focus (where the
+   * frame's own key bindings never see it). Returns {@code true} to consume the keystroke when it
+   * was handled. Any other focused window -- the frame itself, or an admin dialog with a text field
+   * -- is left to normal key handling.
+   */
+  private boolean dispatchPaymentKeyFromOverlay(java.awt.event.KeyEvent e) {
+
+    if (e.getID() != java.awt.event.KeyEvent.KEY_TYPED) {
+      return false;
+    }
+
+    Window focused =
+        java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow();
+    boolean screenSaverFocused = focused != null && focused == screenSaverWindow;
+    boolean hibernationFocused = focused != null && focused == hibernationWindow;
+    if (!screenSaverFocused && !hibernationFocused) {
+      return false;
+    }
+
+    char typed = Character.toLowerCase(e.getKeyChar());
+    String actionName;
+    if (typed == Character.toLowerCase(incrementCreditsKey)) {
+      actionName = BILL_ACCEPTOR_ACTION;
+    } else if (enableCreditCardProcessing
+        && typed == Character.toLowerCase(incrementCreditsCreditCardReaderKey)) {
+      actionName = CREDIT_CARD_READER_ACTION;
+    } else {
+      return false;
+    }
+
+    javax.swing.Action action = getRootPane().getActionMap().get(actionName);
+    if (action == null) {
+      return false;
+    }
+
+    // A patron is paying, so get the screen saver out of the way. Hibernation is left alone: it
+    // runs on the clock, and the credits simply wait on the balance until it ends.
+    if (screenSaverFocused) {
+      screenSaverWindow.setVisible(false);
+      requestFocusInWindow();
+    }
+
+    action.actionPerformed(new java.awt.event.ActionEvent(this,
+        java.awt.event.ActionEvent.ACTION_PERFORMED, actionName));
+    return true;
+  }
+
+  /**
+   * Shows the card-purchase "thank you" message once the card reader's pulse burst has ended.
+   * Floats above everything else in the frame, including an open Add-Song card.
+   */
+  private void showCardPaymentConfirmation(int dollars, int creditsAdded) {
+
+    log.info("Card purchase complete: ${} charged, {} credits added", dollars, creditsAdded);
+
+    if (screenSaverWindow != null && screenSaverWindow.isVisible()) {
+      screenSaverWindow.setVisible(false);
+    }
+
+    if (cardPaymentConfirmationCard != null) {
+      cardPaymentConfirmationCard.dismiss();
+    }
+
+    cardPaymentConfirmationCard = new CardPaymentConfirmationCard(dollars, creditsAdded, () -> {
+      cardPaymentGlassPane.setVisible(false);
+      cardPaymentGlassPane.removeAll();
+      requestFocusInWindow();
+    });
+
+    cardPaymentGlassPane.removeAll();
+    cardPaymentGlassPane.add(cardPaymentConfirmationCard, BorderLayout.CENTER);
+    syncOverlayLayerBounds();
+    cardPaymentGlassPane.setVisible(true);
+    cardPaymentGlassPane.revalidate();
+    cardPaymentGlassPane.repaint();
+    cardPaymentConfirmationCard.onShown();
+  }
+
+  /**
+   * The text to paste into the Nayax reader's {@code Pulse Title 1-6} attribute, so each price
+   * button on the reader shows the credits it buys -- e.g.
+   * {@code 9 CREDITS;20 CREDITS;29 CREDITS;40 CREDITS}.
+   */
+  private String buildNayaxPulseTitles() {
+    StringBuilder titles = new StringBuilder();
+    for (int dollars : CARD_READER_PRICE_DOLLARS) {
+      if (titles.length() > 0) {
+        titles.append(';');
+      }
+      titles.append(creditManager.creditCardCreditsFor(dollars)).append(" CREDITS");
+    }
+    return titles.toString();
   }
 
   /**
@@ -1226,25 +1366,23 @@ public class JukeANatorFrame extends JFrame {
   }
 
   /**
-   * Mirrors {@link #buildCreditsDescription()} but at the reduced credit-card rate -- each tier's
-   * bill-acceptor-equivalent credit total is divided by {@code webCostMultiplier} and rounded up
-   * to the nearest whole credit, matching {@link CreditManager#addCreditCardDollar()}.
+   * The card pricing line, listing amounts offered on the card reader's price-list screen
+   * ({@link #CARD_LINE_PRICE_DOLLARS}) at the reduced credit-card rate, as awarded by
+   * {@link CreditManager#addCreditCardDollar()}.
    */
   private String buildCreditCardCreditsDescription() {
 
-    int oneDollarCredits = ceilDiv(creditsPerDollar, webCostMultiplier);
-    int fiveDollarCredits =
-        ceilDiv((5 * creditsPerDollar) + fiveDollarBonusCredits, webCostMultiplier);
-    int tenDollarCredits =
-        ceilDiv((10 * creditsPerDollar) + tenDollarBonusCredits, webCostMultiplier);
-
     String unit = jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost() ? " plays" : "cr";
-    return String.format("CARD: 1$=%d%s | 5$=%d%s | 10$=%d%s", oneDollarCredits, unit,
-        fiveDollarCredits, unit, tenDollarCredits, unit);
-  }
-
-  private static int ceilDiv(int numerator, int denominator) {
-    return -Math.floorDiv(-numerator, denominator);
+    StringBuilder description = new StringBuilder("CARD: ");
+    for (int i = 0; i < CARD_LINE_PRICE_DOLLARS.length; i++) {
+      if (i > 0) {
+        description.append(" | ");
+      }
+      int dollars = CARD_LINE_PRICE_DOLLARS[i];
+      description.append(dollars).append("$=").append(creditManager.creditCardCreditsFor(dollars))
+          .append(unit);
+    }
+    return description.toString();
   }
 
   // NOW PLAYING PANEL
@@ -1541,6 +1679,8 @@ public class JukeANatorFrame extends JFrame {
     overlayRoot.validate();
     int tabStripHeight = computeTabStripHeight();
     addSongGlassPane.setBounds(0, 0, w, Math.max(0, h - tabStripHeight));
+    cardPaymentGlassPane.setBounds(0, 0, w, h);
+    cardPaymentGlassPane.validate();
   }
 
   /**

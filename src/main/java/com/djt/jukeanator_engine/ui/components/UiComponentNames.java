@@ -24,6 +24,7 @@ public final class UiComponentNames {
   public static final String FRAME_TABS = "JukeANatorFrame.tabs";
   public static final String FRAME_OVERLAY_ROOT = "JukeANatorFrame.overlayRoot";
   public static final String FRAME_ADD_SONG_GLASS_PANE = "JukeANatorFrame.addSongGlassPane";
+  public static final String FRAME_CARD_PAYMENT_GLASS_PANE = "JukeANatorFrame.cardPaymentGlassPane";
   public static final String FRAME_CREDITS_PANEL = "JukeANatorFrame.creditsPanel";
   public static final String FRAME_CREDITS_TITLE = "JukeANatorFrame.creditsTitle";
   public static final String FRAME_NOW_PLAYING_PANEL = "JukeANatorFrame.nowPlayingPanel";
@@ -83,6 +84,11 @@ public final class UiComponentNames {
   public static final String ADD_SONG_CANCEL_BUTTON = "AddSongToQueueCard.cancelButton";
   public static final String ADD_SONG_OK_BUTTON = "AddSongToQueueCard.okButton";
   public static final String ADD_SONG_CONSTRAINT_LABEL = "AddSongToQueueCard.constraintLabel";
+
+  // ── CardPaymentConfirmationCard ─────────────────────────────────────────────
+  public static final String CARD_PAYMENT_CHARGED_LABEL = "CardPaymentConfirmationCard.chargedLabel";
+  public static final String CARD_PAYMENT_CREDITS_LABEL = "CardPaymentConfirmationCard.creditsLabel";
+  public static final String CARD_PAYMENT_OK_BUTTON = "CardPaymentConfirmationCard.okButton";
 
   // ── QueuePanel ──────────────────────────────────────────────────────────────
   public static final String QUEUE_ROW = "QueuePanel.row";

@@ -47,24 +47,7 @@ public class CreditManager {
 
   public synchronized void addDollar() {
     totalDollarsInserted++;
-    numCredits += creditsPerDollar;
-
-    // Apply tiered bonuses based on exact milestone targets
-    if (totalDollarsInserted == 5) {
-      numCredits += fiveDollarBonus;
-    } else if (totalDollarsInserted == 10) {
-      numCredits += tenDollarBonus;
-      if (numCredits > creditsPerDollar * 10) {
-        numCredits = (creditsPerDollar * 10) + tenDollarBonus;
-      }
-    } else if (totalDollarsInserted == 15) {
-      numCredits += fiveDollarBonus;
-    } else if (totalDollarsInserted == 20) {
-      numCredits += tenDollarBonus;
-      if (numCredits > (creditsPerDollar * 20) + (2 * tenDollarBonus)) {
-        numCredits = (creditsPerDollar * 20) + (2 * tenDollarBonus);
-      }
-    }
+    numCredits = addTierDollar(numCredits, totalDollarsInserted);
 
     effectiveCreditsPerDollar =
         (double) numCredits / (totalDollarsInserted + totalCreditCardDollarsInserted);
@@ -78,36 +61,62 @@ public class CreditManager {
    * Applies the same tiered bonus schedule as {@link #addDollar()} to the card's own running
    * total, then divides the result by {@code webCostMultiplier} and rounds up to the nearest whole
    * credit.
+   *
+   * @return the number of credits this dollar added to the balance
    */
-  public synchronized void addCreditCardDollar() {
+  public synchronized int addCreditCardDollar() {
     totalCreditCardDollarsInserted++;
-    rawCreditCardCredits += creditsPerDollar;
-
-    // Apply tiered bonuses based on exact milestone targets
-    if (totalCreditCardDollarsInserted == 5) {
-      rawCreditCardCredits += fiveDollarBonus;
-    } else if (totalCreditCardDollarsInserted == 10) {
-      rawCreditCardCredits += tenDollarBonus;
-      if (rawCreditCardCredits > creditsPerDollar * 10) {
-        rawCreditCardCredits = (creditsPerDollar * 10) + tenDollarBonus;
-      }
-    } else if (totalCreditCardDollarsInserted == 15) {
-      rawCreditCardCredits += fiveDollarBonus;
-    } else if (totalCreditCardDollarsInserted == 20) {
-      rawCreditCardCredits += tenDollarBonus;
-      if (rawCreditCardCredits > (creditsPerDollar * 20) + (2 * tenDollarBonus)) {
-        rawCreditCardCredits = (creditsPerDollar * 20) + (2 * tenDollarBonus);
-      }
-    }
+    rawCreditCardCredits = addTierDollar(rawCreditCardCredits, totalCreditCardDollarsInserted);
 
     int actualCardCredits = ceilDiv(rawCreditCardCredits, webCostMultiplier);
-    numCredits += actualCardCredits - creditCardCreditsAwarded;
+    int creditsAdded = actualCardCredits - creditCardCreditsAwarded;
+    numCredits += creditsAdded;
     creditCardCreditsAwarded = actualCardCredits;
 
     effectiveCreditsPerDollar =
         (double) numCredits / (totalDollarsInserted + totalCreditCardDollarsInserted);
 
     notifyListeners();
+    return creditsAdded;
+  }
+
+  /**
+   * The total credits a fresh credit-card purchase of {@code dollars} awards -- the same result as
+   * calling {@link #addCreditCardDollar()} {@code dollars} times at the start of a session. Used
+   * for the on-screen card pricing line and the Nayax reader's price-button titles.
+   */
+  public int creditCardCreditsFor(int dollars) {
+    int raw = 0;
+    for (int dollar = 1; dollar <= dollars; dollar++) {
+      raw = addTierDollar(raw, dollar);
+    }
+    return ceilDiv(raw, webCostMultiplier);
+  }
+
+  /**
+   * Adds one dollar's worth of credits to {@code credits}, applying the tiered bonus for reaching
+   * {@code dollarCount} dollars this session (exact milestones at $5, $10, $15 and $20, with the
+   * $10 and $20 totals capped).
+   */
+  private int addTierDollar(int credits, int dollarCount) {
+    credits += creditsPerDollar;
+
+    if (dollarCount == 5) {
+      credits += fiveDollarBonus;
+    } else if (dollarCount == 10) {
+      credits += tenDollarBonus;
+      if (credits > creditsPerDollar * 10) {
+        credits = (creditsPerDollar * 10) + tenDollarBonus;
+      }
+    } else if (dollarCount == 15) {
+      credits += fiveDollarBonus;
+    } else if (dollarCount == 20) {
+      credits += tenDollarBonus;
+      if (credits > (creditsPerDollar * 20) + (2 * tenDollarBonus)) {
+        credits = (creditsPerDollar * 20) + (2 * tenDollarBonus);
+      }
+    }
+    return credits;
   }
 
   private static int ceilDiv(int numerator, int denominator) {
