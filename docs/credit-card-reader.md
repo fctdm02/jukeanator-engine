@@ -81,23 +81,22 @@ Check these colors against the tag on your cable first. If anything differs, sto
 
 ### Wiring picture
 
-```
-   WALL                          NAYAX CABLE
- ┌────────────┐
- │ 12V adapter│
- │  barrel    │ (+) ──┬─────────── RED + RED   (power +)
- │  screw end │       │
- └────────────┘       └──── RELAY coil  +  (A1)
-               (−) ─────────────── BLACK + BLACK (power −)
-                                    GREEN (blip) ─── RELAY coil − (A2)
+![Wiring picture: Nayax reader, 12 V adapter, lever nuts, relay and KE-18](Nayax_Card_Reader_Wiring.png)
 
-                RELAY switch side            KE-18 keyboard encoder
-                  11 (COM) ───────────────── a GND (ground) terminal
-                  14 (NO)  ───────────────── one unused input terminal
-                  12 (NC)  ── nothing
-```
+The numbered circles match the steps below. Every connection, one line each:
 
-The Nayax side and the KE-18 side **never share a wire**.
+- **Adapter +** → RED lever nut, together with both **Nayax red** wires and one end of the **red jumper**.
+- **Adapter −** → BLACK lever nut, together with both **Nayax black** wires.
+- **Red jumper** (other end) → relay **A1 (+)**.
+- **Nayax green** (the pulse wire) → relay **A2 (−)**.
+- Relay **11 (COM)** → KE-18 **GND** (the same GND your bill acceptor uses), with a white wire.
+- Relay **14 (NO)** → a **spare KE-18 input**, with a yellow wire.
+- Relay **12 (NC)** → nothing.
+- Every other Nayax wire → capped alone in its own small lever nut.
+
+**What the relay coil is:** A1 and A2 are the two ends of a tiny electromagnet inside the relay. A1 gets 12 V all the time through the red jumper. When a $1 charge is approved, the Nayax connects the green wire to ground for 0.1 second. That turns the magnet on, the relay clicks and its light flashes, and the click closes the switch between 11 and 14, just like pressing a button. The KE-18 sees that "button press" and types one `b`.
+
+The Nayax side and the KE-18 side **never share a wire**. The drawing's source file is [Nayax_Card_Reader_Wiring.svg](Nayax_Card_Reader_Wiring.svg).
 
 ### Step by step
 
@@ -117,8 +116,8 @@ Keep the adapter **unplugged** unless a step says otherwise. Build it on a table
 **3. Connect power**
 1. Strip the 2 red, 2 black and 1 green wires.
 2. Cut a 6-inch red jumper wire.
-3. Put both reds and the red jumper into one 3-port Wago. Run a wire from that Wago to the adapter's **+** screw.
-4. Put both blacks into another Wago. Run a wire from that Wago to the adapter's **−** screw.
+3. Put both reds, one end of the red jumper, and a short wire to the adapter's **+** screw into one **5-port** Wago (4 wires; one port stays empty).
+4. Put both blacks and a short wire to the adapter's **−** screw into one **3-port** Wago.
 5. Tug each wire gently to make sure it is held.
 
 **4. Connect the relay coil**

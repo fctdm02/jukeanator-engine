@@ -1,0 +1,233 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1400" height="900" viewBox="0 0 1400 900" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <g id="screw">
+      <circle cx="0" cy="0" r="7" fill="#d6d6d6" stroke="#4a4a4a" stroke-width="1.5"/>
+      <line x1="-4" y1="-4" x2="4" y2="4" stroke="#4a4a4a" stroke-width="1.8"/>
+    </g>
+    <g id="badge-1"><circle r="13" fill="#2b2b2b"/><text y="5" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">1</text></g>
+    <g id="badge-2"><circle r="13" fill="#2b2b2b"/><text y="5" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">2</text></g>
+    <g id="badge-3"><circle r="13" fill="#2b2b2b"/><text y="5" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">3</text></g>
+    <g id="badge-4"><circle r="13" fill="#2b2b2b"/><text y="5" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">4</text></g>
+    <g id="badge-5"><circle r="13" fill="#2b2b2b"/><text y="5" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">5</text></g>
+    <!-- small 2-port lever nut used to cap one unused wire -->
+    <g id="capnut">
+      <rect x="-15" y="0" width="30" height="24" rx="3" fill="#e4edf2" stroke="#7f98a6" stroke-width="1.5"/>
+      <rect x="-12" y="-6" width="10" height="9" rx="2" fill="#f28c28" stroke="#b5600f"/>
+      <rect x="2" y="-6" width="10" height="9" rx="2" fill="#f28c28" stroke="#b5600f"/>
+    </g>
+  </defs>
+
+  <!-- background and the two sides -->
+  <rect x="0" y="0" width="1400" height="900" fill="#ffffff"/>
+  <text x="700" y="38" text-anchor="middle" font-size="24" font-weight="bold" fill="#222">Nayax card reader → relay → KE-18: how everything connects</text>
+  <rect x="10" y="60" width="890" height="830" rx="10" fill="#fff4e6"/>
+  <rect x="900" y="60" width="490" height="830" rx="10" fill="#e9f2fb"/>
+  <text x="30" y="88" font-size="16" font-weight="bold" fill="#b45f06">NAYAX + POWER SIDE (12 volts)</text>
+  <text x="920" y="88" font-size="16" font-weight="bold" fill="#1f5c99">KE-18 + PC SIDE (5 volts from USB)</text>
+  <line x1="900" y1="60" x2="900" y2="890" stroke="#888" stroke-width="2" stroke-dasharray="10 8"/>
+
+  <!-- ===== Nayax reader ===== -->
+  <rect x="360" y="80" width="160" height="230" rx="18" fill="#1b1b1b"/>
+  <rect x="376" y="98" width="128" height="128" rx="6" fill="#0e2a47"/>
+  <text x="440" y="116" text-anchor="middle" font-size="10" fill="#fff">TAP AMOUNT</text>
+  <rect x="382" y="124" width="54" height="40" rx="4" fill="#2f7de1"/><text x="409" y="150" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">$5</text>
+  <rect x="444" y="124" width="54" height="40" rx="4" fill="#2f7de1"/><text x="471" y="150" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">$10</text>
+  <rect x="382" y="172" width="54" height="40" rx="4" fill="#2f7de1"/><text x="409" y="198" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">$15</text>
+  <rect x="444" y="172" width="54" height="40" rx="4" fill="#2f7de1"/><text x="471" y="198" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">$20</text>
+  <g fill="none" stroke="#9ad0ff" stroke-width="3" stroke-linecap="round">
+    <path d="M432 270 a10 10 0 0 1 0 -16"/>
+    <path d="M441 276 a18 18 0 0 1 0 -28"/>
+    <path d="M450 282 a26 26 0 0 1 0 -40"/>
+  </g>
+  <text x="536" y="112" font-size="15" font-weight="bold" fill="#222">Nayax VPOS Touch</text>
+  <text x="536" y="130" font-size="13" fill="#444">card reader</text>
+  <!-- cable sheath -->
+  <line x1="440" y1="310" x2="440" y2="390" stroke="#555" stroke-width="16" stroke-linecap="round"/>
+  <text x="426" y="352" text-anchor="end" font-size="12" fill="#444">Nayax cable C13003</text>
+
+  <!-- ===== Power strip + 12 V adapter ===== -->
+  <rect x="30" y="790" width="260" height="56" rx="10" fill="#f1f1f1" stroke="#9a9a9a" stroke-width="2"/>
+  <g fill="#d9d9d9" stroke="#888">
+    <rect x="180" y="802" width="34" height="32" rx="5"/>
+    <rect x="232" y="802" width="34" height="32" rx="5"/>
+  </g>
+  <g fill="#444"><rect x="191" y="810" width="3" height="10"/><rect x="200" y="810" width="3" height="10"/><rect x="243" y="810" width="3" height="10"/><rect x="252" y="810" width="3" height="10"/></g>
+  <text x="160" y="866" text-anchor="middle" font-size="12" fill="#444">Jukebox power strip</text>
+  <rect x="50" y="716" width="88" height="78" rx="8" fill="#232323"/>
+  <text x="94" y="750" text-anchor="middle" font-size="15" font-weight="bold" fill="#fff">12 V</text>
+  <text x="94" y="768" text-anchor="middle" font-size="11" fill="#ddd">ADAPTER</text>
+  <path d="M92 716 C 92 690, 110 690, 136 690" fill="none" stroke="#111" stroke-width="5"/>
+  <rect x="134" y="682" width="16" height="16" rx="2" fill="#111"/>
+  <rect x="150" y="640" width="60" height="70" rx="4" fill="#1f7a3a" stroke="#145227" stroke-width="2"/>
+  <text x="164" y="666" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">−</text>
+  <text x="164" y="696" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">+</text>
+  <text x="150" y="728" font-size="12" fill="#444">Adapter's screw end</text>
+  <use xlink:href="#badge-1" x="122" y="648"/>
+
+  <!-- ===== Lever nuts ===== -->
+  <!-- BLACK lever nut (3-port) -->
+  <rect x="150" y="470" width="70" height="34" rx="4" fill="#e4edf2" stroke="#7f98a6" stroke-width="1.5"/>
+  <g fill="#f28c28" stroke="#b5600f"><rect x="157" y="478" width="14" height="18" rx="2"/><rect x="178" y="478" width="14" height="18" rx="2"/><rect x="199" y="478" width="14" height="18" rx="2"/></g>
+  <text x="230" y="490" font-size="12" font-weight="bold" fill="#222">BLACK lever nut</text>
+  <text x="230" y="505" font-size="11" fill="#444">2 Nayax blacks + adapter −</text>
+  <!-- RED lever nut (5-port) -->
+  <rect x="380" y="600" width="110" height="34" rx="4" fill="#e4edf2" stroke="#7f98a6" stroke-width="1.5"/>
+  <g fill="#f28c28" stroke="#b5600f"><rect x="389" y="608" width="14" height="18" rx="2"/><rect x="410" y="608" width="14" height="18" rx="2"/><rect x="431" y="608" width="14" height="18" rx="2"/><rect x="452" y="608" width="14" height="18" rx="2"/><rect x="473" y="608" width="14" height="18" rx="2"/></g>
+  <text x="435" y="654" text-anchor="middle" font-size="12" font-weight="bold" fill="#222">RED lever nut (5-port)</text>
+  <text x="435" y="670" text-anchor="middle" font-size="11" fill="#444">2 Nayax reds + adapter +</text>
+  <text x="435" y="684" text-anchor="middle" font-size="11" fill="#444">+ red jumper (1 port spare)</text>
+  <use xlink:href="#badge-3" x="512" y="617"/>
+
+  <!-- unused wires, each capped alone -->
+  <use xlink:href="#capnut" x="575" y="330"/>
+  <use xlink:href="#capnut" x="615" y="330"/>
+  <use xlink:href="#capnut" x="655" y="330"/>
+  <use xlink:href="#capnut" x="695" y="330"/>
+  <use xlink:href="#capnut" x="735" y="330"/>
+  <use xlink:href="#capnut" x="775" y="330"/>
+  <text x="566" y="262" font-size="12" fill="#333">Every other wire: capped alone in its own</text>
+  <text x="566" y="278" font-size="12" fill="#333">small lever nut (6 of the 10 shown).</text>
+  <text x="566" y="296" font-size="12" font-weight="bold" fill="#c62828">Light blue (VCC) must never touch anything.</text>
+  <use xlink:href="#badge-2" x="546" y="272"/>
+
+  <!-- ===== DIN rail + relay ===== -->
+  <rect x="880" y="360" width="40" height="260" fill="#c9ced3" stroke="#8a9097" stroke-width="1.5"/>
+  <g fill="#9ea4aa"><rect x="893" y="372" width="14" height="22" rx="3"/><rect x="893" y="586" width="14" height="22" rx="3"/></g>
+  <text x="900" y="352" text-anchor="middle" font-size="11" fill="#444">DIN rail (screwed to cabinet)</text>
+  <rect x="740" y="420" width="320" height="100" rx="6" fill="#d8dadc" stroke="#6b6f73" stroke-width="2"/>
+  <rect x="740" y="420" width="50" height="100" rx="6" fill="#b9bcbf" stroke="#6b6f73" stroke-width="2"/>
+  <rect x="1010" y="420" width="50" height="100" rx="6" fill="#b9bcbf" stroke="#6b6f73" stroke-width="2"/>
+  <text x="798" y="456" font-size="12" font-weight="bold" fill="#222">A2 (−)</text>
+  <text x="798" y="492" font-size="12" font-weight="bold" fill="#222">A1 (+)</text>
+  <text x="900" y="462" text-anchor="middle" font-size="20" font-weight="bold" fill="#222">RELAY</text>
+  <text x="900" y="480" text-anchor="middle" font-size="10" fill="#444">Phoenix 2966906</text>
+  <circle cx="893" cy="500" r="5" fill="#3ccf4e" stroke="#1e7a2a"/>
+  <text x="902" y="504" font-size="10" fill="#444">light</text>
+  <text x="1002" y="450" text-anchor="end" font-size="12" font-weight="bold" fill="#222">11 COM</text>
+  <text x="1002" y="474" text-anchor="end" font-size="12" font-weight="bold" fill="#222">14 NO</text>
+  <text x="1002" y="498" text-anchor="end" font-size="12" fill="#666">12 NC</text>
+  <text x="765" y="535" text-anchor="middle" font-size="11" fill="#444">coil side</text>
+  <text x="1035" y="535" text-anchor="middle" font-size="11" fill="#444">switch side</text>
+  <use xlink:href="#badge-4" x="765" y="400"/>
+
+  <!-- ===== Bill acceptor, KE-18, PC ===== -->
+  <text x="1250" y="182" text-anchor="middle" font-size="12" fill="#444">Bill acceptor (already wired, leave as is)</text>
+  <rect x="1190" y="190" width="120" height="64" rx="6" fill="#4a4a4a"/>
+  <rect x="1205" y="208" width="90" height="8" rx="2" fill="#111"/>
+  <rect x="1130" y="335" width="240" height="195" rx="6" fill="#1d6b3a" stroke="#0f4122" stroke-width="2"/>
+  <rect x="1130" y="345" width="34" height="170" rx="3" fill="#2f9e5c" stroke="#145227"/>
+  <g font-size="11" fill="#e6ffe9">
+    <text x="1172" y="366">IN 1</text>
+    <text x="1172" y="388" font-weight="bold" fill="#fff">GND</text>
+    <text x="1172" y="410">IN 2</text>
+    <text x="1172" y="432" font-weight="bold" fill="#fff">IN 3 (spare)</text>
+    <text x="1172" y="454">IN 4</text>
+    <text x="1172" y="476">IN 5</text>
+    <text x="1172" y="498">IN 6</text>
+  </g>
+  <rect x="1262" y="380" width="80" height="56" rx="3" fill="#111"/>
+  <text x="1302" y="413" text-anchor="middle" font-size="12" fill="#ccc">chip</text>
+  <text x="1250" y="522" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">Hagstrom KE-18</text>
+  <rect x="1325" y="530" width="22" height="10" fill="#c0c0c0" stroke="#777"/>
+  <path d="M1336 540 C 1336 590, 1320 600, 1320 640" fill="none" stroke="#222" stroke-width="6"/>
+  <text x="1346" y="590" font-size="11" fill="#444">USB</text>
+  <text x="1230" y="550" text-anchor="middle" font-size="11" fill="#444">Labels on yours may differ. Use the</text>
+  <text x="1230" y="564" text-anchor="middle" font-size="11" fill="#444">same GND as the bill acceptor.</text>
+  <rect x="1190" y="640" width="160" height="104" rx="6" fill="#222"/>
+  <rect x="1198" y="648" width="144" height="82" rx="3" fill="#3b6ea8"/>
+  <text x="1270" y="694" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">JukeANator</text>
+  <rect x="1258" y="744" width="24" height="18" fill="#333"/>
+  <rect x="1235" y="762" width="70" height="8" rx="3" fill="#333"/>
+  <text x="1270" y="790" text-anchor="middle" font-size="12" fill="#444">Jukebox PC</text>
+
+  <!-- ===== Wires (dark outline first, then colour) ===== -->
+  <g fill="none" stroke-linecap="round">
+    <!-- adapter - to BLACK lever nut -->
+    <path d="M190 660 C 250 620, 100 460, 164 470" stroke="#000" stroke-width="7"/>
+    <path d="M190 660 C 250 620, 100 460, 164 470" stroke="#2a2a2a" stroke-width="5"/>
+    <!-- adapter + to RED lever nut -->
+    <path d="M190 690 C 320 700, 360 560, 396 600" stroke="#5a0000" stroke-width="7"/>
+    <path d="M190 690 C 320 700, 360 560, 396 600" stroke="#e02424" stroke-width="5"/>
+    <!-- Nayax blacks -->
+    <path d="M434 394 C 400 430, 220 420, 206 470" stroke="#000" stroke-width="7"/>
+    <path d="M434 394 C 400 430, 220 420, 206 470" stroke="#2a2a2a" stroke-width="5"/>
+    <path d="M436 394 C 390 440, 200 430, 185 470" stroke="#000" stroke-width="7"/>
+    <path d="M436 394 C 390 440, 200 430, 185 470" stroke="#2a2a2a" stroke-width="5"/>
+    <!-- Nayax reds -->
+    <path d="M440 394 C 440 480, 417 520, 417 600" stroke="#5a0000" stroke-width="7"/>
+    <path d="M440 394 C 440 480, 417 520, 417 600" stroke="#e02424" stroke-width="5"/>
+    <path d="M442 394 C 446 480, 438 520, 438 600" stroke="#5a0000" stroke-width="7"/>
+    <path d="M442 394 C 446 480, 438 520, 438 600" stroke="#e02424" stroke-width="5"/>
+    <!-- red jumper: RED lever nut to relay A1 -->
+    <path d="M480 600 C 490 520, 640 488, 765 488" stroke="#5a0000" stroke-width="7"/>
+    <path d="M480 600 C 490 520, 640 488, 765 488" stroke="#e02424" stroke-width="5"/>
+    <!-- Nayax green (pulse) to relay A2 -->
+    <path d="M444 394 C 520 470, 650 452, 765 452" stroke="#0b4d1c" stroke-width="7"/>
+    <path d="M444 394 C 520 470, 650 452, 765 452" stroke="#22b14c" stroke-width="5"/>
+    <!-- unused wires to their caps -->
+    <path d="M448 382 C 520 392, 575 392, 575 354" stroke="#1e5bd8" stroke-width="4"/>
+    <path d="M448 382 C 530 392, 615 392, 615 354" stroke="#f08a00" stroke-width="4"/>
+    <path d="M448 382 C 540 392, 655 392, 655 354" stroke="#e3c400" stroke-width="4"/>
+    <path d="M448 382 C 550 392, 695 392, 695 354" stroke="#7fd3ff" stroke-width="4"/>
+    <path d="M448 382 C 560 392, 735 392, 735 354" stroke="#8a3ffc" stroke-width="4"/>
+    <path d="M448 382 C 570 392, 775 392, 775 354" stroke="#8de0b5" stroke-width="4"/>
+    <!-- bill acceptor (existing) -->
+    <path d="M1222 254 C 1180 290, 1090 300, 1100 340 C 1105 355, 1120 362, 1147 362" stroke="#8c8c8c" stroke-width="4"/>
+    <path d="M1242 254 C 1200 300, 1075 300, 1085 350 C 1090 375, 1115 384, 1147 384" stroke="#8c8c8c" stroke-width="4"/>
+    <!-- relay switch side to KE-18 -->
+    <path d="M1035 446 C 1090 446, 1095 384, 1147 384" stroke="#555" stroke-width="7"/>
+    <path d="M1035 446 C 1090 446, 1095 384, 1147 384" stroke="#f7f7f7" stroke-width="5"/>
+    <path d="M1035 470 C 1090 470, 1095 428, 1147 428" stroke="#6b5a00" stroke-width="7"/>
+    <path d="M1035 470 C 1090 470, 1095 428, 1147 428" stroke="#f2d400" stroke-width="5"/>
+  </g>
+
+  <!-- screws drawn on top of wire ends -->
+  <use xlink:href="#screw" x="190" y="660"/>
+  <use xlink:href="#screw" x="190" y="690"/>
+  <use xlink:href="#screw" x="765" y="452"/>
+  <use xlink:href="#screw" x="765" y="488"/>
+  <use xlink:href="#screw" x="1035" y="446"/>
+  <use xlink:href="#screw" x="1035" y="470"/>
+  <use xlink:href="#screw" x="1035" y="494"/>
+  <use xlink:href="#screw" x="1147" y="362"/>
+  <use xlink:href="#screw" x="1147" y="384"/>
+  <use xlink:href="#screw" x="1147" y="406"/>
+  <use xlink:href="#screw" x="1147" y="428"/>
+  <use xlink:href="#screw" x="1147" y="450"/>
+  <use xlink:href="#screw" x="1147" y="472"/>
+  <use xlink:href="#screw" x="1147" y="494"/>
+
+  <!-- wire name tags -->
+  <g font-size="12" font-weight="bold">
+    <text x="312" y="414" text-anchor="middle" fill="#222">2 black</text>
+    <text x="454" y="540" fill="#c62828">2 red</text>
+    <text x="610" y="440" text-anchor="middle" fill="#178a3a">green = pulse wire</text>
+    <text x="612" y="540" text-anchor="middle" fill="#c62828">red jumper (6 in)</text>
+  </g>
+  <use xlink:href="#badge-5" x="1092" y="510"/>
+
+  <!-- ===== Explanations ===== -->
+  <rect x="560" y="610" width="320" height="190" rx="10" fill="#ffffff" stroke="#e0a868" stroke-width="2"/>
+  <g font-size="12.5" fill="#222">
+    <text x="574" y="634" font-weight="bold" font-size="14">What is the relay coil? (Step 4)</text>
+    <text x="574" y="656">A1 and A2 are the two ends of a tiny</text>
+    <text x="574" y="674">electromagnet inside the relay.</text>
+    <text x="574" y="696">• A1 (+): red jumper, 12 V all the time.</text>
+    <text x="574" y="716">• A2 (−): the Nayax green (pulse) wire.</text>
+    <text x="574" y="738">• For each $1 approved, the Nayax connects</text>
+    <text x="574" y="756">   green to ground for 0.1 s. The magnet</text>
+    <text x="574" y="774">   turns on: CLICK, and the light flashes.</text>
+  </g>
+  <rect x="915" y="580" width="260" height="170" rx="10" fill="#ffffff" stroke="#8fb4d9" stroke-width="2"/>
+  <g font-size="12.5" fill="#222">
+    <text x="929" y="604" font-weight="bold" font-size="14">The switch side (Step 5)</text>
+    <text x="929" y="626">11 and 14 act like a push button.</text>
+    <text x="929" y="646">Each click joins them for 0.1 s,</text>
+    <text x="929" y="666">so the KE-18 types one <tspan font-weight="bold" font-family="Consolas, monospace">b</tspan> key.</text>
+    <text x="929" y="690">• White: 11 (COM) → GND</text>
+    <text x="929" y="710">• Yellow: 14 (NO) → a spare input</text>
+    <text x="929" y="730">• 12 (NC): leave empty</text>
+  </g>
+  <rect x="610" y="846" width="580" height="28" rx="14" fill="#ffffff" stroke="#999"/>
+  <text x="900" y="865" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">No wire crosses the dashed line. Only the relay's click passes across.</text>
+</svg>
