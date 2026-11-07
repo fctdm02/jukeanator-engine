@@ -60,6 +60,7 @@ import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepositoryJpaImpl;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueServiceImpl;
+import com.djt.jukeanator_engine.domain.user.config.AddFundsProperties;
 import com.djt.jukeanator_engine.domain.user.config.BraintreeProperties;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepositoryFileSystemImpl;
@@ -70,6 +71,7 @@ import com.djt.jukeanator_engine.domain.user.service.NoOpPaymentGateway;
 import com.djt.jukeanator_engine.domain.user.service.PaymentGateway;
 import com.djt.jukeanator_engine.domain.user.service.PricingService;
 import com.djt.jukeanator_engine.domain.user.service.PricingServiceImpl;
+import com.djt.jukeanator_engine.domain.user.service.PricingStartupCheck;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
@@ -359,9 +361,10 @@ public class AppConfig {
       SongLibraryService songLibraryService,
       PricingService pricingService,
       PaymentGateway paymentGateway,
-      EmailProperties emailProperties) {
+      EmailProperties emailProperties,
+      AddFundsProperties addFundsProperties) {
 
-    return new UserServiceImpl(
+    UserServiceImpl userService = new UserServiceImpl(
         userRepository,
         passwordEncoder,
         jwtUtil,
@@ -375,6 +378,17 @@ public class AppConfig {
             emailProperties.isVerificationRequired(),
             emailProperties.getVerificationBaseUrl(),
             emailProperties.getVerificationTokenTtl()));
+    userService.setCreditPackages(addFundsProperties.toCreditPackages());
+    return userService;
+  }
+
+  /** Logs per-song pricing at startup and warns about pricing mistakes -- see docs/pricing.md. */
+  @Bean
+  public PricingStartupCheck pricingStartupCheck(
+      JukeANatorUserInterfaceProperties userInterfaceProperties,
+      AddFundsProperties addFundsProperties) {
+
+    return new PricingStartupCheck(userInterfaceProperties, addFundsProperties.toCreditPackages());
   }
 
   // ── Payments ─────────────────────────────────────────────────────────────

@@ -12,8 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -314,7 +312,6 @@ class WebUiPatronLifecycleTest {
     assertEquals("Ron", profile.path("lastName").asText());
     assertEquals(email, profile.path("emailAddress").asText());
     assertEquals(0, profile.path("numCredits").asInt());
-    assertEquals(0, profile.path("balanceUsd").decimalValue().signum());
 
     // ── 2. The signed-in home screen and the Playlists tab ────────────────────────────────
     JsonNode home = ui.get(token, "/api/users/home").expect(200).json();
@@ -356,17 +353,15 @@ class WebUiPatronLifecycleTest {
     JsonNode purchase = ui.post(token, "/api/users/add-funds",
         new AddFundsRequest("pkg-14", "fake-nonce")).expect(200).json();
     assertEquals(24, purchase.path("creditsAdded").asInt());
-    assertEquals(7, purchase.path("bonusCreditsAdded").asInt());
-    assertEquals(31, purchase.path("numCredits").asInt());
-    assertMoney(usd(31), purchase.path("balanceUsd").decimalValue());
+    assertEquals(8, purchase.path("bonusCreditsAdded").asInt());
+    assertEquals(32, purchase.path("numCredits").asInt());
     assertFalse(purchase.path("transactionId").asText("").isBlank());
     assertFalse(purchase.path("paymentSource").asText("").isBlank());
 
     stomp.await(userDestination(email, "/queue/credits"),
-        message -> message.path("numCredits").asInt() == 31);
+        message -> message.path("numCredits").asInt() == 32);
     profile = ui.get(token, "/api/users/me").expect(200).json();
-    assertEquals(31, profile.path("numCredits").asInt());
-    assertMoney(usd(31), profile.path("balanceUsd").decimalValue());
+    assertEquals(32, profile.path("numCredits").asInt());
 
     // ── 5. Searching, and the search history under the search box ─────────────────────────
     String artistName = songA.path("artistName").asText();
@@ -502,7 +497,7 @@ class WebUiPatronLifecycleTest {
       assertEquals(email, entry.path("username").asText());
       assertEquals(1, entry.path("priority").asInt());
     }
-    int expectedBalance = 31 - 3 * queueAddCost(1, false); // 25
+    int expectedBalance = 32 - 3 * queueAddCost(1, false); // 26
     assertEquals(expectedBalance, balance(token), "each queued song is charged as a normal play");
     assertEquals(List.of(key(songD), key(songB), key(songC)), keys(queuedSongs()));
     stomp.await(LocationTopics.queue(locationId), message -> message.size() == 3);
@@ -533,7 +528,7 @@ class WebUiPatronLifecycleTest {
         addSongBody(songA, priorityLevel, true)).expect(200).json();
     assertEquals(email, priorityPlay.path("username").asText());
     assertEquals(2, priorityPlay.path("priority").asInt());
-    expectedBalance -= queueAddCost(2, true); // jumps a priority-1 song: 25 - 4 = 21
+    expectedBalance -= queueAddCost(2, true); // jumps a priority-1 song: 26 - 4 = 22
     assertEquals(expectedBalance, balance(token));
     assertEquals(List.of(key(songA), key(songD), key(songB), key(songC), kioskSong),
         keys(queuedSongs()), "a priority play jumps the normal plays");
@@ -543,7 +538,7 @@ class WebUiPatronLifecycleTest {
     stomp.await(userDestination(email, "/queue/recent-plays"),
         message -> key(message).equals(key(songA)));
     stomp.await(userDestination(email, "/queue/credits"),
-        message -> message.path("numCredits").asInt() == 21);
+        message -> message.path("numCredits").asInt() == 22);
     stomp.await(LocationTopics.queue(locationId), message -> message.size() == 5);
 
     // The kiosk song is taken back out so the Song Queue screen below sees only this patron's.
@@ -558,16 +553,16 @@ class WebUiPatronLifecycleTest {
 
     // ── 10. Reordering and removing on the Song Queue screen ──────────────────────────────
     ui.post(token, queuePath("moveSongUpInQueue"), moveBody(songC)).expect(200);
-    expectedBalance -= queueActionCost(1); // 21 - 6 = 15
+    expectedBalance -= queueActionCost(1); // 22 - 6 = 16
     assertEquals(expectedBalance, balance(token));
     assertEquals(List.of(key(songA), key(songD), key(songC), key(songB)), keys(queuedSongs()));
 
     ui.post(token, queuePath("moveSongDownInQueue"), moveBody(songD)).expect(200);
-    expectedBalance -= queueActionCost(1); // 15 - 6 = 9
+    expectedBalance -= queueActionCost(1); // 16 - 6 = 10
     assertEquals(expectedBalance, balance(token));
     assertEquals(List.of(key(songA), key(songC), key(songD), key(songB)), keys(queuedSongs()));
 
-    // Moving the priority-2 song costs 12; only 9 are held -- refused, the queue untouched.
+    // Moving the priority-2 song costs 12; only 10 are held -- refused, the queue untouched.
     Response cannotAfford = ui.post(token, queuePath("moveSongDownInQueue"), moveBody(songA));
     cannotAfford.expect(402);
     assertEquals("InsufficientCreditsException", cannotAfford.error());
@@ -577,7 +572,7 @@ class WebUiPatronLifecycleTest {
     // Top up with the smallest package.
     ui.post(token, "/api/users/add-funds", new AddFundsRequest("pkg-7", "fake-nonce"))
         .expect(200);
-    expectedBalance += 13; // 22
+    expectedBalance += 14; // 24
 
     // Moving the bottom song down changes nothing, and so costs nothing.
     ui.post(token, queuePath("moveSongDownInQueue"), moveBody(songB)).expect(200);
@@ -585,7 +580,7 @@ class WebUiPatronLifecycleTest {
     assertEquals(List.of(key(songA), key(songC), key(songD), key(songB)), keys(queuedSongs()));
 
     ui.post(token, queuePath("removeSongDownFromQueue"), moveBody(songB)).expect(200);
-    expectedBalance -= queueActionCost(1); // 16
+    expectedBalance -= queueActionCost(1); // 18
     assertEquals(expectedBalance, balance(token));
     assertEquals(List.of(key(songA), key(songC), key(songD)), keys(queuedSongs()));
 
@@ -653,13 +648,13 @@ class WebUiPatronLifecycleTest {
   void aPatron_cannotChooseTheirOwnPriorityOrPrice() throws Exception {
 
     List<JsonNode> songs = songsByDifferentArtists(3);
-    String token = registerWithCredits(uniqueEmail("chancer"), "pkg-7"); // 13 credits
+    String token = registerWithCredits(uniqueEmail("chancer"), "pkg-7"); // 14 credits
 
     // A normal play always queues at priority 1, whatever priority the request names.
     JsonNode normal = ui.post(token, queuePath("addSong"), addSongBody(songs.get(0), 50, false))
         .expect(200).json();
     assertEquals(1, normal.path("priority").asInt());
-    assertEquals(13 - queueAddCost(1, false), balance(token));
+    assertEquals(14 - queueAddCost(1, false), balance(token));
 
     // A priority play below priority 2 is never offered (priority play only jumps another user's
     // priority-1-or-higher selection): refused, not queued, not charged.
@@ -672,7 +667,7 @@ class WebUiPatronLifecycleTest {
     noPriority.remove("priority");
     ui.post(token, queuePath("addSong"), noPriority).expect(400);
     assertEquals(List.of(key(songs.get(0))), keys(queuedSongs()));
-    assertEquals(13 - queueAddCost(1, false), balance(token));
+    assertEquals(14 - queueAddCost(1, false), balance(token));
 
     // A priority play is charged for exactly the priority it is queued at -- here jumping a song
     // someone queued at the kiosk.
@@ -680,14 +675,14 @@ class WebUiPatronLifecycleTest {
     JsonNode priorityPlay = ui.post(token, queuePath("addSong"),
         addSongBody(songs.get(2), 2, true)).expect(200).json();
     assertEquals(2, priorityPlay.path("priority").asInt());
-    assertEquals(13 - queueAddCost(1, false) - queueAddCost(2, true), balance(token));
+    assertEquals(14 - queueAddCost(1, false) - queueAddCost(2, true), balance(token));
   }
 
   @Test
   void aPriorityPlay_isRefusedWhileOnlyThePatronsOwnSongsAreQueued() throws Exception {
 
     List<JsonNode> songs = songsByDifferentArtists(2);
-    String token = registerWithCredits(uniqueEmail("self-jumper"), "pkg-7"); // 13 credits
+    String token = registerWithCredits(uniqueEmail("self-jumper"), "pkg-7"); // 14 credits
 
     ui.post(token, queuePath("addSong"), addSongBody(songs.get(0), 1, false)).expect(200);
     int balanceBefore = balance(token);
@@ -705,7 +700,7 @@ class WebUiPatronLifecycleTest {
   void aPriorityPlay_isRefusedWhileOnlyBackgroundMusicOrNothingIsQueued() throws Exception {
 
     JsonNode song = songsByDifferentArtists(1).get(0);
-    String token = registerWithCredits(uniqueEmail("early-bird"), "pkg-7"); // 13 credits
+    String token = registerWithCredits(uniqueEmail("early-bird"), "pkg-7"); // 14 credits
 
     assertTrue(queuedSongs().isEmpty());
     Response refused = ui.post(token, queuePath("addSong"), addSongBody(song, 2, true));
@@ -714,7 +709,7 @@ class WebUiPatronLifecycleTest {
     assertTrue(refused.json().path("message").asText().startsWith("Priority Play is only"),
         refused.body());
     assertTrue(queuedSongs().isEmpty());
-    assertEquals(13, balance(token), "a refused priority play is never charged");
+    assertEquals(14, balance(token), "a refused priority play is never charged");
   }
 
   @Test
@@ -774,7 +769,7 @@ class WebUiPatronLifecycleTest {
     impersonation.put("username", "someone-else@example.com");
     JsonNode entry = ui.post(token, queuePath("addSong"), impersonation).expect(200).json();
     assertEquals(email, entry.path("username").asText());
-    assertEquals(13 - queueAddCost(1, false), balance(token));
+    assertEquals(14 - queueAddCost(1, false), balance(token));
 
     // An admin-role token is honored only for the operator's own controls.
     String adminToken = jwtUtil.generateToken(uniqueEmail("operator"), UserRole.ROLE_ADMIN.name());
@@ -807,7 +802,7 @@ class WebUiPatronLifecycleTest {
     }
 
     assertEquals(1, queuedSongs().size());
-    assertEquals(13 - queueAddCost(1, false), balance(token), "a refused play is never charged");
+    assertEquals(14 - queueAddCost(1, false), balance(token), "a refused play is never charged");
     assertTrue(stomp.to(userDestination(email, "/queue/credits")).isEmpty(),
         "no credit change was announced");
     assertTrue(stomp.to(userDestination(email, "/queue/recent-plays")).isEmpty(),
@@ -817,7 +812,7 @@ class WebUiPatronLifecycleTest {
     ui.post(token, queuePath("addSong"),
         Map.of("albumId", 999_999, "songId", 1, "priority", 1, "priorityPlay", false))
         .expect(404);
-    assertEquals(13 - queueAddCost(1, false), balance(token));
+    assertEquals(14 - queueAddCost(1, false), balance(token));
   }
 
   @Test
@@ -973,12 +968,6 @@ class WebUiPatronLifecycleTest {
     return Math.max(1, priority * 3) * pricing.path("webCostMultiplier").asInt();
   }
 
-  /** Credits' dollar value at this location's kiosk rate, as the server reports balanceUsd. */
-  private BigDecimal usd(int credits) {
-    return BigDecimal.valueOf(credits).divide(
-        BigDecimal.valueOf(pricing.path("creditsPerDollar").asInt()), 2, RoundingMode.HALF_UP);
-  }
-
   /**
    * {@code count} songs, each by a different artist where the library allows -- so queueing them
    * never trips the consecutive-plays-by-one-artist rule -- and none the queue's rules currently
@@ -1063,10 +1052,6 @@ class WebUiPatronLifecycleTest {
   /** The body the Song Queue screen's up/down/remove buttons and Edit Track Order send. */
   private static Map<String, Object> moveBody(JsonNode song) {
     return Map.of("albumId", song.path("albumId").asInt(), "songId", song.path("songId").asInt());
-  }
-
-  private static void assertMoney(BigDecimal expected, BigDecimal actual) {
-    assertEquals(0, expected.compareTo(actual), "expected $" + expected + " but was $" + actual);
   }
 
   @FunctionalInterface

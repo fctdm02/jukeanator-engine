@@ -577,14 +577,13 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     AddFundsResponseDto response =
         userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-7", "fake-nonce"));
 
-    // pkg-7: 12 credits + 1 bonus = 13, starting balance 6 -> 19
-    assertEquals(19, registeredUser().getNumCredits());
-    assertEquals(Integer.valueOf(19), response.numCredits());
+    // pkg-7: 12 credits + 2 bonus = 14, starting balance 6 -> 20
+    assertEquals(20, registeredUser().getNumCredits());
+    assertEquals(Integer.valueOf(20), response.numCredits());
     assertEquals(12, response.creditsAdded());
-    assertEquals(1, response.bonusCreditsAdded());
+    assertEquals(2, response.bonusCreditsAdded());
     assertEquals("PayPal", response.paymentSource());
     assertEquals("txn-123", response.transactionId());
-    assertEquals(0, new BigDecimal("6.33").compareTo(response.balanceUsd()));
     verify(userRepository).storeAggregateRoot(userRoot);
     verify(eventPublisher).publishEvent(any(UserCreditsChangedEvent.class));
     verify(eventPublisher).publishEvent(any(PurchaseCompletedEvent.class));
@@ -629,7 +628,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     InOrder inOrder = inOrder(paymentGateway, userRepository, eventPublisher);
     inOrder.verify(paymentGateway).charge(any(BigDecimal.class), anyString());
     inOrder.verify(userRepository).storeAggregateRoot(userRoot);
-    inOrder.verify(eventPublisher).publishEvent(new UserCreditsChangedEvent(REGISTERED_EMAIL, 19));
+    inOrder.verify(eventPublisher).publishEvent(new UserCreditsChangedEvent(REGISTERED_EMAIL, 20));
     inOrder.verify(eventPublisher).publishEvent(any(PurchaseCompletedEvent.class));
   }
 
@@ -745,11 +744,44 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   }
 
   @Test
-  void getCreditPackages_returnsThreeFixedPackages() {
+  void getCreditPackages_defaultsToTheBuiltInPackages() {
 
-    List<CreditPackageDto> packages = userServiceImpl.getCreditPackages();
+    assertEquals(CreditPackageCatalog.DEFAULT_PACKAGES, userServiceImpl.getCreditPackages());
+  }
 
-    assertEquals(3, packages.size());
+  @Test
+  void setCreditPackages_replacesThePackagesOnSale() {
+
+    CreditPackageDto pkg = new CreditPackageDto("pkg-10", 20, 0, new BigDecimal("10.00"), null);
+    userServiceImpl.setCreditPackages(List.of(pkg));
+
+    assertEquals(List.of(pkg), userServiceImpl.getCreditPackages());
+  }
+
+  @Test
+  void setCreditPackages_rejectsAnInvalidList() {
+
+    CreditPackageDto pkg = new CreditPackageDto("pkg-10", 20, 0, new BigDecimal("10.00"), null);
+
+    assertThrows(IllegalStateException.class,
+        () -> userServiceImpl.setCreditPackages(List.of(pkg, pkg)));
+    assertEquals(CreditPackageCatalog.DEFAULT_PACKAGES, userServiceImpl.getCreditPackages(),
+        "a rejected list leaves the packages on sale unchanged");
+  }
+
+  @Test
+  void addFunds_sellsAConfiguredPackage() {
+
+    when(paymentGateway.charge(any(BigDecimal.class), anyString()))
+        .thenReturn(PaymentChargeResult.success("txn-123", "PayPal"));
+    userServiceImpl.setCreditPackages(
+        List.of(new CreditPackageDto("pkg-10", 20, 4, new BigDecimal("10.00"), null)));
+
+    AddFundsResponseDto response =
+        userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-10", "fake-nonce"));
+
+    assertEquals(Integer.valueOf(30), response.numCredits()); // 6 + 20 + 4
+    verify(paymentGateway).charge(eq(new BigDecimal("10.00")), eq("fake-nonce"));
   }
 
   // ─────────────────────────────────────────────────────────────────────────

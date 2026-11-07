@@ -124,6 +124,15 @@ email:
   from-address: ${MAIL_FROM_ADDRESS:tmyers1@yahoo.com}
   financial-ledger-recipients: tmyers1@yahoo.com   # receives the Financial Ledger split summary sent from this kiosk
 
+# Web/Mobile UI Add Funds credit packages -- see docs/pricing.md. Keep each total (credits +
+# bonus-credits) divisible by user-interface.web-cost-multiplier, and every package more expensive
+# per song than the card reader; a startup check logs a warning otherwise. One package per line.
+add-funds:
+  packages:
+    - { id: pkg-28, price-usd: 28.00, credits: 48, bonus-credits: 24, badge: Best Value }
+    - { id: pkg-14, price-usd: 14.00, credits: 24, bonus-credits: 8 }
+    - { id: pkg-7, price-usd: 7.00, credits: 12, bonus-credits: 2 }
+
 user-interface:
   always-on-top: false
   enable-screen-saver: true
@@ -141,6 +150,7 @@ user-interface:
   five-dollar-bonus-credits: 3
   ten-dollar-bonus-credits: 10
   web-cost-multiplier: 2 # Web/Mobile UI cost = JFC/Swing cost x this value (1 = same cost as JFC/Swing)
-  display-currency-for-cost: false # if true, will display credits, if false, will display the actual cost of a credit
+  credit-card-cost-multiplier: 2 # card-reader credits = cash credits / this value, rounded up; decimals allowed (e.g. 1.5) -- see docs/pricing.md
+  display-currency-for-cost: false # JFC/Swing kiosk only: if true, shows the actual cost of a credit instead of the credit count (the Web/Mobile UI always shows credits)
   # SEARCH CONFIGURATION
   enable-type-ahead-search: true

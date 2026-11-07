@@ -1,8 +1,11 @@
 package com.djt.jukeanator_engine.domain.user.dto;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 
-public record AddFundsResponseDto(Integer numCredits, BigDecimal balanceUsd, int creditsAdded,
-    int bonusCreditsAdded, String paymentSource, String transactionId, Instant timestamp) {
+/**
+ * The result of an Add Funds purchase. Carries no dollar balance: the Web/Mobile UI shows credits
+ * instead -- see docs/pricing.md.
+ */
+public record AddFundsResponseDto(Integer numCredits, int creditsAdded, int bonusCreditsAdded,
+    String paymentSource, String transactionId, Instant timestamp) {
 }

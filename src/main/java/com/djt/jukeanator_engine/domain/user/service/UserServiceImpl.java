@@ -1,8 +1,6 @@
 package com.djt.jukeanator_engine.domain.user.service;
 
 import static java.util.Objects.requireNonNull;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -94,6 +92,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private final boolean allowSlaveUrlQueueOperations;
   private final EmailVerificationPolicy emailVerificationPolicy;
   private final SecureRandom secureRandom = new SecureRandom();
+
+  // The Add Funds packages on sale -- add-funds.packages, set via setCreditPackages() at startup.
+  private volatile List<CreditPackageDto> creditPackages = CreditPackageCatalog.DEFAULT_PACKAGES;
 
   private UserRootEntity userRoot;
 
@@ -362,13 +363,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new InvalidPrincipalException("User not found: " + emailAddress);
     }
 
-    PricingConfig pricingConfig =
-        pricingService.resolvePricingConfig(songLibraryService.getOwnLocationId());
-    java.math.BigDecimal balanceUsd = java.math.BigDecimal.valueOf(user.getNumCredits()).divide(
-        java.math.BigDecimal.valueOf(pricingConfig.creditsPerDollar()), 2,
-        java.math.RoundingMode.HALF_UP);
+    // No dollar balance: web credits are bought at package prices and spent at each location's
+    // web-cost-multiplier, so no single dollar rate is right. The Web/Mobile UI shows credits
+    // instead -- see docs/pricing.md.
     return new UserProfileDto(user.getPersistentIdentity(), user.getFirstName(), user.getLastName(),
-        user.getEmailAddress(), user.getNumCredits(), balanceUsd, user.getSongPlayHistory());
+        user.getEmailAddress(), user.getNumCredits(), user.getSongPlayHistory());
   }
 
   private static final int MAX_HOT_HERE = 10;
@@ -423,11 +422,17 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   @Override
   public List<CreditPackageDto> getCreditPackages() {
+    return creditPackages;
+  }
 
-    return List.of(
-        new CreditPackageDto("pkg-28", 48, 24, new java.math.BigDecimal("28.00"), "Best Value"),
-        new CreditPackageDto("pkg-14", 24, 7, new java.math.BigDecimal("14.00"), null),
-        new CreditPackageDto("pkg-7", 12, 1, new java.math.BigDecimal("7.00"), null));
+  /**
+   * Replaces the Add Funds packages on sale ({@code add-funds.packages}); defaults to
+   * {@link CreditPackageCatalog#DEFAULT_PACKAGES}.
+   *
+   * @throws IllegalStateException if the list fails {@link CreditPackageCatalog#validate}
+   */
+  public void setCreditPackages(List<CreditPackageDto> creditPackages) {
+    this.creditPackages = CreditPackageCatalog.validate(creditPackages);
   }
 
   @Override
@@ -496,7 +501,6 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new PaymentException(chargeResult.failureMessage());
     }
 
-    Integer locationId = songLibraryService.getOwnLocationId();
     Instant now = Instant.now();
 
     int previousBalance = user.getNumCredits() != null ? user.getNumCredits() : 0;
@@ -522,12 +526,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
         pkg.credits(), pkg.bonusCredits(), pkg.priceUsd(), chargeResult.paymentSource(),
         chargeResult.transactionId(), now, user.getNumCredits()));
 
-    PricingConfig pricingConfig = pricingService.resolvePricingConfig(locationId);
-    BigDecimal balanceUsd = BigDecimal.valueOf(user.getNumCredits())
-        .divide(BigDecimal.valueOf(pricingConfig.creditsPerDollar()), 2, RoundingMode.HALF_UP);
-
-    return new AddFundsResponseDto(user.getNumCredits(), balanceUsd, pkg.credits(),
-        pkg.bonusCredits(), chargeResult.paymentSource(), chargeResult.transactionId(), now);
+    return new AddFundsResponseDto(user.getNumCredits(), pkg.credits(), pkg.bonusCredits(),
+        chargeResult.paymentSource(), chargeResult.transactionId(), now);
   }
 
   @Override

@@ -41,6 +41,7 @@ import com.djt.jukeanator_engine.domain.songplayer.service.SongPlayerService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
+import com.djt.jukeanator_engine.domain.user.service.KioskCreditMath;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
@@ -201,9 +202,6 @@ public class JukeANatorFrame extends JFrame {
    */
   private static final int CARD_PURCHASE_QUIET_PERIOD_MS = 1_500;
 
-  /** The card amounts offered on the Nayax reader's price-list screen. */
-  private static final int[] CARD_READER_PRICE_DOLLARS = {5, 10, 15, 20};
-
   /**
    * The card amounts listed on the credits panel's CARD line -- three of the reader's four, since
    * the fixed-width panel has no room for a fourth.
@@ -219,7 +217,6 @@ public class JukeANatorFrame extends JFrame {
   private final int creditsPerDollar;
   private final int fiveDollarBonusCredits;
   private final int tenDollarBonusCredits;
-  private final int webCostMultiplier;
 
 
   // SCREENSAVER
@@ -274,12 +271,11 @@ public class JukeANatorFrame extends JFrame {
     this.fiveDollarBonusCredits =
         this.jukeANatorUserInterfaceProperties.getFiveDollarBonusCredits();
     this.tenDollarBonusCredits = this.jukeANatorUserInterfaceProperties.getTenDollarBonusCredits();
-    this.webCostMultiplier = this.jukeANatorUserInterfaceProperties.getWebCostMultiplier();
 
     this.enableTypeAheadSearch = this.jukeANatorUserInterfaceProperties.isEnableTypeAheadSearch();
 
     this.creditManager = new CreditManager(numCredits, creditsPerDollar, fiveDollarBonusCredits,
-        tenDollarBonusCredits, webCostMultiplier,
+        tenDollarBonusCredits, jukeANatorUserInterfaceProperties.getCreditCardCostMultiplier(),
         jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost());
 
     this.enableScreenSaver = this.jukeANatorUserInterfaceProperties.isEnableScreenSaver();
@@ -426,7 +422,7 @@ public class JukeANatorFrame extends JFrame {
             }
           });
       log.info("Card reader enabled. Nayax Pulse Title 1-6 for prices {}: {}",
-          java.util.Arrays.toString(CARD_READER_PRICE_DOLLARS), buildNayaxPulseTitles());
+          KioskCreditMath.CARD_READER_PRICE_DOLLARS, buildNayaxPulseTitles());
     }
 
     // The bindings above only fire while this frame has keyboard focus. The screen-saver and
@@ -705,11 +701,12 @@ public class JukeANatorFrame extends JFrame {
   /**
    * The text to paste into the Nayax reader's {@code Pulse Title 1-6} attribute, so each price
    * button on the reader shows the credits it buys -- e.g.
-   * {@code 9 CREDITS;20 CREDITS;29 CREDITS;40 CREDITS}.
+   * {@code 9 CREDITS;20 CREDITS;29 CREDITS;40 CREDITS}. Credits, not songs: a priority play
+   * costs more than one credit.
    */
   private String buildNayaxPulseTitles() {
     StringBuilder titles = new StringBuilder();
-    for (int dollars : CARD_READER_PRICE_DOLLARS) {
+    for (int dollars : KioskCreditMath.CARD_READER_PRICE_DOLLARS) {
       if (titles.length() > 0) {
         titles.append(';');
       }

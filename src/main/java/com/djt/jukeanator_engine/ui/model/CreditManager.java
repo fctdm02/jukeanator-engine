@@ -1,5 +1,8 @@
 package com.djt.jukeanator_engine.ui.model;
 
+import java.math.BigDecimal;
+import com.djt.jukeanator_engine.domain.user.service.KioskCreditMath;
+
 public class CreditManager {
   private int numCredits;
   private int totalDollarsInserted;
@@ -12,7 +15,9 @@ public class CreditManager {
   private final int creditsPerDollar;
   private final int fiveDollarBonus;
   private final int tenDollarBonus;
-  private final int webCostMultiplier;
+  // user-interface.credit-card-cost-multiplier: card credits = cash credits / this (rounded up).
+  // Independent of web-cost-multiplier -- see docs/pricing.md.
+  private final BigDecimal creditCardCostMultiplier;
   private final boolean displayCurrencyForCost;
   // The blended credits-per-dollar rate actually achieved by totalDollarsInserted so far this
   // session (base rate plus whatever bonus tiers have been crossed) -- recomputed only when new
@@ -31,12 +36,13 @@ public class CreditManager {
   private final java.util.List<Runnable> listeners = new java.util.ArrayList<>();
 
   public CreditManager(int numCredits, int creditsPerDollar, int fiveDollarBonus,
-      int tenDollarBonus, int webCostMultiplier, boolean displayCurrencyForCost) {
+      int tenDollarBonus, BigDecimal creditCardCostMultiplier, boolean displayCurrencyForCost) {
     this.numCredits = numCredits;
     this.creditsPerDollar = creditsPerDollar;
     this.fiveDollarBonus = fiveDollarBonus;
     this.tenDollarBonus = tenDollarBonus;
-    this.webCostMultiplier = webCostMultiplier;
+    this.creditCardCostMultiplier =
+        KioskCreditMath.requireValidCreditCardCostMultiplier(creditCardCostMultiplier);
     this.displayCurrencyForCost = displayCurrencyForCost;
     this.effectiveCreditsPerDollar = creditsPerDollar;
   }
@@ -59,8 +65,8 @@ public class CreditManager {
    * Awards credits for one credit-card dollar (e.g. one Nayax VPOS Touch pulse), at a reduced
    * rate that offsets the reader's subscription/wireless fees and per-transaction processing cost.
    * Applies the same tiered bonus schedule as {@link #addDollar()} to the card's own running
-   * total, then divides the result by {@code webCostMultiplier} and rounds up to the nearest whole
-   * credit.
+   * total, then divides the result by {@code credit-card-cost-multiplier} and rounds up to the
+   * nearest whole credit.
    *
    * @return the number of credits this dollar added to the balance
    */
@@ -68,7 +74,8 @@ public class CreditManager {
     totalCreditCardDollarsInserted++;
     rawCreditCardCredits = addTierDollar(rawCreditCardCredits, totalCreditCardDollarsInserted);
 
-    int actualCardCredits = ceilDiv(rawCreditCardCredits, webCostMultiplier);
+    int actualCardCredits =
+        KioskCreditMath.toCreditCardCredits(rawCreditCardCredits, creditCardCostMultiplier);
     int creditsAdded = actualCardCredits - creditCardCreditsAwarded;
     numCredits += creditsAdded;
     creditCardCreditsAwarded = actualCardCredits;
@@ -86,41 +93,14 @@ public class CreditManager {
    * for the on-screen card pricing line and the Nayax reader's price-button titles.
    */
   public int creditCardCreditsFor(int dollars) {
-    int raw = 0;
-    for (int dollar = 1; dollar <= dollars; dollar++) {
-      raw = addTierDollar(raw, dollar);
-    }
-    return ceilDiv(raw, webCostMultiplier);
+    return KioskCreditMath.creditCardCreditsFor(dollars, creditsPerDollar, fiveDollarBonus,
+        tenDollarBonus, creditCardCostMultiplier);
   }
 
-  /**
-   * Adds one dollar's worth of credits to {@code credits}, applying the tiered bonus for reaching
-   * {@code dollarCount} dollars this session (exact milestones at $5, $10, $15 and $20, with the
-   * $10 and $20 totals capped).
-   */
+  /** One dollar of the tiered bonus schedule -- see {@link KioskCreditMath#addTierDollar}. */
   private int addTierDollar(int credits, int dollarCount) {
-    credits += creditsPerDollar;
-
-    if (dollarCount == 5) {
-      credits += fiveDollarBonus;
-    } else if (dollarCount == 10) {
-      credits += tenDollarBonus;
-      if (credits > creditsPerDollar * 10) {
-        credits = (creditsPerDollar * 10) + tenDollarBonus;
-      }
-    } else if (dollarCount == 15) {
-      credits += fiveDollarBonus;
-    } else if (dollarCount == 20) {
-      credits += tenDollarBonus;
-      if (credits > (creditsPerDollar * 20) + (2 * tenDollarBonus)) {
-        credits = (creditsPerDollar * 20) + (2 * tenDollarBonus);
-      }
-    }
-    return credits;
-  }
-
-  private static int ceilDiv(int numerator, int denominator) {
-    return -Math.floorDiv(-numerator, denominator);
+    return KioskCreditMath.addTierDollar(credits, dollarCount, creditsPerDollar, fiveDollarBonus,
+        tenDollarBonus);
   }
 
   public synchronized boolean deductCredits(int amount) {

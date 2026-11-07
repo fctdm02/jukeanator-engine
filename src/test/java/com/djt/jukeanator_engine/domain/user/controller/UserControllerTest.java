@@ -132,7 +132,7 @@ class UserControllerTest extends AbstractControllerTest {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     UserProfileDto profile =
-        new UserProfileDto(1, "Jane", "Doe", "jane@example.com", 10, null, List.of());
+        new UserProfileDto(1, "Jane", "Doe", "jane@example.com", 10, List.of());
     when(userService.getProfile("jane@example.com")).thenReturn(profile);
 
     mockMvc.perform(get("/api/users/me"))
@@ -362,7 +362,7 @@ class UserControllerTest extends AbstractControllerTest {
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     UpdateProfileRequest request = new UpdateProfileRequest("Janet", "Doe");
     UserProfileDto updated =
-        new UserProfileDto(1, "Janet", "Doe", "jane@example.com", 10, null, List.of());
+        new UserProfileDto(1, "Janet", "Doe", "jane@example.com", 10, List.of());
     when(userService.updateProfile("jane@example.com", request)).thenReturn(updated);
 
     mockMvc.perform(put("/api/users/me")
@@ -402,7 +402,7 @@ class UserControllerTest extends AbstractControllerTest {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     AddFundsRequest request = new AddFundsRequest("pkg-7", "fake-nonce");
-    AddFundsResponseDto responseDto = new AddFundsResponseDto(19, new BigDecimal("6.33"), 12, 1,
+    AddFundsResponseDto responseDto = new AddFundsResponseDto(20, 12, 2,
         "PayPal", "txn-123", java.time.Instant.now());
     when(userService.addFunds("jane@example.com", request)).thenReturn(responseDto);
 
@@ -410,7 +410,7 @@ class UserControllerTest extends AbstractControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.numCredits", is(19)))
+        .andExpect(jsonPath("$.numCredits", is(20)))
         .andExpect(jsonPath("$.paymentSource", is("PayPal")));
 
     verify(userService).addFunds("jane@example.com", request);

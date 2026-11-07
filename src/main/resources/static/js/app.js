@@ -71,38 +71,27 @@
     return swingCost * cfg.webCostMultiplier;
   }
 
+  // The Web/Mobile UI always shows credits -- never dollars, since web credits are bought at
+  // package prices and spent at each location's webCostMultiplier, so no single dollar rate is
+  // right (displayCurrencyForCost applies to the JFC/Swing kiosk only); and never a song count,
+  // since priority plays and queue changes cost more than a normal play. See docs/pricing.md.
+
   /**
-   * Formats a credit amount for display -- "Ncr" (or "N Credits", passing unit: 'Credits', to
-   * match a given call site's own pre-existing wording) -- or the actual dollar cost (e.g.
-   * "$0.67", rounded to the nearest cent) when displayCurrencyForCost is enabled. Mirrors
-   * CreditManager.formatCredits, except the Web/Mobile UI has no per-session "money inserted"
-   * concept (accounts carry a persistent balance topped up via credit packages), so this always
-   * converts at the location's base creditsPerDollar rate -- the same rate getProfile() already
-   * uses server-side for balanceUsd.
+   * Formats a credit amount for display -- "Ncr", or "N Credits" (passing unit: 'Credits', to
+   * match a given call site's own pre-existing wording).
    */
   function formatCredits(credits, unit = 'cr') {
-    const cfg = pricingConfig();
-    if (!cfg.displayCurrencyForCost) {
-      return unit === 'cr' ? `${credits}cr` : `${credits} Credits`;
-    }
-    return `$${(credits / cfg.creditsPerDollar).toFixed(2)}`;
+    return unit === 'cr' ? `${credits}cr` : `${credits} Credits`;
   }
 
-  /** Formats a credit shortfall -- "ADD N CREDIT(S)" or "ADD $X.XX". */
+  /** Formats a credit shortfall -- "ADD N CREDIT(S)". */
   function formatShortfall(neededCredits) {
-    const cfg = pricingConfig();
-    if (!cfg.displayCurrencyForCost) {
-      return `ADD ${neededCredits} CREDIT${neededCredits === 1 ? '' : 'S'}`;
-    }
-    return `ADD $${(neededCredits / cfg.creditsPerDollar).toFixed(2)}`;
+    return `ADD ${neededCredits} CREDIT${neededCredits === 1 ? '' : 'S'}`;
   }
 
-  /** The header widget's balance text -- "Credits: N" or "Balance: $X.XX". */
+  /** The header widget's balance text -- "Credits: N". */
   function creditsWidgetText(numCredits) {
-    const cfg = pricingConfig();
-    return cfg.displayCurrencyForCost
-      ? `Balance: $${(numCredits / cfg.creditsPerDollar).toFixed(2)}`
-      : `Credits: ${numCredits}`;
+    return `Credits: ${numCredits}`;
   }
 
   const contentPanel = document.getElementById('contentPanel');
@@ -944,16 +933,22 @@
   function renderAddFundsContent(container, packages) {
     let selectedId = packages[0]?.id || '';
 
+    // Each package is labelled with its total credits (credits + bonus). Not songs or a price per
+    // song: priority plays and queue changes cost more than a normal play, so a song count would
+    // overstate what the credits buy.
     function packageCardHtml(pkg) {
       const selected = pkg.id === selectedId;
+      const totalCredits = pkg.credits + pkg.bonusCredits;
       return `
         <div class="package-card ${selected ? 'selected' : ''}" data-id="${pkg.id}">
           <input type="radio" class="package-radio" name="package" value="${pkg.id}"
                  ${selected ? 'checked' : ''}>
           <span class="package-coin-icon">&#129689;</span>
           <div class="package-details">
-            <div class="package-credits-amount"><strong>${pkg.credits}</strong> Credits</div>
-            <span class="package-bonus-tag">+${pkg.bonusCredits} BONUS CREDIT${pkg.bonusCredits === 1 ? '' : 'S'}</span>
+            <div class="package-credits-amount"><strong>${totalCredits}</strong> Credits</div>
+            ${pkg.bonusCredits > 0
+              ? `<span class="package-bonus-tag">+${pkg.bonusCredits} BONUS CREDIT${pkg.bonusCredits === 1 ? '' : 'S'}</span>`
+              : ''}
           </div>
           <div class="package-price-box">
             ${pkg.badge ? `<div class="package-badge-label">&#11088; ${pkg.badge}</div>` : ''}
@@ -1000,9 +995,8 @@
       return;
     }
 
-    const balance = pricingConfig().displayCurrencyForCost && profile.balanceUsd != null
-      ? `$${Number(profile.balanceUsd).toFixed(2)} (USD)`
-      : `${profile.numCredits} Credits`;
+    const numCredits = profile.numCredits ?? 0;
+    const balance = `${numCredits} Credits`;
 
     contentPanel.querySelector('.sub-content').innerHTML = `
       <div class="account-funds-box">

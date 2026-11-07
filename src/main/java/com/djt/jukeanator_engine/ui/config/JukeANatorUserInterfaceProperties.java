@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.ui.config;
 
+import java.math.BigDecimal;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -38,8 +39,13 @@ public class JukeANatorUserInterfaceProperties {
   // "convenience surcharge" for not walking up to the physical kiosk. At 1, Web/Mobile costs
   // exactly match JFC/Swing.
   private int webCostMultiplier = 2;
-  // If true, the UI shows the actual dollar cost of a credit (e.g. "$0.33") instead of the raw
-  // credit count (e.g. "1cr").
+  // Card-reader credits = bill-acceptor (cash) credits / this value, rounded up -- the card
+  // reader's surcharge over cash, offsetting its service and processing fees. Kiosk-only (never
+  // synced to master) and independent of webCostMultiplier. Decimals allowed (e.g. 1.5). See
+  // docs/pricing.md.
+  private BigDecimal creditCardCostMultiplier = new BigDecimal("2");
+  // If true, the JFC/Swing kiosk shows the actual dollar cost of a credit (e.g. "$0.33") instead
+  // of the raw credit count (e.g. "1cr"). The Web/Mobile UI always shows credits.
   private boolean displayCurrencyForCost = false;
 
   //
@@ -159,6 +165,14 @@ public class JukeANatorUserInterfaceProperties {
 
   public void setWebCostMultiplier(int webCostMultiplier) {
     this.webCostMultiplier = webCostMultiplier;
+  }
+
+  public BigDecimal getCreditCardCostMultiplier() {
+    return creditCardCostMultiplier;
+  }
+
+  public void setCreditCardCostMultiplier(BigDecimal creditCardCostMultiplier) {
+    this.creditCardCostMultiplier = creditCardCostMultiplier;
   }
 
   public boolean isDisplayCurrencyForCost() {

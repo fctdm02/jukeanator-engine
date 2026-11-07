@@ -1,9 +1,10 @@
 # Email Service
 
-This document has two parts:
+This document has three parts:
 
 1. **Conversation** — the design and implementation conversation for the email domain service, in order. User requests are quoted verbatim; responses are summarized, with tool output omitted.
 2. **Plan** — the implementation plan, updated to match what was actually built.
+3. **Local development with Gmail** — how to send real email (verification links, receipts, split summaries) from a local dev environment through a Gmail account.
 
 ---
 
@@ -231,3 +232,90 @@ The nested `${receipt.from-address:...}` keeps a legacy external `receipt.from-a
 - Add Funds → receipt arrives.
 - Swing: Add Split → status line, and the summary arrives at each recipient.
 - `app.repository-type=jpa` against a freshly created database, to confirm V1 validates.
+
+---
+
+## Part 3 — Local development with Gmail
+
+These steps let a local dev environment (for example `http://localhost:8080`) send real email through a Gmail account, so you can test Create Account verification, Add Funds receipts and split summaries end to end. They are for local testing only; production should use the operator's own mail account (see Part 1, item 4).
+
+### Why email doesn't arrive by default
+
+- `spring.mail` reads its server and login from environment variables: `SMTP_HOST` (default `smtp.gmail.com`), `SMTP_PORT` (default `587`), `SMTP_USERNAME` and `SMTP_PASSWORD` (both blank by default).
+- With no username or password set, Gmail refuses the login. The app logs a warning such as `Failed to send account verification email to ...: Authentication failed` and carries on, so the new account stays PENDING with no email sent.
+- Gmail never accepts your normal Google password from an app. It needs an **app password**.
+
+### Step 1: Create a Gmail app password
+
+1. Sign in to the Gmail account the app will send from.
+2. Go to https://myaccount.google.com/security and turn on **2-Step Verification** if it isn't on already. App passwords are only offered once it is on.
+3. Go to https://myaccount.google.com/apppasswords (or search for "App passwords" in your Google Account).
+4. Enter a name such as `JukeANator local dev` and click **Create**.
+5. Copy the 16-character password straight away. Google shows it only once. Spaces in it don't matter; you can leave them out.
+
+If the App passwords page says the setting isn't available, the account is probably a work or school (Google Workspace) account with app passwords turned off, or it uses Advanced Protection. Use a personal Gmail account instead.
+
+You can delete the app password from the same page at any time, which immediately stops the app from sending.
+
+### Step 2: Give the app the mail settings
+
+Set these five values. Use the same Gmail address for both `SMTP_USERNAME` and `MAIL_FROM_ADDRESS`: Gmail sends every message from the account that signed in, and replaces any other From address.
+
+- `SMTP_HOST` = `smtp.gmail.com`
+- `SMTP_PORT` = `587`
+- `SMTP_USERNAME` = your Gmail address, for example `you@gmail.com`
+- `SMTP_PASSWORD` = the app password from step 1
+- `MAIL_FROM_ADDRESS` = the same Gmail address
+
+**Option A: in the Eclipse launch configuration (recommended for dev).** The values apply only when you run the app from Eclipse, and nothing else on the PC sees them.
+
+1. **Run → Run Configurations...**, then select the JukeANator launch configuration.
+2. Open the **Environment** tab and click **Add...** for each of the five variables.
+3. Click **Apply**, then **Run**.
+
+Keep the launch configuration as a local one (the **Common** tab's **Local file** option, which is the default). A **Shared file** is saved as a `.launch` file in the project, where the password could be committed to git.
+
+**Option B: as Windows user environment variables.** These apply to every program you start afterward, including a jar run from a terminal. Run these in a terminal, then close and reopen Eclipse (or the terminal) so it picks them up:
+
+```bash
+setx SMTP_HOST smtp.gmail.com
+setx SMTP_PORT 587
+setx SMTP_USERNAME you@gmail.com
+setx SMTP_PASSWORD yourapppassword
+setx MAIL_FROM_ADDRESS you@gmail.com
+```
+
+To remove them later, open **Edit environment variables for your account** from the Start menu and delete the five entries.
+
+### Step 3: Check the config file
+
+In the `application.yml` the app actually reads (on the jukebox PC, `C:\kiosk\config\application.yml`):
+
+- `email.verification-required` should be `true`, so registering sends a verification link.
+- `email.verification-base-url` can stay blank (`~`). The link then uses the address the request came in on, such as `http://localhost:8080`, which is right for local testing. Only open the link on the same PC, since `localhost` means "this computer".
+- If the file still has the legacy block below, either delete it or make sure `MAIL_FROM_ADDRESS` is set. Without `MAIL_FROM_ADDRESS`, that block makes the From address `noreply@jukeanator.com`, which Gmail replaces with your Gmail address anyway.
+
+```yaml
+receipt:
+  from-address: ${MAIL_FROM_ADDRESS:noreply@jukeanator.com}
+```
+
+### Step 4: Test it
+
+1. Start the app with the settings from step 2.
+2. In the web UI, **Create Account** with an address you can read. The "Check Your Email" screen appears.
+3. The verification email arrives within a minute or so. Check the spam folder if it doesn't show up in the inbox.
+4. Open the link on the same PC. The login screen says the account is verified, and you can sign in.
+5. For an account that is already PENDING, sign in with it and click **Resend Verification Email**. The new link replaces the old one; the old one stops working.
+6. Optional: buy a package in **Add Funds** (Braintree sandbox) and check the receipt email, and run **Add Split** on the kiosk and check the summary email.
+
+### Troubleshooting
+
+Look in the console or `logs/jukeanator-service.log` for a `Failed to send ... email` warning:
+
+- **`Authentication failed`** or **`535-5.7.8 Username and Password not accepted`**: the app password or username is wrong, or the variables weren't picked up. Check that Eclipse (or the terminal) was restarted after `setx`, or that the launch configuration's Environment tab has all five values.
+- **Connection timed out**: something on the network is blocking port 587. Try another network, or check the firewall or antivirus.
+- **No warning, but no email**: check the spam folder, and confirm the Gmail account's **Sent** folder shows the message.
+- **Link opens "expired"**: links last 24 hours (`email.verification-token-ttl`). Sign in and use **Resend Verification Email**.
+
+A personal Gmail account can send about 500 messages a day, which is plenty for testing.

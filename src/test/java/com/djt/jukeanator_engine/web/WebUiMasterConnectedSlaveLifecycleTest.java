@@ -189,8 +189,8 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     String token = register(email);
     PatronSocket socket = connectPatron(token);
     ui.post(token, "/api/users/add-funds", new AddFundsRequest("pkg-14", "fake-nonce")).expect(200);
-    socket.await("/user/queue/credits", m -> m.path("numCredits").asInt() == 31);
-    int balance = 31;
+    socket.await("/user/queue/credits", m -> m.path("numCredits").asInt() == 32);
+    int balance = 32;
 
     // ── The song popup's checks, answered by the bar's jukebox ──────────────────────────
     JsonNode eligibility = ui.post(token, queuePath("checkSongsEligibility"),
@@ -214,7 +214,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     socket.await(LocationTopics.queue(locationId),
         m -> m.size() == 1 && key(m.get(0)).equals(SONG_A_ALBUM + "/" + SONG_A));
     socket.await("/user/queue/recent-plays", m -> key(m).equals(SONG_A_ALBUM + "/" + SONG_A));
-    socket.await("/user/queue/credits", m -> m.path("numCredits").asInt() == 31 - queueAddCost(1,
+    socket.await("/user/queue/credits", m -> m.path("numCredits").asInt() == 32 - queueAddCost(1,
         false));
     slave.awaitSpend(-queueAddCost(1, false));
 
@@ -304,7 +304,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     assertEquals(balance, balance(token));
 
     // ── The bar owner's accounting matches what the patron spent, on master and the slave ─
-    int spent = 31 - balance;
+    int spent = 32 - balance;
     String adminToken = jwtUtil.generateToken(uniqueEmail("owner"), UserRole.ROLE_ADMIN.name());
     Instant now = Instant.now();
     JsonNode ledger = ui.get(adminToken,
@@ -343,7 +343,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     // Alice buys credits and queues a song.
     ui.post(aliceToken, "/api/users/add-funds", new AddFundsRequest("pkg-7", "fake-nonce"))
         .expect(200);
-    aliceSocket.await("/user/queue/credits", m -> m.path("numCredits").asInt() == 13);
+    aliceSocket.await("/user/queue/credits", m -> m.path("numCredits").asInt() == 14);
     ui.post(aliceToken, queuePath("addSong"), addSongBody(SONG_A_ALBUM, SONG_A, 1, false))
         .expect(200);
     aliceSocket.await("/user/queue/recent-plays",
@@ -361,7 +361,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
 
     // Give any misrouted message time to arrive before checking nothing else did.
     Thread.sleep(1_000);
-    assertEquals(List.of(13, 13 - queueAddCost(1, false)),
+    assertEquals(List.of(14, 14 - queueAddCost(1, false)),
         aliceSocket.to("/user/queue/credits").stream().map(m -> m.path("numCredits").asInt())
             .toList(), "Alice sees only her own balance");
     assertEquals(List.of(72), bobSocket.to("/user/queue/credits").stream()

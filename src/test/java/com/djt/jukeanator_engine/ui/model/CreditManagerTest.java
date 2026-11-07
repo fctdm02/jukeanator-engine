@@ -3,14 +3,16 @@ package com.djt.jukeanator_engine.ui.model;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
 /** Tests for {@link CreditManager}'s per-session priority-play level. */
 class CreditManagerTest {
 
   private static CreditManager newCreditManager(int credits) {
-    return new CreditManager(credits, 3, 0, 0, 1, false);
+    return new CreditManager(credits, 3, 0, 0, BigDecimal.ONE, false);
   }
 
   @Test
@@ -91,7 +93,41 @@ class CreditManagerTest {
 
   /** The kiosk's default pricing: 3 credits per dollar, $5/$10 bonuses of 3/10, card rate / 2. */
   private static CreditManager newDefaultPricingCreditManager() {
-    return new CreditManager(0, 3, 3, 10, 2, false);
+    return newCreditManagerWithCardMultiplier("2");
+  }
+
+  private static CreditManager newCreditManagerWithCardMultiplier(String creditCardCostMultiplier) {
+    return new CreditManager(0, 3, 3, 10, new BigDecimal(creditCardCostMultiplier), false);
+  }
+
+  @Test
+  void creditCardCreditsFor_supportsADecimalMultiplier() {
+    CreditManager creditManager = newCreditManagerWithCardMultiplier("1.5");
+
+    // Cash credits 18 / 40 / 58 / 80, divided by 1.5 and rounded up.
+    assertEquals(12, creditManager.creditCardCreditsFor(5));
+    assertEquals(27, creditManager.creditCardCreditsFor(10));
+    assertEquals(39, creditManager.creditCardCreditsFor(15));
+    assertEquals(54, creditManager.creditCardCreditsFor(20));
+  }
+
+  @Test
+  void addCreditCardDollar_withADecimalMultiplier_matchesCreditCardCreditsFor() {
+    for (int dollars : new int[] {1, 5, 10, 15, 20}) {
+      CreditManager creditManager = newCreditManagerWithCardMultiplier("1.5");
+
+      int creditsAdded = 0;
+      for (int pulse = 0; pulse < dollars; pulse++) {
+        creditsAdded += creditManager.addCreditCardDollar();
+      }
+
+      assertEquals(creditManager.creditCardCreditsFor(dollars), creditsAdded, "$" + dollars);
+    }
+  }
+
+  @Test
+  void constructor_rejectsANonPositiveCardMultiplier() {
+    assertThrows(IllegalArgumentException.class, () -> newCreditManagerWithCardMultiplier("0"));
   }
 
   @Test

@@ -195,38 +195,38 @@ class WebPatronPlayLifecycleTest {
     assertEquals(0, refused.getBalance());
     verify(masterSongQueue, never()).addSongToQueue(any(), any());
 
-    // ── 2. Add Funds: $7.00 buys 12 + 1 bonus = 13 credits, at no location ────────────────
+    // ── 2. Add Funds: $7.00 buys 12 + 2 bonus = 14 credits, at no location ────────────────
     AddFundsResponseDto purchase =
         masterUserService.addFunds(PATRON, new AddFundsRequest("pkg-7", "nonce-1"));
 
     verify(paymentGateway).charge(new BigDecimal("7.00"), "nonce-1");
-    assertEquals(Integer.valueOf(13), purchase.numCredits());
+    assertEquals(Integer.valueOf(14), purchase.numCredits());
     assertEquals(12, purchase.creditsAdded());
-    assertEquals(1, purchase.bonusCreditsAdded());
+    assertEquals(2, purchase.bonusCreditsAdded());
     assertEquals("txn-1", purchase.transactionId());
-    assertEquals(0, new BigDecimal("4.33").compareTo(purchase.balanceUsd()),
-        "13 credits at the kiosk rate of 3 per dollar");
     assertEquals(1, eventsOfType(PurchaseCompletedEvent.class).size());
     assertEquals(0, new BigDecimal("0.00").compareTo(openPeriod(barLedger).mobileTotal()),
         "buying credits is not revenue for any location until they are spent there");
 
     // ── 3. Playing at the bar, until the balance runs out ─────────────────────────────────
     play(BAR, 1, 1, false); // normal play: 2 credits
-    assertEquals(11, balance());
+    assertEquals(12, balance());
     play(BAR, 2, 3, true); // priority-3 play: 8 credits
-    assertEquals(3, balance());
+    assertEquals(4, balance());
 
-    // Moving song 1 up costs 6; only 3 are held -- refused, and the queue is untouched.
+    // Moving song 1 up costs 6; only 4 are held -- refused, and the queue is untouched.
     assertThrows(InsufficientCreditsException.class, () -> moveUp(BAR, 1));
     verify(masterSongQueue, never()).moveSongUpInQueue(any(), any());
-    assertEquals(3, balance());
+    assertEquals(4, balance());
 
     play(BAR, 3, 1, false);
-    assertEquals(1, balance());
-    assertThrows(InsufficientCreditsException.class, () -> play(BAR, 4, 1, false));
-    assertEquals(1, balance(), "a refused play is never charged");
+    assertEquals(2, balance());
+    play(BAR, 4, 1, false);
+    assertEquals(0, balance(), "the package's 14 credits buy whole plays, none left over");
+    assertThrows(InsufficientCreditsException.class, () -> play(BAR, 5, 1, false));
+    assertEquals(0, balance(), "a refused play is never charged");
 
-    assertEquals(3, queuedAt(BAR).size(), "only the three paid plays reached the jukebox");
+    assertEquals(4, queuedAt(BAR).size(), "only the four paid plays reached the jukebox");
     assertTrue(queuedAt(BAR).stream().allMatch(entry -> PATRON.equals(entry.username())));
 
     // ── 4. Topping up, and playing at a second bar ────────────────────────────────────────
@@ -240,13 +240,15 @@ class WebPatronPlayLifecycleTest {
 
     // ── 5. Master's record accounts for every credit bought ───────────────────────────────
     List<UserSongCreditUsageDto> barSpends = spendsAt(BAR);
-    assertEquals(List.of(-2, -8, -2, -6), barSpends.stream().map(UserSongCreditUsageDto::amount).toList());
+    assertEquals(List.of(-2, -8, -2, -2, -6),
+        barSpends.stream().map(UserSongCreditUsageDto::amount).toList());
     assertEquals(List.of(UserSongCreditUsageType.QUEUE_ADD, UserSongCreditUsageType.QUEUE_ADD,
-        UserSongCreditUsageType.QUEUE_ADD, UserSongCreditUsageType.QUEUE_ACTION),
+        UserSongCreditUsageType.QUEUE_ADD, UserSongCreditUsageType.QUEUE_ADD,
+        UserSongCreditUsageType.QUEUE_ACTION),
         barSpends.stream().map(UserSongCreditUsageDto::type).toList());
-    assertEquals(List.of(11, 3, 1, 8),
+    assertEquals(List.of(12, 4, 2, 0, 8),
         barSpends.stream().map(UserSongCreditUsageDto::resultingBalance).toList());
-    assertEquals(List.of(1, 2, 3), barSpends.stream().limit(3)
+    assertEquals(List.of(1, 2, 3, 4), barSpends.stream().limit(4)
         .map(UserSongCreditUsageDto::songId).toList());
     assertTrue(barSpends.stream().allMatch(spend -> PATRON.equals(spend.userEmail())));
 
@@ -265,8 +267,8 @@ class WebPatronPlayLifecycleTest {
     int creditsBought = purchases.stream()
         .mapToInt(p -> p.getCreditsAwarded() + p.getBonusCredits()).sum();
     int creditsSpent = -patron.getUserSongCreditUsages().stream().mapToInt(u -> u.getAmount()).sum();
-    assertEquals(26, creditsBought);
-    assertEquals(19, creditsSpent);
+    assertEquals(28, creditsBought);
+    assertEquals(21, creditsSpent);
     assertEquals(creditsBought - creditsSpent, balance(),
         "the balance is exactly what was bought minus what was spent");
 
@@ -276,16 +278,16 @@ class WebPatronPlayLifecycleTest {
     assertEquals(List.of(OTHER_BAR),
         pushedElsewhere.stream().map(UserSongCreditUsageDto::locationId).toList());
 
-    // 18 credits spent at the bar, at the bar's kiosk rate of 3 credits per dollar = $6.00 --
-    // even though the patron paid $7.00 per 13 credits. The bar owner is paid the kiosk-equivalent
+    // 20 credits spent at the bar, at the bar's kiosk rate of 3 credits per dollar = $6.67 --
+    // even though the patron paid $7.00 per 14 credits. The bar owner is paid the kiosk-equivalent
     // value of what was played there.
-    assertMoney("6.00", openPeriod(barLedger).mobileTotal());
+    assertMoney("6.67", openPeriod(barLedger).mobileTotal());
 
     // ── 7. A re-delivered push (live push + catch-up pull) is never counted twice ─────────
     for (UserSongCreditUsageDto spend : barSpends) {
       barLedger.receiveMobileCreditUsage(spend);
     }
-    assertMoney("6.00", openPeriod(barLedger).mobileTotal());
+    assertMoney("6.67", openPeriod(barLedger).mobileTotal());
 
     // ── 8. The patron closes their account: the financial records stay ────────────────────
     masterUserService.deleteAccount(PATRON);
@@ -295,7 +297,7 @@ class WebPatronPlayLifecycleTest {
     assertEquals(barSpends.stream().map(UserSongCreditUsageDto::syncId).toList(),
         spendsAt(BAR).stream().map(UserSongCreditUsageDto::syncId).toList(),
         "the bar's revenue on master must survive the patron leaving");
-    assertMoney("6.00", openPeriod(barLedger).mobileTotal());
+    assertMoney("6.67", openPeriod(barLedger).mobileTotal());
 
     // ── 9. The operator also takes $5 at the kiosk, then settles the split ────────────────
     barLedger.recordLocalCashCredit(5);
@@ -304,11 +306,11 @@ class WebPatronPlayLifecycleTest {
     JukeboxSplitPeriodDto settled = finalizedPeriods(barLedger).get(0);
     assertMoney("5.00", settled.cashTotal());
     assertMoney("0.00", settled.cardTotal());
-    assertMoney("6.00", settled.mobileTotal());
-    assertMoney("11.00", settled.totalEarned());
+    assertMoney("6.67", settled.mobileTotal());
+    assertMoney("11.67", settled.totalEarned());
     assertEquals(Integer.valueOf(50), settled.splitPercentageToOwner());
-    assertMoney("5.50", settled.amountDueOwner());
-    assertMoney("5.50", settled.amountDueOperator());
+    assertMoney("5.84", settled.amountDueOwner()); // 11.67 x 50%, rounded half up
+    assertMoney("5.83", settled.amountDueOperator());
 
     assertMoney("0.00", openPeriod(barLedger).mobileTotal());
   }
@@ -341,7 +343,7 @@ class WebPatronPlayLifecycleTest {
     masterController.addSongToQueue(BAR, new AddSongToQueueRequest(null, ALBUM_ID, 1, 1, false),
         admin(), new MockHttpServletRequest());
 
-    assertEquals(Integer.valueOf(11), masterUserService.getProfile(ADMIN).numCredits());
+    assertEquals(Integer.valueOf(12), masterUserService.getProfile(ADMIN).numCredits());
     assertMoney("0.67", openPeriod(barLedger).mobileTotal()); // 2 credits / 3 per dollar
   }
 
@@ -349,7 +351,7 @@ class WebPatronPlayLifecycleTest {
   void aDoubleTapWithCreditsForOnePlay_queuesExactlyOneSong() throws Exception {
 
     masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "secret123"));
-    masterUserService.addFunds(PATRON, new AddFundsRequest("pkg-7", "nonce-1")); // 13 credits
+    masterUserService.addFunds(PATRON, new AddFundsRequest("pkg-7", "nonce-1")); // 14 credits
 
     // The first add is still in flight at the slave when the second tap arrives.
     CountDownLatch firstAddInFlight = new CountDownLatch(1);
@@ -364,7 +366,7 @@ class WebPatronPlayLifecycleTest {
 
     ExecutorService executor = Executors.newFixedThreadPool(2);
     try {
-      // A priority-3 play costs 8: 13 credits cover one, not two.
+      // A priority-3 play costs 8: 14 credits cover one, not two.
       Future<SongQueueEntryDto> firstTap = executor.submit(() -> play(BAR, 1, 3, true));
       assertTrue(firstAddInFlight.await(10, TimeUnit.SECONDS));
       Future<SongQueueEntryDto> secondTap = executor.submit(() -> play(BAR, 1, 3, true));
@@ -378,7 +380,7 @@ class WebPatronPlayLifecycleTest {
     }
 
     assertEquals(1, adds.get(), "the second tap must never reach the jukebox");
-    assertEquals(5, balance());
+    assertEquals(6, balance());
     assertEquals(List.of(-8), spendsAt(BAR).stream().map(UserSongCreditUsageDto::amount).toList());
     assertMoney("2.67", openPeriod(barLedger).mobileTotal()); // 8 credits / 3 per dollar
   }

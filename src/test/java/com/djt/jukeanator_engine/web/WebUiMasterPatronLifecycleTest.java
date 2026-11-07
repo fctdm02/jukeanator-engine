@@ -182,8 +182,8 @@ class WebUiMasterPatronLifecycleTest {
         .expect(200).json().path("clientToken").asText());
     JsonNode purchase = ui.post(token, "/api/users/add-funds",
         new AddFundsRequest("pkg-7", "fake-nonce")).expect(200).json();
-    assertEquals(13, purchase.path("numCredits").asInt());
-    assertEquals(13, balance(token));
+    assertEquals(14, purchase.path("numCredits").asInt());
+    assertEquals(14, balance(token));
 
     // ── Playlists hold songs tagged with the location they came from ──────────────────────
     ui.get(token, "/api/users/home").expect(200);
@@ -264,7 +264,7 @@ class WebUiMasterPatronLifecycleTest {
     for (Response attempt : attempts) {
       attempt.expect(503);
     }
-    assertEquals(13, balance(token), "nothing was charged");
+    assertEquals(14, balance(token), "nothing was charged");
 
     // The bar owner's accounting shows no spend there -- and is not the patron's to read.
     Instant now = Instant.now();
@@ -313,7 +313,7 @@ class WebUiMasterPatronLifecycleTest {
         .expect(200);
 
     stomp.await(userDestination(email, "/queue/credits"),
-        message -> message.path("numCredits").asInt() == 13);
+        message -> message.path("numCredits").asInt() == 14);
   }
 
   @Test

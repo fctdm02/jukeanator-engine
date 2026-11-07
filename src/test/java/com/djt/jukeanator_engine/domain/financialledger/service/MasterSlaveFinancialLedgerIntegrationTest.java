@@ -165,7 +165,7 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
         userService.addFunds(email, new AddFundsRequest("pkg-7", "fake-nonce"));
     assertNotNull(addFundsResult.transactionId());
 
-    assertAddFundsTransactionRow(email, "pkg-7", 12, 1);
+    assertAddFundsTransactionRow(email, "pkg-7", 12, 2);
 
     // ── song credits -> queueing a song at a specific location ─────────────
     userService.chargeCreditsForQueueAction(email, Integer.valueOf(1), locationA.locationId());
@@ -184,7 +184,7 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
 
     // The two spends never touched the Add-Funds ledger -- it still has exactly the one entry
     // from earlier, proving the split is real, not just a filter on one shared table.
-    assertAddFundsTransactionRow(email, "pkg-7", 12, 1);
+    assertAddFundsTransactionRow(email, "pkg-7", 12, 2);
   }
 
   @Test
