@@ -11,6 +11,7 @@ import java.awt.RenderingHints;
 import java.util.function.Consumer;
 import javax.swing.AbstractButton;
 import javax.swing.JButton;
+import javax.swing.border.EmptyBorder;
 
 public final class ButtonFactory {
 
@@ -64,6 +65,70 @@ public final class ButtonFactory {
     button.setFocusPainted(false);
     button.setOpaque(false);
     button.setPreferredSize(new Dimension(LayoutTheme.get().navBtnW, LayoutTheme.get().navBtnH));
+    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+    return button;
+  }
+
+  /**
+   * Creates a blue text button sized to its label (plus padding), used for the buttons on the Admin
+   * Panel's in-window cards. Same face, hover and pressed look as {@link #createNavigationButton};
+   * a disabled button is painted grey.
+   *
+   * @param text the button label
+   * @param font the label font
+   */
+  static JButton createTextButton(String text, Font font) {
+
+    JButton button = new JButton(text) {
+
+      private static final long serialVersionUID = 1L;
+      private boolean hovered = false;
+
+      {
+        addMouseListener(new java.awt.event.MouseAdapter() {
+          @Override
+          public void mouseEntered(java.awt.event.MouseEvent e) {
+            hovered = true;
+            repaint();
+          }
+
+          @Override
+          public void mouseExited(java.awt.event.MouseEvent e) {
+            hovered = false;
+            repaint();
+          }
+        });
+      }
+
+      @Override
+      protected void paintComponent(Graphics g) {
+
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        if (isEnabled()) {
+          paintNavButtonBackground(g2, this, hovered);
+        } else {
+          ColorTheme theme = ColorTheme.get();
+          int w = getWidth();
+          int h = getHeight();
+          g2.setColor(theme.btnGreyFace);
+          g2.fillRoundRect(0, 0, w, h, NAV_ARC, NAV_ARC);
+          g2.setColor(theme.btnGreyBorder);
+          g2.setStroke(new java.awt.BasicStroke(1.5f));
+          g2.drawRoundRect(0, 0, w - 1, h - 1, NAV_ARC, NAV_ARC);
+        }
+        g2.dispose();
+        paintLabelShifted(g, this, super::paintComponent);
+      }
+    };
+
+    button.setFont(font);
+    button.setForeground(ColorTheme.get().textPrimary);
+    button.setContentAreaFilled(false);
+    button.setFocusPainted(false);
+    button.setOpaque(false);
+    button.setBorder(new EmptyBorder(6, 18, 6, 18));
     button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     return button;

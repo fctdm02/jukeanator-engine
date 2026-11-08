@@ -15,8 +15,9 @@ import javax.swing.ButtonModel;
  * no outer shadow) shifts down a pixel or two. Label colours never change.
  *
  * <p>
- * Used by {@link ButtonFactory} (blue navigation buttons), {@link Button3D} (3-D queue buttons) and
- * {@link Key3D} (keyboard keys and the Home letter strip).
+ * Used by {@link ButtonFactory} (blue navigation buttons and the Admin Panel's overlay-card text
+ * buttons), {@link Button3D} (3-D queue buttons), {@link Key3D} (keyboard keys and the Home letter
+ * strip), the {@link AdminPanel} sidebar buttons and the {@link EditAlbumCard} buttons.
  */
 final class PressedEffect {
 

@@ -87,6 +87,9 @@ public class AdminPanel extends JPanel {
   private static final Dimension BTN_SIZE =
       new Dimension(LayoutTheme.get().adminBtnW, LayoutTheme.get().adminBtnH);
 
+  /** How far a pressed sidebar button sinks toward its 3 px drop shadow. */
+  private static final int SIDE_BTN_PRESS_DROP = 2;
+
   // ── Dependencies ──────────────────────────────────────────────────────────
   private final SongLibraryService songLibraryService;
   private final SongQueueService songQueueService;
@@ -140,8 +143,8 @@ public class AdminPanel extends JPanel {
   private final JPanel overlayScrim = new JPanel();
   private final JLabel overlayTitleLabel = new JLabel();
   private final JLabel overlayMessageLabel = new JLabel();
-  private final JButton overlayPrimaryBtn = new JButton();
-  private final JButton overlaySecondaryBtn = new JButton();
+  private final JButton overlayPrimaryBtn = overlayButton("");
+  private final JButton overlaySecondaryBtn = overlayButton("");
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -261,8 +264,6 @@ public class AdminPanel extends JPanel {
     JPanel buttonRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
     buttonRow.setOpaque(false);
     buttonRow.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
-    styleOverlayButton(overlaySecondaryBtn);
-    styleOverlayButton(overlayPrimaryBtn);
     buttonRow.add(overlayPrimaryBtn);
     buttonRow.add(overlaySecondaryBtn);
 
@@ -276,15 +277,14 @@ public class AdminPanel extends JPanel {
     overlayScrim.add(overlayFormCard, new GridBagConstraints());
   }
 
-  private static void styleOverlayButton(JButton btn) {
-    btn.setFocusPainted(false);
-    btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSideBtn2));
-    btn.setForeground(ColorTheme.get().textPrimary);
-    btn.setBackground(ColorTheme.get().bgListSelected);
-    btn.setBorder(BorderFactory.createCompoundBorder(
-        BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
-        new EmptyBorder(6, 18, 6, 18)));
-    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+  /**
+   * Creates a button for the in-window overlay cards: blue face with the shared hover and pressed
+   * look (see {@link ButtonFactory#createTextButton}). Fires through its {@code ActionListener} on
+   * release, like every user-screen button, so it works with the touchscreen's Mouse Emulation mode.
+   */
+  private static JButton overlayButton(String text) {
+    return ButtonFactory.createTextButton(text,
+        new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSideBtn2));
   }
 
   /** Shows an OK-only overlay notice. */
@@ -687,8 +687,8 @@ public class AdminPanel extends JPanel {
     private final JLabel albumsLabel = new JLabel();
     private final JLabel songsLabel = new JLabel();
     private final JLabel currentItemLabel = new JLabel(" ");
-    private final JButton stopBtn = new JButton("Stop");
-    private final JButton cancelBtn = new JButton("Cancel");
+    private final JButton stopBtn = overlayButton("Stop");
+    private final JButton cancelBtn = overlayButton("Cancel");
     private final JPanel content = new JPanel(new BorderLayout(0, 16));
 
     ScanProgressForm(String scanPath, boolean firstTimeUse) {
@@ -793,14 +793,12 @@ public class AdminPanel extends JPanel {
 
     private JPanel buildButtonRow() {
 
-      styleOverlayButton(stopBtn);
       stopBtn.addActionListener(e -> {
         monitor.requestStop();
         stopBtn.setEnabled(false);
         refresh();
       });
 
-      styleOverlayButton(cancelBtn);
       cancelBtn.addActionListener(e -> {
         monitor.requestCancel();
         stopBtn.setEnabled(false);
@@ -1038,14 +1036,12 @@ public class AdminPanel extends JPanel {
 
     private JPanel buildButtonRow() {
 
-      JButton createBtn = new JButton("Create Admin");
+      JButton createBtn = overlayButton("Create Admin");
       createBtn.setName(UiComponentNames.ADMIN_USER_CREATE_BUTTON);
-      styleOverlayButton(createBtn);
       createBtn.addActionListener(e -> attemptCreate());
 
-      JButton cancelBtn = new JButton("Cancel");
+      JButton cancelBtn = overlayButton("Cancel");
       cancelBtn.setName(UiComponentNames.ADMIN_FORM_CANCEL_BUTTON);
-      styleOverlayButton(cancelBtn);
       cancelBtn.addActionListener(e -> hideOverlay());
 
       JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
@@ -1144,9 +1140,8 @@ public class AdminPanel extends JPanel {
 
       // Touchscreen-only deployments have no Escape key, so this is the only way to close the
       // ledger short of waiting out the IdleMonitor timeout below.
-      JButton dismissBtn = new JButton("Dismiss");
+      JButton dismissBtn = overlayButton("Dismiss");
       dismissBtn.setName(UiComponentNames.ADMIN_LEDGER_DISMISS);
-      styleOverlayButton(dismissBtn);
       dismissBtn.addActionListener(e -> close());
       JPanel dismissRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
       dismissRow.setOpaque(false);
@@ -1184,13 +1179,10 @@ public class AdminPanel extends JPanel {
 
     private JComponent buildAddSplitRow() {
 
-      JButton addSplitBtn = new JButton("Add Split");
-      styleOverlayButton(addSplitBtn);
+      JButton addSplitBtn = overlayButton("Add Split");
 
-      JButton confirmYesBtn = new JButton("Yes, finalize");
-      styleOverlayButton(confirmYesBtn);
-      JButton confirmNoBtn = new JButton("Cancel");
-      styleOverlayButton(confirmNoBtn);
+      JButton confirmYesBtn = overlayButton("Yes, finalize");
+      JButton confirmNoBtn = overlayButton("Cancel");
 
       JLabel confirmLabel = new JLabel("Finalize the current period and start a new one?");
       confirmLabel.setForeground(ColorTheme.get().accentOrange);
@@ -1350,9 +1342,8 @@ public class AdminPanel extends JPanel {
       statusLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
 
       // Same touchscreen rationale as FinancialLedgerDialog's Dismiss button above.
-      JButton dismissBtn = new JButton("Dismiss");
+      JButton dismissBtn = overlayButton("Dismiss");
       dismissBtn.setName(UiComponentNames.ADMIN_ACTIVITY_DISMISS);
-      styleOverlayButton(dismissBtn);
       dismissBtn.addActionListener(e -> close());
       JPanel dismissRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
       dismissRow.setOpaque(false);
@@ -1692,12 +1683,10 @@ public class AdminPanel extends JPanel {
 
     private JPanel buildButtonRow() {
 
-      JButton registerBtn = new JButton("Register Location");
-      styleOverlayButton(registerBtn);
+      JButton registerBtn = overlayButton("Register Location");
       registerBtn.addActionListener(e -> attemptRegister());
 
-      JButton cancelBtn = new JButton("Cancel");
-      styleOverlayButton(cancelBtn);
+      JButton cancelBtn = overlayButton("Cancel");
       cancelBtn.addActionListener(e -> hideOverlay());
 
       JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
@@ -1788,8 +1777,7 @@ public class AdminPanel extends JPanel {
 
       content.add(result, BorderLayout.CENTER);
 
-      JButton doneBtn = new JButton("Done");
-      styleOverlayButton(doneBtn);
+      JButton doneBtn = overlayButton("Done");
       doneBtn.addActionListener(e -> hideOverlay());
       JPanel buttonRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
       buttonRow.setOpaque(false);
@@ -1957,14 +1945,12 @@ public class AdminPanel extends JPanel {
 
     private JPanel buildButtonRow() {
 
-      JButton saveBtn = new JButton("Save Changes");
+      JButton saveBtn = overlayButton("Save Changes");
       saveBtn.setName(UiComponentNames.ADMIN_LOCATION_SAVE_BUTTON);
-      styleOverlayButton(saveBtn);
       saveBtn.addActionListener(e -> attemptSave());
 
-      JButton cancelBtn = new JButton("Cancel");
+      JButton cancelBtn = overlayButton("Cancel");
       cancelBtn.setName(UiComponentNames.ADMIN_FORM_CANCEL_BUTTON);
-      styleOverlayButton(cancelBtn);
       cancelBtn.addActionListener(e -> hideOverlay());
 
       JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
@@ -2583,36 +2569,54 @@ public class AdminPanel extends JPanel {
         int faceH = visH - shelfH;
 
         boolean enabled = isEnabled();
+        // Shared pressed motif (see PressedEffect): the body sinks onto its drop shadow, the face
+        // and border darken, the specular edge disappears and an inset shadow appears.
+        boolean pressed = enabled && PressedEffect.isPressed(this);
+        boolean hoverLook = enabled && hovered && !pressed;
         Color gradTop = enabled ? accent.darker() : ColorTheme.get().btnGreyFace.brighter();
         Color gradBottom = enabled ? accent.darker().darker() : ColorTheme.get().btnGreyFace;
         Color borderColor = enabled ? accent : ColorTheme.get().btnGreyBorder;
 
+        // A pressed button sinks toward its shadow; the shadow's bottom edge stays put.
+        int drop = pressed ? SIDE_BTN_PRESS_DROP : 0;
+        g2.translate(0, drop);
+
         // Drop-shadow
         g2.setColor(ColorTheme.get().adminSideBtnShadow);
-        g2.fillRoundRect(1, shadowH, w - 2, visH, arc, arc);
+        g2.fillRoundRect(1, shadowH - drop, w - 2, visH, arc, arc);
 
         // Shelf
         g2.setColor(ColorTheme.get().adminSideBtnShelf);
         g2.fillRoundRect(1, faceH, w - 2, shelfH + arc / 2, arc, arc);
 
         // Face gradient
-        Color top = (enabled && hovered) ? gradTop.brighter() : gradTop;
-        Color bot = (enabled && hovered) ? gradBottom.brighter() : gradBottom;
+        Color top = pressed ? PressedEffect.darken(gradTop)
+            : hoverLook ? gradTop.brighter() : gradTop;
+        Color bot = pressed ? PressedEffect.darken(gradBottom)
+            : hoverLook ? gradBottom.brighter() : gradBottom;
         g2.setPaint(new GradientPaint(0, 0, top, 0, faceH, bot));
         g2.fillRoundRect(1, 0, w - 2, faceH + arc / 2, arc, arc);
 
-        // Specular edge
-        if (enabled) {
-          g2.setColor(new Color(Math.min(255, accent.getRed() + 80),
-              Math.min(255, accent.getGreen() + 80), Math.min(255, accent.getBlue() + 80), 160));
-        } else {
-          g2.setColor(new Color(255, 255, 255, 30));
+        // Specular edge — a sunken button doesn't catch the light
+        if (!pressed) {
+          if (enabled) {
+            g2.setColor(new Color(Math.min(255, accent.getRed() + 80),
+                Math.min(255, accent.getGreen() + 80), Math.min(255, accent.getBlue() + 80), 160));
+          } else {
+            g2.setColor(new Color(255, 255, 255, 30));
+          }
+          g2.setStroke(new java.awt.BasicStroke(1f));
+          g2.drawLine(arc, 1, w - arc - 1, 1);
         }
-        g2.setStroke(new java.awt.BasicStroke(1f));
-        g2.drawLine(arc, 1, w - arc - 1, 1);
+
+        // Inset shadow — the pressed face now sits below the surrounding surface
+        if (pressed) {
+          PressedEffect.paintInsetShadow(g2, 1, 0, w - 2, visH, arc);
+        }
 
         // Border
-        g2.setColor((enabled && hovered) ? accent.brighter() : borderColor);
+        g2.setColor(pressed ? PressedEffect.darken(accent)
+            : hoverLook ? accent.brighter() : borderColor);
         g2.setStroke(new java.awt.BasicStroke(1.5f));
         g2.drawRoundRect(1, 1, w - 3, visH - 2, arc, arc);
 

@@ -902,20 +902,35 @@ public class EditAlbumCard extends JPanel {
           return;
         }
 
-        Color top = hovered ? ColorTheme.get().editAlbumGradTop.brighter()
-            : ColorTheme.get().editAlbumGradTop;
-        Color bot = hovered ? ColorTheme.get().editAlbumGradBottom.brighter()
-            : ColorTheme.get().editAlbumGradBottom;
+        // Shared pressed motif (see PressedEffect): face and border darken, an inset shadow
+        // appears and the label moves down a pixel.
+        boolean pressed = PressedEffect.isPressed(this);
+        Color top;
+        Color bot;
+        if (pressed) {
+          top = PressedEffect.darken(ColorTheme.get().editAlbumGradTop);
+          bot = PressedEffect.darken(ColorTheme.get().editAlbumGradBottom);
+        } else if (hovered) {
+          top = ColorTheme.get().editAlbumGradTop.brighter();
+          bot = ColorTheme.get().editAlbumGradBottom.brighter();
+        } else {
+          top = ColorTheme.get().editAlbumGradTop;
+          bot = ColorTheme.get().editAlbumGradBottom;
+        }
         g2.setPaint(new GradientPaint(0, 0, top, 0, h, bot));
         g2.fillRoundRect(0, 0, w, h, 8, 8);
-        g2.setColor(ColorTheme.get().editAlbumAccentBlue);
+        if (pressed) {
+          PressedEffect.paintInsetShadow(g2, 0, 0, w, h, 8);
+        }
+        g2.setColor(pressed ? PressedEffect.darken(ColorTheme.get().editAlbumAccentBlue)
+            : ColorTheme.get().editAlbumAccentBlue);
         g2.setStroke(new java.awt.BasicStroke(1.2f));
         g2.drawRoundRect(1, 1, w - 3, h - 3, 8, 8);
         g2.setFont(getFont());
         g2.setColor(ColorTheme.get().textPrimary);
         java.awt.FontMetrics fm = g2.getFontMetrics();
         g2.drawString(getText(), (w - fm.stringWidth(getText())) / 2,
-            (h - fm.getHeight()) / 2 + fm.getAscent());
+            (h - fm.getHeight()) / 2 + fm.getAscent() + (pressed ? 1 : 0));
         g2.dispose();
       }
     };
