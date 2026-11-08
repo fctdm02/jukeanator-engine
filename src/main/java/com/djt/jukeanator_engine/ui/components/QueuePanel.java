@@ -347,9 +347,9 @@ public class QueuePanel extends JPanel {
     queueRowsScroll.getViewport().setOpaque(false);
     queueRowsScroll.setBorder(null);
     queueRowsScroll.getVerticalScrollBar().setUnitIncrement(LayoutTheme.get().albumViewRowH);
-    // Touch screens need a much wider, easier-to-grab scroll bar than the look and feel's
-    // mouse-sized default (same as LegacyAlbumGridPanel's track list).
-    queueRowsScroll.getVerticalScrollBar().setUI(new TouchScrollBarUI());
+    // Big touch-friendly scroll bar unless user-interface.use-big-scrollbars is off (same as
+    // LegacyAlbumGridPanel's track list).
+    ScrollBars.apply(queueRowsScroll.getVerticalScrollBar());
     body.add(queueRowsScroll, BorderLayout.CENTER);
 
     wrapper.add(body, BorderLayout.CENTER);

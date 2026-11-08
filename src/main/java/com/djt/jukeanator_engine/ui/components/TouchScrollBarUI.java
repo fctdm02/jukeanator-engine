@@ -18,8 +18,8 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
  * minimum thumb size, and bigger increment/decrement arrow buttons than the default look and
  * feel's scroll bar, which is sized for mouse precision rather than a fingertip. Supports both
  * vertical and horizontal scroll bars, and outlines the whole bar in the same gray as the thumb so
- * it reads as distinct from the black content area beside it. Used by
- * {@link LegacyAlbumGridPanel}'s per-album track-list scroll pane.
+ * it reads as distinct from the black content area beside it. Installed on every JFC/Swing scroll
+ * pane through {@link ScrollBars} when {@code user-interface.use-big-scrollbars} is on.
  */
 class TouchScrollBarUI extends BasicScrollBarUI {
 

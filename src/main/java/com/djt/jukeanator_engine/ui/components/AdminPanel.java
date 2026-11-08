@@ -2768,12 +2768,18 @@ public class AdminPanel extends JPanel {
     return btn;
   }
 
+  /**
+   * Scroll pane for the admin lists and tables. Uses the same big touch-friendly scroll bar as the
+   * Legacy view's CD panels unless {@code user-interface.use-big-scrollbars} is off, in which case
+   * it keeps the look and feel's normal bar on the admin background colour.
+   */
   private static JScrollPane darkScrollPane(java.awt.Component view) {
     JScrollPane sp = new JScrollPane(view);
     sp.setOpaque(false);
     sp.getViewport().setOpaque(false);
     sp.setBorder(BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1));
     sp.getVerticalScrollBar().setBackground(ColorTheme.get().adminScrollBarBg);
+    ScrollBars.apply(sp.getVerticalScrollBar());
     sp.getHorizontalScrollBar().setVisible(false);
     return sp;
   }

@@ -153,3 +153,5 @@ user-interface:
   display-currency-for-cost: false # JFC/Swing kiosk only: if true, shows the actual cost of a credit instead of the credit count (the Web/Mobile UI always shows credits)
   # SEARCH CONFIGURATION
   enable-type-ahead-search: true
+  # SCROLL BARS
+  use-big-scrollbars: true # JFC/Swing kiosk only: if true, uses wide touch-friendly scroll bars; if false, the normal (mouse-sized) scroll bars

@@ -314,10 +314,8 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
     scroll.setBorder(null);
     scroll.getVerticalScrollBar().setUnitIncrement(profile.trackRowH());
     scroll.getHorizontalScrollBar().setUnitIncrement(profile.trackRowH());
-    // Touch screens need a much wider, easier-to-grab scroll bar than the look and feel's
-    // mouse-sized default.
-    scroll.getVerticalScrollBar().setUI(new TouchScrollBarUI());
-    scroll.getHorizontalScrollBar().setUI(new TouchScrollBarUI());
+    // Big touch-friendly scroll bars unless user-interface.use-big-scrollbars is off.
+    ScrollBars.apply(scroll);
     // Fill the bottom-right gap left when both scroll bars are showing, so it matches the black
     // tracks rather than the look and feel's default corner color.
     JPanel corner = new JPanel();

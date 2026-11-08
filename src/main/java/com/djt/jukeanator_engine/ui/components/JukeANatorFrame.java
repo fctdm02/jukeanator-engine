@@ -274,6 +274,9 @@ public class JukeANatorFrame extends JFrame {
 
     this.enableTypeAheadSearch = this.jukeANatorUserInterfaceProperties.isEnableTypeAheadSearch();
 
+    // Must be set before initialize() builds any scroll pane.
+    ScrollBars.setUseBigScrollBars(this.jukeANatorUserInterfaceProperties.isUseBigScrollbars());
+
     this.creditManager = new CreditManager(numCredits, creditsPerDollar, fiveDollarBonusCredits,
         tenDollarBonusCredits, jukeANatorUserInterfaceProperties.getCreditCardCostMultiplier(),
         jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost());

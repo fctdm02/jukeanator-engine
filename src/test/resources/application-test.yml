@@ -136,3 +136,5 @@ user-interface:
   display-currency-for-cost: false # if true, will display credits, if false, will display the actual cost of a credit
   # SEARCH CONFIGURATION
   enable-type-ahead-search: true
+  # SCROLL BARS
+  use-big-scrollbars: true # JFC/Swing kiosk only: if true, uses wide touch-friendly scroll bars; if false, the normal (mouse-sized) scroll bars

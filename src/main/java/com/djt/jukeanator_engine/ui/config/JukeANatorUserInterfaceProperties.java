@@ -53,7 +53,14 @@ public class JukeANatorUserInterfaceProperties {
   //
   private boolean enableTypeAheadSearch = true;
 
-  
+  //
+  // SCROLL BARS
+  //
+  // If true, every JFC/Swing scroll pane uses the wide, touch-friendly scroll bar; if false, the
+  // look and feel's normal (mouse-sized) scroll bar.
+  private boolean useBigScrollbars = true;
+
+
   
   public boolean isAlwaysOnTop() {
     return alwaysOnTop;
@@ -189,5 +196,13 @@ public class JukeANatorUserInterfaceProperties {
 
   public void setEnableTypeAheadSearch(boolean enableTypeAheadSearch) {
     this.enableTypeAheadSearch = enableTypeAheadSearch;
+  }
+
+  public boolean isUseBigScrollbars() {
+    return useBigScrollbars;
+  }
+
+  public void setUseBigScrollbars(boolean useBigScrollbars) {
+    this.useBigScrollbars = useBigScrollbars;
   }
 }
