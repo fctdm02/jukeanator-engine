@@ -1276,10 +1276,9 @@ public class JukeANatorFrame extends JFrame {
         : LayoutTheme.get().fontSizeCreditDesc;
     creditDescription.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, creditDescFontSize));
 
-    JLabel creditDisclaimer = new JLabel("(Priority plays & queue operations may cost more)");
-    creditDisclaimer.setForeground(ColorTheme.get().textSecondary);
-    creditDisclaimer
-        .setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeCreditDisclaimer));
+    // Only meaningful when costs are shown in currency; in credit mode each operation's credit cost
+    // is already displayed directly, so the disclaimer is omitted.
+    boolean showCreditDisclaimer = jukeANatorUserInterfaceProperties.isDisplayCurrencyForCost();
 
     // Vertical glue above and below the label stack centers it within creditsTextPanel's full
     // height (it stretches to fill creditsPanel's BorderLayout.CENTER slot) instead of leaving it
@@ -1296,8 +1295,14 @@ public class JukeANatorFrame extends JFrame {
       creditsTextPanel.add(Box.createVerticalStrut(2));
       creditsTextPanel.add(creditCardDescription);
     }
-    creditsTextPanel.add(Box.createVerticalStrut(3));
-    creditsTextPanel.add(creditDisclaimer);
+    if (showCreditDisclaimer) {
+      JLabel creditDisclaimer = new JLabel("(Priority plays & queue operations may cost more)");
+      creditDisclaimer.setForeground(ColorTheme.get().textSecondary);
+      creditDisclaimer.setFont(
+          new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeCreditDisclaimer));
+      creditsTextPanel.add(Box.createVerticalStrut(3));
+      creditsTextPanel.add(creditDisclaimer);
+    }
     creditsTextPanel.add(Box.createVerticalGlue());
 
     creditsPanel.add(locationLogo, BorderLayout.WEST);
