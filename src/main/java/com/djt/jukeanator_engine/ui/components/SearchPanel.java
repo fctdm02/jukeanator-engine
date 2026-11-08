@@ -195,8 +195,9 @@ public class SearchPanel extends JPanel implements TabNavigator {
   }
 
   /**
-   * Resets the Search tab to its initial entry state (blank query, no results). Called after 10
-   * minutes of inactivity, as part of resetting every tab to its default state.
+   * Resets the Search tab to its initial entry state (blank query, no results, ABC keyboard).
+   * Called each time the Search tab is selected, and after 10 minutes of inactivity as part of
+   * resetting every tab to its default state.
    */
   public void resetToDefaultView() {
     resetSearch();

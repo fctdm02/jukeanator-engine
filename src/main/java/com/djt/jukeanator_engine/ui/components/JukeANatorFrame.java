@@ -1022,6 +1022,14 @@ public class JukeANatorFrame extends JFrame {
     // of trigger.
     tabs.addChangeListener(e -> {
       int index = tabs.getSelectedIndex();
+
+      // Always open the Search tab in its default state (blank query, no results), so a previous
+      // search is never shown when the user comes back to it. This runs before the tab is painted,
+      // so the old search is never briefly visible.
+      if (index == 2 && searchPanel != null) {
+        searchPanel.resetToDefaultView();
+      }
+
       String tabName = tabNameForIndex(index);
       if (tabName != null) {
         userActivityService.recordSwingActivity(songLibraryService.getOwnLocationId(),
