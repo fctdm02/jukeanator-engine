@@ -2411,8 +2411,9 @@ public class AdminPanel extends JPanel {
 
   /**
    * Builds the "JUKEBOX LIST" section header that includes a compact filter text field on the
-   * right. Typing in the field scrolls the album list to the first entry whose display name starts
-   * with the entered text (case-insensitive).
+   * right. Typing in the field scrolls the album list to the first entry whose display name
+   * contains the entered text (case-insensitive). Touching (releasing on) the field opens an
+   * on-screen keyboard overlay, since touchscreen deployments have no physical keyboard.
    */
   private JPanel buildAlbumSectionHeader() {
     JPanel header = new JPanel(new BorderLayout(8, 0)) {
@@ -2452,9 +2453,20 @@ public class AdminPanel extends JPanel {
         new Dimension(LayoutTheme.get().adminFilterFieldW, LayoutTheme.get().adminFilterFieldH));
     filterField.setMaximumSize(
         new Dimension(LayoutTheme.get().adminFilterFieldW, LayoutTheme.get().adminFilterFieldH));
-    filterField.setToolTipText("Filter — jumps to first match");
+    filterField.setToolTipText("Filter — jumps to first album containing the text");
 
-    // Jump to the first album whose display name starts with the filter text
+    // Touchscreen deployments have no physical keyboard, so a touch on the field opens the
+    // on-screen keyboard overlay. Triggered on release, like every other touch-driven control.
+    filterField.addMouseListener(new java.awt.event.MouseAdapter() {
+      @Override
+      public void mouseReleased(java.awt.event.MouseEvent e) {
+        if (SwingUtilities.isLeftMouseButton(e) && !overlayScrim.isVisible()) {
+          showAlbumSearchKeyboard(filterField);
+        }
+      }
+    });
+
+    // Jump to the first album whose display name contains the filter text
     filterField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
       private void jumpToMatch() {
         String filter = filterField.getText().trim().toLowerCase();
@@ -2464,7 +2476,7 @@ public class AdminPanel extends JPanel {
           AlbumDto album = albumListModel.getElementAt(i);
           String display = AlbumGridPanel
               .albumDisplayName(album.albumName(), album.genreName()).toLowerCase();
-          if (display.startsWith(filter)) {
+          if (display.contains(filter)) {
             albumList.setSelectedIndex(i);
             albumList.ensureIndexIsVisible(i);
             return;
@@ -2498,6 +2510,99 @@ public class AdminPanel extends JPanel {
     header.add(filterWrapper, BorderLayout.EAST);
 
     return header;
+  }
+
+  /**
+   * Shows the album-search pseudo dialog in the in-window overlay: an entry field seeded with the
+   * current filter text, the shared on-screen {@link KeyboardPanel}, and Search / Cancel buttons.
+   * Search copies the entry into {@code filterField} (whose document listener jumps the album list
+   * to the first match); Cancel leaves the filter unchanged. The entry field also accepts a physical
+   * keyboard, with Enter acting as Search.
+   */
+  private void showAlbumSearchKeyboard(javax.swing.JTextField filterField) {
+
+    JLabel title = new JLabel("Search Albums");
+    title.setForeground(ColorTheme.get().accentBlue);
+    title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+    title.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+
+    javax.swing.JTextField entry = new javax.swing.JTextField(filterField.getText());
+    entry.setName(UiComponentNames.ADMIN_ALBUM_SEARCH_FIELD);
+    entry.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminSection));
+    entry.setForeground(ColorTheme.get().textPrimary);
+    entry.setBackground(ColorTheme.get().adminFilterFieldBg);
+    entry.setCaretColor(ColorTheme.get().accentBlue);
+    entry.setBorder(BorderFactory.createCompoundBorder(
+        BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
+        new EmptyBorder(6, 10, 6, 10)));
+
+    Runnable search = () -> {
+      hideOverlay();
+      filterField.setText(entry.getText());
+    };
+    entry.addActionListener(e -> search.run());
+
+    KeyboardPanel keyboard = new KeyboardPanel(new KeyboardPanel.KeyboardListener() {
+      @Override
+      public void onCharacter(String ch) {
+        setEntry(entry.getText() + ch);
+      }
+
+      @Override
+      public void onBackspace() {
+        String text = entry.getText();
+        if (!text.isEmpty()) {
+          setEntry(text.substring(0, text.length() - 1));
+        }
+      }
+
+      @Override
+      public void onClear() {
+        setEntry("");
+      }
+
+      @Override
+      public void onSpace() {
+        setEntry(entry.getText() + " ");
+      }
+
+      /** Updates the entry and hands focus back so a physical keyboard keeps working too. */
+      private void setEntry(String text) {
+        entry.setText(text);
+        entry.requestFocusInWindow();
+      }
+    });
+    keyboard.useNaturalWidth();
+
+    JButton searchBtn = overlayButton("Search");
+    searchBtn.setName(UiComponentNames.ADMIN_ALBUM_SEARCH_BUTTON);
+    searchBtn.addActionListener(e -> search.run());
+
+    JButton cancelBtn = overlayButton("Cancel");
+    cancelBtn.setName(UiComponentNames.ADMIN_ALBUM_SEARCH_CANCEL_BUTTON);
+    cancelBtn.addActionListener(e -> hideOverlay());
+
+    JPanel buttonRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
+    buttonRow.setOpaque(false);
+    buttonRow.add(searchBtn);
+    buttonRow.add(cancelBtn);
+
+    JPanel top = new JPanel(new BorderLayout(0, 10));
+    top.setOpaque(false);
+    top.add(title, BorderLayout.NORTH);
+    top.add(entry, BorderLayout.CENTER);
+
+    JPanel content = new JPanel(new BorderLayout(0, 12));
+    content.setOpaque(false);
+    content.add(top, BorderLayout.NORTH);
+    content.add(keyboard, BorderLayout.CENTER);
+    content.add(buttonRow, BorderLayout.SOUTH);
+
+    showOverlayForm(ColorTheme.get().accentBlue, content);
+    SwingUtilities.invokeLater(() -> {
+      entry.requestFocusInWindow();
+      entry.setCaretPosition(entry.getText().length());
+    });
   }
 
   /**

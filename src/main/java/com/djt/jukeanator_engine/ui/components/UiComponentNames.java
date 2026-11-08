@@ -111,6 +111,12 @@ public final class UiComponentNames {
   public static final String ADMIN_QUEUE_LIST = "AdminPanel.queueList";
   public static final String ADMIN_FILTER_FIELD = "AdminPanel.filterField";
 
+  // ── AdminPanel: album search keyboard overlay ───────────────────────────────
+  public static final String ADMIN_ALBUM_SEARCH_FIELD = "AdminPanel.albumSearchField";
+  public static final String ADMIN_ALBUM_SEARCH_BUTTON = "AdminPanel.albumSearchButton";
+  public static final String ADMIN_ALBUM_SEARCH_CANCEL_BUTTON =
+      "AdminPanel.albumSearchCancelButton";
+
   // ── AdminPanel: west (library) side buttons ─────────────────────────────────
   public static final String ADMIN_FINANCIAL_LEDGER_BUTTON = "AdminPanel.financialLedgerButton";
   public static final String ADMIN_VIEW_ACTIVITY_BUTTON = "AdminPanel.viewActivityButton";

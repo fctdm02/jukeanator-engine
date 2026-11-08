@@ -276,6 +276,16 @@ public class KeyboardPanel extends JPanel {
     }
   }
 
+  /**
+   * Sets the preferred width to the width the keys actually need (instead of the nominal width
+   * used when a stretching layout such as {@code BorderLayout.SOUTH} decides the width). Use this
+   * when the keyboard sits in a container that is sized to its content, e.g. a centred overlay card.
+   */
+  public void useNaturalWidth() {
+    setPreferredSize(
+        new Dimension(outerWrapper.getPreferredSize().width, LayoutTheme.get().keyboardHeight));
+  }
+
   private void refreshKeyboard() {
     JPanel frostedBody = (JPanel) outerWrapper.getComponent(0);
     frostedBody.removeAll();
