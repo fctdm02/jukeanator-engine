@@ -2057,6 +2057,18 @@ public class JukeANatorFrame extends JFrame {
     adminPanel.showScanFileSystemDialog(true);
   }
 
+  /**
+   * Like {@link #promptForInitialLibraryScan()}, but scans a known music folder without asking:
+   * used at startup when a legacy install was migrated and its {@code ScanPaths} folder exists.
+   * Cancelling the scan exits the application, as there is no library to fall back on.
+   */
+  public void startInitialLibraryScan(String scanPath) {
+
+    preAdminTabIndex = contentPanelTabs.getSelectedIndex();
+    contentPanelTabs.setSelectedIndex(6);
+    adminPanel.startScan(scanPath, true);
+  }
+
   // TOGGLE MUSIC PLAY STATE ICON
   public void toggleMusicPlayStateIcon() {
 

@@ -477,4 +477,18 @@ public class RootFolderEntityTest extends AbstractSongLibraryEntityTest {
     assertEquals(1, fullRoot.getChildFolders().size(), "Rock genre should still be present");
   }
 
+  @Test
+  void storeSongStatistics_emptyLibrary_leavesExistingCdStatsUntouched(@TempDir Path dataDir)
+      throws Exception {
+
+    Path cdStats = dataDir.resolve(RootFolderEntity.CD_STATS);
+    java.nio.file.Files.writeString(cdStats, "5 C:\\Music\\a.mp3\r\n");
+
+    RootFolderEntity emptyRoot = new RootFolderEntity(dataDir.resolve("music").toString());
+    emptyRoot.initialize();
+    emptyRoot.storeSongStatistics(dataDir.toString());
+
+    assertEquals("5 C:\\Music\\a.mp3\r\n", java.nio.file.Files.readString(cdStats));
+  }
+
 }

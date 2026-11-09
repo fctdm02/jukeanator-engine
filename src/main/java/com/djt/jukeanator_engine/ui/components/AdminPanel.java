@@ -649,6 +649,17 @@ public class AdminPanel extends JPanel {
 
     String scanPath = chooser.getSelectedFile().getAbsolutePath();
 
+    startScan(scanPath, firstTimeUse);
+  }
+
+  /**
+   * Scans the given folder with the in-window progress card, without the directory chooser.
+   *
+   * @param firstTimeUse true when there is no song library yet; cancelling the scan then exits the
+   *        application instead of returning to the Admin panel
+   */
+  public void startScan(String scanPath, boolean firstTimeUse) {
+
     new ScanProgressForm(scanPath, firstTimeUse).start();
   }
 

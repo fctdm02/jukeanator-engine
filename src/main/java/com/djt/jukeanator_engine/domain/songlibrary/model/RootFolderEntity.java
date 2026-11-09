@@ -519,6 +519,14 @@ public class RootFolderEntity extends FolderEntity {
 
     String cdStatsPathName = dataDir + File.separator + RootFolderEntity.CD_STATS;
 
+    // An empty library (e.g. a first-run scan) has no counts to save. Writing anyway would replace
+    // an existing CDStats.TXT -- such as one carried over from a legacy install -- with an empty
+    // file just before the scan restores play counts from it.
+    if (this.songsMap == null || this.songsMap.isEmpty()) {
+      log.info("No songs in the library; leaving {} unchanged", cdStatsPathName);
+      return;
+    }
+
     List<SongFileEntity> songs = new ArrayList<>(this.songsMap.values());
 
     songs.sort(

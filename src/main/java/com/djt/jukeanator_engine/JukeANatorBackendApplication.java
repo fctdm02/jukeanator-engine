@@ -3,6 +3,7 @@ package com.djt.jukeanator_engine;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -15,6 +16,7 @@ import org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerA
 import org.springframework.scheduling.annotation.EnableScheduling;
 import com.djt.jukeanator_engine.config.ExternalConfigInitializer;
 import com.djt.jukeanator_engine.config.ExternalConfigMerger;
+import com.djt.jukeanator_engine.config.LegacyInstallMigrator;
 
 /**
  * DataSource/JPA/Flyway autoconfiguration is excluded here and re-imported only on instances that
@@ -39,12 +41,22 @@ public class JukeANatorBackendApplication {
     // this directory unless the app happens to be launched from inside it. A --app.config-dir
     // program argument (e.g. for a kiosk deployment with config outside the install dir)
     // overrides that default location.
-    Path configDirOverride = extractConfigDirOverride(args);
+    Path configDirOverride =
+        extractArgument(args, "--app.config-dir=").map(Paths::get).orElse(null);
     Path externalConfigDir = ExternalConfigInitializer
         .seedExternalConfigIfAbsent(JukeANatorBackendApplication.class, configDirOverride);
+    Path externalConfigFile = externalConfigDir.resolve("application.yml");
     // Surfaces settings added by a newer build in the operator-edited file (behavior is
     // unchanged either way -- a missing key already falls back to the bundled value).
-    ExternalConfigMerger.addMissingProperties(externalConfigDir.resolve("application.yml"));
+    ExternalConfigMerger.addMissingProperties(externalConfigFile);
+
+    // One-time migration of a legacy install (C:\old_kiosk by default) -- before Spring starts,
+    // so its license files, play counts and settings are in place for this start.
+    Path legacyDir = extractArgument(args, "--app.legacy-dir=").map(Paths::get)
+        .orElse(LegacyInstallMigrator.DEFAULT_LEGACY_DIR);
+    Path dataDir = LegacyInstallMigrator
+        .resolveDataDir(extractArgument(args, "--app.data-dir=").orElse(null), externalConfigFile);
+    LegacyInstallMigrator.migrateIfNeeded(legacyDir, dataDir, externalConfigFile);
     System.setProperty("spring.config.additional-location",
         "file:" + externalConfigDir.toAbsolutePath() + "/");
 
@@ -69,13 +81,12 @@ public class JukeANatorBackendApplication {
     builder.run(args);
   }
 
-  // Read ahead of Spring's own arg parsing, since the config directory has to be known before
-  // Spring's config loading (which is what would otherwise expose this as a property) even starts.
-  // Last occurrence wins, matching Spring's own precedence for repeated program arguments.
-  private static Path extractConfigDirOverride(String[] args) {
+  // Read ahead of Spring's own arg parsing, since the config and data directories have to be known
+  // before Spring's config loading (which is what would otherwise expose them as properties) even
+  // starts. Last occurrence wins, matching Spring's own precedence for repeated program arguments.
+  private static Optional<String> extractArgument(String[] args, String prefix) {
 
-    String prefix = "--app.config-dir=";
     return Arrays.stream(args).filter(arg -> arg.startsWith(prefix)).reduce((first, second) -> second)
-        .map(arg -> Paths.get(arg.substring(prefix.length()))).orElse(null);
+        .map(arg -> arg.substring(prefix.length()));
   }
 }

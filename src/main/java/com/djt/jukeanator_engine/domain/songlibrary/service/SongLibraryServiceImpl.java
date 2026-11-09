@@ -2,13 +2,10 @@ package com.djt.jukeanator_engine.domain.songlibrary.service;
 
 import static java.util.Objects.requireNonNull;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -61,6 +58,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryFileSystemImpl;
+import com.djt.jukeanator_engine.domain.songlibrary.service.utils.AdminPasswordAuthenticator;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongLibraryStructuralComparator;
 import com.djt.jukeanator_engine.domain.songlibrary.service.utils.SongScanner;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
@@ -1261,46 +1259,24 @@ public class SongLibraryServiceImpl
 
     String lowerUsername = username.toLowerCase();
 
-    if ("admin".equals(lowerUsername)) {
-      return authenticatePassword(password, "admin.sha");
-    }
-
-    if ("owner".equals(lowerUsername)) {
-      return authenticatePassword(password, "owner.sha");
+    if ("admin".equals(lowerUsername) || "owner".equals(lowerUsername)) {
+      return authenticatePassword(password, lowerUsername);
     }
 
     return Boolean.FALSE;
   }
 
-  private Boolean authenticatePassword(String password, String hashFileName) {
+  // Checks <accountName>.sha, or a migrated legacy <accountName>.md5 -- see
+  // AdminPasswordAuthenticator.
+  private Boolean authenticatePassword(String password, String accountName) {
 
     try {
-      Path hashFile = Path.of(this.dataDir, hashFileName);
+      return AdminPasswordAuthenticator.authenticate(Path.of(this.dataDir), accountName, password);
 
-      if (!Files.exists(hashFile)) {
-        return Boolean.FALSE;
-      }
-
-      String storedHash = Files.readString(hashFile, StandardCharsets.UTF_8).trim();
-
-      MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      byte[] hashedBytes = digest.digest(password.getBytes(StandardCharsets.UTF_8));
-
-      String computedHash = bytesToHex(hashedBytes);
-
-      return computedHash.equalsIgnoreCase(storedHash);
-
-    } catch (IOException | NoSuchAlgorithmException e) {
-      throw new SongLibraryServiceException("Could not authenticate password using hash file: " + hashFileName, e);
+    } catch (IOException e) {
+      throw new SongLibraryServiceException(
+          "Could not authenticate password for account: " + accountName, e);
     }
-  }
-
-  private static String bytesToHex(byte[] bytes) {
-    StringBuilder sb = new StringBuilder(bytes.length * 2);
-    for (byte b : bytes) {
-      sb.append(String.format("%02x", b));
-    }
-    return sb.toString();
   }
 
   @Override

@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.ui;
 
+import java.nio.file.Path;
 import java.util.List;
 
 import javax.swing.SwingUtilities;
@@ -13,6 +14,7 @@ import com.djt.jukeanator_engine.domain.license.service.LicenseService;
 import org.springframework.stereotype.Component;
 
 import com.djt.jukeanator_engine.config.AppProperties;
+import com.djt.jukeanator_engine.config.LegacyInstallMigrator;
 import com.djt.jukeanator_engine.domain.email.config.EmailProperties;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
@@ -112,9 +114,19 @@ public class JukeANatorUserInterfaceApplication {
     // data load completes.
     this.frame.bringToFront();
 
+    // Taken (and removed) on every start, so a legacy scan request is only ever acted on once.
+    String legacyScanPath =
+        LegacyInstallMigrator.takePendingScanPath(Path.of(appProperties.getDataDir()));
+
     if (Boolean.TRUE.equals(songLibraryService.isLibraryLoadFailedAtStartup())) {
-      log.info("No song library could be loaded at startup — prompting for initial library scan");
-      frame.promptForInitialLibraryScan();
+      if (legacyScanPath != null) {
+        log.info("No song library could be loaded at startup — scanning the legacy install's "
+            + "music folder {}", legacyScanPath);
+        frame.startInitialLibraryScan(legacyScanPath);
+      } else {
+        log.info("No song library could be loaded at startup — prompting for initial library scan");
+        frame.promptForInitialLibraryScan();
+      }
     }
 
     log.info("JukeANator UI launched: fetching library data in background");
