@@ -116,6 +116,10 @@ email:
   verification-base-url: http://localhost
   verification-token-ttl: 24h
 
+license:   # never touch real license files or the real license server from tests
+  directory: ${java.io.tmpdir}/jukeanator-test-license
+  server-url: ""
+
 user-interface:
   always-on-top: false
   enable-screen-saver: false

@@ -132,6 +132,27 @@ add-funds:
     - { id: pkg-14, price-usd: 14.00, credits: 24, bonus-credits: 8 }
     - { id: pkg-7, price-usd: 7.00, credits: 12, bonus-credits: 2 }
 
+license:   # legacy license key (JukeANator.CTL) and subscription (ExtendCode.CTL) checks; standalone and slave only
+  directory: ~   # folder holding JukeANator.CTL / ExtendCode.CTL; blank = app.data-dir, then the working directory, then C:\kiosk
+  server-url: https://www.jukeanator.com   # license server (master instance) base URL
+  customer-email: ~   # registered customer email; required for subscription tiers
+  customer-name: ~
+  location-name: ~
+  auto-provision-email: ~   # with auto-provision-passcode: provision a license at startup when none is installed; both are blanked after success
+  auto-provision-passcode: ~
+  heartbeat-interval: 6h   # how often to report in to the license server
+  revalidation-hour: 6   # local hour of the daily subscription re-check
+  demote-to-non-commercial: false   # true = always run non-commercial (bill acceptor and card reader disabled)
+  time-zone: ~   # zone for subscription quarter math; blank = system default
+
+license-server:   # master mode only: www.jukeanator.com license server and public website
+  time-zone: America/Detroit   # zone for subscription quarter math
+  downloads-dir: ~   # serves /temp/** and /webstart/** (legacy MP3Jukeboxx.jar auto-update, kiosk.zip, JNLP files)
+  legacy-jar-path: ~   # frozen legacy MP3Jukeboxx.jar for the build date/size checks; blank = <downloads-dir>/temp/MP3Jukeboxx.jar
+  latest-engine-version: ~   # reported to jukeanator-engine clients by command=getengineversion
+  engine-download-url: ~
+  feedback-recipients: tmyers1@yahoo.com   # contact form recipients (comma-separated)
+
 user-interface:
   always-on-top: false
   enable-screen-saver: true

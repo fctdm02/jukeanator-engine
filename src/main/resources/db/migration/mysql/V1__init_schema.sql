@@ -336,3 +336,65 @@ CREATE TABLE user_activity (
 CREATE INDEX idx_user_activity_location_occurred_at ON user_activity (location_id, occurred_at);
 CREATE INDEX idx_user_activity_activity_type ON user_activity (activity_type);
 CREATE INDEX idx_user_activity_synced_to_master_at ON user_activity (synced_to_master_at);
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────
+-- License server (master mode only): customers and their registered computers, serving the
+-- legacy MP3Jukeboxx /FrontController protocol and new engine instances alike. Replaces the
+-- legacy jukeanator.com CUSTOMER / CUSTOMER_SERIAL tables; the legacy per-IP/hostname
+-- CUSTOMER_SERIAL_IP_ADDRESS table is intentionally not carried over (heartbeat columns on
+-- license_machine replace it). See docs/license/legacy-import.sql for the one-time data import.
+-- ─────────────────────────────────────────────────────────────────────────────────────────────
+
+-- A licensed customer. license_type is the legacy single-letter tier: R/A = subscription
+-- (legacy "ASCAP mode", remote/standalone), C = commercial, P = professional (non-commercial),
+-- L = lite. passcode_sha1 is the lowercase SHA-1 hex the legacy client sends (never plaintext).
+-- available_licenses is decremented each time a new computer is provisioned.
+CREATE TABLE license_customer (
+    persistent_identity INT PRIMARY KEY,
+    customer_name        VARCHAR(256) NOT NULL,
+    email                  VARCHAR(255) NOT NULL UNIQUE,
+    phone_number             VARCHAR(32) NULL,
+    address                    VARCHAR(256) NULL,
+    notes                        VARCHAR(1024) NULL,
+    passcode_sha1                  VARCHAR(128) NOT NULL,
+    license_type                     VARCHAR(1) NOT NULL,
+    available_licenses                 INT NOT NULL DEFAULT 0,
+    revoked                              BOOLEAN NOT NULL DEFAULT FALSE,
+    -- TRUE when created implicitly by a legacy heartbeat from an unknown email (legacy behavior:
+    -- passcode = SHA-1 of the email itself) rather than by an administrator.
+    auto_created                           BOOLEAN NOT NULL DEFAULT FALSE,
+    legacy_customer_id                       INT NULL,
+    version                                    INT NOT NULL DEFAULT 1,
+    date_added                                   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_updated                                   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- A registered computer, identified by the legacy machine id ("serial number": diskid32
+-- Computer ID, network-card GUID or MAC address). last_paid_quarter (nQyyyy, '' for perpetual
+-- tiers) is the subscription paid-through quarter returned by the subscription check.
+CREATE TABLE license_machine (
+    persistent_identity INT PRIMARY KEY,
+    customer_id          INT NOT NULL,
+    serial_number          VARCHAR(64) NOT NULL UNIQUE,
+    last_paid_quarter        VARCHAR(8) NOT NULL DEFAULT '',
+    location_name              VARCHAR(256) NULL,
+    -- Client build date as sent by the client (legacy MM-dd-yyyy).
+    build_date                   VARCHAR(32) NULL,
+    revoked                        BOOLEAN NOT NULL DEFAULT FALSE,
+    -- LEGACY (MP3Jukeboxx) or ENGINE (jukeanator-engine), from the last request seen.
+    client_kind                      VARCHAR(16) NOT NULL DEFAULT 'LEGACY',
+    app_version                        VARCHAR(64) NULL,
+    app_mode                             VARCHAR(16) NULL,
+    first_seen_at                          TIMESTAMP NULL,
+    last_heartbeat_at                        TIMESTAMP NULL,
+    heartbeat_count                            INT NOT NULL DEFAULT 0,
+    last_license_issued_at                       TIMESTAMP NULL,
+    legacy_customer_serial_id                      INT NULL,
+    version                                          INT NOT NULL DEFAULT 1,
+    date_added                                         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_updated                                         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_license_machine_customer FOREIGN KEY (customer_id)
+        REFERENCES license_customer (persistent_identity)
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_license_machine_customer ON license_machine (customer_id);

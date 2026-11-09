@@ -1,37 +1,329 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=393, initial-scale=1.0">
-<title>JukeANator</title>
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-<link rel="manifest" href="/site.webmanifest">
-<link rel="stylesheet" href="/css/style.css">
+  <meta charset="utf-8">
+  <title>Home | JukeANator Digital Jukebox Software</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="keywords" content="digital jukebox, digital jukebox software, digital jukebox for bars, jukebox conversion, jukebox software, commercial digital jukebox, touch screen jukebox, touchscreen jukebox, standalone digital jukebox">
+  <meta name="description" content="JukeANator Digital Jukebox Software can be used to build standalone digital jukeboxes or convert existing CD jukeboxes for commercial use, designed for touchscreens and interfaces with bill/coin acceptors.">
+  <meta name="robots" content="index,follow">
+  <meta name="author" content="Tom Myers, Digital Jukebox Technologies LLC">
+  <meta name="google-site-verification" content="eZjzOxTxNk-QosX2KyCbY5LeHJQKK282nPkh28p4Y6Q">
+  <link href="/assets/css/bootstrap.css" rel="stylesheet">
+  <style>
+    body { padding-top: 60px; }
+  </style>
+  <link href="/assets/css/bootstrap-responsive.css" rel="stylesheet">
+  <link href="/assets/css/jukeanator-1.0.0.css" rel="stylesheet">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 </head>
 <body>
-  <div id="app-shell">
-    <div id="contentPanel"></div>
+
+  <div class="navbar navbar-inverse navbar-fixed-top">
+    <div class="navbar-inner">
+      <div class="container">
+        <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="brand" href="/"><img class="responsive-image" src="/assets/img/jukeanator_logo_100x24.gif" width="100" height="24" alt="JukeANator Logo"></a>
+        <div class="nav-collapse collapse">
+          <ul class="nav">
+            <li class="active"><a href="/">Home</a></li>
+            <li><a href="/screenshots.html">Screenshots</a></li>
+            <li><a href="/photos.html">Photos</a></li>
+            <li><a href="/features.html">Features</a></li>
+            <li><a href="/faq.html">FAQ</a></li>
+            <li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Order<b class="caret"></b></a>
+              <ul class="dropdown-menu">
+                <li><a href="/conversionkits.html">Conversion Kits</a></li>
+                <li><a href="/order.html">Software</a></li>
+              </ul>
+            </li>
+            <li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Legal<b class="caret"></b></a>
+              <ul class="dropdown-menu">
+                <li><a href="/licensing.html">Licensing</a></li>
+                <li><a href="/privacy_policy.html">Privacy Policy</a></li>
+                <li><a href="/return_policy.html">Shipping &amp; Return Policy</a></li>
+                <li><a href="/terms_and_conditions.html">Terms &amp; Conditions</a></li>
+              </ul>
+            </li>
+            <li><a href="/contact.html">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+  <div class="container">
 
-  <!-- Braintree Web SDK (modular client, NOT the deprecated Drop-in UI) for the Add Funds
-       payment-method sheet: card entry (Hosted Fields) plus PayPal, Venmo, and Google Pay,
-       each feature-detected and initialized in js/app.js. -->
-  <script src="https://js.braintreegateway.com/web/3.145.0/js/client.min.js"></script>
-  <script src="https://js.braintreegateway.com/web/3.145.0/js/hosted-fields.min.js"></script>
-  <script src="https://js.braintreegateway.com/web/3.145.0/js/paypal-checkout.min.js"></script>
-  <script src="https://js.braintreegateway.com/web/3.145.0/js/venmo.min.js"></script>
-  <script src="https://js.braintreegateway.com/web/3.145.0/js/google-payment.min.js"></script>
-  <script src="https://pay.google.com/gp/p/js/pay.js"></script>
-  <!-- Apple Pay is stubbed out (APPLE_PAY_ENABLED = false in app.js) until an Apple Developer
-       account and merchant domain-association file are set up -- not loading its SDK either. -->
-  <!-- PayPal's JS SDK is loaded dynamically in app.js, not here -- it must carry a
-       data-client-token attribute set from our own per-session Braintree client token. -->
+<div class="row-fluid">
+	<div class="span12">
+		<h4>A Digital Jukebox for Curated Music Content</h4>
+	</div>				
+</div>
 
-  <script src="/js/app.js"></script>
+<div class="row-fluid">
+  <div class="span8">
+      JukeANator stand-alone digital jukeboxes combine the business model of CD jukeboxes with the flexibility and power of computer-based internet digital jukeboxes, with the end result being that they are a "Best of Both Worlds" digital jukebox solution and with more money/more control in your hands!
+      <p>&nbsp;</p>
+      <h4>CD Jukebox Look and Feel</h4>
+      JukeANator is digital jukebox software that has the look and feel of CD jukeboxes, but with all of the power and flexibility of newer computer-based digital jukeboxes.
+      Its screens were designed to mimic the simplicity of CD jukeboxes, yet offer ways to search for music, browse by popularity or browse by genre.  
+      It is touch-screen friendly and can interface with any pulse based bill acceptor or coin acceptor.
+      <p>&nbsp;</p>
+  </div>
+  <div class="span4">
+      <a title="JukeANator Digital Jukebox" href="/images/main_screen_800_x_600.png" target="new">
+        <img src="/images/main_screen_240_x_180.png" width="240" height="180" style="border:4px solid red" alt="JukeANator Digital Jukebox">
+      </a>    
+  </div>
+</div>
+
+<div class="row-fluid">
+  <div class="span8">
+      <h4>With Digital Jukebox Power</h4>
+      The most important distinction about JukeANator based  jukeboxes is that they allow the owner/operator to have complete control of the music and allow them to put hundreds of albums on the jukebox.
+      <p>&nbsp;</p>
+      JukeANator can be used for custom built Digital Jukeboxes, retrofit/upgrade of existing audio CD jukeboxes or conversion of existing digital jukeboxes.
+      
+      <h4>Better than CD Jukeboxes</h4>
+      <ul>
+      <li>Break the "100 CD" limit!  Put as many albums on the jukebox as you can afford (thousands if you want), including singles and local bands</li>
+      <li>Increased revenue through song priority play, or "make mine first", where patrons pay more per song to hear their songs next</li>
+      <li>Better experience for patrons as they can search for music, look at comprehensive "most popular" tables or browse music by genre</li>
+      <li>Far easier to add, remove and sort albums, as the user interface simply displays whatever is loaded onto the jukebox computer's hard disk</li>
+      <li>Customized play lists can be used to provide desired background music</li>
+      <li>Random play is highly configurable</li>
+      <li>Limits on song plays can be set</li>
+      <li>Less maintenance overhead because of virtually no moving parts</li>
+      <li>Spanish built in, with capability for any language via plug-in</li>  
+      <li>Web interface for song queue management.</li>
+      </ul>
+  </div>
+  <div class="span4">
+      <a title="JukeANator Digital Jukebox" href="/images/jukeboxes/jukebox_1.jpg" target="new">
+        <img src="/images/jukeboxes/jukebox_1.jpg" width="240" height="320" style="border:4px solid red" alt="JukeANator Digital Jukebox">
+      </a>    
+  </div>
+</div>
+
+<div class="row-fluid">
+  <div class="span12">
+	<h4>Better than Internet Digital Jukeboxes</h4>
+	<ul>
+	<li>Own the jukebox outright (no leasing)</li> 
+	<li>As the owner/operator of the jukebox, since you are responsible for purchasing 100% of the content, you get 100% of the revenue</li>
+	<li>For a cost comparison between Standalone JukeANator Digital Jukeboxes, Audio CD Jukeboxes and Downloading Digital Jukeboxes, see <A HREF="/comparison_matrix.html">Jukebox Cost Comparison Matrix</A></li>
+	<li>No need for expensive music service contracts where %20 of the gross revenue (or an expensive monthly flat fee) goes directly to a 3rd party</li>
+	<li>Have complete control over all songs/albums that are available on the jukebox for patrons to play</li>
+	<li>Have complete control over song pricing, free play and whether you want advertisements displayed</li>
+	<li>Better experience for patrons, as they won't feel gouged paying $2 for a song to be downloaded that already exists on the jukebox</li>
+	<li>Have all the tracks that were meant to be on the album, instead of one or two deemed "popular"  by "the man"</li>
+	<li>Can run in private/home-use mode</li>
+	<li>Dual display capable for videos, karaoke and screen-saver content</li>
+	</ul>
+	
+	<h4>Jukebox Operator/Owner Friendly</h4>
+	JukeANator has been in constant development since 2000 and many of its features have come from input from jukebox operators and bar owners.
+	In short, many of the features of JukeANator digital jukeboxes are designed to give more earnings potential, more flexibility and more control to jukebox operators and bar owners.    
+	Go to <a href="/webstart.html">JukeANator Online Demo</a> and try it yourself for free!
+	
+	<h4>Getting a JukeANator Jukebox</h4>
+	There are basically 3 ways in which you can get a JukeANator digital jukebox installed into your location:
+	<ul>
+	<li>You can purchase a ready-to-install JukeANator digital jukebox (as pictured above)</li>
+	<li>You can purchase a JukeANator jukebox conversion kit and retrofit your existing CD (or internet) jukebox yourself</li>
+	<li>You can purchase just the JukeANator software and build/retrofit your own jukebox using your own computer, touchscreen, bill acceptor, touchscreen bezel and marquee</li>
+	</ul>
+	
+	<h4>Song Library Tools</h4>
+	JukeANator keeps your song library accurate and easy to manage:
+  </div>
+</div>
+
+<div class="row-fluid">
+  <div class="span12">
+     <ol>
+       <li>Automatic copyright information retrieval from <a href="http://www.amazon.com">Amazon.com</a>
+       <li>Automatic <a href="http://en.wikipedia.org/wiki/International_Standard_Recording_Code">song ISRC</a> retrieval from <a href="http://musicbrainz.org/doc/ISRC">MusicBrainz</a>
+       <li>Enhanced song metadata extraction for proper Amazon/MusicBrainz automatic web service lookups
+       <li>CD/Song properties editor for manual editing of publisher/copyright info, artist/song names and song ISRC
+       <li>Also, a Jukebox Conversion Kit available (to retrofit existing CD Jukeboxes or even other digital jukeboxes)
+     </ol>
+  </div>
+</div>
+
+<div class="row-fluid">
+  <div class="span12">
+<ul>
+<li>
+Don't be fooled by other standalone/non-downloading digital jukebox software companies that claim to be the only one licensable 
+for U.S. licensing requirements, or to offer the "world's first" commercially available, fully digital conversion 
+system for coin operated jukeboxes, as the 
+<a href="/images/Jukebox_OMalleys.jpg">first JukeANator digital jukebox conversion</a> 
+to be used in production, was in 2002 in Allen Park, MI.  Indeed, the 
+<a href="http://static.patsnap.com/patent/download/pdf/US20020113824">provisional patent application</a> 
+for JukeANator was submitted on Oct. 12, 2000 and the JukeANator website has been in operation since 
+<a href="http://www.networksolutions.com/whois/registry-data.jsp?domain=jukeanator.com">May 2004</a>, 3 years 
+before one <a href="http://www.networksolutions.com/whois/registry-data.jsp?domain=seeburgdigital.com">competitor</a>
+making such claims.
+<p>
+ 
+<li>
+Unlike TouchTunes or eCast, JukeANator is not an "internet jukebox" or a "downloading jukebox"!  You, as the 
+owner/operator, select/purchase the music that you and your locations <b>actually want</b> (not what they 
+force on you), and you get to keep the 100% of the revenue (as it has been for a long time with CD and vinyl 
+jukeboxes).  Just because the media has changed (MP3/WMA/AAC) and underlying jukebox construction has changed, it
+doesn't mean that the business model has to as well...  You can buy music from many different genres of music 
+(such as Latin/Hispanic) from on-line sources, such as 
+<a href="http://astore.amazon.com/jukdigjuksofa-20" target="new">Amazon MP3</a> or
+<a href="http://itunes.apple.com/us/genre/music/id34">Apple iTunes</a> 
+that internet/downloading jukeboxes don't offer...
+<p>
+
+<li>
+ABSOLUTELY NO: Contracts, 'partners', 3rd party advertising for alcohol that you don't even serve, profit sharing, bank account attachments, misleading/unfair 'deals' by 
+downloader service providers.  You don't even need to have an Internet connection at the location because of the standalone nature of
+<img src="/images/jukeanator_small.gif" width="87" height="16" border="0" alt="JukeANator Digital Jukebox"><br>&nbsp;<br>
+
+<li>Set your own pricing! The number of credits per song and bonus credits for $1,$2 and $5 is fully configurable<br>&nbsp;<br>  
+
+<li>Locations will generate more revenue with the "Song Priority Option" where patrons pay more credits to hear their song next<br>&nbsp;<br>
+
+<li>Works with any pulse type bill acceptor interface (used in conjunction with a keyboard encoder) <br>&nbsp;<br>
+
+<li>Designed from the start to have a touch screen friendly GUI with an intuitive look and feel..  No 'eyesore' iTunes/MusicMatch/poorly contrived UI like the competition..<br>&nbsp;<br>
+
+<li>Uses 100% "off-the-shelf" components, which is why you have the option of buying the software only!<br>&nbsp;<br>
+
+<li>For a cost comparison between Standalone JukeANator Digital Jukeboxes, Audio CD Jukeboxes and Downloading Digital Jukeboxes, see <A HREF="/comparison_matrix.html">Jukebox Cost Comparison Matrix</A></li>
+
+</ul>
+  </div>
+</div>
+
+<div class="row-fluid">
+  <div class="span8">
+	<!-- <H1>JukeANator Digital Jukebox</H1> -->
+	<img src="/images/jukeanator_small.gif" width="87" height="16" border="0" alt="JukeANator Digital Jukebox">
+	is next generation digital jukebox software that allows you to easily navigate and
+	play any song in your music library.  It has the look and feel of a bar-style
+	CD jukebox and can be used, for example, in a custom cabinet with a touch-screen in your game room, or on your
+	desktop as the most easy-to-use MP3 Jukebox application, right along side your other applications.  
+	With the commercial version and a bill acceptor, operators/owners have an attractive and flexible alternative to the
+	expensive high-profile commercial digital jukeboxes on the market.
+		
+	<p>&nbsp;</p>	
+	<img src="/images/jukeanator_small.gif" width="87" height="16" border="0" alt="JukeANator Digital Jukebox">
+	also has a powerful administration screen that allows you to DJ parties with ease, with
+	many features not found in other jukebox software programs.
+	Whether you are a home user looking for a solution to managing your personal music
+	collection on your computer, a DJ looking to leave the cases and cases of easily
+	damaged CDs at home and be able to queue up many songs at once or a bar owner
+	looking to increase your revenue and attract interest with cool next generation
+	jukebox, then
+	<img src="/images/jukeanator_small.gif" width="87" height="16" border="0" alt="JukeANator Digital Jukebox">
+	is for you!
+  </div>
+  <div class="span4">
+	<a title="Click image to see full-size" href="/images/main_screen_800_x_600.png" target="new">
+	  <img src="/images/main_screen_240_x_180.png" width="240" height="180" border="0" alt="JukeANator Digital Jukebox Software">
+	</a>    
+  </div>
+</div>
+	
+<div class="row-fluid">
+  <div class="span12">	
+	<p>
+	  The key to the ease-of-use is how music is organized, chosen and played.
+	  Using an intuitive scheme
+	  whereby music is categorized by genre, artist and CD title and an automatic numbering
+	  scheme, each song in the library is uniquely identified by a 4 or 5 digit number
+	  (depending upon how many CD titles there are). Songs can be chosen either by their
+	  unique number, or by clicking on them with your mouse or touch screen.  Songs in
+	  the library, or jukebox, are chosen by the user and then added to the
+	  "Song Queue"
+	  .
+	  This queue is dynamic and can adjusted on the fly so that you can easily add/remove
+	  songs to the queue, move the order with which songs will be played. Songs are played
+	  on a first-in-first-out basis, but there are other features that allow for more
+	  flexibility.
+	  <p>
+	    Whether you want to DJ a party, have all your personal music collection accessible with
+	    the click of a mouse, or a bar owner looking to build your own next generation digital
+	    jukebox, allowing you to generate more profit,
+	    <img src="/images/jukeanator_small.gif" width="87" height="16" border="0" alt="JukeANator Digital Jukebox">
+	    is what you are looking for!
+	  </p>
+  </div>
+</div>
+
+<div class="row-fluid">
+  <div class="span12">
+	<h4>Free Online Demo</h4>
+	<p>
+		With <a href="http://java.sun.com/products/javawebstart/">Java Web Start technology</a>, you can see for yourself and run a <a href="/webstart.html"> free trial version right now!</a>
+	</p>
+  </div>
+</div>
+
+<div class="row-fluid">
+  <div class="span12">
+	<h4>JukeANator Digital Jukebox Marketing Brochure</h4>
+	<p>
+		<a href="/digital-jukebox.pdf" target="digital-jukebox">JukeANator Digital Jukebox Marketing Brochure</a>
+	</p>
+  </div>
+</div>
+<div class="row-fluid">
+  <div class="span12">
+	<h4>Digital Jukebox Technologies, LLC. is now <a href="http://www.bbb.org" target="bbb">BBB</a> Accredited!</h4>
+	<p>
+		Click on the link below to see details on the accreditation:<br>
+		<a href="http://www.bbb.org/detroit/business-reviews/juke-boxes/digital-jukebox-technologies-l-l-c-in-royal-oak-mi-90029910/#bbbonlineclick" target="_blank" rel="nofollow"><img src="https://seal-easternmichigan.bbb.org/seals/blue-seal-250-52-bbb-90029910.png" style="border: 0;" alt="Digital Jukebox Technologies, L.L.C. BBB Business Review" /></a>
+	</p>
+  </div>
+</div>
+
+    <div class="row-fluid">
+      <div class="span12">
+        <hr>
+        <footer>
+          <p>
+            <small style="color: gray;">
+            &#169;2004-2026 Tom Myers. For more information, email: tmyers1 at yahoo dot com.
+            <a title="JukeANator Digital Jukebox" href="/patent_Application.htm" target="JUKEBOX">See Patent Application</a>
+            <a title="JukeANator Digital Jukebox" href="/google_shopping_data_feed.xml" target="JUKEBOX">See Google Shopping Data Feed</a>
+            </small>
+          </p>
+        </footer>
+      </div>
+    </div>
+  </div> <!-- /container -->
+
+  <script src="/assets/js/jquery.js"></script>
+  <script src="/assets/js/bootstrap-transition.js"></script>
+  <script src="/assets/js/bootstrap-alert.js"></script>
+  <script src="/assets/js/bootstrap-modal.js"></script>
+  <script src="/assets/js/bootstrap-dropdown.js"></script>
+  <script src="/assets/js/bootstrap-tab.js"></script>
+  <script src="/assets/js/bootstrap-tooltip.js"></script>
+  <script src="/assets/js/bootstrap-popover.js"></script>
+  <script src="/assets/js/bootstrap-button.js"></script>
+  <script src="/assets/js/bootstrap-collapse.js"></script>
+  <script src="/assets/js/bootstrap-carousel.js"></script>
+  <script>
+    jQuery(function ($) {
+      $("li.dropdown a").click(function (e) {
+        $(this).next('ul.dropdown-menu').css("display", "block");
+        e.stopPropagation();
+      });
+    });
+  </script>
 </body>
 </html>

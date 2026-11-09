@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.email.service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
 
 /**
@@ -28,4 +29,10 @@ public interface EmailService {
    * email.financial-ledger-recipients}; a no-op when that list is empty.
    */
   void sendFinancialLedgerSplitSummaryEmail(JukeboxSplitPeriodDto period);
+
+  /**
+   * The public website's contact/feedback form (master mode, legacy {@code command=feedback}).
+   * Sent to {@code toAddresses} with the visitor's address, when present, as the Reply-To.
+   */
+  void sendContactFeedbackEmail(List<String> toAddresses, String visitorEmail, String comments);
 }

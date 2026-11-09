@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
  * but a client is never trusted to have checked. Every violation is an
  * {@link IllegalArgumentException} (400) whose message is written for the patron.
  *
- * <p>The same rules are mirrored in {@code static/js/app.js} ({@code passwordProblem}); keep both
+ * <p>The same rules are mirrored in {@code static/app/js/app.js} ({@code passwordProblem}); keep both
  * sides in sync.
  */
 public final class AccountValidator {

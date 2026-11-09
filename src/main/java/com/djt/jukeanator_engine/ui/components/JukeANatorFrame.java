@@ -32,6 +32,8 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
+import com.djt.jukeanator_engine.domain.license.service.LicenseService;
+import com.djt.jukeanator_engine.ui.security.SwingSecurityUtil;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.GenreDto;
@@ -119,6 +121,15 @@ public class JukeANatorFrame extends JFrame {
   public static final String CARD_EDIT_ALBUM = "EDIT_ALBUM";
   public static final String CARD_LOGIN = "LOGIN";
   public static final String CARD_NOW_PLAYING_ALBUM = "NOW_PLAYING_ALBUM";
+  public static final String CARD_REGISTRATION = "REGISTRATION";
+  public static final String CARD_LICENSE_DETAIL = "LICENSE_DETAIL";
+
+  // ── LICENSING ──────────────────────────────────────────────────────────────
+  // Null when no license service exists (e.g. GUI tests): payment inputs then stay enabled.
+  private LicenseService licenseService;
+  private RegistrationCard registrationCard;
+  private LicenseDetailPromptCard licenseDetailCard;
+  private long lastUnlicensedPaymentLogMillis;
 
   private final CardLayout overlayCardLayout = new CardLayout();
   private final JPanel overlayRoot = new JPanel(overlayCardLayout) {
@@ -398,6 +409,9 @@ public class JukeANatorFrame extends JFrame {
 
       @Override
       public void actionPerformed(java.awt.event.ActionEvent e) {
+        if (!paymentsLicensed("bill acceptor")) {
+          return;
+        }
         creditManager.addDollar();
         financialLedgerService.recordLocalCashCredit(1);
       }
@@ -419,6 +433,9 @@ public class JukeANatorFrame extends JFrame {
 
             @Override
             public void actionPerformed(java.awt.event.ActionEvent e) {
+              if (!paymentsLicensed("card reader")) {
+                return;
+              }
               int creditsAdded = creditManager.addCreditCardDollar();
               financialLedgerService.recordLocalCreditCardCredit(1);
               cardPulseBurstTracker.recordPulse(creditsAdded);
@@ -446,6 +463,11 @@ public class JukeANatorFrame extends JFrame {
 
       @Override
       public void actionPerformed(java.awt.event.ActionEvent e) {
+        // The registration screen closes only through its own buttons.
+        if (registrationCardShowing()) {
+          return;
+        }
+
         // CASE 1: If AdminPanel is currently showing, return to the previous screen
         if (contentPanelTabs.getSelectedIndex() == 6) {
           contentPanelTabs.setSelectedIndex(preAdminTabIndex);
@@ -487,6 +509,11 @@ public class JukeANatorFrame extends JFrame {
             // or working the screen with no mouse/keyboard activity shouldn't
             // get interrupted by the screensaver.
             if (contentPanelTabs.getSelectedIndex() == 6) {
+              return;
+            }
+
+            // Nor the registration screen, which an operator is filling in during setup.
+            if (registrationCardShowing()) {
               return;
             }
 
@@ -1796,7 +1823,7 @@ public class JukeANatorFrame extends JFrame {
    */
   private void showNowPlayingAlbumCard() {
 
-    if (currentNowPlayingSong == null)
+    if (currentNowPlayingSong == null || registrationCardShowing())
       return;
 
     // Fetch the full album (with track listing) for the now-playing song
@@ -1863,7 +1890,132 @@ public class JukeANatorFrame extends JFrame {
    * invisible at all times so it cannot be reached without logging in. On Cancel or timeout the
    * overlay is dismissed and the previously active tab / state is preserved.
    */
+  /**
+   * Enables license enforcement of the payment inputs and the License admin screen. Without a
+   * license service (GUI tests) payment inputs stay enabled.
+   */
+  public void setLicenseService(LicenseService licenseService) {
+    this.licenseService = licenseService;
+    if (adminPanel != null) {
+      adminPanel.setLicenseService(licenseService, this::showRegistrationCard);
+    }
+  }
+
+  /**
+   * Payment inputs (bill acceptor, card reader) only operate under a commercial license. A pulse
+   * arriving otherwise is ignored (logged at most once a minute), as in the legacy application.
+   */
+  private boolean paymentsLicensed(String source) {
+    if (licenseService == null || licenseService.isCommercialEnabled()) {
+      return true;
+    }
+    long now = System.currentTimeMillis();
+    if (now - lastUnlicensedPaymentLogMillis > 60_000L) {
+      lastUnlicensedPaymentLogMillis = now;
+      log.warn("Ignoring {} pulse: no commercial license is active ({})", source,
+          licenseService.getStatus().describe());
+    }
+    return false;
+  }
+
+  /**
+   * True while the registration card or a license-detail prompt is on screen. They close only
+   * through their own buttons, so nothing else may replace or hide them meanwhile.
+   */
+  private boolean registrationCardShowing() {
+    return (registrationCard != null && registrationCard.isShowing())
+        || (licenseDetailCard != null && licenseDetailCard.isShowing());
+  }
+
+  /**
+   * Licensed instances need {@code license.customer-name} and {@code license.location-name}. The
+   * customer name is first requested from the license server ({@code getcustomername}, the only
+   * legacy command that returns customer details; no command returns a location). Whatever is
+   * still missing is then asked for, one prompt at a time, and saved to the external config.
+   * Unlicensed (trial) instances have no customer, so nothing is asked.
+   */
+  public void showMissingLicenseDetails() {
+    if (licenseService == null || licenseService.getStatus().isTrial()) {
+      return;
+    }
+    SwingSecurityUtil.runAsync(licenseService::refreshCustomerName)
+        .thenRun(() -> SwingUtilities.invokeLater(this::promptNextMissingLicenseDetail))
+        .exceptionally(t -> {
+          log.warn("Could not check the license details", t);
+          SwingUtilities.invokeLater(this::promptNextMissingLicenseDetail);
+          return null;
+        });
+  }
+
+  private void promptNextMissingLicenseDetail() {
+    LicenseDetailPromptCard.Detail next = null;
+    if (licenseService.getCustomerName() == null) {
+      next = LicenseDetailPromptCard.Detail.CUSTOMER_NAME;
+    } else if (licenseService.getLocationName() == null) {
+      next = LicenseDetailPromptCard.Detail.LOCATION_NAME;
+    }
+    if (next != null && !registrationCardShowing()) {
+      showLicenseDetailCard(next);
+    }
+  }
+
+  private void showLicenseDetailCard(LicenseDetailPromptCard.Detail asked) {
+    if (licenseDetailCard != null) {
+      licenseDetailCard.dismiss();
+    }
+    licenseDetailCard = new LicenseDetailPromptCard(licenseService, asked,
+        () -> SwingUtilities.invokeLater(() -> {
+          licenseDetailCard.dismiss();
+          hideOverlay();
+          // Skipping the customer name still asks for the location; skipping ends the round.
+          if (asked == LicenseDetailPromptCard.Detail.CUSTOMER_NAME
+              && licenseService.getLocationName() == null) {
+            showLicenseDetailCard(LicenseDetailPromptCard.Detail.LOCATION_NAME);
+          }
+        }));
+    replaceOverlayCard(CARD_LICENSE_DETAIL, licenseDetailCard);
+    overlayCardLayout.show(overlayRoot, CARD_LICENSE_DETAIL);
+    syncOverlayLayerBounds();
+    overlayRoot.revalidate();
+    overlayRoot.repaint();
+    requestFocusInWindow();
+    log.info("License detail prompt shown: {}", asked);
+  }
+
+  /** Shows the licensing card (register, import a license file, or try unlicensed). */
+  public void showRegistrationCard() {
+    if (licenseService == null) {
+      return;
+    }
+    if (registrationCard != null) {
+      registrationCard.dismiss();
+    }
+    registrationCard = new RegistrationCard(licenseService, licenseService.getCustomerEmail(),
+        licenseService.getLocationName(), () -> SwingUtilities.invokeLater(() -> {
+          if (registrationCard != null) {
+            registrationCard.dismiss();
+          }
+          hideOverlay();
+          // Now ask for any customer / location name the license server could not supply.
+          showMissingLicenseDetails();
+        }));
+    replaceOverlayCard(CARD_REGISTRATION, registrationCard);
+    overlayCardLayout.show(overlayRoot, CARD_REGISTRATION);
+    syncOverlayLayerBounds();
+    overlayRoot.revalidate();
+    overlayRoot.repaint();
+    // The card reads the physical keyboard through a KeyEventDispatcher, which needs this window
+    // to hold keyboard focus.
+    requestFocusInWindow();
+    log.info("Registration screen shown (overlay {}x{}, card visible={})", overlayRoot.getWidth(),
+        overlayRoot.getHeight(), registrationCard.isVisible());
+  }
+
   public void showLoginToAdminPanelCard() {
+
+    if (registrationCardShowing()) {
+      return;
+    }
 
     if (loginToAdminPanelCard != null) {
       loginToAdminPanelCard.dismiss();

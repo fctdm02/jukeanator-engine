@@ -18,7 +18,7 @@ import com.fasterxml.jackson.databind.node.NullNode;
 
 /**
  * Calls the engine's REST API exactly as the Web/Mobile UI's {@code api()} helper in
- * {@code static/js/app.js} does: a JSON body, {@code Content-Type: application/json}, and the
+ * {@code static/app/js/app.js} does: a JSON body, {@code Content-Type: application/json}, and the
  * patron's JWT as a {@code Bearer} token when logged in (none when anonymous). Requests go through
  * the full servlet filter chain -- {@code JwtAuthenticationFilter} and {@code SecurityConfig}'s
  * rules included -- via {@link MockMvc}, so no port is opened.

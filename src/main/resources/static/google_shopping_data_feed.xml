@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+  
+    <item>
+      <title>JukeANator Lite</title>
+      <g:brand>JukeANator</g:brand>
+      <link>http://www.jukeanator.com/servlet/FrontController?command=order&amp;product=jukeanator_sw_lite</link>
+      <description>JukeANator digital jukebox software license - noncommercial 'lite' mode.&#10;
+      Features:&#10;  
+      - Unlimited jukebox song/CD capacity&#10;
+      - Unlimited number of song plays</description>
+      <g:id>jukeanator_sw_lite</g:id>
+      <g:item_group_id>jukeanator_sw</g:item_group_id>
+      <g:condition>new</g:condition>
+      <g:availability>in stock</g:availability>
+      <g:mpn>jukeanator_sw_lite</g:mpn>
+      <g:price>49.95 USD</g:price>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:google_product_category>
+      <g:product_type>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:product_type>      
+      <g:image_link>http://www.jukeanator.com/images/jukeanator_main_screen_noncommercial.jpg</g:image_link>
+      <g:shipping>
+        <g:country>US</g:country>
+        <g:service>Standard</g:service>
+        <g:price>5.00 USD</g:price>
+      </g:shipping>
+      <g:tax>
+        <g:country>US</g:country>
+        <g:region>MI</g:region>
+        <g:rate>3.0</g:rate>
+        <g:tax_ship>y</g:tax_ship>
+      </g:tax>
+      <g:weight>0.2 lb</g:weight>            
+    </item>
+
+    <item>
+      <title>JukeANator Professional</title>
+      <g:brand>JukeANator</g:brand>
+      <link>http://www.jukeanator.com/servlet/FrontController?command=order&amp;product=jukeanator_sw_professional</link>
+      <description>JukeANator digital jukebox software license - noncommercial 'professional' mode.&#10;
+      Features:&#10;  
+      - Unlimited jukebox song/CD capacity&#10;
+      - Unlimited number of song plays&#10;
+      - Unlimited song queue capacity&#10;
+      - Unlimited song priority levels&#10;
+      - Remote web interface</description>
+      <g:id>jukeanator_sw_professional</g:id>
+      <g:item_group_id>jukeanator_sw</g:item_group_id>
+      <g:condition>new</g:condition>
+      <g:availability>in stock</g:availability>
+      <g:mpn>jukeanator_sw_professional</g:mpn>
+      <g:price>149.95 USD</g:price>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:google_product_category>
+      <g:product_type>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:product_type>      
+      <g:image_link>http://www.jukeanator.com/images/jukeanator_main_screen_noncommercial.jpg</g:image_link>
+      <g:shipping>
+        <g:country>US</g:country>
+        <g:service>Standard</g:service>
+        <g:price>5.00 USD</g:price>
+      </g:shipping>
+      <g:tax>
+        <g:country>US</g:country>
+        <g:region>MI</g:region>
+        <g:rate>3.0</g:rate>
+        <g:tax_ship>y</g:tax_ship>
+      </g:tax>
+      <g:weight>0.2 lb</g:weight>            
+    </item>
+
+    <item>
+      <title>JukeANator Commercial (outside of U.S.)</title>
+      <g:brand>JukeANator</g:brand>
+      <link>http://www.jukeanator.com/servlet/FrontController?command=order&amp;product=jukeanator_sw_commercial</link>
+      <description>JukeANator digital jukebox software license - commercial 'outside of U.S.' mode.&#10;
+      Features:&#10;
+      - Unlimited jukebox song/CD capacity&#10;
+      - Unlimited number of song plays&#10;
+      - Unlimited song queue capacity&#10;
+      - Unlimited song priority levels&#10;
+      - Remote web interface&#10;
+      - Password protected admin screen&#10;
+      - Bill/coin acceptor&#10;
+      - Paid song credits support&#10;
+      - Touchscreen support</description>
+      <g:id>jukeanator_sw_commercial</g:id>
+      <g:item_group_id>jukeanator_sw</g:item_group_id>
+      <g:condition>new</g:condition>
+      <g:availability>in stock</g:availability>
+      <g:mpn>jukeanator_sw_commerciall</g:mpn>
+      <g:price>399.95 USD</g:price>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:google_product_category>
+      <g:product_type>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:product_type>      
+      <g:image_link>http://www.jukeanator.com/images/thumbs/JukeANator_Main_Screen.jpg</g:image_link>
+      <g:shipping>
+        <g:country>US</g:country>
+        <g:service>Standard</g:service>
+        <g:price>5.00 USD</g:price>
+      </g:shipping>
+      <g:tax>
+        <g:country>US</g:country>
+        <g:region>MI</g:region>
+        <g:rate>3.0</g:rate>
+        <g:tax_ship>y</g:tax_ship>
+      </g:tax>
+      <g:weight>0.2 lb</g:weight>            
+    </item>
+
+    <item>
+      <title>JukeANator Commercial (U.S. and U.S. Territories)</title>
+      <g:brand>JukeANator</g:brand>
+      <link>http://www.jukeanator.com/servlet/FrontController?command=order&amp;product=jukeanator_sw_commercial_ascap</link>
+      <description>JukeANator digital jukebox software license - commercial 'U.S. and U.S. territories' mode.&#10;
+      Features:&#10;
+      - Unlimited jukebox song/CD capacity&#10;
+      - Unlimited number of song plays&#10;
+      - Unlimited song queue capacity&#10;
+      - Unlimited song priority levels&#10;
+      - Remote web interface&#10;
+      - Password protected admin screen&#10;
+      - Bill/coin acceptor&#10;
+      - Paid song credits support&#10;
+      - Touchscreen support&#10;
+      - ASCAP/BMI/SESAC public performance song licensing support</description>
+      <g:id>jukeanator_sw_commercial_ascap</g:id>
+      <g:item_group_id>jukeanator_sw</g:item_group_id>
+      <g:condition>new</g:condition>
+      <g:availability>in stock</g:availability>
+      <g:mpn>jukeanator_commercial_ascap</g:mpn>
+      <g:price>549.95 USD</g:price>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:google_product_category>
+      <g:product_type>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:product_type>      
+      <g:image_link>http://www.jukeanator.com/images/thumbs/JukeANator_Main_Screen.jpg</g:image_link>
+      <g:shipping>
+        <g:country>US</g:country>
+        <g:service>Standard</g:service>
+        <g:price>5.00 USD</g:price>
+      </g:shipping>
+      <g:tax>
+        <g:country>US</g:country>
+        <g:region>MI</g:region>
+        <g:rate>3.0</g:rate>
+        <g:tax_ship>y</g:tax_ship>
+      </g:tax>
+      <g:weight>0.2 lb</g:weight>            
+    </item>
+
+    <item>
+      <title>JukeANator Digital Jukebox Conversion Kit (You supply your own bill acceptor/touchscreen and create your own bezel/marquee)</title>
+      <g:brand>JukeANator</g:brand>
+      <link>http://www.jukeanator.com/servlet/FrontController?command=conversionkits&amp;product=jukeanator_kit_djt000</link>
+      <description>      
+    Hardware:&#10;
+        - Dell Optiplex GX 620 Small Form Factor&#10;
+        - KeySpan Remote Control (configured to pause/reject/volume up/volume down)&#10;
+        - CyberPower CP425HG 425VA/255W UPS Battery Backup (with automatic shutdown when on battery power for > 5 min)&#10;
+        - Hagstrom Electronics KE-18 Keyboard Encoder (to interface between the bill acceptor/coin acceptor and the PC/software)&#10; 
+    Software:&#10;
+        - Windows XP (or Windows 7, depending upon availability)&#10;
+        - JukeANator Commercial (either ASCAP/BMI/SESAC Paid Public Performance Licensing version for U.S./Puerto Rico or normal commercial version for international)&#10;
+        - Keyspan Infrared Remote controller&#10;
+        - CyberPower UPS driver&#10;
+        - ELO Touch Screen driver&#10;
+      </description>      
+      <g:id>jukeanator_kit_djt000</g:id>
+      <g:item_group_id>jukeanator_hw</g:item_group_id>
+      <g:condition>new</g:condition>
+      <g:availability>in stock</g:availability>
+      <g:mpn>jukeanator_kit_djt000</g:mpn>
+      <g:price>1025.00 USD</g:price>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:google_product_category>
+      <g:product_type>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:product_type>      
+      <g:image_link>http://www.jukeanator.com/images/thumbs/JukeANator_Main_Screen.jpg</g:image_link>
+      <g:shipping>
+        <g:country>US</g:country>
+        <g:service>Standard</g:service>
+        <g:price>5.00 USD</g:price>
+      </g:shipping>
+      <g:tax>
+        <g:country>US</g:country>
+        <g:region>MI</g:region>
+        <g:rate>3.0</g:rate>
+        <g:tax_ship>y</g:tax_ship>
+      </g:tax>
+      <g:weight>0.2 lb</g:weight>            
+    </item>
+
+    <item>
+      <title>JukeANator Digital Jukebox Conversion Kit (You supply your own bill acceptor and create your own bezel/marquee)</title>
+      <g:brand>JukeANator</g:brand>
+      <link>http://www.jukeanator.com/servlet/FrontController?command=conversionkits&amp;product=jukeanator_kit_djt001</link>
+      <description>
+    Hardware:&#10;
+        - Dell Optiplex GX 620 Small Form Factor&#10;
+        - ELO 1547L 15" LCD Touchscreen Display&#10;
+        - KeySpan Remote Control (configured to pause/reject/volume up/volume down)&#10;
+        - CyberPower CP425HG 425VA/255W UPS Battery Backup (with automatic shutdown when on battery power for > 5 min)&#10;
+        - Hagstrom Electronics KE-18 Keyboard Encoder (to interface between the bill acceptor/coin acceptor and the PC/software)&#10; 
+    Software:&#10;
+        - Windows XP (or Windows 7, depending upon availability)&#10;
+        - JukeANator Commercial (either ASCAP/BMI/SESAC Paid Public Performance Licensing version for U.S./Puerto Rico or normal commercial version for international)&#10;
+        - Keyspan Infrared Remote controller&#10;
+        - CyberPower UPS driver&#10;
+        - ELO Touch Screen driver &#10;
+      </description>      
+      <g:id>jukeanator_kit_djt001</g:id>
+      <g:item_group_id>jukeanator_hw</g:item_group_id>
+      <g:condition>new</g:condition>
+      <g:availability>in stock</g:availability>
+      <g:mpn>jukeanator_kit_djt001</g:mpn>
+      <g:price>1625.00 USD</g:price>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:google_product_category>
+      <g:product_type>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:product_type>      
+      <g:image_link>http://www.jukeanator.com/images/thumbs/JukeANator_Main_Screen.jpg</g:image_link>
+      <g:shipping>
+        <g:country>US</g:country>
+        <g:service>Standard</g:service>
+        <g:price>5.00 USD</g:price>
+      </g:shipping>
+      <g:tax>
+        <g:country>US</g:country>
+        <g:region>MI</g:region>
+        <g:rate>3.0</g:rate>
+        <g:tax_ship>y</g:tax_ship>
+      </g:tax>
+      <g:weight>20.0 lb</g:weight>            
+    </item>
+
+    <item>
+      <title>JukeANator Digital Jukebox Conversion Kit (NSM Gen I wall models - Hyperbeam/Performer/Thunderbird)</title>
+      <g:brand>JukeANator</g:brand>
+      <link>http://www.jukeanator.com/servlet/FrontController?command=conversionkits&amp;product=jukeanator_kit_djt002</link>
+      <description>
+    Hardware:&#10;
+        - Dell Optiplex GX 620 Small Form Factor&#10;
+        - ELO 1547L 15" LCD Touchscreen Display&#10;
+        - MEI AE2411 Bill Acceptor&#10;
+        - KeySpan Remote Control (configured to pause/reject/volume up/volume down)&#10;
+        - CyberPower CP425HG 425VA/255W UPS Battery Backup (with automatic shutdown when on battery power for > 5 min)&#10;
+        - Hagstrom Electronics KE-18 Keyboard Encoder (to interface between the bill acceptor/coin acceptor and the PC/software)&#10;
+        - Translucent marquee with JukeANator logo&#10;
+        - Plexiglass Bezel with art work&#10;         
+    Software:&#10;
+        - Windows XP (or Windows 7, depending upon availability)&#10;
+        - JukeANator Commercial (either ASCAP/BMI/SESAC Paid Public Performance Licensing version for U.S./Puerto Rico or normal commercial version for international)&#10;
+        - Keyspan Infrared Remote controller&#10;
+        - CyberPower UPS driver&#10;
+        - ELO Touch Screen driver &#10;
+      </description>      
+      <g:id>jukeanator_kit_djt002</g:id>
+      <g:item_group_id>jukeanator_hw</g:item_group_id>
+      <g:condition>new</g:condition>
+      <g:availability>in stock</g:availability>
+      <g:mpn>jukeanator_kit_djt002</g:mpn>
+      <g:price>2400.00 USD</g:price>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:google_product_category>
+      <g:product_type>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:product_type>      
+      <g:image_link>http://www.jukeanator.com/images/thumbs/JukeANator_Main_Screen.jpg</g:image_link>
+      <g:shipping>
+        <g:country>US</g:country>
+        <g:service>Standard</g:service>
+        <g:price>5.00 USD</g:price>
+      </g:shipping>
+      <g:tax>
+        <g:country>US</g:country>
+        <g:region>MI</g:region>
+        <g:rate>3.0</g:rate>
+        <g:tax_ship>y</g:tax_ship>
+      </g:tax>            
+      <g:weight>30.0 lb</g:weight>
+    </item>
+    
+    <item>
+      <title>JukeANator Digital Jukebox</title>
+      <g:brand>JukeANator</g:brand>
+      <link>http://www.jukeanator.com/servlet/FrontController?command=conversionkits&amp;product=jukeanator_digital_jukebox</link>
+      <description>
+      Completely converted jukebox (0usually based off of either NSM Gen I, Rowe Wall Rock or Rowe Modbox chassis).
+      JukeANator Commercial (either ASCAP/BMI/SESAC Paid Public Performance Licensing version for U.S./Puerto Rico or normal commercial version for international)
+      </description>      
+      <g:id>jukeanator_digital_jukebox</g:id>
+      <g:item_group_id>jukeanator_hw</g:item_group_id>
+      <g:condition>new</g:condition>
+      <g:availability>in stock</g:availability>
+      <g:mpn>jukeanator_digital_jukebox</g:mpn>
+      <g:price>3500.00 USD</g:price>
+      <g:google_product_category>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:google_product_category>
+      <g:product_type>Electronics &gt; Audio &gt; Audio Players &amp; Recorders &gt; Jukeboxes</g:product_type>      
+      <g:image_link>http://www.jukeanator.com/images/Jukebox_OMalleys.jpg</g:image_link>
+      <g:shipping>
+        <g:country>US</g:country>
+        <g:service>Standard</g:service>
+        <g:price>5.00 USD</g:price>
+      </g:shipping>
+      <g:tax>
+        <g:country>US</g:country>
+        <g:region>MI</g:region>
+        <g:rate>3.0</g:rate>
+        <g:tax_ship>y</g:tax_ship>
+      </g:tax>
+      <g:weight>175.0 lb</g:weight>            
+    </item>
+        
+  </channel>
+</rss>

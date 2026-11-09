@@ -54,7 +54,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Functional tests of every REST endpoint and STOMP subscription the Web/Mobile UI
- * ({@code static/js/app.js}) uses, each exercised the way a patron actually reaches it -- signing
+ * ({@code static/app/js/app.js}) uses, each exercised the way a patron actually reaches it -- signing
  * up, browsing, buying credits, building playlists, queueing songs and closing the account -- so a
  * break in the API contract surfaces here rather than in an already-published mobile app.
  *

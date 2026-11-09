@@ -197,7 +197,7 @@ The nested `${receipt.from-address:...}` keeps a legacy external `receipt.from-a
 - `SecurityConfig`: `/api/users/resend-verification` and `GET /api/users/verify` are `permitAll()`.
 - `AppConfig`: builds `EmailVerificationPolicy` from `EmailProperties` for the `userService` bean.
 
-### 4. Web UI (`static/js/app.js`, `static/css/style.css`)
+### 4. Web UI (`static/app/js/app.js`, `static/css/style.css`)
 
 - Register: a `null` token shows a "Check Your Email" screen naming the address, with "Resend Email" and "Back to Sign In".
 - Login: a 403 shows the server's message and a "Resend Verification Email" button, with the email field pre-filled. `renderLogin` now escapes its messages and accepts a green `notice`.

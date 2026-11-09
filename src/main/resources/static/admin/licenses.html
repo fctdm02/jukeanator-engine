@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>License Administration | JukeANator</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/admin/licenses.css">
+</head>
+<body>
+  <header>
+    <h1>License Administration</h1>
+    <div id="who"></div>
+  </header>
+
+  <main>
+    <section id="loginView" hidden>
+      <h2>Sign in</h2>
+      <p class="hint">Use an administrator account of the JukeANator web UI.</p>
+      <form id="loginForm">
+        <label>Email <input type="email" id="loginEmail" required autocomplete="username"></label>
+        <label>Password <input type="password" id="loginPassword" required autocomplete="current-password"></label>
+        <button type="submit">Sign in</button>
+        <p class="error" id="loginError"></p>
+      </form>
+    </section>
+
+    <section id="adminView" hidden>
+      <div class="toolbar">
+        <form id="searchForm">
+          <input type="search" id="searchBox" placeholder="Search name, email, serial number or location">
+          <button type="submit">Search</button>
+        </form>
+        <button type="button" id="newCustomerBtn">New customer</button>
+      </div>
+      <p class="error" id="adminError"></p>
+      <p class="hint">License types: R/A = Subscription (remote/standalone), C = Commercial,
+        P = Professional (non-commercial), L = Lite. A subscription machine is valid through its
+        paid-through quarter; clients reject quarters more than four quarters ahead.</p>
+      <div id="results"></div>
+    </section>
+  </main>
+
+  <dialog id="customerDialog">
+    <form id="customerForm" method="dialog">
+      <h2 id="customerDialogTitle">Customer</h2>
+      <label>Name <input id="cName" required></label>
+      <label>Email <input id="cEmail" type="email" required></label>
+      <label>Passcode <input id="cPasscode" type="password" autocomplete="new-password"
+          placeholder="Leave blank to keep the current passcode"></label>
+      <label>License type
+        <select id="cType">
+          <option value="A">A - Subscription (standalone)</option>
+          <option value="R">R - Subscription (remote)</option>
+          <option value="C">C - Commercial</option>
+          <option value="P">P - Professional</option>
+          <option value="L">L - Lite</option>
+        </select>
+      </label>
+      <label>Available licenses <input id="cLicenses" type="number" min="0" value="1"></label>
+      <label>Phone <input id="cPhone"></label>
+      <label>Address <input id="cAddress"></label>
+      <label>Notes <textarea id="cNotes" rows="3"></textarea></label>
+      <p class="error" id="customerError"></p>
+      <div class="buttons">
+        <button type="button" id="customerCancel">Cancel</button>
+        <button type="submit" id="customerSave">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/admin/licenses.js"></script>
+</body>
+</html>

@@ -7,7 +7,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -185,5 +187,112 @@ public final class ExternalConfigUpdater {
     }
 
     return String.join(lineSeparator, lines);
+  }
+
+  /**
+   * Sets {@code section.key: value} for every entry of {@code values} in the given config file
+   * (a null or blank value is written as {@code ~}). Failure is logged rather than thrown, since
+   * the caller has already applied the values in memory.
+   *
+   * @return true if the file was written
+   */
+  public static boolean persistSectionValues(Path configFile, String section,
+      Map<String, String> values) {
+
+    if (configFile == null) {
+      LOG.warn("No external config file is known; {} {} will not be persisted", section,
+          values.keySet());
+      return false;
+    }
+    try {
+      String yaml = Files.exists(configFile)
+          ? Files.readString(configFile, StandardCharsets.UTF_8)
+          : "";
+      Files.writeString(configFile, setSectionValues(yaml, section, values),
+          StandardCharsets.UTF_8);
+      LOG.info("Updated {} with {} {}", configFile, section, values.keySet());
+      return true;
+    } catch (IOException e) {
+      LOG.warn("Unable to persist {} {} to {}", section, values.keySet(), configFile, e);
+      return false;
+    }
+  }
+
+  /**
+   * Returns {@code yaml} with each {@code section.key} set to its value, replacing existing lines
+   * (keeping any trailing {@code # comment}) and inserting missing keys, or the whole section, as
+   * needed. Only direct children of a top-level {@code section} are supported.
+   */
+  static String setSectionValues(String yaml, String section, Map<String, String> values) {
+
+    String lineSeparator = yaml.contains("\r\n") ? "\r\n" : "\n";
+    Pattern sectionLine = Pattern.compile("^" + Pattern.quote(section) + ":[ \\t]*(#.*)?$");
+    List<String> lines = new ArrayList<>(Arrays.asList(yaml.split("\\R", -1)));
+
+    int blockStart = -1;
+    for (int i = 0; i < lines.size(); i++) {
+      if (sectionLine.matcher(lines.get(i)).matches()) {
+        blockStart = i;
+        break;
+      }
+    }
+
+    if (blockStart < 0) {
+      StringBuilder sb = new StringBuilder(yaml);
+      if (!yaml.isEmpty() && !yaml.endsWith("\n")) {
+        sb.append(lineSeparator);
+      }
+      sb.append(section).append(':').append(lineSeparator);
+      values.forEach((key, value) -> sb.append(DEFAULT_CHILD_INDENT).append(key).append(": ")
+          .append(yamlValue(value)).append(lineSeparator));
+      return sb.toString();
+    }
+
+    int blockEnd = lines.size();
+    for (int i = blockStart + 1; i < lines.size(); i++) {
+      String line = lines.get(i);
+      if (!line.isBlank() && !Character.isWhitespace(line.charAt(0))
+          && !line.startsWith("#")) {
+        blockEnd = i;
+        break;
+      }
+    }
+
+    String childIndent = null;
+    Map<String, Boolean> done = new LinkedHashMap<>();
+    for (int i = blockStart + 1; i < blockEnd; i++) {
+      String line = lines.get(i);
+      Matcher childKey = CHILD_KEY_LINE.matcher(line);
+      if (childIndent == null && childKey.matches()) {
+        childIndent = childKey.group(1);
+      }
+      for (Map.Entry<String, String> entry : values.entrySet()) {
+        if (done.containsKey(entry.getKey())) {
+          continue;
+        }
+        Matcher m = Pattern.compile("^([ \\t]+)" + Pattern.quote(entry.getKey())
+            + ":(?:'[^']*(?:''[^']*)*'|[^#])*?([ \\t]+#.*)?$").matcher(line);
+        if (m.matches() && (childIndent == null || m.group(1).equals(childIndent))) {
+          String comment = m.group(2) != null ? m.group(2) : "";
+          lines.set(i, m.group(1) + entry.getKey() + ": " + yamlValue(entry.getValue())
+              + comment);
+          done.put(entry.getKey(), Boolean.TRUE);
+          break;
+        }
+      }
+    }
+
+    String indent = childIndent != null ? childIndent : DEFAULT_CHILD_INDENT;
+    int insertAt = blockStart + 1;
+    for (Map.Entry<String, String> entry : values.entrySet()) {
+      if (!done.containsKey(entry.getKey())) {
+        lines.add(insertAt++, indent + entry.getKey() + ": " + yamlValue(entry.getValue()));
+      }
+    }
+    return String.join(lineSeparator, lines);
+  }
+
+  private static String yamlValue(String value) {
+    return value == null || value.isBlank() ? "~" : ExternalConfigInitializer.toYamlScalar(value);
   }
 }

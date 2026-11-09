@@ -76,7 +76,7 @@ public class UserController {
       case INVALID -> "invalid";
     };
     return ResponseEntity.status(HttpStatus.FOUND)
-        .location(ServletUriComponentsBuilder.fromCurrentContextPath().path("/")
+        .location(ServletUriComponentsBuilder.fromCurrentContextPath().path("/app/")
             .queryParam("verify", outcome).build().toUri())
         .build();
   }

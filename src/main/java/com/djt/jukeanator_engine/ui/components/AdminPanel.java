@@ -50,6 +50,8 @@ import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import com.djt.jukeanator_engine.domain.license.model.LicenseStatus;
+import com.djt.jukeanator_engine.domain.license.service.LicenseService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanCancelledException;
@@ -99,6 +101,10 @@ public class AdminPanel extends JPanel {
   private final FinancialLedgerService financialLedgerService;
   private final UserActivityService userActivityService;
   private final CreditManager creditManager;
+
+  // Licensing (set after construction; null when no license service exists)
+  private LicenseService licenseService;
+  private Runnable showRegistration;
   private final Frame ownerFrame;
   private final ImageLoader imageLoader;
   private final List<String> splitSummaryRecipients; // email.financial-ledger-recipients
@@ -436,6 +442,7 @@ public class AdminPanel extends JPanel {
     strip.add(sideButton(UiComponentNames.ADMIN_ADD_ADMIN_USER_BUTTON, "Add Admin\nUser", ColorTheme.get().accentGold, e -> doAddAdminUser()));
     strip.add(sideButton(UiComponentNames.ADMIN_ADD_LOCATION_BUTTON, "Add\nLocation", ColorTheme.get().accentGold, e -> doAddLocation()));
     strip.add(sideButton(UiComponentNames.ADMIN_EDIT_LOCATION_INFO_BUTTON, "Edit Location\nInfo", ColorTheme.get().accentGold, e -> doEditLocationInfo()));
+    strip.add(sideButton(UiComponentNames.ADMIN_LICENSE_BUTTON, "License", ColorTheme.get().accentGold, e -> doLicense()));
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton(UiComponentNames.ADMIN_MINIMIZE_BUTTON, "⊟ Minimize", ColorTheme.get().accentBlue, e -> doMinimize()));
     strip.add(sideButton(UiComponentNames.ADMIN_EXIT_BUTTON, "✕ Exit", ColorTheme.get().accentRed, e -> doExit()));
@@ -1815,6 +1822,73 @@ public class AdminPanel extends JPanel {
       c.gridx = 1;
       panel.add(field, c);
     }
+  }
+
+  /**
+   * Called by {@link JukeANatorFrame#setLicenseService} once the license service is known.
+   *
+   * @param showRegistration opens the frame's registration card
+   */
+  public void setLicenseService(LicenseService licenseService, Runnable showRegistration) {
+    this.licenseService = licenseService;
+    this.showRegistration = showRegistration;
+  }
+
+  /**
+   * Shows the license status (after a fresh subscription check for the subscription tiers) and
+   * offers to open the registration screen.
+   */
+  private void doLicense() {
+
+    if (licenseService == null) {
+      showOverlayMessage("License", "Licensing is not available on this instance.",
+          ColorTheme.get().accentGold);
+      return;
+    }
+    SwingSecurityUtil.runAsync(() -> {
+      LicenseStatus status;
+      try {
+        status = licenseService.getStatus().licensedTier().isSubscription()
+            ? licenseService.validateSubscription()
+            : licenseService.refreshLocal();
+      } catch (Exception ex) {
+        status = licenseService.getStatus();
+      }
+      LicenseStatus s = status;
+      SwingUtilities.invokeLater(() -> {
+        StringBuilder text = new StringBuilder();
+        text.append("License: ").append(s.describe()).append(". ");
+        text.append("Commercial operation (bill acceptor and card reader): ")
+            .append(s.commercialEnabled() ? "enabled" : "disabled").append(". ");
+        text.append("Machine ID: ").append(s.machineId() == null ? "unknown" : s.machineId())
+            .append(". ");
+        if (s.subscriptionQuarter() != null) {
+          text.append("Subscription paid through ").append(s.subscriptionQuarter())
+              .append(" (").append(s.subscriptionHoursRemaining()).append(" hours left). ");
+        }
+        if (s.lastServerCheckAt() != null) {
+          text.append("Last confirmed by the license server: ")
+              .append(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")
+                  .withZone(java.time.ZoneId.systemDefault()).format(s.lastServerCheckAt()))
+              .append(". ");
+        }
+        if (s.message() != null) {
+          text.append(s.message()).append(' ');
+        }
+        if (s.latestEngineVersion() != null) {
+          text.append("Latest JukeANator version: ").append(s.latestEngineVersion())
+              .append(". ");
+        }
+        text.append("Open the registration screen?");
+        showOverlayConfirm("License", text.toString(),
+            s.commercialEnabled() ? ColorTheme.get().accentGreen : ColorTheme.get().accentOrange,
+            () -> {
+              if (showRegistration != null) {
+                showRegistration.run();
+              }
+            });
+      });
+    });
   }
 
   private void doEditLocationInfo() {

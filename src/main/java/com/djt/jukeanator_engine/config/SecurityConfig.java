@@ -65,9 +65,12 @@ public class SecurityConfig {
             // /ws-slave/** (master-mode only) is the same story as /ws/**: the HTTP handshake
             // itself can't carry STOMP headers, so real auth happens one layer up, at the STOMP
             // CONNECT frame (StompJwtChannelInterceptor / StompLocationApiKeyChannelInterceptor).
-            .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/images/**",
+            // The Web/Mobile UI lives under /app/ (see StaticSiteConfig); "/" is the public
+            // marketing home page on master and a redirect to /app/ elsewhere.
+            .requestMatchers("/", "/index.html", "/app", "/app/**", "/images/**",
                 "/favicon.ico", "/favicon-16x16.png", "/favicon-32x32.png",
-                "/apple-touch-icon.png", "/site.webmanifest", "/ws/**", "/ws-slave/**")
+                "/apple-touch-icon.png", "/android-chrome-192x192.png",
+                "/android-chrome-512x512.png", "/ws/**", "/ws-slave/**")
             .permitAll()
 
             // ── Public: container error-page forward ──────────────────────────
@@ -75,6 +78,20 @@ public class SecurityConfig {
             // filter chain as a new request. Without this, that forward gets blocked too and
             // silently overwrites the real 401/403 status set by the handlers below.
             .requestMatchers("/error").permitAll()
+
+            // ── Master-mode only: legacy jukeanator.com license server + public website ──
+            // Legacy MP3Jukeboxx installs call /FrontController anonymously over plain HTTP and
+            // download auto-updates from /temp/** -- never require auth or HTTPS on these.
+            .requestMatchers("/FrontController", "/servlet/FrontController", "/temp/**",
+                "/webstart/**", "/*.jsp")
+            .permitAll()
+            // Static marketing pages and assets at the site root, the web UI under /app/, the
+            // license admin page shell (its API below is admin-only), and well-known files.
+            .requestMatchers("/*.html", "/*.htm", "/*.pdf", "/*.xml", "/*.txt", "/*.jpg",
+                "/*.png", "/*.ico", "/*.gif", "/assets/**", "/patent_Application_files/**",
+                "/admin/**", "/.well-known/**")
+            .permitAll()
+            .requestMatchers("/api/admin/licenses/**").hasRole("ADMIN")
 
             // Every song-library/song-player/song-queue route is location-scoped
             // (/api/locations/{locationId}/...) in every app.mode -- on standalone/slave the

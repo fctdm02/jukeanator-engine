@@ -84,12 +84,35 @@ public class EmailServiceImpl implements EmailService {
         body.toString(), "financial ledger split summary");
   }
 
+  @Override
+  public void sendContactFeedbackEmail(List<String> toAddresses, String visitorEmail,
+      String comments) {
+
+    if (toAddresses == null || toAddresses.isEmpty()) {
+      log.warn("Contact feedback received but no recipients are configured; dropping it.");
+      return;
+    }
+    String subject = "Juke-A-Nator Feedback: " + formatInstant(Instant.now());
+    String body = "From: " + (visitorEmail == null || visitorEmail.isBlank() ? "(not given)"
+        : visitorEmail) + "\n\n" + (comments == null ? "" : comments);
+    send(toAddresses.toArray(String[]::new), subject, body, "contact feedback",
+        visitorEmail != null && visitorEmail.contains("@") ? visitorEmail.trim() : null);
+  }
+
   // A bad SMTP config or transient network failure must never fail or roll back the operation
   // that triggered the email -- log and move on.
   private void send(String[] toAddresses, String subject, String text, String description) {
+    send(toAddresses, subject, text, description, null);
+  }
+
+  private void send(String[] toAddresses, String subject, String text, String description,
+      String replyTo) {
     try {
       SimpleMailMessage message = new SimpleMailMessage();
       message.setFrom(fromAddress);
+      if (replyTo != null) {
+        message.setReplyTo(replyTo);
+      }
       message.setTo(toAddresses);
       message.setSubject(subject);
       message.setText(text);

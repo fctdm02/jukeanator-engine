@@ -1,0 +1,2 @@
+id	title	link	price	description	condition
+jukeanator_conversion_kit_nsm_gen1	JukeANator Digital Jukebox Conversion Kit (NSM Gen1)	http://www.jukeanator.com/servlet/FrontController?command=order	2,175 USD	JukeANator Digital Jukebox Conversion Kit (NSM Gen I wall models - Hyperbeam/Performer/Thunderbird)	new

@@ -106,6 +106,21 @@ public final class UiComponentNames {
   public static final String LOGIN_ERROR_LABEL = "LoginToAdminPanelCard.errorLabel";
   public static final String LOGIN_TIMEOUT_LABEL = "LoginToAdminPanelCard.timeoutLabel";
 
+  // ── RegistrationCard ────────────────────────────────────────────────────────
+  public static final String REGISTRATION_EMAIL_FIELD = "RegistrationCard.emailField";
+  public static final String REGISTRATION_PASSCODE_FIELD = "RegistrationCard.passcodeField";
+  public static final String REGISTRATION_LOCATION_FIELD = "RegistrationCard.locationField";
+  public static final String REGISTRATION_SUBMIT_BUTTON = "RegistrationCard.submitButton";
+  public static final String REGISTRATION_IMPORT_BUTTON = "RegistrationCard.importButton";
+  public static final String REGISTRATION_TRY_BUTTON = "RegistrationCard.tryButton";
+  public static final String REGISTRATION_MESSAGE_LABEL = "RegistrationCard.messageLabel";
+
+  // ── LicenseDetailPromptCard ─────────────────────────────────────────────────
+  public static final String LICENSE_DETAIL_FIELD = "LicenseDetailPromptCard.field";
+  public static final String LICENSE_DETAIL_SAVE_BUTTON = "LicenseDetailPromptCard.saveButton";
+  public static final String LICENSE_DETAIL_SKIP_BUTTON = "LicenseDetailPromptCard.skipButton";
+  public static final String LICENSE_DETAIL_MESSAGE_LABEL = "LicenseDetailPromptCard.messageLabel";
+
   // ── AdminPanel: lists ───────────────────────────────────────────────────────
   public static final String ADMIN_ALBUM_LIST = "AdminPanel.albumList";
   public static final String ADMIN_QUEUE_LIST = "AdminPanel.queueList";
@@ -129,6 +144,7 @@ public final class UiComponentNames {
   public static final String ADMIN_ADD_ADMIN_USER_BUTTON = "AdminPanel.addAdminUserButton";
   public static final String ADMIN_ADD_LOCATION_BUTTON = "AdminPanel.addLocationButton";
   public static final String ADMIN_EDIT_LOCATION_INFO_BUTTON = "AdminPanel.editLocationInfoButton";
+  public static final String ADMIN_LICENSE_BUTTON = "AdminPanel.licenseButton";
   public static final String ADMIN_MINIMIZE_BUTTON = "AdminPanel.minimizeButton";
   public static final String ADMIN_EXIT_BUTTON = "AdminPanel.exitButton";
 

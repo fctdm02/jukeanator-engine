@@ -405,7 +405,7 @@ then repeat with a sandbox decline to confirm no credits are granted and no emai
 - `src/main/java/com/djt/jukeanator_engine/config/AppConfig.java`
 - `src/main/java/com/djt/jukeanator_engine/domain/common/controller/GlobalExceptionHandler.java`
 - `src/main/java/com/djt/jukeanator_engine/domain/user/dto/AddFundsRequest.java`
-- `src/main/resources/static/js/app.js`, `css/style.css`, `index.html`
+- `src/main/resources/static/app/js/app.js`, `css/style.css`, `index.html`
 - `src/main/resources/application.yml` (plus the external `C:\kiosk\config\application.yml` and
   `application-test.yml`)
 - `pom.xml`

@@ -6,7 +6,10 @@ import javax.swing.SwingUtilities;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.djt.jukeanator_engine.domain.license.model.LicenseStatus;
+import com.djt.jukeanator_engine.domain.license.service.LicenseService;
 import org.springframework.stereotype.Component;
 
 import com.djt.jukeanator_engine.config.AppProperties;
@@ -43,6 +46,14 @@ public class JukeANatorUserInterfaceApplication {
   private final EmailProperties emailProperties;
 
   private JukeANatorFrame frame;
+
+  // Absent on instances without licensing (master never runs the UI); payment inputs then stay on.
+  private LicenseService licenseService;
+
+  @Autowired(required = false)
+  public void setLicenseService(LicenseService licenseService) {
+    this.licenseService = licenseService;
+  }
 
   public JukeANatorUserInterfaceApplication(
       JukeANatorUserInterfaceProperties jukeANatorUserInterfaceProperties,
@@ -84,6 +95,7 @@ public class JukeANatorUserInterfaceApplication {
         appProperties.getDataDir(),
         emailProperties.getFinancialLedgerRecipients());
 
+    this.frame.setLicenseService(licenseService);
     this.jukeANatorEventListener.setFrame(frame);
     this.jukeANatorEventListener.setSongLibraryService(songLibraryService);
     this.jukeANatorEventListener.setSongQueueService(songQueueService);
@@ -112,9 +124,33 @@ public class JukeANatorUserInterfaceApplication {
       // calls below, leaving the UI possibly hidden behind the console with nothing in the log.
       log.error("JukeANator UI: initial data load failed", t);
       // Start playback anyway, so a failed data load does not leave the jukebox silent.
-      SwingUtilities.invokeLater(songPlayerService::startPlayback);
+      SwingUtilities.invokeLater(() -> {
+        songPlayerService.startPlayback();
+        showRegistrationIfNeeded();
+      });
       return null;
     });
+  }
+
+  /**
+   * Legacy RegistrationDialog: shown at startup when unlicensed, when the subscription needs
+   * registration details, or when it has a renewal warning / has expired. Called on the EDT once
+   * the initial data load has finished, so the full-screen frame is laid out and raised before the
+   * card is shown. The card stays up until the operator clicks Try (or Later).
+   */
+  private void showRegistrationIfNeeded() {
+    if (licenseService == null) {
+      return;
+    }
+    LicenseStatus status = licenseService.getStatus();
+    if (status.registrationNeeded()
+        || (status.licensedTier().isSubscription() && status.message() != null)) {
+      log.info("License: {} -- showing the registration screen", status.describe());
+      // Closing it goes on to ask for any missing customer / location name.
+      frame.showRegistrationCard();
+    } else {
+      frame.showMissingLicenseDetails();
+    }
   }
 
   private void loadInitialData() {
@@ -149,6 +185,8 @@ public class JukeANatorUserInterfaceApplication {
       // Only now start playing songs, so the media player (e.g. Winamp) is not competing with UI
       // startup for CPU on underpowered machines, where it could stop responding to IPC.
       songPlayerService.startPlayback();
+
+      showRegistrationIfNeeded();
     });
   }
 }
