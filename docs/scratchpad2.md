@@ -1,6 +1,6 @@
 You’re basically trying to fix two problems at once:
 
-1. **Zero-play leakage across nested projections (albums → artists → songs)**
+1. **Zero-play leakage across nested projections (albums -> artists -> songs)**
 2. **Two orthogonal projections:**
 
    * *POPULAR* = filter by `numPlays > 0` + sort by plays
@@ -183,9 +183,9 @@ Right now your problem is deeper:
 
 You filter at each level independently:
 
-* artist has plays → included
-* album has plays → included
-* song has plays → included
+* artist has plays -> included
+* album has plays -> included
+* song has plays -> included
 
 BUT:
 

@@ -1,4 +1,4 @@
-# Financial ledger: entity-model refactor + slave→master mirroring
+# Financial ledger: entity-model refactor + slave->master mirroring
 
 Status: Implemented.
 
@@ -6,7 +6,7 @@ Status: Implemented.
 
 The original ask was to extend the master/slave integration tests to cover the financial ledger:
 local cash, local credit-card, and mobile transactions. Research found mobile transactions already
-behave correctly (master-only, correctly location-tagged), but no slave→master mirroring exists at
+behave correctly (master-only, correctly location-tagged), but no slave->master mirroring exists at
 all for local cash/credit-card — each instance's ledger is a JVM-local singleton, never seen by
 master. The decision was to build that mirroring for real, not just document the gap.
 
@@ -71,8 +71,8 @@ These become two genuinely separate entities:
 - **`UserSongCreditUsageEntity`** (renamed from `CreditTransactionEntity`) — `deductCredits(...)`
   keeps building this, now typed `UserSongCreditUsageType` (renamed from `CreditTransactionType`,
   `PURCHASE` removed — its only call site is gone since Add Funds no longer uses this type at
-  all). Table `mobile_transactions` → `user_song_credit_usage`.
-- **`UserEntity`**: `transactions` (`Set<CreditTransactionEntity>`) → `userSongCreditUsages`
+  all). Table `mobile_transactions` -> `user_song_credit_usage`.
+- **`UserEntity`**: `transactions` (`Set<CreditTransactionEntity>`) -> `userSongCreditUsages`
   (`Set<UserSongCreditUsageEntity>`), same `@OneToMany(mappedBy="user", cascade=ALL,
   orphanRemoval=true, fetch=EAGER)` mapping; new `userAddFundsTransactions`
   (`Set<UserAddFundsTransactionEntity>`) added alongside it, identically mapped.
@@ -86,7 +86,7 @@ These become two genuinely separate entities:
   mapping methods alongside the renamed `userSongCreditUsages` ones, following
   `CreditTransactionEntryDto`'s existing shape (renamed `UserSongCreditUsageEntryDto`) as the
   template for a new sibling `UserAddFundsTransactionEntryDto`.
-- **API-facing DTO**: `CreditTransactionDto` → `UserSongCreditUsageDto`.
+- **API-facing DTO**: `CreditTransactionDto` -> `UserSongCreditUsageDto`.
   `getCreditLedgerForLocation` (interface + impl, unchanged method name/endpoint) now returns this
   renamed type, built from `userSongCreditUsages` instead of `transactions`.
 - **Rename footprint**: `FinancialLedgerServiceImpl` (`computeMobileTotal`'s import + usage),
@@ -131,7 +131,7 @@ These become two genuinely separate entities:
 - `AdminPanel.java`'s Financial Ledger table only ever touches `FinancialLedgerService`'s DTOs
   (`getAllPeriods()`), never the entity classes directly — no Swing UI changes needed.
 
-## Part C — Slave→master mirroring, built on the refactored model
+## Part C — Slave->master mirroring, built on the refactored model
 
 - Slave: `FinancialLedgerServiceImpl.recordLocalCashCredit`/`recordLocalCreditCardCredit` publish a
   new `LocalFinancialTransactionRecordedEvent` (kind, locationId, sourceTransactionId=the
@@ -165,7 +165,7 @@ These become two genuinely separate entities:
 Part C's push was best-effort with no retry: a transaction recorded while master was unreachable
 never reached master. Part D closes that gap and extends mirroring to the remaining ledger data.
 
-- **Slave→master outbox.** `location_transaction` and `location_jukebox_split` gain
+- **Slave->master outbox.** `location_transaction` and `location_jukebox_split` gain
   `synced_to_master_at` (NULL until master acknowledges). `FinancialLedgerService.getPendingMasterSync()`
   returns every own, unacknowledged transaction plus every *finalized* split period (the open
   period has no totals yet and is never mirrored); `markSyncedToMaster(entries)` stamps them.
@@ -177,11 +177,11 @@ never reached master. Part D closes that gap and extends mirroring to the remain
   idempotency makes that a safe backfill. A transaction recorded before the slave's own location
   was known (NULL `location_id`) is attributed to the now-known own location when pushed.
 - **Split-period mirror.** New `POST /api/locations/{locationId}/financial-ledger/split-period`
-  (`JukeboxSplitPeriodSyncDto`) → `FinancialLedgerService.receiveSplitPeriodSync`, idempotent on the
+  (`JukeboxSplitPeriodSyncDto`) -> `FinancialLedgerService.receiveSplitPeriodSync`, idempotent on the
   new `location_jukebox_split.source_period_id` (unique with `parent_location_id`). Master stores
   it via `JukeboxSplitPeriodEntity.mirroredFrom(...)`; the entity now maps `parent_location_id`
   read-only (`getLocationId()`), since master's mirrored periods have no transient `parentLocation`.
-- **Mobile/web spends, master→slave.** `user_song_credit_usage` gains a master-minted
+- **Mobile/web spends, master->slave.** `user_song_credit_usage` gains a master-minted
   `sync_id` (UUID). A location-attributed spend publishes `LocationSongCreditUsageRecordedEvent`;
   master's `MobileCreditUsageSlaveNotifier` pushes it to the slave as a `recordMobileCreditUsage`
   command over `/ws-slave`. The slave stores it in the new `location_mobile_credit_usage` table
@@ -193,7 +193,7 @@ never reached master. Part D closes that gap and extends mirroring to the remain
 - **Slave mobile total.** In slave mode, `computeMobileTotal()` sums `location_mobile_credit_usage`
   instead of the slave's own `user_song_credit_usage` (which never holds mobile/web spends there) —
   previously a slave's split periods always showed a $0 mobile total.
-- **User activity, slave→master.** Same outbox idea, in `UserActivitySyncService`. Each
+- **User activity, slave->master.** Same outbox idea, in `UserActivitySyncService`. Each
   activity gets a UUID `activity_id` when it is captured (`UserActivityServiceImpl.record`);
   master's copy is idempotent on `(location_id, activity_id)`
   (`POST /api/locations/{locationId}/user-activity/sync`, a JSON array of `UserActivityRecord`).
@@ -227,7 +227,7 @@ placeholder can equal one of them:
 - **Users / playlists** — the store saw the new entity as the existing row and `merge()`d it over
   that row: registering a user could overwrite another user's account (email, password hash,
   credits); creating a playlist could overwrite an existing playlist. Likely on a fresh master,
-  where early accounts get small ids (e.g. users with ids 1 and 3 → the next placeholder is 3).
+  where early accounts get small ids (e.g. users with ids 1 and 3 -> the next placeholder is 3).
 - **Credit usages / Add-Funds transactions** — both live in a `HashSet`, and
   `AbstractPersistentEntity.equals`/`hashCode` compare by id, so the new record was silently
   dropped from the set (credits deducted, ledger entry lost).
@@ -261,7 +261,7 @@ replaced, and stores a second one.
 
 ## Part F — Every recorded spend is paid for
 
-A review of the web patron's lifecycle (sign up → Add Funds → play at a location → the location's
+A review of the web patron's lifecycle (sign up -> Add Funds -> play at a location -> the location's
 split) found ways for a location's mobile revenue to include plays nobody paid for.
 
 - **Server-side affordability.** Only the web UI checked the balance. `SongQueueController` now

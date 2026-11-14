@@ -15,7 +15,7 @@ import io.jsonwebtoken.security.Keys;
  *
  * <h3>Usage</h3>
  * <ol>
- * <li>Set SECRET below to the value of {@code app.jwt.secret} in your application.yml / .env</li>
+ * <li>Set the JWT_SECRET environment variable to the same value the running application uses</li>
  * <li>Set EMAIL and ROLE to the test identity you want to impersonate</li>
  * <li>Run the class as a plain Java main (no Spring context needed)</li>
  * <li>Copy the printed token into Postman → jukeanator-engine collection → Variables →
@@ -40,10 +40,13 @@ import io.jsonwebtoken.security.Keys;
  */
 public class GeneratePostmanJwtToken {
 
-  // ── Configuration — edit these three values before running ───────────────
+  // ── Configuration — set JWT_SECRET, then edit the remaining values ───────
 
-  /** Must match app.jwt.secret in application.yml exactly (≥ 32 ASCII chars for HS256). */
-  private static final String SECRET = "fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP";
+  /**
+   * Read from the JWT_SECRET environment variable, which must match the running application's
+   * app.jwt.secret exactly (≥ 32 ASCII chars for HS256).
+   */
+  private static final String SECRET = System.getenv("JWT_SECRET");
 
   /** Email address embedded as the JWT subject claim. */
   private static final String EMAIL = "admin@jukeanator.local";
@@ -65,9 +68,9 @@ public class GeneratePostmanJwtToken {
 
   public static void main(String[] args) {
 
-    if (SECRET.equals("PASTE_YOUR_APP_JWT_SECRET_HERE")) {
-      System.err
-          .println("ERROR: Set the SECRET constant to your app.jwt.secret value before running.");
+    if (SECRET == null || SECRET.isBlank()) {
+      System.err.println(
+          "ERROR: Set the JWT_SECRET environment variable to your app.jwt.secret value before running.");
       System.exit(1);
     }
 

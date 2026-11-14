@@ -30,7 +30,7 @@ CREATE TABLE `song_library_files` (
 
 ## The core idea: single-table inheritance, done by hand
 
-`song_library_files` is a flat, SINGLE_TABLE-style mapping for four different domain subtypes of `AbstractFileEntity` — `SongFileEntity`, `AlbumCoverArtFileEntity`, `AlbumMetaDataFileEntity`, and `LocationMetaDataFileEntity`. Rather than using JPA's `@Inheritance(strategy = SINGLE_TABLE)` with `@DiscriminatorColumn`, this is a plain `@Entity` with `file_type` acting as a hand-rolled discriminator, and `SongLibraryRepositoryJpaImpl` presumably does the row→subtype assembly manually. That's why most columns are nullable and grouped into "SONG columns" / "ALBUM_METADATA columns" / "LOCATION_METADATA columns" comment blocks — each group is only populated when `file_type` matches that variant.
+`song_library_files` is a flat, SINGLE_TABLE-style mapping for four different domain subtypes of `AbstractFileEntity` — `SongFileEntity`, `AlbumCoverArtFileEntity`, `AlbumMetaDataFileEntity`, and `LocationMetaDataFileEntity`. Rather than using JPA's `@Inheritance(strategy = SINGLE_TABLE)` with `@DiscriminatorColumn`, this is a plain `@Entity` with `file_type` acting as a hand-rolled discriminator, and `SongLibraryRepositoryJpaImpl` presumably does the row->subtype assembly manually. That's why most columns are nullable and grouped into "SONG columns" / "ALBUM_METADATA columns" / "LOCATION_METADATA columns" comment blocks — each group is only populated when `file_type` matches that variant.
 
 ## Column-by-column
 

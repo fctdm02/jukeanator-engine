@@ -32,8 +32,8 @@ public class DiscogsClientWrapperTest {
 
   public static DiscogsClientWrapper createDiscogsClientWrapper() {
 
-    String consumerKey = "vBSFEvNtGflHQnULBNnL";
-    String consumerSecret = "AOOYhlvSshYkJieLRrdTCUoLcsWACfWW";
+    String consumerKey = "INSERT_VALUE_HERE";
+    String consumerSecret = "INSERT_VALUE_HERE";
     return new DiscogsClientWrapper(consumerKey, consumerSecret);
   }
 }

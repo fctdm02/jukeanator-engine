@@ -3,14 +3,15 @@
 In production a jukeanator-engine **master** instance replaces the legacy JSP site
 (`C:\dev-wks\projects\jukeanator.com`). The single WAR serves:
 
-| Path | Purpose |
-|---|---|
-| `/` and `/*.html`, `/assets/**`, `/images/**` | Public marketing site (ported from the legacy JSP pages) |
-| `/app/` | Web/Mobile jukebox UI (Braintree Add Funds) |
-| `/FrontController`, `/servlet/FrontController` | Legacy license protocol used by MP3Jukeboxx installs **and** jukeanator-engine standalone/slave instances |
-| `/temp/**`, `/webstart/**` | Legacy auto-update downloads, served from `license-server.downloads-dir` |
-| `/admin/licenses.html` + `/api/admin/licenses/**` | License administration (ADMIN role) |
-| `/api/**`, `/ws`, `/ws-slave` | Existing engine APIs (unchanged) |
+- `/` and `/*.html`, `/assets/**`, `/images/**`: public marketing site (ported from the legacy
+  JSP pages)
+- `/app/`: Web/Mobile jukebox UI (Braintree Add Funds)
+- `/FrontController`, `/servlet/FrontController`: legacy license protocol used by MP3Jukeboxx
+  installs **and** jukeanator-engine standalone/slave instances
+- `/temp/**`, `/webstart/**`: legacy auto-update downloads, served from
+  `license-server.downloads-dir`
+- `/admin/licenses.html` + `/api/admin/licenses/**`: license administration (ADMIN role)
+- `/api/**`, `/ws`, `/ws-slave`: existing engine APIs (unchanged)
 
 The design, the legacy scheme analysis, the decisions and the open items are in
 [license/legacy-licensing-design.md](license/legacy-licensing-design.md).
@@ -90,24 +91,34 @@ in a way that preserves the original modification time (`cp -p`, or `touch -d` a
 
 ## Cutover
 
-1. Rotate the legacy database password: it is hardcoded in jukeanator.com's `DatabaseUtil` and
-   committed to git.
-2. Create the MySQL schema and start the master instance once, so Flyway creates the tables.
-3. Load a fresh dump of the legacy database into a scratch schema `legacy_jukeanator` and run
-   `docs/license/legacy-import.sql` against the engine schema. Compare the row counts it prints.
-4. Create an administrator account for the web UI (used to sign in to `/admin/licenses.html`).
-5. Copy the downloads folder (see above).
-6. Smoke test against the new host before switching DNS:
+**Step 1.** Rotate the legacy database password: it is hardcoded in jukeanator.com's
+`DatabaseUtil` and committed to git.
 
-   ```bash
-   curl -i "http://NEW_HOST/FrontController?command=heartbeat&licenseType=1&serialNumber=TEST&customerEmail=test%40example.com"
-   curl -i "http://NEW_HOST/FrontController?command=getJukeANatorBuildDate"
-   ```
+**Step 2.** Create the MySQL schema and start the master instance once, so Flyway creates the
+tables.
 
-   The first must answer `OK` followed by 49 `a` characters (`text/html;charset=ISO-8859-1`); the
-   second must print the legacy jar's date.
-7. Point `www.jukeanator.com` and `jukeanator.com` at the new host.
-8. Watch the log for `Provisioned`, `Subscription check` and heartbeat activity from the field.
+**Step 3.** Load a fresh dump of the legacy database into a scratch schema `legacy_jukeanator` and
+run `docs/license/legacy-import.sql` against the engine schema. Compare the row counts it prints.
+
+**Step 4.** Create an administrator account for the web UI (used to sign in to
+`/admin/licenses.html`).
+
+**Step 5.** Copy the downloads folder (see above).
+
+**Step 6.** Smoke test against the new host before switching DNS:
+
+```bash
+curl -i "http://NEW_HOST/FrontController?command=heartbeat&licenseType=1&serialNumber=TEST&customerEmail=test%40example.com"
+curl -i "http://NEW_HOST/FrontController?command=getJukeANatorBuildDate"
+```
+
+The first must answer `OK` followed by 49 `a` characters (`text/html;charset=ISO-8859-1`); the
+second must print the legacy jar's date.
+
+**Step 7.** Point `www.jukeanator.com` and `jukeanator.com` at the new host.
+
+**Step 8.** Watch the log for `Provisioned`, `Subscription check` and heartbeat activity from the
+field.
 
 ## Customer administration
 

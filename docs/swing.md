@@ -244,7 +244,7 @@ The old `buildSearchResultColumn` and `buildHotHereColumn` in `JukeANatorFrame` 
 - Implements `TabNavigator`. `popToRoot()` returns to `CARD_RESULTS` if a search was active (`lastResult != null`), otherwise `CARD_ENTRY` — matching the original behaviour where CLEAR sent you back to the hero screen.
 - The keyboard, search bar, and results column rebuilds are all self-contained. The `syncSearchLabel` method keeps both the entry-card and results-card search labels in sync, exactly as before.
 - `pushArtist` / `pushAlbumDetail` use `replaceCard` by name, removing the old tree-walk helpers (`findTabRootPanel`, `findCardLayout`, `getPreviousCard`, `removeCardIfPresent`).
-- Song clicks go directly to `AddSongToQueueDialog` (unchanged modal). Album clicks go through `pushAlbumDetail` (in-panel card). Artist clicks go through `pushArtist` → `ArtistDetailPanel`.
+- Song clicks go directly to `AddSongToQueueDialog` (unchanged modal). Album clicks go through `pushAlbumDetail` (in-panel card). Artist clicks go through `pushArtist` -> `ArtistDetailPanel`.
 
 ---
 

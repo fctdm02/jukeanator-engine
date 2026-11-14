@@ -133,10 +133,10 @@ const isPortrait = window.innerHeight > window.innerWidth;
 **Fixed vs fluid sizing in portrait:**
 
 In portrait, height becomes the scarce resource instead of width. The rule of thumb:
-- Header, footer, toolbar → fixed in the *smaller* dimension (usually height), expressed in `vh`
-- Sidebars/nav that become tab bars → fixed height (e.g. 48px)
-- Bottom drawers → either a fixed `vh` (e.g. `30vh`) or user-draggable
-- Content area → always `flex: 1` or `1fr` to consume whatever remains
+- Header, footer, toolbar -> fixed in the *smaller* dimension (usually height), expressed in `vh`
+- Sidebars/nav that become tab bars -> fixed height (e.g. 48px)
+- Bottom drawers -> either a fixed `vh` (e.g. `30vh`) or user-draggable
+- Content area -> always `flex: 1` or `1fr` to consume whatever remains
 
 ---
 
@@ -429,13 +429,13 @@ Looking at the last batch of files you uploaded, the task was to do the layout r
 
 Before writing anything, let me do a complete audit of every hardcoded value across all these files.Now I have a complete picture. Let me do a precise audit before writing any file:Now I have a complete picture. Here's the precise audit of what needs doing in each file:
 
-**`ButtonFactory`** — `new Dimension(140, 36)` → `lt.navBtnW/H`; font 18 → `lt.fontSizeNavBtn`  
-**`DetailHeaderPanel`** — image size `72,72`, back btn `140,52`, fonts 26/14/18 → LayoutTheme  
-**`KeyboardPanel`** — 5 key sizes, height, padding → LayoutTheme; remove public constants  
-**`SearchPanel`** — 4 local constants (SEARCH_BAR_HEIGHT, SEARCH_PREVIEW_COUNT, SCREEN_PADDING_HORIZONTAL, COLUMN_INTERNAL_EDGE_GAP), hero height 300, fonts → LayoutTheme  
-**`HotHerePanel`** — `PREVIEW_COUNT = 10` → `lt.hotHerePreviewCount`  
-**`SongQueueCard`** — `TIMEOUT_SECONDS`, `MAX_QUEUE_VISIBLE`, card size 900×660, button sizes → LayoutTheme  
-**`JukeANatorFrame`** — `TAB_WIDTH=200`, tab height 96, `SEPARATOR_HEIGHT=2`, top-panel sizes, fonts → LayoutTheme  
+**`ButtonFactory`** — `new Dimension(140, 36)` -> `lt.navBtnW/H`; font 18 -> `lt.fontSizeNavBtn`  
+**`DetailHeaderPanel`** — image size `72,72`, back btn `140,52`, fonts 26/14/18 -> LayoutTheme  
+**`KeyboardPanel`** — 5 key sizes, height, padding -> LayoutTheme; remove public constants  
+**`SearchPanel`** — 4 local constants (SEARCH_BAR_HEIGHT, SEARCH_PREVIEW_COUNT, SCREEN_PADDING_HORIZONTAL, COLUMN_INTERNAL_EDGE_GAP), hero height 300, fonts -> LayoutTheme  
+**`HotHerePanel`** — `PREVIEW_COUNT = 10` -> `lt.hotHerePreviewCount`  
+**`SongQueueCard`** — `TIMEOUT_SECONDS`, `MAX_QUEUE_VISIBLE`, card size 900×660, button sizes -> LayoutTheme  
+**`JukeANatorFrame`** — `TAB_WIDTH=200`, tab height 96, `SEPARATOR_HEIGHT=2`, top-panel sizes, fonts -> LayoutTheme  
 **`QueuePanel`** — already clean (no hardcoded layout values, passes through to `SongQueueCard`)  
 **`ScreenSaverWindow`** — no layout refactoring needed (uses `screenWidth/screenHeight` proportionally, not canonical px values)  
 **`DetailHeaderPanel`** — needs updating**`ButtonFactory.java`****`DetailHeaderPanel.java`****`KeyboardPanel.java`****`SearchPanel.java`****`HotHerePanel.java`****`SongQueueCard.java`**Now the `JukeANatorFrame` diff for the remaining hardcoded values:Here's a complete summary of every change made.
