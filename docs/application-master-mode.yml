@@ -176,3 +176,6 @@ user-interface:
   enable-type-ahead-search: true
   # SCROLL BARS
   use-big-scrollbars: true # JFC/Swing kiosk only: if true, uses wide touch-friendly scroll bars; if false, the normal (mouse-sized) scroll bars
+  # MOUSE POINTER
+  hide-mouse-pointer: false # JFC/Swing kiosk only: if true, hides the mouse pointer inside the kiosk window (for touch screens)
+  touch-indicator: false # JFC/Swing kiosk only: if true, shows a small translucent circle where the screen is touched (for legacy serial touch screens with no Windows touch support)
