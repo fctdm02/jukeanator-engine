@@ -3,14 +3,18 @@ package com.djt.jukeanator_engine.domain.songlibrary.model;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -452,11 +456,23 @@ public class RootFolderEntity extends FolderEntity {
       initialize();
     }
 
+    // Two indexes: the full (absolute) path, for a stats file written by this same install, and the
+    // path relative to the root folder, so a stats file carried over from another machine (e.g. a
+    // legacy Windows install under C:\Music being restored on Linux under /home/.../Music/X) still
+    // matches as long as the genre/artist/album/song layout beneath the root is the same.
     Map<String, SongFileEntity> songsByPath = new HashMap<>();
+    Map<String, SongFileEntity> songsByRelativePath = new HashMap<>();
+    String normalizedRoot = rootPath == null ? "" : normalizeStatsPath(rootPath);
     for (SongFileEntity song : this.songsMap.values()) {
 
-      String songPathName = song.getNaturalIdentity().toLowerCase();
-      songsByPath.put(songPathName.replace(":\\\\", ":\\"), song);
+      String normalizedSongPath = normalizeStatsPath(song.getNaturalIdentity());
+      songsByPath.put(normalizedSongPath, song);
+
+      String relativePath = normalizedSongPath;
+      if (!normalizedRoot.isEmpty() && normalizedSongPath.startsWith(normalizedRoot + "/")) {
+        relativePath = normalizedSongPath.substring(normalizedRoot.length() + 1);
+      }
+      songsByRelativePath.putIfAbsent(relativePath, song);
     }
 
     // NEW FORMAT
@@ -465,6 +481,8 @@ public class RootFolderEntity extends FolderEntity {
     // OLD FORMAT
     // <numPlays> <ignored> <ignored> <songPath>
     int restoredCount = 0;
+    int relocatedCount = 0;
+    int unmatchedCount = 0;
     try {
       List<String> lines = fileSystemHelper.readNonBlankLines(filename);
 
@@ -477,26 +495,33 @@ public class RootFolderEntity extends FolderEntity {
 
         try {
 
-          int rootPathIndex = line.indexOf(rootPath);
-          if (rootPathIndex < 0) {
-            System.err.println("rootPath: [" + rootPath + "] does not exist in: [" + line + "]");
+          Matcher matcher = CD_STATS_LINE_PATTERN.matcher(line);
+          if (!matcher.matches()) {
+            log.warn("Could not parse CD stats line: {}", line);
             continue;
           }
 
-          String prefix = line.substring(0, rootPathIndex);
-          String[] parts = prefix.split(" ");
+          int numPlays = Integer.parseInt(matcher.group(1));
+          if (numPlays <= 0) {
+            continue;
+          }
 
-          int numPlays = Integer.parseInt(parts[0].trim());
-          if (numPlays > 0) {
-
-            String songPath = line.substring(rootPathIndex).trim();
-            SongFileEntity song = songsByPath.get(songPath.toLowerCase());
+          String songPath = matcher.group(2).trim();
+          String normalizedSongPath = normalizeStatsPath(songPath);
+          SongFileEntity song = songsByPath.get(normalizedSongPath);
+          if (song == null) {
+            song = findSongByRelativeSuffix(normalizedSongPath, songsByRelativePath);
             if (song != null) {
-              song.setNumPlays(numPlays);
-              restoredCount++;
-            } else {
-              System.err.println("Could not find song: " + songPath);
+              relocatedCount++;
             }
+          }
+
+          if (song != null) {
+            song.setNumPlays(numPlays);
+            restoredCount++;
+          } else {
+            unmatchedCount++;
+            log.debug("Could not find song for CD stats path: {}", songPath);
           }
 
         } catch (NumberFormatException e) {
@@ -505,7 +530,10 @@ public class RootFolderEntity extends FolderEntity {
           log.warn("Could not restore song stats from line: {}", line, e);
         }
       }
-      log.info("Restored num plays processing completed for {} log lines.", restoredCount);
+      log.info(
+          "Restored num plays for {} songs from {} ({} matched by path relative to root [{}]; "
+              + "{} lines with plays had no matching song).",
+          restoredCount, filename, relocatedCount, rootPath, unmatchedCount);
 
     } catch (IOException e) {
       throw new SongLibraryServiceException(
@@ -513,6 +541,55 @@ public class RootFolderEntity extends FolderEntity {
     }
 
     return restoredCount;
+  }
+
+  // <numPlays> [<n> <n>] <songPath> -- the legacy format has two extra numeric columns. The song
+  // path is always absolute ("/..." or "C:\..."), so it never starts with a bare number.
+  private static final Pattern CD_STATS_LINE_PATTERN =
+      Pattern.compile("^(\\d+)\\s+(?:-?\\d+\\s+){0,2}(\\S.*)$");
+
+  // A relative match must include at least the album folder and the file name, so a bare file name
+  // such as "01 - intro.mp3" can never be credited to the wrong album.
+  private static final int MIN_RELATIVE_PATH_SEGMENTS = 2;
+
+  /**
+   * Normalizes a song path for comparison across operating systems: backslashes become forward
+   * slashes, doubled separators collapse, trailing separators are dropped, and case is ignored.
+   */
+  static String normalizeStatsPath(String path) {
+
+    if (path == null) {
+      return "";
+    }
+    String normalized = path.trim().replace('\\', '/').replaceAll("/{2,}", "/");
+    while (normalized.length() > 1 && normalized.endsWith("/")) {
+      normalized = normalized.substring(0, normalized.length() - 1);
+    }
+    return normalized.toLowerCase(Locale.ROOT);
+  }
+
+  /**
+   * Finds a song whose path relative to this root equals the longest possible trailing portion of
+   * the given (normalized) stats-file path. Trying the longest suffix first means that for
+   * "c:/music/rock/van halen/album/song.mp3" the candidates are, in order,
+   * "music/rock/van halen/album/song.mp3", "rock/van halen/album/song.mp3",
+   * "van halen/album/song.mp3", "album/song.mp3" -- so it works whether the old root was
+   * "C:\Music" or "C:\Music\Rock", without needing to know the old root.
+   */
+  private static SongFileEntity findSongByRelativeSuffix(String normalizedPath,
+      Map<String, SongFileEntity> songsByRelativePath) {
+
+    String[] segments = normalizedPath.split("/");
+    for (int start = 0; start <= segments.length - MIN_RELATIVE_PATH_SEGMENTS; start++) {
+
+      String candidate =
+          String.join("/", Arrays.copyOfRange(segments, start, segments.length));
+      SongFileEntity song = songsByRelativePath.get(candidate);
+      if (song != null) {
+        return song;
+      }
+    }
+    return null;
   }
 
   public void storeSongStatistics(String dataDir) {
