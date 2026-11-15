@@ -84,6 +84,45 @@ public class SearchPanel extends JPanel implements TabNavigator {
   private KeyboardPanel keyboard;
   private JPanel entryKeyboardSlot;
 
+  /**
+   * Physical keyboard input (a keyboard attached during PC setup or manual testing), active while
+   * the on-screen keyboard is visible (entry or results card) and no card floats above this tab:
+   * characters extend the query exactly like the on-screen keys, Backspace deletes, Enter searches,
+   * Ctrl+V pastes. The configured payment keys (bill acceptor, card reader) and Escape pass through
+   * to the frame, so a bill or card pulse arriving while a patron searches still adds credits and
+   * the Escape admin shortcut still works; those characters must be entered on the on-screen keys.
+   */
+  private final PhysicalKeyboardInput physicalKeyboard = new PhysicalKeyboardInput(this,
+      () -> keyboard != null && keyboard.isShowing()
+          && !(SwingUtilities.getWindowAncestor(this) instanceof JukeANatorFrame frame
+              && frame.floatingOverlayShowing()),
+      new PhysicalKeyboardInput.Target() {
+        @Override
+        public void type(String text) {
+          searchBuffer.append(text);
+          syncSearchLabel();
+          if (enableTypeAheadSearch)
+            typeAheadSearch();
+        }
+
+        @Override
+        public void backspace() {
+          if (searchBuffer.length() > 0) {
+            searchBuffer.deleteCharAt(searchBuffer.length() - 1);
+            syncSearchLabel();
+            if (enableTypeAheadSearch)
+              typeAheadSearch();
+          }
+        }
+
+        @Override
+        public void enter() {
+          // Type-ahead may already be showing results for this exact query.
+          if (!searchBuffer.toString().trim().equals(currentQuery))
+            executeSearch();
+        }
+      }, this::isPassThroughKey);
+
   private AlbumDetailCard currentDetailCard;
 
   // ── Tracks which card to return to when the detail card's BACK button is
@@ -159,6 +198,29 @@ public class SearchPanel extends JPanel implements TabNavigator {
     rootPanel.add(detailPlaceholder, CARD_DETAIL);
 
     cardLayout.show(rootPanel, CARD_ENTRY);
+  }
+
+  @Override
+  public void addNotify() {
+    super.addNotify();
+    physicalKeyboard.install();
+  }
+
+  @Override
+  public void removeNotify() {
+    physicalKeyboard.uninstall();
+    super.removeNotify();
+  }
+
+  /** Escape and the payment keys are left to the frame's own key bindings. */
+  private boolean isPassThroughKey(java.awt.event.KeyEvent e) {
+    if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) {
+      return true;
+    }
+    char c = e.getKeyChar();
+    return c != java.awt.event.KeyEvent.CHAR_UNDEFINED
+        && SwingUtilities.getWindowAncestor(this) instanceof JukeANatorFrame frame
+        && frame.isPaymentKey(c);
   }
 
   @Override

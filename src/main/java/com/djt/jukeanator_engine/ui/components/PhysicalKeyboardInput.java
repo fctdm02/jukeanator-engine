@@ -7,6 +7,7 @@ import java.awt.Window;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.event.KeyEvent;
 import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
 
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
@@ -14,12 +15,15 @@ import javax.swing.SwingUtilities;
 /**
  * Feeds physical keyboard input to an overlay card whose fields are drawn labels (the on-screen
  * {@link KeyboardPanel} model) rather than focusable text fields. Used by the setup-time licensing
- * cards, where an attached keyboard is assumed.
+ * cards, the Admin login card and the Search screen, so a keyboard attached to the PC works
+ * alongside the on-screen one.
  *
  * <p>While the owner is showing in the focused window (and {@code enabled} holds), every key event
  * is consumed, so none reaches the frame's WHEN_IN_FOCUSED_WINDOW bindings: Escape would otherwise
  * open the Admin panel over the card, and typing the bill-acceptor or card-reader key (e.g. the 'a'
- * in an email address) would add credits.
+ * in an email address) would add credits. The one exception is any event matching the optional
+ * {@code passThrough} predicate, which is left untouched for normal key handling (the Search screen
+ * uses it so the payment keys still add credits while a patron is searching).
  *
  * <p>Keys: printable characters are typed; Backspace deletes; Tab / Shift+Tab and the Down / Up
  * arrows move between fields; Enter submits; Ctrl+V or Shift+Insert pastes.
@@ -44,12 +48,23 @@ final class PhysicalKeyboardInput implements KeyEventDispatcher {
   private final JComponent owner;
   private final BooleanSupplier enabled;
   private final Target target;
+  private final Predicate<KeyEvent> passThrough;
   private boolean installed;
 
   PhysicalKeyboardInput(JComponent owner, BooleanSupplier enabled, Target target) {
+    this(owner, enabled, target, e -> false);
+  }
+
+  /**
+   * @param passThrough key events it accepts are neither handled nor consumed here, so they reach
+   *        the frame's own key bindings as usual
+   */
+  PhysicalKeyboardInput(JComponent owner, BooleanSupplier enabled, Target target,
+      Predicate<KeyEvent> passThrough) {
     this.owner = owner;
     this.enabled = enabled;
     this.target = target;
+    this.passThrough = passThrough;
   }
 
   /** Call from the owner's {@code addNotify()}. */
@@ -76,6 +91,9 @@ final class PhysicalKeyboardInput implements KeyEventDispatcher {
     Window focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow();
     if (focused == null || focused != SwingUtilities.getWindowAncestor(owner)) {
       return false; // e.g. the screen saver has focus; it handles its own keys
+    }
+    if (passThrough.test(e)) {
+      return false;
     }
 
     if (e.getID() == KeyEvent.KEY_PRESSED) {

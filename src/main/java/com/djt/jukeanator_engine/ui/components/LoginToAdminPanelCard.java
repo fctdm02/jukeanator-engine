@@ -23,7 +23,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
 /**
  * Full-screen overlay card that prompts for admin credentials via the shared {@link KeyboardPanel}
- * on-screen keyboard.
+ * on-screen keyboard, or a physical keyboard when one is attached (see {@link #physicalKeyboard}).
  *
  * <p>
  * Lifecycle:
@@ -72,6 +72,46 @@ public class LoginToAdminPanelCard extends JPanel {
   private final Runnable onSuccess;
   private final Runnable onDismiss;
   private final KeyboardPanel keyboardPanel;
+
+  /**
+   * Physical keyboard input (a keyboard attached during PC setup or manual testing): characters go
+   * to the active field, Tab / Shift+Tab and the arrows switch fields, Enter logs in, Ctrl+V pastes.
+   * Every other keystroke is consumed so typing the bill-acceptor or card-reader key (e.g. the 'a'
+   * in "admin") never adds credits; only Escape passes through to the frame's admin-bypass binding.
+   * Unlike the on-screen keyboard, physical typing never auto-advances from the username field, so
+   * a habitual Tab after the username does not send focus back to it.
+   */
+  private final PhysicalKeyboardInput physicalKeyboard = new PhysicalKeyboardInput(this,
+      () -> true, new PhysicalKeyboardInput.Target() {
+        @Override
+        public void type(String text) {
+          activeBuffer().append(text);
+          syncLabels();
+          resetTimeout();
+        }
+
+        @Override
+        public void backspace() {
+          StringBuilder buf = activeBuffer();
+          if (buf.length() > 0)
+            buf.deleteCharAt(buf.length() - 1);
+          syncLabels();
+          resetTimeout();
+        }
+
+        @Override
+        public void enter() {
+          attemptLogin();
+        }
+
+        @Override
+        public void moveField(int delta) {
+          activeField =
+              activeField == ActiveField.USERNAME ? ActiveField.PASSWORD : ActiveField.USERNAME;
+          refreshFieldBorders();
+          resetTimeout();
+        }
+      }, e -> e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -146,6 +186,19 @@ public class LoginToAdminPanelCard extends JPanel {
   public void dismiss() {
     countdownTimer.stop();
     hidePassword();
+    physicalKeyboard.uninstall();
+  }
+
+  @Override
+  public void addNotify() {
+    super.addNotify();
+    physicalKeyboard.install();
+  }
+
+  @Override
+  public void removeNotify() {
+    physicalKeyboard.uninstall();
+    super.removeNotify();
   }
 
   /**
@@ -155,7 +208,14 @@ public class LoginToAdminPanelCard extends JPanel {
   private void cancel() {
     countdownTimer.stop();
     hidePassword();
+    physicalKeyboard.uninstall();
     onDismiss.run();
+  }
+
+  /** Restarts the countdown after user interaction. */
+  private void resetTimeout() {
+    secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
+    updateTimeout();
   }
 
   /** Called whenever this card is shown — restarts the countdown. */
@@ -411,9 +471,12 @@ public class LoginToAdminPanelCard extends JPanel {
     };
 
     button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeLoginBtn));
-    button.setForeground(ColorTheme.get().textPrimary);    button.setContentAreaFilled(false);
+    button.setForeground(ColorTheme.get().textPrimary);
+    button.setContentAreaFilled(false);
     button.setBorderPainted(false);
     button.setFocusPainted(false);
+    // Not focusable, so a physical Space / Enter never "clicks" whichever button was clicked last.
+    button.setFocusable(false);
     button.setOpaque(false);
     button.setPreferredSize(
         new Dimension(LayoutTheme.get().loginActionBtnW, LayoutTheme.get().loginActionBtnH));
@@ -440,6 +503,7 @@ public class LoginToAdminPanelCard extends JPanel {
       if (Boolean.TRUE.equals(result)) {
         countdownTimer.stop();
         hidePassword();
+        physicalKeyboard.uninstall();
         onSuccess.run();
       } else {
         errorLabel.setText("Invalid credentials. Please try again.");

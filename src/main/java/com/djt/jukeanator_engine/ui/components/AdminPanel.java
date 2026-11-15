@@ -624,22 +624,15 @@ public class AdminPanel extends JPanel {
   }
 
   /**
-   * Opens a directory chooser so the operator can pick the file-system folder to scan for music,
-   * then kicks off a scan against the selected path. Invoked automatically at startup (via
-   * {@link JukeANatorFrame#promptForInitialLibraryScan()}) when there is no usable song library, so
-   * the operator can point the app at a music folder on first use, and from Rescan Library's
-   * "Scan New Folder" choice.
-   *
-   * @param firstTimeUse true when there is no song library yet; cancelling either the directory
-   *        chooser or the scan then exits the application instead of returning to the Admin panel
+   * A {@link JFileChooser} whose dialog, on Windows, stays always-on-top and is raised and focused
+   * once shown. On first use the scan dialog appears during startup, when Windows may still be
+   * keeping the launching command prompt in the foreground; without this the dialog can open hidden
+   * behind that console. It also makes sure the dialog (a separate window, opened over the
+   * full-screen frame) receives the physical keyboard, e.g. for typing a playlist file name.
+   * Skipped on Linux/macOS (see ForegroundWindowUtil#isApplicable()), which get the plain dialog.
    */
-  public void showScanFileSystemDialog(boolean firstTimeUse) {
-
-    // On Windows, keep the chooser's dialog always-on-top and raise it once shown. On first use
-    // this dialog appears during startup, when Windows may still be keeping the launching command
-    // prompt in the foreground; without this the dialog can open hidden behind that console.
-    // Skipped on Linux/macOS (see ForegroundWindowUtil#isApplicable()), which get the plain dialog.
-    JFileChooser chooser = new JFileChooser() {
+  private static JFileChooser newForegroundFileChooser() {
+    return new JFileChooser() {
       private static final long serialVersionUID = 1L;
 
       @Override
@@ -662,6 +655,21 @@ public class AdminPanel extends JPanel {
         return dialog;
       }
     };
+  }
+
+  /**
+   * Opens a directory chooser so the operator can pick the file-system folder to scan for music,
+   * then kicks off a scan against the selected path. Invoked automatically at startup (via
+   * {@link JukeANatorFrame#promptForInitialLibraryScan()}) when there is no usable song library, so
+   * the operator can point the app at a music folder on first use, and from Rescan Library's
+   * "Scan New Folder" choice.
+   *
+   * @param firstTimeUse true when there is no song library yet; cancelling either the directory
+   *        chooser or the scan then exits the application instead of returning to the Admin panel
+   */
+  public void showScanFileSystemDialog(boolean firstTimeUse) {
+
+    JFileChooser chooser = newForegroundFileChooser();
     chooser.setDialogTitle("Select Music Folder to Scan");
     chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
     chooser.setAcceptAllFileFilterUsed(false);
@@ -1047,6 +1055,12 @@ public class AdminPanel extends JPanel {
       content.registerKeyboardAction(e -> hideOverlay(),
           javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
           JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+      // Physical keyboard: Enter in any field submits, like the Create Admin button.
+      for (JTextField field : new JTextField[] {firstNameField, lastNameField, emailField,
+          passwordField}) {
+        field.addActionListener(e -> attemptCreate());
+      }
     }
 
     void show() {
@@ -1696,6 +1710,11 @@ public class AdminPanel extends JPanel {
       content.registerKeyboardAction(e -> hideOverlay(),
           javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
           JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+      // Physical keyboard: Enter in any field submits, like the Register Location button.
+      for (JTextField field : new JTextField[] {nameField, latitudeField, longitudeField}) {
+        field.addActionListener(e -> attemptRegister());
+      }
     }
 
     void show() {
@@ -2018,6 +2037,12 @@ public class AdminPanel extends JPanel {
       content.registerKeyboardAction(e -> hideOverlay(),
           javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
           JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+      // Physical keyboard: Enter in any field saves, like the Save Changes button.
+      for (JTextField field : new JTextField[] {nameField, latitudeField, longitudeField,
+          logoNameField}) {
+        field.addActionListener(e -> attemptSave());
+      }
     }
 
     void show() {
@@ -2310,7 +2335,7 @@ public class AdminPanel extends JPanel {
 
   private void doLoadPlaylist() {
 
-    JFileChooser chooser = new JFileChooser();
+    JFileChooser chooser = newForegroundFileChooser();
     chooser.setDialogTitle("Load Playlist");
     chooser.setFileFilter(new FileNameExtensionFilter("Playlist files (*.txt)", "txt"));
     chooser.setCurrentDirectory(new File(""));
@@ -2340,7 +2365,7 @@ public class AdminPanel extends JPanel {
 
   private void doSavePlaylist() {
 
-    JFileChooser chooser = new JFileChooser();
+    JFileChooser chooser = newForegroundFileChooser();
     chooser.setDialogTitle("Save Playlist");
     chooser.setFileFilter(new FileNameExtensionFilter("Playlist files (*.txt)", "txt"));
 
@@ -2733,6 +2758,11 @@ public class AdminPanel extends JPanel {
     content.add(top, BorderLayout.NORTH);
     content.add(keyboard, BorderLayout.CENTER);
     content.add(buttonRow, BorderLayout.SOUTH);
+
+    // Escape cancels, like the other admin overlay forms (instead of leaving the Admin panel).
+    content.registerKeyboardAction(e -> hideOverlay(),
+        javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+        JComponent.WHEN_IN_FOCUSED_WINDOW);
 
     showOverlayForm(ColorTheme.get().accentBlue, content);
     SwingUtilities.invokeLater(() -> {

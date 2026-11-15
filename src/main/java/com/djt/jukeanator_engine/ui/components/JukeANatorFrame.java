@@ -2137,6 +2137,29 @@ public class JukeANatorFrame extends JFrame {
     replaceOverlayCard(CARD_LOGIN, loginToAdminPanelCard);
     overlayCardLayout.show(overlayRoot, CARD_LOGIN);
     loginToAdminPanelCard.onShown();
+    // The card reads the physical keyboard through a KeyEventDispatcher, which needs this window
+    // to hold keyboard focus.
+    requestFocusInWindow();
+  }
+
+  /**
+   * True if {@code c} is a configured payment key: the bill-acceptor key, or the card-reader key
+   * when card processing is enabled (either case, matching {@link #bindKeyCaseInsensitive}).
+   * Screens that read the physical keyboard while patrons use the jukebox let these through so a
+   * bill or card pulse is never swallowed as typed text.
+   */
+  boolean isPaymentKey(char c) {
+    char typed = Character.toLowerCase(c);
+    return typed == Character.toLowerCase(incrementCreditsKey) || (enableCreditCardProcessing
+        && typed == Character.toLowerCase(incrementCreditsCreditCardReaderKey));
+  }
+
+  /**
+   * True while a card floats above the tabs (Add Song to Queue, or the card-payment confirmation),
+   * covering whatever tab is underneath.
+   */
+  boolean floatingOverlayShowing() {
+    return addSongGlassPane.isVisible() || cardPaymentGlassPane.isVisible();
   }
 
   /**

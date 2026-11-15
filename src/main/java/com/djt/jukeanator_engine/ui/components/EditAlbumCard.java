@@ -312,6 +312,9 @@ public class EditAlbumCard extends JPanel {
     gbcS.gridwidth = 1;
     JButton btnExecuteSearch = createStyledButton("Search", e -> doInternetSearch());
     searchInputsPanel.add(btnExecuteSearch, gbcS);
+    // Physical keyboard: Enter in either search field runs the search, like the Search button.
+    tfSearchArtist.addActionListener(e -> doInternetSearch());
+    tfSearchAlbum.addActionListener(e -> doInternetSearch());
 
     rightPanel.add(searchInputsPanel, BorderLayout.NORTH);
 
@@ -475,6 +478,15 @@ public class EditAlbumCard extends JPanel {
         onDismiss.run();
     });
     btnCancel.setName(UiComponentNames.EDIT_ALBUM_CANCEL_BUTTON);
+
+    // Physical keyboard: Escape acts as Cancel, like the Admin panel's overlay forms. Registered on
+    // this card (newer than the frame's own Escape binding, so it takes precedence while the card
+    // is showing); otherwise the frame would switch tabs underneath and leave this card on screen.
+    registerKeyboardAction(e -> {
+      if (onDismiss != null)
+        onDismiss.run();
+    }, javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+        WHEN_IN_FOCUSED_WINDOW);
 
     btnUpdateMeta.setEnabled(false);
     btnDownloadArt.setEnabled(false);
