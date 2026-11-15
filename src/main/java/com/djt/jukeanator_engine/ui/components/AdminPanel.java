@@ -41,7 +41,6 @@ import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JList;
 import javax.swing.JPanel;
-import javax.swing.JPasswordField;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -1016,7 +1015,15 @@ public class AdminPanel extends JPanel {
     private final JTextField firstNameField = new JTextField(18);
     private final JTextField lastNameField = new JTextField(18);
     private final JTextField emailField = new JTextField(18);
-    private final JPasswordField passwordField = new JPasswordField(18);
+    /** Same footprint as the other (identically styled, 18-column) text fields, icon included. */
+    private final PeekPasswordField passwordField = new PeekPasswordField(18) {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      public java.awt.Dimension getPreferredSize() {
+        return firstNameField.getPreferredSize();
+      }
+    };
     private final JLabel errorLabel = new JLabel(" ");
     private final JPanel content = new JPanel(new BorderLayout(0, 16));
 
@@ -1059,7 +1066,7 @@ public class AdminPanel extends JPanel {
       addFieldRow(fields, c, 0, "First Name:", firstNameField);
       addFieldRow(fields, c, 1, "Last Name:", lastNameField);
       addFieldRow(fields, c, 2, "Email:", emailField);
-      addFieldRow(fields, c, 3, "Password:", passwordField, buildPasswordWithPeek());
+      addFieldRow(fields, c, 3, "Password:", passwordField);
 
       c.gridx = 0;
       c.gridy = 4;
@@ -1072,17 +1079,9 @@ public class AdminPanel extends JPanel {
       return fields;
     }
 
+    /** Styles {@code field} and adds it as a labelled row. */
     private void addFieldRow(JPanel fields, GridBagConstraints c, int row, String labelText,
         JTextField field) {
-      addFieldRow(fields, c, row, labelText, field, field);
-    }
-
-    /**
-     * Styles {@code field} and adds a labelled row whose value cell is {@code cell} -- either the
-     * field itself or a container holding it (see {@link #buildPasswordWithPeek()}).
-     */
-    private void addFieldRow(JPanel fields, GridBagConstraints c, int row, String labelText,
-        JTextField field, JComponent cell) {
 
       JLabel label = new JLabel(labelText);
       label.setForeground(ColorTheme.get().textSecondary);
@@ -1101,44 +1100,7 @@ public class AdminPanel extends JPanel {
       fields.add(label, c);
 
       c.gridx = 1;
-      fields.add(cell, c);
-    }
-
-    /**
-     * Wraps the password field and a {@link PasswordPeekButton} in one cell sized to the other text
-     * fields, so the password field is narrowed and the peek's right edge lines up with theirs.
-     * While the peek is revealing, the field's echo character is turned off so the typed text shows
-     * in plain form.
-     */
-    private JPanel buildPasswordWithPeek() {
-
-      char defaultEchoChar = passwordField.getEchoChar();
-      PasswordPeekButton peek = new PasswordPeekButton(
-          revealed -> passwordField.setEchoChar(revealed ? (char) 0 : defaultEchoChar), null) {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        public java.awt.Dimension getPreferredSize() {
-          // Square, matching the password field's height (read live, after styling is applied)
-          int size = passwordField.getPreferredSize().height;
-          return new java.awt.Dimension(size, size);
-        }
-      };
-      peek.setName(UiComponentNames.ADMIN_USER_PASSWORD_PEEK);
-
-      JPanel cell = new JPanel(new BorderLayout(8, 0)) {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        public java.awt.Dimension getPreferredSize() {
-          // Same footprint as the other (identically styled, 18-column) text fields
-          return firstNameField.getPreferredSize();
-        }
-      };
-      cell.setOpaque(false);
-      cell.add(passwordField, BorderLayout.CENTER);
-      cell.add(peek, BorderLayout.EAST);
-      return cell;
+      fields.add(field, c);
     }
 
     private JPanel buildButtonRow() {

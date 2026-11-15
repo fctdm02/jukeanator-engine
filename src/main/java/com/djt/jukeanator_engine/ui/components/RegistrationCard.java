@@ -17,6 +17,7 @@ import java.io.File;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -76,11 +77,10 @@ public class RegistrationCard extends JPanel {
   private Field activeField = Field.EMAIL;
 
   private JLabel emailLabel;
-  private JLabel passcodeLabel;
+  /** Display-only (keyboard input goes to {@link #passcode}); masks itself, with a peek. */
+  private PeekPasswordField passcodeField;
   private JLabel locationLabel;
   private JLabel messageLabel;
-  private boolean passcodeRevealed = false;
-  private PasswordPeekButton passcodePeek;
   private JButton submitButton;
   private final JPanel center = new JPanel(new GridBagLayout());
   private JPanel formPanel;
@@ -223,13 +223,13 @@ public class RegistrationCard extends JPanel {
     JPanel fields = new JPanel(new GridLayout(0, 1, 0, 8));
     fields.setOpaque(false);
     emailLabel = fieldRow(fields, "EMAIL:", Field.EMAIL,
-        UiComponentNames.REGISTRATION_EMAIL_FIELD);
+        UiComponentNames.REGISTRATION_EMAIL_FIELD, new JLabel(" "));
     if (!detailsOnly) {
-      passcodeLabel = fieldRow(fields, "PASSCODE:", Field.PASSCODE,
-          UiComponentNames.REGISTRATION_PASSCODE_FIELD);
+      passcodeField = fieldRow(fields, "PASSCODE:", Field.PASSCODE,
+          UiComponentNames.REGISTRATION_PASSCODE_FIELD, buildPasscodeField());
     }
     locationLabel = fieldRow(fields, "LOCATION:", Field.LOCATION,
-        UiComponentNames.REGISTRATION_LOCATION_FIELD);
+        UiComponentNames.REGISTRATION_LOCATION_FIELD, new JLabel(" "));
     panel.add(fields, BorderLayout.CENTER);
 
     messageLabel = new JLabel(" ", SwingConstants.CENTER);
@@ -292,7 +292,9 @@ public class RegistrationCard extends JPanel {
     return row;
   }
 
-  private JLabel fieldRow(JPanel parent, String caption, Field field, String name) {
+  /** Styles {@code value} as a display field and adds it as a captioned row; returns it. */
+  private <T extends JComponent> T fieldRow(JPanel parent, String caption, Field field,
+      String name, T value) {
     JPanel row = new JPanel(new BorderLayout(12, 0));
     row.setOpaque(false);
 
@@ -304,7 +306,6 @@ public class RegistrationCard extends JPanel {
         LayoutTheme.get().loginFieldH));
     captionLabel.setHorizontalAlignment(SwingConstants.RIGHT);
 
-    JLabel value = new JLabel(" ");
     value.setName(name);
     value.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeLoginField));
     value.setForeground(ColorTheme.get().textPrimary);
@@ -324,30 +325,20 @@ public class RegistrationCard extends JPanel {
     });
 
     row.add(captionLabel, BorderLayout.WEST);
-    if (field == Field.PASSCODE) {
-      // Passcode field + peek together span the same width as the other fields
-      JPanel valueWithPeek = new JPanel(new BorderLayout(8, 0));
-      valueWithPeek.setOpaque(false);
-      valueWithPeek.add(value, BorderLayout.CENTER);
-      valueWithPeek.add(buildPasscodePeek(), BorderLayout.EAST);
-      row.add(valueWithPeek, BorderLayout.CENTER);
-    } else {
-      row.add(value, BorderLayout.CENTER);
-    }
+    row.add(value, BorderLayout.CENTER);
     parent.add(row);
     return value;
   }
 
-  /** Eye icon beside the passcode field; see {@link PasswordPeekButton}. */
-  private PasswordPeekButton buildPasscodePeek() {
-    passcodePeek = new PasswordPeekButton(revealed -> {
-      passcodeRevealed = revealed;
-      syncLabels();
-    }, null);
-    passcodePeek.setName(UiComponentNames.REGISTRATION_PASSCODE_PEEK);
-    passcodePeek.setPreferredSize(
-        new Dimension(LayoutTheme.get().loginFieldH, LayoutTheme.get().loginFieldH));
-    return passcodePeek;
+  /**
+   * Passcode display: a non-editable, non-focusable {@link PeekPasswordField} (keystrokes go to
+   * {@link #passcode}) with the peek eye inside its right edge.
+   */
+  private static PeekPasswordField buildPasscodeField() {
+    PeekPasswordField field = new PeekPasswordField();
+    field.setEditable(false);
+    field.setFocusable(false);
+    return field;
   }
 
   private JButton actionButton(String text, Runnable action) {
@@ -468,8 +459,8 @@ public class RegistrationCard extends JPanel {
 
   private void finish(String reason) {
     log.info("Registration screen closed: {}", reason);
-    if (passcodePeek != null) {
-      passcodePeek.conceal();
+    if (passcodeField != null) {
+      passcodeField.conceal();
     }
     physicalKeyboard.uninstall();
     onDone.run();
@@ -516,18 +507,22 @@ public class RegistrationCard extends JPanel {
 
   private void syncLabels() {
     setField(emailLabel, email.toString(), activeField == Field.EMAIL);
-    if (passcodeLabel != null) {
-      // Masked with bullets unless the peek icon is revealing it
-      String shown = passcodeRevealed ? passcode.toString() : "•".repeat(passcode.length());
-      setField(passcodeLabel, shown, activeField == Field.PASSCODE);
+    if (passcodeField != null) {
+      // The field masks the text itself unless its peek icon is revealing it
+      passcodeField.setText(passcode.toString());
+      setFieldBorder(passcodeField, activeField == Field.PASSCODE);
     }
     setField(locationLabel, location.toString(), activeField == Field.LOCATION);
   }
 
   private static void setField(JLabel label, String text, boolean active) {
     label.setText(text.isEmpty() ? " " : text);
+    setFieldBorder(label, active);
+  }
+
+  private static void setFieldBorder(JComponent field, boolean active) {
     Color border = active ? ColorTheme.get().accentBlue : ColorTheme.get().textPrimary;
-    label.setBorder(BorderFactory.createCompoundBorder(
+    field.setBorder(BorderFactory.createCompoundBorder(
         BorderFactory.createMatteBorder(2, 1, 1, 1, border),
         BorderFactory.createEmptyBorder(8, 12, 8, 12)));
   }

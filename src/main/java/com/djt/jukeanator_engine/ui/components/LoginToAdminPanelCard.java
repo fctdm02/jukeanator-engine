@@ -11,6 +11,7 @@ import java.awt.GridBagLayout;
 import java.awt.RenderingHints;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
@@ -56,12 +57,9 @@ public class LoginToAdminPanelCard extends JPanel {
   private final StringBuilder passwordBuffer = new StringBuilder();
 
   private JLabel usernameLabel;
-  private JLabel passwordLabel;
+  /** Display-only (keyboard input goes to {@link #passwordBuffer}); masks itself, with a peek. */
+  private PeekPasswordField passwordField;
   private JLabel errorLabel;
-
-  // ── Password peek ─────────────────────────────────────────────────────────
-  private boolean passwordRevealed = false;
-  private PasswordPeekButton peekIcon;
 
   private int secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
   private Timer countdownTimer;
@@ -256,7 +254,7 @@ public class LoginToAdminPanelCard extends JPanel {
         new Dimension(LayoutTheme.get().loginCaptionW, LayoutTheme.get().loginFieldH));
     caption.setHorizontalAlignment(SwingConstants.RIGHT);
 
-    JLabel field = new JLabel();
+    JComponent field = isPassword ? buildPasswordField() : new JLabel();
     field.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeLoginField));
     field.setForeground(ColorTheme.get().textPrimary);
     field.setBackground(ColorTheme.get().bgFieldDark);
@@ -284,18 +282,9 @@ public class LoginToAdminPanelCard extends JPanel {
     row.add(caption, BorderLayout.WEST);
 
     if (isPassword) {
-      passwordLabel = field;
       field.setName(UiComponentNames.LOGIN_PASSWORD_FIELD);
-
-      // Field plus the peek icon on its right edge
-      JPanel fieldWithPeek = new JPanel(new BorderLayout(8, 0));
-      fieldWithPeek.setOpaque(false);
-      fieldWithPeek.add(field, BorderLayout.CENTER);
-      fieldWithPeek.add(buildPeekIcon(), BorderLayout.EAST);
-      row.add(fieldWithPeek, BorderLayout.CENTER);
-      return row;
     } else {
-      usernameLabel = field;
+      usernameLabel = (JLabel) field;
       field.setName(UiComponentNames.LOGIN_USERNAME_FIELD);
       // Username is active by default
       field.setBorder(BorderFactory.createCompoundBorder(
@@ -311,26 +300,26 @@ public class LoginToAdminPanelCard extends JPanel {
   // PASSWORD PEEK
   // ─────────────────────────────────────────────────────────────────────────
 
-  /** Builds the eye icon beside the password field; see {@link PasswordPeekButton}. */
-  private PasswordPeekButton buildPeekIcon() {
-    peekIcon = new PasswordPeekButton(revealed -> {
-      passwordRevealed = revealed;
-      syncLabels();
-    }, () -> {
+  /**
+   * Builds the password display: a non-editable, non-focusable {@link PeekPasswordField} (the
+   * on-screen keyboard fills {@link #passwordBuffer}) with the peek eye inside its right edge.
+   */
+  private PeekPasswordField buildPasswordField() {
+    passwordField = new PeekPasswordField();
+    passwordField.setEditable(false);
+    passwordField.setFocusable(false);
+    passwordField.setOnPeekPressed(() -> {
       // Reset timeout on interaction
       secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
       updateTimeout();
     });
-    peekIcon.setName(UiComponentNames.LOGIN_PASSWORD_PEEK);
-    peekIcon.setPreferredSize(
-        new Dimension(LayoutTheme.get().loginFieldH, LayoutTheme.get().loginFieldH));
-    return peekIcon;
+    return passwordField;
   }
 
   /** Masks the password again if the peek icon is currently revealing it. */
   private void hidePassword() {
-    if (peekIcon != null)
-      peekIcon.conceal();
+    if (passwordField != null)
+      passwordField.conceal();
   }
 
   /** Login / Cancel buttons and error label row. */
@@ -494,11 +483,9 @@ public class LoginToAdminPanelCard extends JPanel {
       String u = usernameBuffer.toString();
       usernameLabel.setText(u.isEmpty() ? " " : u);
     }
-    if (passwordLabel != null) {
-      // Mask password with bullets unless the peek icon is revealing it
-      String shown =
-          passwordRevealed ? passwordBuffer.toString() : "•".repeat(passwordBuffer.length());
-      passwordLabel.setText(shown.isEmpty() ? " " : shown);
+    if (passwordField != null) {
+      // The field masks the text itself unless its peek icon is revealing it
+      passwordField.setText(passwordBuffer.toString());
     }
   }
 
@@ -511,10 +498,10 @@ public class LoginToAdminPanelCard extends JPanel {
           BorderFactory.createMatteBorder(2, 1, 1, 1, borderColor),
           BorderFactory.createEmptyBorder(8, 12, 8, 12)));
     }
-    if (passwordLabel != null) {
+    if (passwordField != null) {
       Color borderColor = (activeField == ActiveField.PASSWORD) ? ColorTheme.get().accentBlue
           : ColorTheme.get().textPrimary;
-      passwordLabel.setBorder(BorderFactory.createCompoundBorder(
+      passwordField.setBorder(BorderFactory.createCompoundBorder(
           BorderFactory.createMatteBorder(2, 1, 1, 1, borderColor),
           BorderFactory.createEmptyBorder(8, 12, 8, 12)));
     }
