@@ -197,6 +197,7 @@ Code: `LegacyFrontController`, `LegacyResponses`, `LicenseServerClient`.
 | Missing email/serial caused HTTP 500 (NPE) | server | Fixed: legacy text replies |
 | `index.jsp` read the `home` parameter instead of `command`, so every page rendered home | site | Fixed: page commands redirect to the matching static page |
 | Heartbeat auto-creates customers | server | Preserved (flagged `auto_created`) for transparency |
+| A few `CUSTOMER.EMAIL` rows hold more than one address (free-text admin entry, e.g. newline-separated) | data | Import takes the first address as canonical (it's the unique provisioning key); any further address is appended to `notes` |
 
 ## Setup-time licensing screens
 

@@ -29,25 +29,43 @@ SELECT next_val INTO @base FROM persistent_identity_seq FOR UPDATE;
 SELECT COALESCE(MAX(CUSTOMER_ID), 0) INTO @max_customer FROM legacy_jukeanator.CUSTOMER;
 
 -- Customers: id = @base + CUSTOMER_ID
+-- A handful of rows have more than one address jammed into EMAIL (newline- or space-separated --
+-- e.g. CUSTOMER_ID 3, 'eftobias@gmail.com\nmikejoed@me.com'), left over from free-text entry on
+-- the legacy admin page. license_customer.email is UNIQUE and is the provisioning lookup key, so
+-- only the first address can be canonical; any further addresses are preserved in notes instead
+-- of silently dropped.
 INSERT INTO license_customer (persistent_identity, customer_name, email, phone_number, address,
     notes, passcode_sha1, license_type, available_licenses, revoked, auto_created,
     legacy_customer_id, version, date_added, date_updated)
 SELECT @base + c.CUSTOMER_ID,
        c.CUSTOMER_NAME,
-       LOWER(TRIM(c.EMAIL)),
+       LOWER(c.primary_email),
        NULLIF(TRIM(c.PHONE_NUMBER), ''),
        NULLIF(TRIM(c.ADDRESS), ''),
-       NULLIF(TRIM(c.NOTES), ''),
+       CASE WHEN c.extra_emails <> ''
+            THEN TRIM(CONCAT_WS(' -- ', NULLIF(TRIM(c.NOTES), ''),
+                                 CONCAT('Legacy EMAIL field also listed: ', c.extra_emails)))
+            ELSE NULLIF(TRIM(c.NOTES), '')
+       END,
        LOWER(TRIM(c.PASSCODE)),
        CASE WHEN UPPER(TRIM(c.LICENSE_TYPE)) IN ('R', 'A', 'C', 'P', 'L')
             THEN UPPER(TRIM(c.LICENSE_TYPE)) ELSE 'L' END,
        c.AVAILABLE_LICENSES,
        FALSE,
        -- Legacy heartbeats auto-created customers whose passcode is the SHA-1 of their email.
-       LOWER(TRIM(c.PASSCODE)) = SHA1(TRIM(c.EMAIL)),
+       LOWER(TRIM(c.PASSCODE)) = SHA1(c.primary_email),
        c.CUSTOMER_ID,
        1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-FROM legacy_jukeanator.CUSTOMER c;
+FROM (
+    SELECT CUSTOMER_ID, CUSTOMER_NAME, PHONE_NUMBER, ADDRESS, NOTES, PASSCODE, LICENSE_TYPE,
+           AVAILABLE_LICENSES,
+           TRIM(SUBSTRING_INDEX(REPLACE(REPLACE(TRIM(EMAIL), '\r', ' '), '\n', ' '), ' ', 1))
+               AS primary_email,
+           TRIM(SUBSTRING(REPLACE(REPLACE(TRIM(EMAIL), '\r', ' '), '\n', ' '),
+                LENGTH(SUBSTRING_INDEX(REPLACE(REPLACE(TRIM(EMAIL), '\r', ' '), '\n', ' '), ' ', 1)) + 2))
+               AS extra_emails
+    FROM legacy_jukeanator.CUSTOMER
+) c;
 
 -- Machines: id = @base + @max_customer + CUSTOMER_SERIAL_ID
 INSERT INTO license_machine (persistent_identity, customer_id, serial_number, last_paid_quarter,
