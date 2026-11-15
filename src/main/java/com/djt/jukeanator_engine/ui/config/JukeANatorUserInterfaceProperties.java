@@ -8,7 +8,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "user-interface")
 public class JukeANatorUserInterfaceProperties {
 
-  private boolean alwaysOnTop = false;
+  private boolean alwaysOnTop = true;
   
   //
   // SCREEN SAVER

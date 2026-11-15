@@ -178,7 +178,7 @@ license-server:   # master mode only: www.jukeanator.com license server and publ
   feedback-recipients: tmyers1@yahoo.com   # contact form recipients (comma-separated)
 
 user-interface:
-  always-on-top: false
+  always-on-top: true
   enable-screen-saver: false
   # HIBERNATE CONFIGURATION  
   enable-hibernation: false

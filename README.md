@@ -38,10 +38,13 @@ This sets them for the current user. To set them for all users instead, run an *
 Create `GO.CMD` in the same directory as the WAR and the `jdk-25.0.2` folder:
 
 ```
+cd /d "%~dp0"
 set path=jdk-25.0.2\bin;%PATH%
 set classpath=.;
 java --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar jukeanator-engine-0.0.1-SNAPSHOT.war --app.config-dir=C:\kiosk\config --app.data-dir=C:\kiosk\data
 ```
+
+The first line switches to the folder containing `GO.CMD`, so it also works when started from a shortcut or the Startup folder.
 
 ## Linux (Mint)
 
@@ -78,7 +81,7 @@ Then make it executable with `chmod +x go.sh`.
 
 # Prerequisite: Java 25
 
-The application needs a **Java 25** runtime (64-bit). The instructions below install Eclipse Temurin 25, a free OpenJDK build from Adoptium. A full JRE is needed, not a "headless" one, because the kiosk UI uses Swing.
+The application needs a **Java 25** runtime (64-bit). The instructions below install Eclipse Temurin 25 (a free OpenJDK build from Adoptium) on Windows, and the distribution's OpenJDK 25 package on Linux Mint. A full JRE is needed, not a "headless" one, because the kiosk UI uses Swing.
 
 There are two ways to provide Java:
 
@@ -114,53 +117,11 @@ where java
 
 ## Linux (Mint)
 
-### Step 1: Add the Adoptium package repository
-
-Mint is based on Ubuntu, and the Adoptium repository is organised by Ubuntu release name, so these commands read the Ubuntu codename from `/etc/os-release` (for example `noble` on Mint 22):
+Install OpenJDK 25 from the Mint repositories:
 
 ```
-sudo apt install -y wget apt-transport-https gpg
-wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
-echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^UBUNTU_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
+sudo apt update && sudo apt install openjdk-25-jre
 ```
-
-### Step 2: Install
-
-```
-sudo apt update
-sudo apt install temurin-25-jre
-```
-
-(Ubuntu's own `openjdk-25-jre` package also works where the Mint release provides it. Check with `apt-cache policy openjdk-25-jre`.)
-
-### Step 3: Make it the default
-
-If more than one Java is installed, choose Java 25 as the system default. The command lists every installed Java; type the number of the `temurin-25` entry and press Enter:
-
-```
-sudo update-alternatives --config java
-```
-
-To set `JAVA_HOME` as well, find the install folder:
-
-```
-ls /usr/lib/jvm
-```
-
-Then add this line to `~/.profile` (as with the other environment variables), using the folder name shown, and log out and back in:
-
-```
-export JAVA_HOME=/usr/lib/jvm/temurin-25-jre-amd64
-```
-
-### Step 4: Verify
-
-```
-java -version
-readlink -f "$(which java)"
-```
-
-`java -version` must report version 25, and the second command shows which installation is being used.
 
 # Prerequisite: media player
 
@@ -363,6 +324,291 @@ xinput map-to-output "Elo TouchSystems ..." HDMI-1
 ```
 
 This lasts until logout. To apply it at every login, add the same command in **Menu**, then **Startup Applications** (click **+**, then **Custom command**, and set a delay of a few seconds).
+
+# Kiosk Mode Settings
+
+A jukebox must stay on and unlocked at all times. The application shows its own screensaver when idle, so the operating system must never turn off the display, never start its own screensaver, never lock the screen after a timeout, and never sleep or hibernate. The steps below turn all of these off and sign the kiosk account in automatically after a reboot or power cut.
+
+## Windows
+
+### Step 1: Use a local account (no Microsoft account)
+
+Windows 11 pushes setup towards signing in with a Microsoft (Outlook) account. A kiosk does not need one; a local account works offline, has no online sign-in, and is easier to sign in automatically.
+
+**New installation:** Microsoft keeps removing the setup workarounds for skipping the Microsoft account (such as `oobe\bypassnro`, and on recent builds `start ms-cxh:localonly`, both typed at the network screen after `Shift+F10`). They may still work on some builds, but the reliable method is to create the installation USB stick with Rufus (https://rufus.ie). After choosing the Windows 11 ISO and clicking **Start**, Rufus offers a **Windows User Experience** dialog: tick **Remove requirement for an online Microsoft account** and **Create a local account with username**, and enter the kiosk account name. Setup then creates that local account and never asks for a Microsoft account.
+
+**Existing installation signed in with a Microsoft account:** add a separate local account for the jukebox and keep the Microsoft account as the administrator for maintenance. In an **Administrator** Command Prompt (choose your own name and password):
+
+```
+net user kiosk "INSERT_VALUE_HERE" /add
+net user kiosk /passwordchg:no /expires:never
+```
+
+The same can be done in **Settings**, then **Accounts**, then **Other users**, then **Add account**: choose **I don't have this person's sign-in information**, then **Add a user without a Microsoft account**.
+
+Sign in as the kiosk account once, then do the remaining steps (and the environment variables under "Building/Running the Application") while signed in as that account. When an Administrator Command Prompt is needed, Windows asks for the administrator account's password.
+
+Run the commands in the steps below in an **Administrator** Command Prompt while signed in as the kiosk account (the screensaver settings are per user).
+
+### Step 2: Never turn off the display, sleep or hibernate
+
+```
+powercfg /change monitor-timeout-ac 0
+powercfg /change monitor-timeout-dc 0
+powercfg /change standby-timeout-ac 0
+powercfg /change standby-timeout-dc 0
+powercfg /change hibernate-timeout-ac 0
+powercfg /change hibernate-timeout-dc 0
+powercfg /hibernate off
+```
+
+A value of `0` means never. The `-dc` lines only matter on a PC with a battery. The same settings are in **Settings**, then **System**, then **Power** (set "Turn off my screen" and "Make my device sleep" to **Never**).
+
+### Step 3: Never require a sign-in on wake
+
+```
+powercfg /setacvalueindex SCHEME_CURRENT SUB_NONE CONSOLELOCK 0
+powercfg /setdcvalueindex SCHEME_CURRENT SUB_NONE CONSOLELOCK 0
+powercfg /setactive SCHEME_CURRENT
+```
+
+Then, in **Settings**, then **Accounts**, then **Sign-in options**:
+
+- Set "If you've been away, when should Windows require you to sign in again?" to **Never**.
+- Turn off **Dynamic lock** (it locks the PC when a paired phone moves away).
+
+### Step 4: Turn off the Windows screensaver
+
+```
+reg add "HKCU\Control Panel\Desktop" /v ScreenSaveActive /t REG_SZ /d 0 /f
+reg add "HKCU\Control Panel\Desktop" /v ScreenSaverIsSecure /t REG_SZ /d 0 /f
+```
+
+The same setting is in **Settings**, then **Personalization**, then **Lock screen**, then **Screen saver**: choose **(None)** and untick **On resume, display logon screen**.
+
+### Step 5: Remove any inactivity lock policy
+
+Windows can be told by policy to lock after a period of inactivity. It is not set on a normal home PC, but this makes sure it is off:
+
+```
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v InactivityTimeoutSecs /t REG_DWORD /d 0 /f
+```
+
+### Step 6: Sign in automatically (skip the login screen)
+
+So the jukebox comes back by itself after a reboot or power cut, sign the kiosk account in automatically. Either method below works; use one.
+
+**Method A: netplwiz.** Windows 11 hides the option until passwordless sign-in is turned off. In **Settings**, then **Accounts**, then **Sign-in options**, turn off **For improved security, only allow Windows Hello sign-in for Microsoft accounts on this device**. If that switch is not shown, run this in an Administrator Command Prompt instead:
+
+```
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device" /v DevicePasswordLessBuildVersion /t REG_DWORD /d 0 /f
+```
+
+Then press `Win+R`, run `netplwiz`, select the kiosk account, untick **Users must enter a user name and password to use this computer**, click **OK**, and enter the kiosk account's password twice.
+
+**Method B: Microsoft Sysinternals Autologon.** Download Autologon from https://learn.microsoft.com/sysinternals/downloads/autologon , run `Autologon64.exe`, enter the kiosk account's user name, `.` (a dot) as the domain, and its password, and click **Enable**. It stores the password encrypted, and works even when the netplwiz checkbox is missing.
+
+Reboot to confirm the PC goes straight to the kiosk account's desktop.
+
+### Step 7: Suppress welcome screens and notifications
+
+Windows periodically shows full-screen "Let's finish setting up your device" pages and pop-up notifications, which can cover the jukebox. In **Settings**, then **System**, then **Notifications**:
+
+- Turn **Notifications** off.
+- Under **Additional settings**, untick **Show the Windows welcome experience after updates and when signed in to show what's new and suggested**, **Suggest ways to get the most out of Windows and finish setting up this device**, and **Get tips and suggestions when using Windows**.
+
+### Step 8: Stop automatic updates and restarts
+
+Windows 11 has no switch in Settings that turns updates off permanently, but on **Windows 11 Pro** (and Enterprise or Education) the Windows Update policies can. With these settings Windows never downloads, installs or restarts for updates on its own; updates are installed only when someone clicks **Check for updates** in **Settings**, then **Windows Update**. In an Administrator Command Prompt:
+
+```
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoUpdate /t REG_DWORD /d 0 /f
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" /v AUOptions /t REG_DWORD /d 2 /f
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" /v NoAutoRebootWithLoggedOnUsers /t REG_DWORD /d 1 /f
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v ExcludeWUDriversInQualityUpdate /t REG_DWORD /d 1 /f
+```
+
+What they do:
+
+- `AUOptions 2`: notify only; nothing is downloaded or installed until it is started manually.
+- `NoAutoRebootWithLoggedOnUsers 1`: never restart automatically while an account is signed in (which, with automatic sign-in, is always).
+- `ExcludeWUDriversInQualityUpdate 1`: Windows Update never replaces the drivers (graphics, touchscreen, audio) that are known to work.
+
+To block updates completely instead of only notifying, change the first command to `/d 1` (`NoAutoUpdate 1`). The same settings are in the Group Policy Editor (`Win+R`, then `gpedit.msc`) under **Computer Configuration**, then **Administrative Templates**, then **Windows Components**, then **Windows Update**.
+
+Restart the PC. **Settings**, then **Windows Update**, then shows **Some update policies are managed by your organization**, which confirms the policies are active. Also, in **Settings**, then **Windows Update**, then **Advanced options**, turn off **Get me up to date** and **Receive updates for other Microsoft products**, and turn off **Get the latest updates as soon as they're available** on the main Windows Update page.
+
+**Windows 11 Home** may ignore these policies. On Home, use **Pause updates** (up to 5 weeks at a time) on the Windows Update page and set **Active hours** under **Advanced options** to cover the hours the jukebox is in use, or upgrade the PC to Pro.
+
+Turning off automatic updates also stops security fixes, so install them by hand during a maintenance visit every month or two (Microsoft Defender virus definitions keep updating on their own and never need a restart).
+
+### Verify
+
+Reboot, then run:
+
+```
+powercfg /query SCHEME_CURRENT SUB_VIDEO VIDEOIDLE
+powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE
+```
+
+Both must show `Current AC Power Setting Index: 0x00000000`.
+
+## Linux (Mint)
+
+These steps assume the default Cinnamon desktop on X11. They work in three layers: Cinnamon's own idle and power settings, the X11 display power management (DPMS) underneath it, and systemd suspend as the final safety net.
+
+### Step 1: Cinnamon idle, screensaver and power settings
+
+Run these as the account that runs the application, **without** `sudo` (they are per-user settings):
+
+```
+gsettings set org.cinnamon.desktop.session idle-delay 0
+gsettings set org.cinnamon.desktop.screensaver lock-enabled false
+gsettings set org.cinnamon.settings-daemon.plugins.power sleep-display-ac 0
+gsettings set org.cinnamon.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
+gsettings set org.cinnamon.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+gsettings set org.cinnamon.settings-daemon.plugins.power lock-on-suspend false
+gsettings set org.cinnamon.settings-daemon.plugins.power idle-dim-battery false
+```
+
+What they do:
+
+- `idle-delay 0`: the session is never considered idle, so the Cinnamon screensaver and lock never start.
+- `lock-enabled false`: the screen is never locked.
+- `sleep-display-ac 0`: the display is never turned off on mains power.
+- `sleep-inactive-ac-timeout 0` and `sleep-inactive-ac-type 'nothing'`: the PC never suspends when idle.
+- `lock-on-suspend false`: no lock screen if the PC is ever woken from sleep.
+
+The same settings are in **System Settings**, then **Screensaver** (set "Delay before starting the screensaver" to **Never** and turn off both lock options) and **System Settings**, then **Power Management** (set "Turn off the screen when inactive" and "Suspend when inactive" to **Never**).
+
+### Step 2: Disable X11 screen blanking and DPMS system-wide
+
+This covers anything Cinnamon misses, including the login screen:
+
+```
+sudo mkdir -p /etc/X11/xorg.conf.d
+sudo nano /etc/X11/xorg.conf.d/10-no-blanking.conf
+```
+
+```
+Section "ServerFlags"
+    Option "BlankTime"   "0"
+    Option "StandbyTime" "0"
+    Option "SuspendTime" "0"
+    Option "OffTime"     "0"
+EndSection
+
+Section "Extensions"
+    Option "DPMS" "Disable"
+EndSection
+```
+
+As an extra safeguard, add a startup entry in **Menu**, then **Startup Applications** (click **+**, then **Custom command**) with this command:
+
+```
+sh -c "sleep 10; xset s off; xset s noblank; xset -dpms"
+```
+
+### Step 3: Block suspend and hibernate at the system level
+
+```
+sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+```
+
+Nothing can then put the PC to sleep: not an idle timer, the menu, or a stray power-key event. To undo it later, run the same command with `unmask` in place of `mask`.
+
+### Step 4 (optional): Sign in automatically
+
+So the jukebox comes back by itself after a reboot, skip the login screen and sign the kiosk account in automatically. Either use the GUI or edit the configuration file.
+
+**GUI:** open **System Settings**, then **Login Window**, then **Users**, set **Automatic login** to the kiosk account, and leave the delay at 0.
+
+**Configuration file:** open the LightDM configuration:
+
+```
+sudo nano /etc/lightdm/lightdm.conf
+```
+
+Under the `[Seat:*]` section (add the section if it is missing), add these lines, using the account's user name in place of `kiosk`:
+
+```
+[Seat:*]
+autologin-user=kiosk
+autologin-user-timeout=0
+```
+
+Reboot to confirm the PC goes straight to the desktop. The account keeps its password for `sudo` and remote (SSH) access.
+
+**Avoid the keyring prompt:** with automatic sign-in, no password is typed, so the account's login keyring (where saved passwords are kept) stays locked. Anything that reads a saved password, such as a saved Wi-Fi password or a web browser, then shows an "Unlock login keyring" prompt over the jukebox screen. To prevent it:
+
+- **Wi-Fi:** open the network's settings, and on the **Details** tab tick **Make available to other users**. The password is then stored system-wide instead of in the keyring.
+- **Keyring in general:** open **Passwords and Keys** (Seahorse), right-click the **Login** keyring, choose **Change Password**, enter the current password, and leave the new password blank. The keyring then never needs unlocking. Saved passwords are then stored unencrypted on disk, which is acceptable for a PC in a locked cabinet.
+
+### Verify
+
+Reboot, then run:
+
+```
+xset q
+gsettings get org.cinnamon.desktop.session idle-delay
+```
+
+`xset q` must show `timeout:  0` under **Screen Saver** and `DPMS is Disabled` under **DPMS**, and the second command must print `uint32 0`.
+
+If the session is ever switched to Wayland at the login screen, Step 2 and the `xset` startup entry have no effect; Steps 1 and 3 still apply.
+
+# Auto-Start JukeANator at Power-On
+
+With the steps below, switching the PC on ends with JukeANator running full screen on top of everything: the PC boots, signs the kiosk account in automatically (Step 6 for Windows or Step 4 for Linux Mint under Kiosk Mode Settings), and the sign-in starts `GO.CMD` or `go.sh`.
+
+## Step 1: Power on after a power cut (BIOS/UEFI)
+
+So the PC also starts when the cabinet's power is switched on or comes back after an outage, enter the BIOS/UEFI setup (usually by pressing `Del`, `F2` or `F10` right after power-on) and set the power-loss option to **Power On**. Its name depends on the manufacturer, for example **Restore on AC Power Loss**, **AC Back**, **After Power Failure** or **AC Recovery**. Save and exit.
+
+## Step 2: Keep the jukebox window on top
+
+The application already fills the screen in full-screen mode, and by default it also keeps other windows from appearing over it. That is controlled by this setting, which is `true` by default. Check that the external `application.yml` (in `--app.config-dir`) does not set it to `false`, which can be the case in a copy seeded by an older version:
+
+```
+user-interface:
+  always-on-top: true
+```
+
+## Windows
+
+Add a shortcut to `GO.CMD` in the kiosk account's Startup folder, while signed in as the kiosk account:
+
+- Press `Win+R`, type `shell:startup` and press Enter. The Startup folder opens.
+- Right-click inside it, choose **New**, then **Shortcut**, click **Browse**, select `GO.CMD`, click **Next**, name it `JukeANator`, and click **Finish**.
+- Right-click the new shortcut, choose **Properties**, set **Run** to **Minimized**, and click **OK**. The console window then starts minimized on the taskbar instead of in front of the jukebox (its log output is still there for troubleshooting).
+
+Check that the entry is enabled in **Settings**, then **Apps**, then **Startup** (it is listed as `JukeANator` or `GO`). Windows starts Startup folder items a few seconds after the desktop appears.
+
+The `cd /d "%~dp0"` line at the top of `GO.CMD` (see "Building/Running the Application") is required here, because programs started from the Startup folder do not run in the folder that holds the WAR.
+
+## Linux (Mint)
+
+Add `go.sh` to the kiosk account's autostart entries, while signed in as the kiosk account. Either use **Menu**, then **Startup Applications**, click **+**, then **Custom command**, enter the full path to `go.sh` as the command (for example `/home/kiosk/jukeanator/go.sh`; `~` is not expanded here), and set **Startup delay** to 10 seconds. Or create the entry file directly:
+
+```
+mkdir -p ~/.config/autostart
+nano ~/.config/autostart/jukeanator.desktop
+```
+
+```
+[Desktop Entry]
+Type=Application
+Name=JukeANator
+Exec=/home/kiosk/jukeanator/go.sh
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=10
+```
+
+Use the real path to `go.sh` on the `Exec=` line. `go.sh` must be executable (`chmod +x go.sh`). The 10-second delay gives the sound system and the display settings time to start before the application does. The environment variables in `~/.profile` are loaded at sign-in, so the application started this way sees them.
+
+## Verify
+
+Switch the PC off at the wall or cabinet switch, then switch it on again. Without touching anything, it must boot, sign in, and show JukeANator full screen.
 
 # Optional: MySQL database
 
