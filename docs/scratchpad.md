@@ -702,7 +702,7 @@ You’ve fixed the **song/album/artist filtering at the top level**, but the rem
 
 > You are filtering *artists*, but not filtering their *nested albums (and therefore songs)* inside the DTO graph.
 
-So even if an artist has `numPlays > 0`, their `albums → songs` can still include zero-play songs, because `SongLibraryMapper.toArtistDtoList(...)` is likely mapping the full hierarchy blindly.
+So even if an artist has `numPlays > 0`, their `albums -> songs` can still include zero-play songs, because `SongLibraryMapper.toArtistDtoList(...)` is likely mapping the full hierarchy blindly.
 
 ---
 
@@ -733,7 +733,7 @@ You must enforce:
 
 ### Rule:
 
-> If an artist is included → only include albums with plays > 0 → only include songs with plays > 0
+> If an artist is included -> only include albums with plays > 0 -> only include songs with plays > 0
 
 That means filtering must happen **before mapping**, not after.
 
@@ -876,7 +876,7 @@ So the fix is to make the mapper **filter-aware and tree-safe by design**, inste
 
 We introduce a small, reusable filtering pipeline inside `SongLibraryMapper` that guarantees:
 
-> If `numPlays <= 0` → entity never enters DTO graph at any level
+> If `numPlays <= 0` -> entity never enters DTO graph at any level
 
 ---
 
@@ -1062,8 +1062,8 @@ If you want to make this even more bulletproof:
 
 ### Add “raw vs filtered” naming convention
 
-* `toSongDto()` → raw (internal only)
-* `toPopularSongDtoList()` → safe/public
+* `toSongDto()` -> raw (internal only)
+* `toPopularSongDtoList()` -> safe/public
 
 This prevents accidental misuse at compile-time by convention.
 
@@ -1093,8 +1093,8 @@ We split everything into:
 
 ### 2. Projection (how node becomes DTO)
 
-* Song → SongDto
-* Artist → ArtistDto
+* Song -> SongDto
+* Artist -> ArtistDto
 
 ### 3. Traversal (tree walking + pruning)
 

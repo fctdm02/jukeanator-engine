@@ -1,4 +1,4 @@
-spring-boot:build# Read Me First
+# Read Me First
 The following was discovered as part of building this project:
 
 * The original package name 'com.djt.jukeanator-engine' is invalid and this project uses 'com.djt.jukeanator_engine' instead.
@@ -6,7 +6,469 @@ The following was discovered as part of building this project:
 # Building/Running the Application
 ```
 mvn clean package -DskipTests
-java --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar jukeanator-engine-0.0.1-SNAPSHOT.war
+```
+
+Keys and secrets are never put in the launch script. Set them once as permanent environment variables for the account that runs the application, so copies of the script can be shared without exposing them.
+
+Standalone and slave installs need these variables (master mode needs more -- see [Master Mode environment variables](#master-mode-environment-variables)):
+
+- `DISCOGS_CONSUMER_KEY`: Discogs API consumer key (song metadata / internet search)
+- `DISCOGS_CONSUMER_SECRET`: Discogs API consumer secret
+- `JWT_SECRET`: signing key for web login tokens, 32+ random characters (generate one with
+  `openssl rand -base64 48`). If unset, the app still runs but web logins do not survive a restart
+
+A variable only takes effect if the external `application.yml` (in `--app.config-dir`) keeps that property in its `${VARIABLE:default}` form. A literal value written there overrides it.
+
+## Windows
+
+### Step 1: Set the environment variables (once)
+
+In a Command Prompt, run:
+
+```
+setx DISCOGS_CONSUMER_KEY "INSERT_VALUE_HERE"
+setx DISCOGS_CONSUMER_SECRET "INSERT_VALUE_HERE"
+setx JWT_SECRET "INSERT_VALUE_HERE"
+```
+
+This sets them for the current user. To set them for all users instead, run an **Administrator** Command Prompt and add `/M` to each command. The values apply only to programs started afterwards; check one in a new window with `echo %JWT_SECRET%`. They can also be edited in a dialog: `Win+R` -> `rundll32 sysdm.cpl,EditEnvironmentVariables`.
+
+### Step 2: Create GO.CMD
+
+Create `GO.CMD` in the same directory as the WAR and the `jdk-25.0.2` folder:
+
+```
+set path=jdk-25.0.2\bin;%PATH%
+set classpath=.;
+java --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar jukeanator-engine-0.0.1-SNAPSHOT.war --app.config-dir=C:\kiosk\config --app.data-dir=C:\kiosk\data
+```
+
+## Linux (Mint)
+
+### Step 1: Set the environment variables (once)
+
+Open `~/.profile` in a text editor (`nano ~/.profile`) and add at the end:
+
+```
+# JukeANator
+export DISCOGS_CONSUMER_KEY="INSERT_VALUE_HERE"
+export DISCOGS_CONSUMER_SECRET="INSERT_VALUE_HERE"
+export JWT_SECRET="INSERT_VALUE_HERE"
+```
+
+Then run `chmod 600 ~/.profile` so other accounts cannot read it, and log out and back in. Check one in a new terminal with `echo "$JWT_SECRET"`. (Use an editor rather than `echo ... >> ~/.profile`, which leaves the secret in the shell history. If the app runs as a systemd service, put the same lines without `export` in a `chmod 600` file and reference it with `EnvironmentFile=` in the unit.)
+
+### Step 2: Create go.sh
+
+Create `go.sh` in the same directory as the WAR and the `jdk-25.0.2` folder:
+
+```
+#!/usr/bin/env bash
+# One-time step to make this script executable:  chmod +x go.sh
+# Then launch it with:                           ./go.sh
+
+# Run from the directory containing this script (and the WAR / JDK)
+cd "$(dirname "$0")"
+
+export PATH="$PWD/jdk-25.0.2/bin:$PATH"
+exec java --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 -jar jukeanator-engine-0.0.1-SNAPSHOT.war --app.config-dir="$HOME/kiosk/config" --app.data-dir="$HOME/kiosk/data"
+```
+
+Then make it executable with `chmod +x go.sh`.
+
+# Prerequisite: Java 25
+
+The application needs a **Java 25** runtime (64-bit). The instructions below install Eclipse Temurin 25, a free OpenJDK build from Adoptium. A full JRE is needed, not a "headless" one, because the kiosk UI uses Swing.
+
+There are two ways to provide Java:
+
+- **Installed Java (described below):** install Java 25 once and make it the default. Then remove the `set path=jdk-25.0.2\bin;%PATH%` line from `GO.CMD`, or the `export PATH="$PWD/jdk-25.0.2/bin:$PATH"` line from `go.sh`.
+- **Bundled JDK:** unzip a JDK 25 into a `jdk-25.0.2` folder next to the WAR and keep those lines in the scripts. Nothing has to be installed or made the default.
+
+## Windows
+
+### Step 1: Download
+
+Open https://adoptium.net/temurin/releases/?version=25 and choose **Operating System:** Windows, **Architecture:** x64, **Package Type:** JRE. Download the **.msi** installer.
+
+### Step 2: Install
+
+Run the `.msi`. On the **Custom Setup** page, make sure these features are set to **Will be installed on local hard drive**:
+
+- **Add to PATH**
+- **Set JAVA_HOME variable** (off by default)
+- **Associate .jar** (optional)
+
+Finish the installer. It installs to `C:\Program Files\Eclipse Adoptium\jre-25...`.
+
+### Step 3: Make it the default and verify
+
+Open a **new** Command Prompt and run:
+
+```
+java -version
+where java
+```
+
+`java -version` must report version 25. If it reports an older version, another Java is earlier in the `PATH`. `where java` lists them in the order Windows uses them. To fix it, press `Win+R`, run `rundll32 sysdm.cpl,EditEnvironmentVariables`, select **Path** under **System variables**, click **Edit**, and move the `Eclipse Adoptium\jre-25...\bin` entry to the top with **Move Up**. Also check that `JAVA_HOME` points to the Temurin 25 folder (without `\bin`). Open a new Command Prompt and check again.
+
+## Linux (Mint)
+
+### Step 1: Add the Adoptium package repository
+
+Mint is based on Ubuntu, and the Adoptium repository is organised by Ubuntu release name, so these commands read the Ubuntu codename from `/etc/os-release` (for example `noble` on Mint 22):
+
+```
+sudo apt install -y wget apt-transport-https gpg
+wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
+echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^UBUNTU_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
+```
+
+### Step 2: Install
+
+```
+sudo apt update
+sudo apt install temurin-25-jre
+```
+
+(Ubuntu's own `openjdk-25-jre` package also works where the Mint release provides it. Check with `apt-cache policy openjdk-25-jre`.)
+
+### Step 3: Make it the default
+
+If more than one Java is installed, choose Java 25 as the system default. The command lists every installed Java; type the number of the `temurin-25` entry and press Enter:
+
+```
+sudo update-alternatives --config java
+```
+
+To set `JAVA_HOME` as well, find the install folder:
+
+```
+ls /usr/lib/jvm
+```
+
+Then add this line to `~/.profile` (as with the other environment variables), using the folder name shown, and log out and back in:
+
+```
+export JAVA_HOME=/usr/lib/jvm/temurin-25-jre-amd64
+```
+
+### Step 4: Verify
+
+```
+java -version
+readlink -f "$(which java)"
+```
+
+`java -version` must report version 25, and the second command shows which installation is being used.
+
+# Prerequisite: media player
+
+The application needs a media player installed before it can play songs. It is chosen with `song-player.player-type` in the external `application.yml`:
+
+- `vlc` or `detached-vlc`: VLC media player, on any operating system. The application drives VLC through its libraries (vlcj), so VLC 3.x must be installed with the same bitness as the JDK (64-bit).
+- `winamp`: Winamp, Windows only. `song-player.winamp-exe-path` must point to `winamp.exe`.
+
+The bundled default is `winamp`. On Linux, change it to `vlc`, otherwise no song plays.
+
+## Windows
+
+### VLC
+
+1. Download the **64-bit** Windows installer of VLC 3.x from https://www.videolan.org/vlc/ (the 32-bit build cannot be loaded by a 64-bit JDK).
+2. Run the installer with the default options, which install to `C:\Program Files\VideoLAN\VLC`, where the application finds it automatically.
+
+Then, in `application.yml`, set:
+
+```
+song-player:
+  player-type: vlc
+```
+
+### Winamp
+
+1. Download the Winamp installer from https://www.winamp.com/ and run it with the default options. It installs to `C:\Program Files (x86)\Winamp`.
+2. Start Winamp once, finish any first-run prompts, then close it.
+
+Then, in `application.yml`, set (the path only needs changing if Winamp was installed elsewhere):
+
+```
+song-player:
+  player-type: winamp
+  winamp-exe-path: C:\\Program Files (x86)\\Winamp\\winamp.exe
+```
+
+## Linux (Mint)
+
+Install VLC from the Mint repositories (not the Flatpak or Snap version: those are sandboxed and their libraries cannot be loaded by the application):
+
+```
+sudo apt update
+sudo apt install vlc
+```
+
+Check it with `vlc --version` (it should report 3.x). Then, in `application.yml`, set:
+
+```
+song-player:
+  player-type: vlc
+```
+
+# ELO ET2002L touchscreen
+
+The ET2002L is a 20" Elo desktop touch monitor. Its touch controller connects to the PC with either a **USB** cable or a **serial** (RS-232, 9-pin) cable; dual-interface controllers switch to USB only when a USB cable is plugged in. Connect only one of the two.
+
+- **USB:** the screen appears as a standard HID touch device. No Elo driver is needed on Windows or Linux Mint.
+- **Serial:** the operating system cannot detect it by itself. On Windows the Elo serial driver is required; on Linux Mint either the built-in kernel driver (recommended below) or the Elo Linux serial driver is used.
+
+Connect the monitor's video cable as well, and make the touchscreen the primary display if the PC has more than one.
+
+## Windows
+
+### USB
+
+1. Plug in the USB cable. Windows installs its built-in touch driver within a few seconds.
+2. If touches land in the wrong place, open **Control Panel**, then **Tablet PC Settings**, and click **Calibrate**. On a PC with two monitors, click **Setup** there first and tap the touchscreen when asked, so Windows knows which display it belongs to.
+
+### Serial
+
+1. Download the Elo **Windows serial touch driver** from Elo's support site, https://elosupport.elotouch.com/ (search for "Windows touch driver"), choosing the build for your Windows version.
+2. Run the installer, choose **Serial** as the interface, and pick the COM port the cable is plugged into (usually COM1). The controller always runs at 9600 baud.
+3. Reboot when prompted.
+4. Run the **Elo Config** utility the driver installs, and use its **Align** (calibration) function: tap each target as it appears.
+
+## Linux (Mint)
+
+These steps assume the default Cinnamon desktop on X11. Install the tools used below once:
+
+```
+sudo apt update
+sudo apt install xinput xinput-calibrator xserver-xorg-input-evdev evtest
+```
+
+### Step 1: Connect the touch controller
+
+**USB:** plug in the USB cable and check that the kernel found it (Elo's USB vendor id is `04e7`):
+
+```
+lsusb | grep -i 04e7
+```
+
+Tapping the screen should already move the mouse pointer. Skip to Step 2.
+
+**Serial:** the kernel's `elo` driver handles Elo serial controllers but has to be attached to the serial port. Find the port (usually `/dev/ttyS0`; a USB-to-serial adapter shows up as `/dev/ttyUSB0`):
+
+```
+sudo dmesg | grep -i tty
+```
+
+Install `inputattach` and test the connection (stop it with `Ctrl+C` afterwards):
+
+```
+sudo apt install inputattach
+sudo inputattach --elotouch /dev/ttyS0
+```
+
+While it runs, tapping the screen should move the pointer. If nothing happens, try the other Elo protocols: `--elo4b`, `--elo6b` or `--elo3b` in place of `--elotouch`.
+
+To attach it automatically at every boot, create a systemd service:
+
+```
+sudo nano /etc/systemd/system/elo-touch.service
+```
+
+```
+[Unit]
+Description=Elo serial touchscreen
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/inputattach --elotouch /dev/ttyS0
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Use the port and protocol option that worked in the test, then enable and start it:
+
+```
+sudo systemctl enable --now elo-touch.service
+```
+
+(Alternatively, Elo publishes its own Linux serial driver with a calibration tool: see Elo's Linux driver downloads at https://elosupport.elotouch.com/hc/en-us/articles/33699338540183-Linux-Touch-Drivers and follow the installation instructions included with it. Use either that driver or `inputattach`, not both.)
+
+### Step 2: Check the device name
+
+```
+xinput list
+```
+
+Note the name of the Elo entry (for example `Elo TouchSystems ...` or `Elo Serial TouchScreen`). If the screen does not respond at all, `sudo evtest` lists the input devices and shows whether touches arrive.
+
+### Step 3: Use the evdev driver for the touchscreen
+
+Mint's default input driver ignores the calibration that `xinput_calibrator` produces, so assign the touchscreen to the `evdev` driver instead:
+
+```
+sudo mkdir -p /etc/X11/xorg.conf.d
+sudo nano /etc/X11/xorg.conf.d/99-elo-touch.conf
+```
+
+```
+Section "InputClass"
+    Identifier "Elo touchscreen"
+    MatchProduct "Elo"
+    MatchDevicePath "/dev/input/event*"
+    Driver "evdev"
+EndSection
+```
+
+Log out and back in (or reboot).
+
+### Step 4: Calibrate
+
+```
+xinput_calibrator
+```
+
+Tap each of the four targets as it appears. When it finishes, the tool prints a `Section "InputClass" ... EndSection` block. Add the `Option "Calibration" ...` line it prints (and `Option "SwapAxes" ...` if it prints one) to the block in `/etc/X11/xorg.conf.d/99-elo-touch.conf`, so it reads for example:
+
+```
+Section "InputClass"
+    Identifier "Elo touchscreen"
+    MatchProduct "Elo"
+    MatchDevicePath "/dev/input/event*"
+    Driver "evdev"
+    Option "Calibration" "3929 167 3864 185"
+    Option "SwapAxes" "0"
+EndSection
+```
+
+Log out and back in (or reboot); the calibration then applies at every login. If the X or Y direction is reversed, add `Option "InvertX" "on"` or `Option "InvertY" "on"`, or rerun `xinput_calibrator`.
+
+### Step 5: Two monitors (only if the PC has more than one display)
+
+Touches are spread over all displays until the touchscreen is tied to its own output. Find the output name (for example `HDMI-1`):
+
+```
+xrandr --listmonitors
+```
+
+Then map the touch device to it, using the device name from Step 2:
+
+```
+xinput map-to-output "Elo TouchSystems ..." HDMI-1
+```
+
+This lasts until logout. To apply it at every login, add the same command in **Menu**, then **Startup Applications** (click **+**, then **Custom command**, and set a delay of a few seconds).
+
+# Optional: MySQL database
+
+By default the application stores its data as files under `--app.data-dir` (`app.repository-type: filesystem`). It can store it in MySQL instead (`app.repository-type: jpa`); master mode always uses MySQL. MySQL 8.0 or later is required (the schema uses the `utf8mb4_0900_ai_ci` collation); 8.4 LTS is recommended.
+
+The application creates and updates its tables itself (Flyway, on startup), so only an empty database and a user are needed. It does not copy existing filesystem data into MySQL: after switching, the database starts empty.
+
+## Windows
+
+### Step 1: Download
+
+Open https://dev.mysql.com/downloads/mysql/ , select version **8.4 LTS** and **Microsoft Windows**, and download the **MSI Installer** (x64). The "No thanks, just start my download" link skips the Oracle account sign-up.
+
+### Step 2: Install and configure
+
+Run the `.msi` and choose the **Typical** setup. At the end, leave **Run MySQL Configurator** ticked and click **Finish**. In the configurator:
+
+- **Type and Networking:** keep **Development Computer** (or **Server Computer** for a master), port **3306**.
+- **Accounts and Roles:** set a strong password for the MySQL `root` account and keep it somewhere safe.
+- **Windows Service:** keep **Configure MySQL Server as a Windows Service** and **Start the MySQL Server at System Startup** ticked.
+- Click **Execute**, then **Finish**.
+
+### Step 3: Create the database and user
+
+Open **MySQL 8.4 Command Line Client** from the Start menu, enter the `root` password, and run (choose your own password in place of `INSERT_VALUE_HERE`):
+
+```
+CREATE DATABASE IF NOT EXISTS jukeanator CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER IF NOT EXISTS 'jukeanator'@'localhost' IDENTIFIED BY 'INSERT_VALUE_HERE';
+GRANT ALL PRIVILEGES ON jukeanator.* TO 'jukeanator'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+### Step 4: Set the password environment variable
+
+In a Command Prompt, set the same password, then open a new Command Prompt (as in Step 1 of "Building/Running the Application"):
+
+```
+setx DB_PASSWORD "INSERT_VALUE_HERE"
+```
+
+`DB_URL` (default `jdbc:mysql://localhost:3306/jukeanator`) and `DB_USERNAME` (default `jukeanator`) only need setting if MySQL runs on another host or port, or a different database or user name is used.
+
+## Linux (Mint)
+
+### Step 1: Install
+
+```
+sudo apt update
+sudo apt install mysql-server
+```
+
+The service starts automatically and is enabled at boot. Check it with `systemctl status mysql`.
+
+### Step 2: Secure the installation
+
+```
+sudo mysql_secure_installation
+```
+
+Answer **Y** to removing anonymous users, disallowing remote root login, and removing the test database. On Mint, the MySQL `root` account signs in through `sudo` rather than a password.
+
+### Step 3: Create the database and user
+
+Open the MySQL prompt:
+
+```
+sudo mysql
+```
+
+and run (choose your own password in place of `INSERT_VALUE_HERE`):
+
+```
+CREATE DATABASE IF NOT EXISTS jukeanator CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER IF NOT EXISTS 'jukeanator'@'localhost' IDENTIFIED BY 'INSERT_VALUE_HERE';
+GRANT ALL PRIVILEGES ON jukeanator.* TO 'jukeanator'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+### Step 4: Set the password environment variable
+
+Add this line to `~/.profile` with the same password, then log out and back in (as in Step 1 of "Building/Running the Application"):
+
+```
+export DB_PASSWORD="INSERT_VALUE_HERE"
+```
+
+`DB_URL` (default `jdbc:mysql://localhost:3306/jukeanator`) and `DB_USERNAME` (default `jukeanator`) only need setting if MySQL runs on another host or port, or a different database or user name is used.
+
+## Switch the application to MySQL
+
+In the external `application.yml` (in `--app.config-dir`), set:
+
+```
+app:
+  repository-type: jpa
+```
+
+Restart the application. On the first start it creates the tables; the log shows Flyway applying `V1__init_schema`. To go back to file storage, set `repository-type: filesystem` again.
+
+To check the connection without the application, sign in as the new user and list the tables (after the first start). On Windows, run it from `C:\Program Files\MySQL\MySQL Server 8.4\bin`:
+
+```
+mysql -u jukeanator -p jukeanator -e "SHOW TABLES;"
 ```
 
 # To Start for Claude Code
@@ -38,6 +500,65 @@ mvn test -Pgui-tests
 ```
 
 # Master Mode
+
+## Master Mode environment variables
+
+Set these permanently, the same way as the standalone/slave variables (step 1 under [Windows](#windows) or [Linux (Mint)](#linux-mint)). Variables shown with a default fall back to it when unset; the ones marked **required** have no usable default for a production master.
+
+- `DISCOGS_CONSUMER_KEY` (default `dummy`): **Required.** Discogs API consumer key
+- `DISCOGS_CONSUMER_SECRET` (default `dummy`): **Required.** Discogs API consumer secret
+- `JWT_SECRET` (default blank: random key per run): **Required.** Signing key for web login
+  tokens, 32+ random characters. When unset, every restart signs out all web users and tokens from
+  other instances / `GeneratePostmanJwtToken` are rejected
+- `DB_URL` (default `jdbc:mysql://localhost:3306/jukeanator`): JDBC URL of the MySQL database
+- `DB_USERNAME` (default `jukeanator`): MySQL user
+- `DB_PASSWORD` (default `password`): **Required.** MySQL password -- never leave the default in
+  production
+- `DB_DRIVER` (default `com.mysql.cj.jdbc.Driver`): JDBC driver class (normally left unset)
+- `SMTP_HOST` (default `smtp.gmail.com`): outbound mail server
+- `SMTP_PORT` (default `587`): outbound mail port (STARTTLS)
+- `SMTP_USERNAME` (default blank): **Required.** SMTP login
+- `SMTP_PASSWORD` (default blank): **Required.** SMTP password (for Gmail, an app password)
+- `MAIL_FROM_ADDRESS` (default `receipt.from-address`, then the built-in address): sender address
+  for verification emails, receipts and Financial Ledger summaries
+- `BRAINTREE_MERCHANT_ID` (default blank): **Required.** Braintree merchant ID
+- `BRAINTREE_PUBLIC_KEY` (default blank): **Required.** Braintree public key
+- `BRAINTREE_PRIVATE_KEY` (default blank): **Required.** Braintree private key
+
+The database variables apply whenever `app.repository-type` is `jpa`. The Braintree keys must match `braintree.environment` in `application.yml` (`sandbox` or `production`), which is set there rather than through an environment variable.
+
+Windows example (one `setx` per variable, then open a new Command Prompt):
+
+```
+setx JWT_SECRET "INSERT_VALUE_HERE"
+setx DB_PASSWORD "INSERT_VALUE_HERE"
+setx SMTP_USERNAME "INSERT_VALUE_HERE"
+setx SMTP_PASSWORD "INSERT_VALUE_HERE"
+setx BRAINTREE_MERCHANT_ID "INSERT_VALUE_HERE"
+setx BRAINTREE_PUBLIC_KEY "INSERT_VALUE_HERE"
+setx BRAINTREE_PRIVATE_KEY "INSERT_VALUE_HERE"
+```
+
+Linux example (append to `~/.profile`, keep it `chmod 600`, then log out and back in):
+
+```
+# JukeANator (master mode)
+export JWT_SECRET="INSERT_VALUE_HERE"
+export DB_URL="jdbc:mysql://localhost:3306/jukeanator"
+export DB_USERNAME="jukeanator"
+export DB_PASSWORD="INSERT_VALUE_HERE"
+export SMTP_HOST="smtp.gmail.com"
+export SMTP_PORT="587"
+export SMTP_USERNAME="INSERT_VALUE_HERE"
+export SMTP_PASSWORD="INSERT_VALUE_HERE"
+export MAIL_FROM_ADDRESS="INSERT_VALUE_HERE"
+export BRAINTREE_MERCHANT_ID="INSERT_VALUE_HERE"
+export BRAINTREE_PUBLIC_KEY="INSERT_VALUE_HERE"
+export BRAINTREE_PRIVATE_KEY="INSERT_VALUE_HERE"
+```
+
+## MySQL setup
+
 Setting up MySQL database for first time use:
 
 ```

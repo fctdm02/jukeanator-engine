@@ -95,8 +95,8 @@ With `credit-card-cost-multiplier: 1.5`, the card reader gives $5 = 12, $10 = 27
   - `validate()`, which stops startup on an empty list, or a package with a blank or duplicate id, a missing or zero price, zero credits, or negative bonus credits.
 - **`UserServiceImpl`** now sells whatever `setCreditPackages()` was given. `AppConfig` sets it from `add-funds.packages` when the bean is created.
 - **New package contents.** The total of each package is now even:
-  - $7: 12 + 1 → **12 + 2** = 14 credits
-  - $14: 24 + 7 → **24 + 8** = 32 credits
+  - $7: 12 + 1 -> **12 + 2** = 14 credits
+  - $14: 24 + 7 -> **24 + 8** = 32 credits
   - $28: 48 + 24 = 72 credits (unchanged)
 - **Package ids are unchanged** (`pkg-7`, `pkg-14`, `pkg-28`). Each purchase record (`UserAddFundsTransactionEntity`) already stores the credits, bonus and price at the time of sale, so past purchases stay accurate when a package's contents change. Keeping the ids also means a browser that loaded the Add Funds screen before an update can still complete its purchase.
 - **New startup check, `domain/user/service/PricingStartupCheck`** (an `ApplicationRunner` registered in `AppConfig`). It only logs and never stops startup:

@@ -85,14 +85,14 @@ Check these colors against the tag on your cable first. If anything differs, sto
 
 The numbered circles match the steps below. Every connection, one line each:
 
-- **Adapter +** → RED lever nut, together with both **Nayax red** wires and one end of the **red jumper**.
-- **Adapter −** → BLACK lever nut, together with both **Nayax black** wires.
-- **Red jumper** (other end) → relay **A1 (+)**.
-- **Nayax green** (the pulse wire) → relay **A2 (−)**.
-- Relay **11 (COM)** → KE-18 **GND** (the same GND your bill acceptor uses), with a white wire.
-- Relay **14 (NO)** → a **spare KE-18 input**, with a yellow wire.
-- Relay **12 (NC)** → nothing.
-- Every other Nayax wire → capped alone in its own small lever nut.
+- **Adapter +** -> RED lever nut, together with both **Nayax red** wires and one end of the **red jumper**.
+- **Adapter −** -> BLACK lever nut, together with both **Nayax black** wires.
+- **Red jumper** (other end) -> relay **A1 (+)**.
+- **Nayax green** (the pulse wire) -> relay **A2 (−)**.
+- Relay **11 (COM)** -> KE-18 **GND** (the same GND your bill acceptor uses), with a white wire.
+- Relay **14 (NO)** -> a **spare KE-18 input**, with a yellow wire.
+- Relay **12 (NC)** -> nothing.
+- Every other Nayax wire -> capped alone in its own small lever nut.
 
 **What the relay coil is:** A1 and A2 are the two ends of a tiny electromagnet inside the relay. A1 gets 12 V all the time through the red jumper. When a $1 charge is approved, the Nayax connects the green wire to ground for 0.1 second. That turns the magnet on, the relay clicks and its light flashes, and the click closes the switch between 11 and 14, just like pressing a button. The KE-18 sees that "button press" and types one `b`.
 
@@ -129,8 +129,8 @@ Keep the adapter **unplugged** unless a step says otherwise. Build it on a table
 **5. Connect the relay switch to the KE-18**
 
 Copy how your bill acceptor is wired: one wire goes to an input, one to ground.
-1. Relay **11 (COM)** → a KE-18 **GND** terminal.
-2. Relay **14 (NO)** → an **unused KE-18 input**. Write down its number.
+1. Relay **11 (COM)** -> a KE-18 **GND** terminal.
+2. Relay **14 (NO)** -> an **unused KE-18 input**. Write down its number.
 3. Leave relay **12** empty.
 
 **6. Meter check (adapter unplugged)**
@@ -201,7 +201,7 @@ Open the file in Notepad and search for `Pulse Title`.
 ### Why each one matters to the app
 
 - **One pulse = $1** (`Credit per Pulse 1` = `100`, with `Decimal Place` `2` and `USD`). The app adds one dollar's worth of credits and writes one ledger entry for each pulse. Any other value credits the wrong amount and puts the wrong card total in the owner's split.
-- **The price buttons** (`Multiple Price → Price List`, `Pulse Increment` = `5,10,15,20`). These must match `KioskCreditMath.CARD_READER_PRICE_DOLLARS` in the code. An amount that isn't on the list would still be credited correctly, pulse by pulse, but the button titles and the startup price check only cover these four amounts.
+- **The price buttons** (`Multiple Price -> Price List`, `Pulse Increment` = `5,10,15,20`). These must match `KioskCreditMath.CARD_READER_PRICE_DOLLARS` in the code. An amount that isn't on the list would still be credited correctly, pulse by pulse, but the button titles and the startup price check only cover these four amounts.
 - **Pulse timing** (`Active` 100 ms, `Inactive` 150 ms). The KE-18 needs each pulse long enough to register one `b`. The app treats a purchase as finished after 1.5 s with no pulse, so the gap between pulses must stay well under that, or one purchase shows up as several "thank you" messages.
 - **Button titles** (`Pulse Title 1-6`). The credit amounts come from the app's pricing settings, so this is the setting most likely to go out of date (see "When to update the reader again" below).
 - **Inhibit off and no invert** (`Pulse Inhibit` = `0`, `Pulse Invert` at its default). The purple Inhibit wire isn't connected, and a pulse must pull the green wire down for the relay to click.
@@ -209,11 +209,11 @@ Open the file in Notepad and search for `Pulse Title`.
 
 ### How to apply them yourself
 
-1. Sign in to Nayax Core and go to **Operations → Machines → *your machine* → General → Pulse/ccTalk**.
-2. Run the **Pulse Wizard** to put the reader in pulse mode, and choose **Multiple Price → Price List**.
+1. Sign in to Nayax Core and go to **Operations -> Machines -> *your machine* -> General -> Pulse/ccTalk**.
+2. Run the **Pulse Wizard** to put the reader in pulse mode, and choose **Multiple Price -> Price List**.
 3. Enter the settings above and save.
-4. Run **Actions → Update Queue**, then **Actions → Restart Device**. The reader downloads the settings over its cellular connection and restarts.
-5. If the reader's screen doesn't change, run **Reset Default Parameters → Reload Configuration → Restart Device**.
+4. Run **Actions -> Update Queue**, then **Actions -> Restart Device**. The reader downloads the settings over its cellular connection and restarts.
+5. If the reader's screen doesn't change, run **Reset Default Parameters -> Reload Configuration -> Restart Device**.
 
 Before any of this, the reader must be activated in Nayax Core: linked to a machine and to your merchant account. Your Nayax distributor normally does that during setup, and they can also enter the pulse settings for you (see "What to ask Nayax support" below).
 
@@ -234,7 +234,7 @@ Before calling, have ready:
 Then ask, in this order:
 
 1. **Activation.** "Please activate this VPOS Touch, link it to a machine for this location, and connect it to my merchant account so it can take card payments."
-2. **Mode and cable.** "Set it to **Pulse** mode for the standard pulse cable, **C13003**, using **Pulse 1** on the green wire. Use **Multiple Price → Price List**."
+2. **Mode and cable.** "Set it to **Pulse** mode for the standard pulse cable, **C13003**, using **Pulse 1** on the green wire. Use **Multiple Price -> Price List**."
 3. **The values.** Read them the list:
    - Decimal Place `2`, Currency `USD`
    - Credit per Pulse 1: `100` (one pulse per dollar)

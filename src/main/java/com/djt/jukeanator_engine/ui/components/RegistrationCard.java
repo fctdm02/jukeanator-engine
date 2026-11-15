@@ -79,6 +79,8 @@ public class RegistrationCard extends JPanel {
   private JLabel passcodeLabel;
   private JLabel locationLabel;
   private JLabel messageLabel;
+  private boolean passcodeRevealed = false;
+  private PasswordPeekButton passcodePeek;
   private JButton submitButton;
   private final JPanel center = new JPanel(new GridBagLayout());
   private JPanel formPanel;
@@ -322,9 +324,30 @@ public class RegistrationCard extends JPanel {
     });
 
     row.add(captionLabel, BorderLayout.WEST);
-    row.add(value, BorderLayout.CENTER);
+    if (field == Field.PASSCODE) {
+      // Passcode field + peek together span the same width as the other fields
+      JPanel valueWithPeek = new JPanel(new BorderLayout(8, 0));
+      valueWithPeek.setOpaque(false);
+      valueWithPeek.add(value, BorderLayout.CENTER);
+      valueWithPeek.add(buildPasscodePeek(), BorderLayout.EAST);
+      row.add(valueWithPeek, BorderLayout.CENTER);
+    } else {
+      row.add(value, BorderLayout.CENTER);
+    }
     parent.add(row);
     return value;
+  }
+
+  /** Eye icon beside the passcode field; see {@link PasswordPeekButton}. */
+  private PasswordPeekButton buildPasscodePeek() {
+    passcodePeek = new PasswordPeekButton(revealed -> {
+      passcodeRevealed = revealed;
+      syncLabels();
+    }, null);
+    passcodePeek.setName(UiComponentNames.REGISTRATION_PASSCODE_PEEK);
+    passcodePeek.setPreferredSize(
+        new Dimension(LayoutTheme.get().loginFieldH, LayoutTheme.get().loginFieldH));
+    return passcodePeek;
   }
 
   private JButton actionButton(String text, Runnable action) {
@@ -445,6 +468,9 @@ public class RegistrationCard extends JPanel {
 
   private void finish(String reason) {
     log.info("Registration screen closed: {}", reason);
+    if (passcodePeek != null) {
+      passcodePeek.conceal();
+    }
     physicalKeyboard.uninstall();
     onDone.run();
   }
@@ -491,7 +517,9 @@ public class RegistrationCard extends JPanel {
   private void syncLabels() {
     setField(emailLabel, email.toString(), activeField == Field.EMAIL);
     if (passcodeLabel != null) {
-      setField(passcodeLabel, "•".repeat(passcode.length()), activeField == Field.PASSCODE);
+      // Masked with bullets unless the peek icon is revealing it
+      String shown = passcodeRevealed ? passcode.toString() : "•".repeat(passcode.length());
+      setField(passcodeLabel, shown, activeField == Field.PASSCODE);
     }
     setField(locationLabel, location.toString(), activeField == Field.LOCATION);
   }

@@ -101,6 +101,7 @@ public final class UiComponentNames {
   // ── LoginToAdminPanelCard ───────────────────────────────────────────────────
   public static final String LOGIN_USERNAME_FIELD = "LoginToAdminPanelCard.usernameField";
   public static final String LOGIN_PASSWORD_FIELD = "LoginToAdminPanelCard.passwordField";
+  public static final String LOGIN_PASSWORD_PEEK = "LoginToAdminPanelCard.passwordPeek";
   public static final String LOGIN_LOGIN_BUTTON = "LoginToAdminPanelCard.loginButton";
   public static final String LOGIN_CANCEL_BUTTON = "LoginToAdminPanelCard.cancelButton";
   public static final String LOGIN_ERROR_LABEL = "LoginToAdminPanelCard.errorLabel";
@@ -177,6 +178,8 @@ public final class UiComponentNames {
   public static final String ADMIN_USER_LAST_NAME_FIELD = "AdminPanel.addAdminUser.lastNameField";
   public static final String ADMIN_USER_EMAIL_FIELD = "AdminPanel.addAdminUser.emailField";
   public static final String ADMIN_USER_PASSWORD_FIELD = "AdminPanel.addAdminUser.passwordField";
+  public static final String REGISTRATION_PASSCODE_PEEK = "RegistrationCard.passcodePeek";
+  public static final String ADMIN_USER_PASSWORD_PEEK = "AdminPanel.addAdminUser.passwordPeek";
   public static final String ADMIN_USER_ERROR_LABEL = "AdminPanel.addAdminUser.errorLabel";
   public static final String ADMIN_USER_CREATE_BUTTON = "AdminPanel.addAdminUser.createButton";
   public static final String ADMIN_LOCATION_NAME_FIELD = "AdminPanel.editLocationInfo.nameField";

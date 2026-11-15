@@ -59,6 +59,10 @@ public class LoginToAdminPanelCard extends JPanel {
   private JLabel passwordLabel;
   private JLabel errorLabel;
 
+  // ── Password peek ─────────────────────────────────────────────────────────
+  private boolean passwordRevealed = false;
+  private PasswordPeekButton peekIcon;
+
   private int secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
   private Timer countdownTimer;
   private final JLabel timeoutLabel = new JLabel();
@@ -143,6 +147,7 @@ public class LoginToAdminPanelCard extends JPanel {
   /** Must be called when the card is removed from view so the timer doesn't leak. */
   public void dismiss() {
     countdownTimer.stop();
+    hidePassword();
   }
 
   /**
@@ -151,6 +156,7 @@ public class LoginToAdminPanelCard extends JPanel {
    */
   private void cancel() {
     countdownTimer.stop();
+    hidePassword();
     onDismiss.run();
   }
 
@@ -275,9 +281,19 @@ public class LoginToAdminPanelCard extends JPanel {
       }
     });
 
+    row.add(caption, BorderLayout.WEST);
+
     if (isPassword) {
       passwordLabel = field;
       field.setName(UiComponentNames.LOGIN_PASSWORD_FIELD);
+
+      // Field plus the peek icon on its right edge
+      JPanel fieldWithPeek = new JPanel(new BorderLayout(8, 0));
+      fieldWithPeek.setOpaque(false);
+      fieldWithPeek.add(field, BorderLayout.CENTER);
+      fieldWithPeek.add(buildPeekIcon(), BorderLayout.EAST);
+      row.add(fieldWithPeek, BorderLayout.CENTER);
+      return row;
     } else {
       usernameLabel = field;
       field.setName(UiComponentNames.LOGIN_USERNAME_FIELD);
@@ -287,9 +303,34 @@ public class LoginToAdminPanelCard extends JPanel {
           BorderFactory.createEmptyBorder(8, 12, 8, 12)));
     }
 
-    row.add(caption, BorderLayout.WEST);
     row.add(field, BorderLayout.CENTER);
     return row;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PASSWORD PEEK
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Builds the eye icon beside the password field; see {@link PasswordPeekButton}. */
+  private PasswordPeekButton buildPeekIcon() {
+    peekIcon = new PasswordPeekButton(revealed -> {
+      passwordRevealed = revealed;
+      syncLabels();
+    }, () -> {
+      // Reset timeout on interaction
+      secondsRemaining = LayoutTheme.get().overlayTimeoutSeconds;
+      updateTimeout();
+    });
+    peekIcon.setName(UiComponentNames.LOGIN_PASSWORD_PEEK);
+    peekIcon.setPreferredSize(
+        new Dimension(LayoutTheme.get().loginFieldH, LayoutTheme.get().loginFieldH));
+    return peekIcon;
+  }
+
+  /** Masks the password again if the peek icon is currently revealing it. */
+  private void hidePassword() {
+    if (peekIcon != null)
+      peekIcon.conceal();
   }
 
   /** Login / Cancel buttons and error label row. */
@@ -409,6 +450,7 @@ public class LoginToAdminPanelCard extends JPanel {
           .authenticateForAdminPanel(new AuthenticateForAdminPanelRequest(username, password));
       if (Boolean.TRUE.equals(result)) {
         countdownTimer.stop();
+        hidePassword();
         onSuccess.run();
       } else {
         errorLabel.setText("Invalid credentials. Please try again.");
@@ -416,6 +458,7 @@ public class LoginToAdminPanelCard extends JPanel {
         // keyboard to its default state, and send focus back to username.
         usernameBuffer.setLength(0);
         passwordBuffer.setLength(0);
+        hidePassword();
         syncLabels();
         keyboardPanel.resetMode();
         activeField = ActiveField.USERNAME;
@@ -452,9 +495,10 @@ public class LoginToAdminPanelCard extends JPanel {
       usernameLabel.setText(u.isEmpty() ? " " : u);
     }
     if (passwordLabel != null) {
-      // Mask password with bullets
-      String mask = "•".repeat(passwordBuffer.length());
-      passwordLabel.setText(mask.isEmpty() ? " " : mask);
+      // Mask password with bullets unless the peek icon is revealing it
+      String shown =
+          passwordRevealed ? passwordBuffer.toString() : "•".repeat(passwordBuffer.length());
+      passwordLabel.setText(shown.isEmpty() ? " " : shown);
     }
   }
 

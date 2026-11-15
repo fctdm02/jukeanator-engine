@@ -60,6 +60,16 @@ public class JukeANatorUserInterfaceProperties {
   // look and feel's normal (mouse-sized) scroll bar.
   private boolean useBigScrollbars = true;
 
+  //
+  // MOUSE POINTER
+  //
+  // If true, the mouse pointer is hidden inside the JFC/Swing kiosk window (for touch screens).
+  private boolean hideMousePointer = false;
+  // If true, a small translucent circle appears where the screen is touched (pressed), like the
+  // touch feedback Windows shows for USB touch screens. Meant for legacy serial touch screens
+  // whose driver only emulates a mouse.
+  private boolean touchIndicator = false;
+
 
   
   public boolean isAlwaysOnTop() {
@@ -204,5 +214,21 @@ public class JukeANatorUserInterfaceProperties {
 
   public void setUseBigScrollbars(boolean useBigScrollbars) {
     this.useBigScrollbars = useBigScrollbars;
+  }
+
+  public boolean isHideMousePointer() {
+    return hideMousePointer;
+  }
+
+  public void setHideMousePointer(boolean hideMousePointer) {
+    this.hideMousePointer = hideMousePointer;
+  }
+
+  public boolean isTouchIndicator() {
+    return touchIndicator;
+  }
+
+  public void setTouchIndicator(boolean touchIndicator) {
+    this.touchIndicator = touchIndicator;
   }
 }

@@ -61,8 +61,9 @@ each is a separate host, there's no port clash to avoid:
   LAN address, e.g. `http://192.168.1.50:8080` (use the IP/hostname you noted in step 0 --
   `localhost` here would point the slave at itself). Also point its song-player root folder at a
   small test music folder. `location-id`/`location-api-key` are filled in at step 3.
-- [ ] Both configs carry the **same** `app.jwt.secret` as `GeneratePostmanJwtToken.SECRET` (the
-  sample configs already do).
+- [ ] Set the **same** `JWT_SECRET` environment variable (32+ characters) on both machines, and in
+  the environment `GeneratePostmanJwtToken` runs in. The sample configs read `app.jwt.secret` from
+  it; if it is unset, each instance signs with its own random per-run key.
 
 Launch each on its own machine, e.g.:
 ```bash
@@ -157,7 +158,7 @@ UPDATE jukeanator.persistent_identity_seq SET next_val = 2 WHERE next_val <= 1;
 - [ ] Trigger a library scan on the slave (Admin Panel); master receives the library snapshot
   (`GET http://<master-ip>:8080/api/locations/<id>/song-library/albums` returns the albums).
 
-## 5. Slave → master: cash and credit-card transactions (item 1)
+## 5. Slave -> master: cash and credit-card transactions (item 1)
 
 - [ ] On the **slave machine**'s Swing UI press the bill-acceptor key (`a` by default) three
   times.
@@ -174,7 +175,7 @@ UPDATE jukeanator.persistent_identity_seq SET next_val = 2 WHERE next_val <= 1;
 - [ ] **On the slave machine**, `C:\kiosk-trial\data\JukeANator_FinancialLedger.json`: those
   transactions now carry a non-null `syncedToMasterAt`.
 
-## 6. Master → slave: mobile credit spends (item 3)
+## 6. Master -> slave: mobile credit spends (item 3)
 
 - [ ] Register a patron on master (new users start with 6 credits) -- run from either machine:
   ```bash
@@ -196,12 +197,12 @@ UPDATE jukeanator.persistent_identity_seq SET next_val = 2 WHERE next_val <= 1;
 - [ ] **On the slave machine**, the slave received it: `mobileCreditUsages` in
   `C:\kiosk-trial\data\JukeANator_FinancialLedger.json` holds one entry with the same
   `sourceSyncId`.
-- [ ] Slave Admin Panel → Financial Ledger: the open period's **Mobile** total is non-zero
+- [ ] Slave Admin Panel -> Financial Ledger: the open period's **Mobile** total is non-zero
   (credits spent ÷ credits-per-dollar), not $0.
 
-## 7. Slave → master: finalized split period (item 2)
+## 7. Slave -> master: finalized split period (item 2)
 
-- [ ] **On the slave machine**'s Admin Panel → Financial Ledger → **Add Split**.
+- [ ] **On the slave machine**'s Admin Panel -> Financial Ledger -> **Add Split**.
 - [ ] **On the master machine**:
   ```sql
   SELECT parent_location_id, source_period_id, start_date, end_date, cash_total, card_total,
@@ -211,7 +212,7 @@ UPDATE jukeanator.persistent_identity_seq SET next_val = 2 WHERE next_val <= 1;
   Exactly one row -- the finalized period, with the same totals the slave shows. The slave's new
   open period is **not** mirrored.
 
-## 8. Slave → master: user activity (item 4)
+## 8. Slave -> master: user activity (item 4)
 
 - [ ] On the **slave machine**, click around the Swing UI (tabs, an artist, paging) and queue a
   song locally.

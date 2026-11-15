@@ -28,7 +28,7 @@ app:
     # testing from phones on a plain-http LAN address, where browsers block device location.
     allow-simulated-position: false
   jwt:
-    secret: fT7mK9xQ2pNc8VdL4sHz1YwB6rAe3JkM0uCp5GqX8nRv2ZtF7hLs9Wd3YbKm6QaP
+    secret: ${JWT_SECRET:}   # set via the JWT_SECRET environment variable (32+ characters); blank = random key per run
     expiration-ms: 86400000   # 24 hours
   logging:
     file-path: logs/jukeanator-service.log
@@ -200,3 +200,6 @@ user-interface:
   enable-type-ahead-search: true
   # SCROLL BARS
   use-big-scrollbars: true # JFC/Swing kiosk only: if true, uses wide touch-friendly scroll bars; if false, the normal (mouse-sized) scroll bars
+  # MOUSE POINTER
+  hide-mouse-pointer: false # JFC/Swing kiosk only: if true, hides the mouse pointer inside the kiosk window (for touch screens)
+  touch-indicator: false # JFC/Swing kiosk only: if true, shows a small translucent circle where the screen is touched (for legacy serial touch screens with no Windows touch support)

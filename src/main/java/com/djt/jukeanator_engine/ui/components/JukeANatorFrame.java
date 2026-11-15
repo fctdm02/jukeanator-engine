@@ -1,8 +1,10 @@
 package com.djt.jukeanator_engine.ui.components;
 
+import java.awt.AWTEvent;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -14,10 +16,14 @@ import java.awt.GraphicsEnvironment;
 import java.awt.GridBagLayout;
 import java.awt.Image;
 import java.awt.LinearGradientPaint;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Toolkit;
 import java.awt.Window;
+import java.awt.event.MouseEvent;
 import java.awt.geom.Point2D;
+import java.awt.image.BufferedImage;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -96,6 +102,10 @@ public class JukeANatorFrame extends JFrame {
   // SEARCH TAB
   private final boolean enableTypeAheadSearch;
   private SearchPanel searchPanel;
+
+  // MOUSE POINTER
+  private final boolean hideMousePointer;
+  private final boolean touchIndicator;
 
   // HOT HERE TAB
   private HotHerePanel hotHerePanel;
@@ -285,6 +295,9 @@ public class JukeANatorFrame extends JFrame {
 
     this.enableTypeAheadSearch = this.jukeANatorUserInterfaceProperties.isEnableTypeAheadSearch();
 
+    this.hideMousePointer = this.jukeANatorUserInterfaceProperties.isHideMousePointer();
+    this.touchIndicator = this.jukeANatorUserInterfaceProperties.isTouchIndicator();
+
     // Must be set before initialize() builds any scroll pane.
     ScrollBars.setUseBigScrollBars(this.jukeANatorUserInterfaceProperties.isUseBigScrollbars());
 
@@ -299,6 +312,28 @@ public class JukeANatorFrame extends JFrame {
     this.hibernateEnd = this.jukeANatorUserInterfaceProperties.getHibernateEnd();
 
     initialize();
+  }
+
+  /**
+   * Hides the mouse pointer inside the kiosk window ({@code user-interface.hide-mouse-pointer}).
+   * The blank cursor is set on the content pane, but any component with its own cursor (HAND_CURSOR
+   * on buttons, rows and tiles; TEXT_CURSOR on text fields) would still show it, so a global
+   * listener also gives every component the blank cursor when the pointer enters it. This covers
+   * components created later as well.
+   */
+  private void applyHiddenMousePointer() {
+    Cursor blank = Toolkit.getDefaultToolkit().createCustomCursor(
+        new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB), new Point(0, 0), "blank");
+    getContentPane().setCursor(blank);
+    setCursor(blank);
+
+    Toolkit.getDefaultToolkit().addAWTEventListener(event -> {
+      if (event.getID() == MouseEvent.MOUSE_ENTERED
+          && event.getSource() instanceof Component component
+          && component.getCursor() != blank) {
+        component.setCursor(blank);
+      }
+    }, AWTEvent.MOUSE_EVENT_MASK);
   }
 
   // INITIALIZE
@@ -339,6 +374,13 @@ public class JukeANatorFrame extends JFrame {
     };
     contentPane.setOpaque(false);
     setContentPane(contentPane);
+
+    if (hideMousePointer) {
+      applyHiddenMousePointer();
+    }
+    if (touchIndicator) {
+      TouchIndicatorOverlay.install(this);
+    }
 
     // ── Compute the Home grid profile for the actual screen dimensions ────────
     // screenWidth / screenHeight are already populated from GraphicsEnvironment

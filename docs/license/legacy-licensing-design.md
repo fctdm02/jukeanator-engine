@@ -26,16 +26,24 @@ Legacy sources analyzed:
 
 ## Decisions
 
-| Topic | Decision |
-|---|---|
-| Site layout (master) | Marketing pages at `/`; the Web/Mobile jukebox UI moves to `/app/`. Standalone/slave redirect `/` to `/app/`. |
-| Customer administration | Admin-only REST API (`/api/admin/licenses/**`) plus a static page `/admin/licenses.html`. |
-| Legacy client bugs | The new client fixes the behavior; file formats and wire protocol stay byte-identical. |
-| What non-commercial disables | Only the payment inputs: bill acceptor and card reader. No trial queue caps or nags beyond the registration screen. |
-| Terminology | Legacy "ASCAP mode" is called **Subscription mode** everywhere. The business no longer deals with ASCAP/BMI/SESAC performance licensing. Only the frozen wire command `command=ascap` keeps the old name. |
-| Song usage reporting | Not ported (`command=songusagereport` falls through to a redirect to `/`). Legacy clients never upload reports anyway. |
-| Wire protocol for new installs | jukeanator-engine uses the same `/FrontController` protocol as MP3Jukeboxx (over HTTPS), plus optional `appVersion` / `appMode` parameters, so the server has one code path. |
-| Schema | Two tables, `license_customer` and `license_machine`, in `V1__init_schema.sql` (single-migration rule). The per-IP/hostname table is dropped; heartbeat columns replace it. |
+- **Site layout (master):** Marketing pages at `/`; the Web/Mobile jukebox UI moves to `/app/`.
+  Standalone/slave redirect `/` to `/app/`.
+- **Customer administration:** Admin-only REST API (`/api/admin/licenses/**`) plus a static page
+  `/admin/licenses.html`.
+- **Legacy client bugs:** The new client fixes the behavior; file formats and wire protocol stay
+  byte-identical.
+- **What non-commercial disables:** Only the payment inputs: bill acceptor and card reader. No
+  trial queue caps or nags beyond the registration screen.
+- **Terminology:** Legacy "ASCAP mode" is called **Subscription mode** everywhere. The business no
+  longer deals with ASCAP/BMI/SESAC performance licensing. Only the frozen wire command
+  `command=ascap` keeps the old name.
+- **Song usage reporting:** Not ported (`command=songusagereport` falls through to a redirect to
+  `/`). Legacy clients never upload reports anyway.
+- **Wire protocol for new installs:** jukeanator-engine uses the same `/FrontController` protocol
+  as MP3Jukeboxx (over HTTPS), plus optional `appVersion` / `appMode` parameters, so the server has
+  one code path.
+- **Schema:** Two tables, `license_customer` and `license_machine`, in `V1__init_schema.sql`
+  (single-migration rule). The per-IP/hostname table is dropped; heartbeat columns replace it.
 
 ## How the legacy scheme works
 
@@ -51,14 +59,15 @@ Legacy sources analyzed:
 
 ### License tiers
 
-| Tier | Wire code | DB letter | Delimiter | Meaning |
-|---|---|---|---|---|
-| CR | -1 | R | `&@` | Subscription, remote ("downloading") data source |
-| CD | 0 | A | `__` | Subscription, standalone |
-| C | 1 | C | `##` | Commercial (perpetual) |
-| NC | 5 | P | `@#` | Professional (non-commercial) |
-| L | 6 | L | `&&` | Lite |
-| D | 10 | — | — | Trial (no key matched) |
+Each tier is listed as tier (wire code, DB letter, delimiter): meaning.
+
+- **CR** (wire code -1, DB letter R, delimiter `&@`): Subscription, remote ("downloading") data
+  source
+- **CD** (wire code 0, DB letter A, delimiter `__`): Subscription, standalone
+- **C** (wire code 1, DB letter C, delimiter `##`): Commercial (perpetual)
+- **NC** (wire code 5, DB letter P, delimiter `@#`): Professional (non-commercial)
+- **L** (wire code 6, DB letter L, delimiter `&&`): Lite
+- **D** (wire code 10, no DB letter or delimiter): Trial (no key matched)
 
 Lower codes mean more functionality: `<= C` is commercial (payments allowed), `<= CD` requires a
 valid subscription. Code: `domain/license/legacy/LicenseTier`.
@@ -112,18 +121,16 @@ matches whichever source the legacy install used. The registry GUID is read with
   Dec 31).
 - Hours remaining are decremented once per runtime hour, and the file's last-modified time is
   restored after each rewrite to hide the hourly write.
-- Checks and messages:
-
-  | Code | Condition | Effect |
-  |---|---|---|
-  | 444 | hours remaining <= 0 | expired |
-  | 555 | hours remaining <= 336 (14 days) | warning |
-  | 888 | within 7 days of expiry | warning |
-  | 999 | at or after expiry | expired |
-  | 002 | file's machine id or email does not match | legacy: fatal exit; new: commercial disabled |
-  | 003 | server reply does not cover the current quarter | expired |
-  | 005 | file missing or unreadable | expired |
-  | 006 / 007 | offline fallback, warning / expired | as 555/888 and 444/999 |
+- Checks and messages (code: condition -> effect):
+  - **444:** hours remaining <= 0 -> expired
+  - **555:** hours remaining <= 336 (14 days) -> warning
+  - **888:** within 7 days of expiry -> warning
+  - **999:** at or after expiry -> expired
+  - **002:** file's machine id or email does not match -> legacy: fatal exit; new: commercial
+    disabled
+  - **003:** server reply does not cover the current quarter -> expired
+  - **005:** file missing or unreadable -> expired
+  - **006 / 007:** offline fallback, warning / expired -> as 555/888 and 444/999
 
 - Code: `ExtendCode`, `LegacyCtlFiles.readExtendCode` / `writeExtendCode`,
   `SubscriptionQuarter`, `LicenseServiceImpl.evaluateExtendCode`.
@@ -138,24 +145,25 @@ double-encoded. `command` is case-insensitive.
 Text replies are `text/html;charset=ISO-8859-1` with body `URLEncoder.encode(text, UTF-8) + "\n"`.
 Fixed reply constants (padding is part of the protocol):
 
-| Constant | Text |
-|---|---|
-| OK | `OK` + 49 × `a` |
-| ERROR | `ERROR` + 52 × `a` |
-| REVOKED | `REVOKED` + 52 × `a` |
-| invalid email | `invalidCustomerEmail` + 49 × `a` |
-| invalid name | `invalidCustomerName` + 49 × `a` |
+- **OK:** `OK` + 49 × `a`
+- **ERROR:** `ERROR` + 52 × `a`
+- **REVOKED:** `REVOKED` + 52 × `a`
+- **invalid email:** `invalidCustomerEmail` + 49 × `a`
+- **invalid name:** `invalidCustomerName` + 49 × `a`
 
-| Command | Parameters | Reply |
-|---|---|---|
-| `provision` | customerEmail, passcode (SHA-1 hex), serialNumber, buildDate | 16 raw key bytes (`application/octet-stream`), or a refusal text |
-| `ascap` (subscription check) | licenseType, serialNumber, buildDate, [customerEmail, customerName, locationName] | `hex(AES(URLEncode(serial + lastPaidQuarter)))`, or REVOKED / ERROR |
-| `heartbeat` | as `ascap` | OK, or invalid email |
-| `getcustomername` | customerEmail, … | name, or invalid email / invalid name |
-| `getJukeANatorBuildDate` | (ignored) | `MM-dd-yyyy` of the legacy `MP3Jukeboxx.jar` |
-| `getJukeANatorBuildSize` | (ignored) | byte length of that jar |
-| `feedback` | contact form fields | email to the site owner, then the thank-you page |
-| `getengineversion` (new) | appVersion, appMode | `<version>|<downloadUrl>` for engine clients |
+Commands (parameters -> reply):
+
+- `provision` (customerEmail, passcode (SHA-1 hex), serialNumber, buildDate) -> 16 raw key bytes
+  (`application/octet-stream`), or a refusal text
+- `ascap`, the subscription check (licenseType, serialNumber, buildDate, [customerEmail,
+  customerName, locationName]) -> `hex(AES(URLEncode(serial + lastPaidQuarter)))`, or REVOKED /
+  ERROR
+- `heartbeat` (as `ascap`) -> OK, or invalid email
+- `getcustomername` (customerEmail, …) -> name, or invalid email / invalid name
+- `getJukeANatorBuildDate` (ignored) -> `MM-dd-yyyy` of the legacy `MP3Jukeboxx.jar`
+- `getJukeANatorBuildSize` (ignored) -> byte length of that jar
+- `feedback` (contact form fields) -> email to the site owner, then the thank-you page
+- `getengineversion`, new (appVersion, appMode) -> `<version>|<downloadUrl>` for engine clients
 
 Provisioning refusal texts: `REVOKED: Unpaid subscription for customer email: <email>`,
 `customerEmail and serialNumber are null`, `Incorrect credentials given for customer email:
@@ -172,9 +180,9 @@ Code: `LegacyFrontController`, `LegacyResponses`, `LicenseServerClient`.
 
 ### Server business rules (legacy, preserved)
 
-- **Provision:** revoked check → credentials (email + SHA-1 passcode) → register the machine if new
-  (paid-through = current quarter of next year) → if the machine was already paid for this period,
-  issue the key free → else require and consume one available license → key for the customer's
+- **Provision:** revoked check -> credentials (email + SHA-1 passcode) -> register the machine if new
+  (paid-through = current quarter of next year) -> if the machine was already paid for this period,
+  issue the key free -> else require and consume one available license -> key for the customer's
   tier.
 - **Heartbeat:** an unknown email auto-creates a customer (passcode = SHA-1 of the email, zero
   licenses); an unknown serial is registered (subscription tiers get next year's quarter).
@@ -183,22 +191,31 @@ Code: `LegacyFrontController`, `LegacyResponses`, `LicenseServerClient`.
 
 ## Legacy bugs and how each is handled
 
-| Bug | Where | Handling |
-|---|---|---|
-| Startup "hours since last run" deduction never ran (hours not yet loaded) | client | Fixed: uses a `License.STAMP` file touched hourly |
-| A server "not paid" reply at startup was overridden by a still-valid local file (NPE in message building) | client | Fixed: the server's verdict wins and the local file is zeroed |
-| New extend code written with +4 quarters but only 3 quarters of hours | client | Fixed: hours computed from the calendar to the quarter's expiry |
-| Provisioned bytes saved without validation | client | Fixed: key verified against this computer before replacing the old one |
-| Machine/email mismatch called `System.exit` | client | Fixed: commercial disabled, shown on screen |
-| Auto-update size check protected nothing | client | Not applicable (legacy client only) |
-| Available-license decrement was read-then-write | server | Fixed: atomic conditional update |
-| Provisioning wrote the CTL path into LOCATION_NAME and the quarter into BUILD_DATE | server | Fixed; the import script repairs the 14 affected rows |
-| Revocations hardcoded in source | server | Now `revoked` flags, seeded from the hardcoded lists by the import script |
-| Missing email/serial caused HTTP 500 (NPE) | server | Fixed: legacy text replies |
-| `index.jsp` read the `home` parameter instead of `command`, so every page rendered home | site | Fixed: page commands redirect to the matching static page |
-| Heartbeat auto-creates customers | server | Preserved (flagged `auto_created`) for transparency |
-| A few `CUSTOMER.EMAIL` rows hold more than one address (free-text admin entry, e.g. newline-separated) | data | Import takes the first address as canonical (it's the unique provisioning key); any further address is appended to `notes` |
+Each bug is listed as bug (where): handling.
 
+- Startup "hours since last run" deduction never ran (hours not yet loaded) (client): Fixed: uses
+  a `License.STAMP` file touched hourly
+- A server "not paid" reply at startup was overridden by a still-valid local file (NPE in message
+  building) (client): Fixed: the server's verdict wins and the local file is zeroed
+- New extend code written with +4 quarters but only 3 quarters of hours (client): Fixed: hours
+  computed from the calendar to the quarter's expiry
+- Provisioned bytes saved without validation (client): Fixed: key verified against this computer
+  before replacing the old one
+- Machine/email mismatch called `System.exit` (client): Fixed: commercial disabled, shown on
+  screen
+- Auto-update size check protected nothing (client): Not applicable (legacy client only)
+- Available-license decrement was read-then-write (server): Fixed: atomic conditional update
+- Provisioning wrote the CTL path into LOCATION_NAME and the quarter into BUILD_DATE (server):
+  Fixed; the import script repairs the 14 affected rows
+- Revocations hardcoded in source (server): Now `revoked` flags, seeded from the hardcoded lists
+  by the import script
+- Missing email/serial caused HTTP 500 (NPE) (server): Fixed: legacy text replies
+- `index.jsp` read the `home` parameter instead of `command`, so every page rendered home (site):
+  Fixed: page commands redirect to the matching static page
+- Heartbeat auto-creates customers (server): Preserved (flagged `auto_created`) for transparency
+- A few `CUSTOMER.EMAIL` rows hold more than one address (free-text admin entry, e.g.
+  newline-separated) (data): Import takes the first address as canonical (it's the unique
+  provisioning key); any further address is appended to `notes`
 ## Setup-time licensing screens
 
 These screens are shown while the PC and jukebox are being set up, so a physical keyboard is
@@ -226,22 +243,24 @@ assumed. All of them also accept the on-screen keyboard, and none closes by itse
 
 ## Implementation map
 
-| Area | Location |
-|---|---|
-| Compatibility core (pure Java) | `domain/license/legacy/` |
-| Client service, machine id, scheduler, startup check | `domain/license/service/`, `domain/license/client/`, `domain/license/config/` |
-| Server service, entities, repository, controllers | `domain/licenseserver/` |
-| Registration screen | `ui/components/RegistrationCard.java` |
-| Customer / location name prompts | `ui/components/LicenseDetailPromptCard.java`, `JukeANatorFrame.showMissingLicenseDetails` |
-| Physical keyboard on the licensing screens | `ui/components/PhysicalKeyboardInput.java` |
-| Payment gating | `ui/components/JukeANatorFrame.java` (`paymentsLicensed`) |
-| Admin License screen (kiosk) | `ui/components/AdminPanel.java` (`doLicense`) |
-| Static routing (`/` vs `/app/`) | `config/StaticSiteConfig.java` |
-| Security rules | `config/SecurityConfig.java` |
-| Config write-back | `config/ExternalConfigUpdater.persistSectionValues` |
-| Marketing site, web UI, admin page | `src/main/resources/static/`, `static/app/`, `static/admin/` |
-| Schema | `db/migration/mysql/V1__init_schema.sql` |
-| Data import / existing-DB update | `docs/license/legacy-import.sql`, `docs/license/license-tables-update.sql` |
+- Compatibility core (pure Java): `domain/license/legacy/`
+- Client service, machine id, scheduler, startup check: `domain/license/service/`,
+  `domain/license/client/`, `domain/license/config/`
+- Server service, entities, repository, controllers: `domain/licenseserver/`
+- Registration screen: `ui/components/RegistrationCard.java`
+- Customer / location name prompts: `ui/components/LicenseDetailPromptCard.java`,
+  `JukeANatorFrame.showMissingLicenseDetails`
+- Physical keyboard on the licensing screens: `ui/components/PhysicalKeyboardInput.java`
+- Payment gating: `ui/components/JukeANatorFrame.java` (`paymentsLicensed`)
+- Admin License screen (kiosk): `ui/components/AdminPanel.java` (`doLicense`)
+- Static routing (`/` vs `/app/`): `config/StaticSiteConfig.java`
+- Security rules: `config/SecurityConfig.java`
+- Config write-back: `config/ExternalConfigUpdater.persistSectionValues`
+- Marketing site, web UI, admin page: `src/main/resources/static/`, `static/app/`,
+  `static/admin/`
+- Schema: `db/migration/mysql/V1__init_schema.sql`
+- Data import / existing-DB update: `docs/license/legacy-import.sql`,
+  `docs/license/license-tables-update.sql`
 
 Configuration: `license.*` (client) and `license-server.*` (master) in `application.yml` and
 `docs/application-*-mode.yml`.

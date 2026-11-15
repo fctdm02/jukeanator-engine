@@ -39,11 +39,14 @@ This document has three parts:
 
 **Questions asked and answers:**
 
-| Question | Answer |
-|---|---|
-| What can a PENDING account do before verifying? | Block login (Recommended): register returns no token, the web UI shows a "check your email" screen, a PENDING login is refused with a resend option, and links expire after 24 hours. |
-| How should the existing user-domain email code move? | Move and rename (Recommended): move into `domain/email`, add `email.from-address` and `email.financial-ledger-recipients`, and keep reading the old `receipt.from-address` as a fallback. |
-| When is the split summary sent? | Automatically on split (Recommended), in the background after "Yes, finalize" succeeds. |
+- **What can a PENDING account do before verifying?** Block login (Recommended): register returns
+  no token, the web UI shows a "check your email" screen, a PENDING login is refused with a resend
+  option, and links expire after 24 hours.
+- **How should the existing user-domain email code move?** Move and rename (Recommended): move
+  into `domain/email`, add `email.from-address` and `email.financial-ledger-recipients`, and keep
+  reading the old `receipt.from-address` as a fallback.
+- **When is the split summary sent?** Automatically on split (Recommended), in the background
+  after "Yes, finalize" succeeds.
 
 The plan was written and approved (see Part 2).
 
@@ -109,7 +112,7 @@ The account already created stays PENDING; once mail works, signing in with it o
 
 **Response** (from general knowledge; Yahoo's labels may differ slightly):
 
-1. Sign in at https://login.yahoo.com/account/security (or Yahoo Mail → profile icon → **Account info** → **Account security**).
+1. Sign in at https://login.yahoo.com/account/security (or Yahoo Mail -> profile icon -> **Account info** -> **Account security**).
 2. Find **Generate app password** / **Generate and manage app passwords**. If it is missing, turn on **2-step verification** first.
 3. Click **Get started** or **Generate app password**, enter a name such as `JukeANator`, and click **Generate password**.
 4. Copy the 16-character password immediately; it is shown only once.
@@ -206,7 +209,7 @@ The nested `${receipt.from-address:...}` keeps a legacy external `receipt.from-a
 
 ### 5. Financial Ledger split (Swing)
 
-- `email.financial-ledger-recipients` is passed through `JukeANatorUserInterfaceApplication` → `JukeANatorFrame` → `AdminPanel`.
+- `email.financial-ledger-recipients` is passed through `JukeANatorUserInterfaceApplication` -> `JukeANatorFrame` -> `AdminPanel`.
 - After `addSplit()` succeeds, `FinancialLedgerDialog.reload(doneMessage)` shows "Split finalized. Emailing the summary to N recipient(s)." ("Split finalized." when the list is empty).
 - Comments on `JukeboxSplitFinalizedEvent` and `FinancialLedgerServiceImpl.addSplit()` updated to mention the email listener.
 
@@ -228,9 +231,9 @@ The nested `${receipt.from-address:...}` keeps a legacy external `receipt.from-a
 ### 8. Verification
 
 - Run the unit tests above.
-- Web UI: register → "Check Your Email" screen; sign-in refused with a resend option; open the emailed link → login screen shows "verified"; sign in.
-- Add Funds → receipt arrives.
-- Swing: Add Split → status line, and the summary arrives at each recipient.
+- Web UI: register -> "Check Your Email" screen; sign-in refused with a resend option; open the emailed link -> login screen shows "verified"; sign in.
+- Add Funds -> receipt arrives.
+- Swing: Add Split -> status line, and the summary arrives at each recipient.
 - `app.repository-type=jpa` against a freshly created database, to confirm V1 validates.
 
 ---
@@ -269,7 +272,7 @@ Set these five values. Use the same Gmail address for both `SMTP_USERNAME` and `
 
 **Option A: in the Eclipse launch configuration (recommended for dev).** The values apply only when you run the app from Eclipse, and nothing else on the PC sees them.
 
-1. **Run → Run Configurations...**, then select the JukeANator launch configuration.
+1. **Run -> Run Configurations...**, then select the JukeANator launch configuration.
 2. Open the **Environment** tab and click **Add...** for each of the five variables.
 3. Click **Apply**, then **Run**.
 

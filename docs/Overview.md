@@ -52,9 +52,9 @@ The object model is **thoughtful and coherent** — clearly designed by someone 
 
 ### What's Working Well
 
-**The filesystem-as-domain metaphor is elegant.** Mapping the music library to a folder tree (`RootFolderEntity → GenreFolderEntity → ArtistFolderEntity → AlbumFolderEntity → SongFileEntity`) is clever because it mirrors the actual physical layout of the music on disk. The `naturalIdentity` is the file path itself, which means the model is self-describing and the aggregate root can always reconnect to the real world without extra mapping.
+**The filesystem-as-domain metaphor is elegant.** Mapping the music library to a folder tree (`RootFolderEntity -> GenreFolderEntity -> ArtistFolderEntity -> AlbumFolderEntity -> SongFileEntity`) is clever because it mirrors the actual physical layout of the music on disk. The `naturalIdentity` is the file path itself, which means the model is self-describing and the aggregate root can always reconnect to the real world without extra mapping.
 
-**The base class hierarchy is solid.** `AbstractEntity` → `AbstractPersistentEntity` → `AbstractLibraryEntity` is clean and purposeful. The separation between natural identity (the meaningful domain key) and persistent identity (the DB surrogate key) is a good pattern that avoids the pitfalls of surrogate-key-only designs. The `isModified` tracking using attribute name sets is a nice lightweight change-tracking mechanism.
+**The base class hierarchy is solid.** `AbstractEntity` -> `AbstractPersistentEntity` -> `AbstractLibraryEntity` is clean and purposeful. The separation between natural identity (the meaningful domain key) and persistent identity (the DB surrogate key) is a good pattern that avoids the pitfalls of surrogate-key-only designs. The `isModified` tracking using attribute name sets is a nice lightweight change-tracking mechanism.
 
 **The `LibraryItem` interface is a clean abstraction.** Having `getNumPlays()`, `getParentGenre()`, `getTitle()`, and `getReleaseDate()` as a common interface across `GenreFolderEntity`, `ArtistFolderEntity`, `AlbumFolderEntity`, and `SongFileEntity` means the UI can treat all of them polymorphically without caring about their type.
 

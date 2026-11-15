@@ -1,3 +1,11 @@
+BLANK MOUSE CURSOR FOR APPLICATION ONLY
+=======================================
+Cursor blank = Toolkit.getDefaultToolkit().createCustomCursor(
+        new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB),
+        new Point(0, 0), "blank");
+frame.getContentPane().setCursor(blank);
+
+
 TASK NAME
 =========
 Location/SongLibrary object model and JPA mapping refactor

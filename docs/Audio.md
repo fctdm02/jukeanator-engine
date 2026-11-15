@@ -35,52 +35,52 @@ you already have.
 
 ## Integration steps
 
-1. **Copy the package** into `src/main/java` (and the `.ps1` resource into
-   `src/main/resources/audio/`), adjusting `com.jukebox.audio` to your real
-   base package if it differs.
+**Step 1. Copy the package** into `src/main/java` (and the `.ps1` resource into
+`src/main/resources/audio/`), adjusting `com.jukebox.audio` to your real
+base package if it differs.
 
-2. **Implement `SongQueueStateProvider`** on your existing
-   `SongQueueServiceImpl`:
+**Step 2. Implement `SongQueueStateProvider`** on your existing
+`SongQueueServiceImpl`:
 
-   ```java
-   public class SongQueueServiceImpl implements SongQueueService, SongQueueStateProvider {
-       ...
-       @Override
-       public boolean isQueueEmpty() { return queue.isEmpty(); }
+```java
+public class SongQueueServiceImpl implements SongQueueService, SongQueueStateProvider {
+    ...
+    @Override
+    public boolean isQueueEmpty() { return queue.isEmpty(); }
 
-       @Override
-       public boolean isBackgroundMusicEnabled() { return enableBackgroundMusic; }
-   }
-   ```
+    @Override
+    public boolean isBackgroundMusicEnabled() { return enableBackgroundMusic; }
+}
+```
 
-   If you'd rather not touch that class, write a small `@Component` adapter
-   that wraps it and implements the interface instead.
+If you'd rather not touch that class, write a small `@Component` adapter
+that wraps it and implements the interface instead.
 
-3. **Add `@EnableScheduling`** to your main `@SpringBootApplication` class —
-   `JukeboxAudioCoordinator` polls every second to reconcile monitoring
-   state. If you want instant reaction instead of a ≤1s delay, call
-   `jukeboxAudioCoordinator.reconcile()` directly from
-   `SongQueueServiceImpl` whenever a song is added/removed or
-   `enableBackgroundMusic` is toggled — it's idempotent and cheap.
+**Step 3. Add `@EnableScheduling`** to your main `@SpringBootApplication` class —
+`JukeboxAudioCoordinator` polls every second to reconcile monitoring
+state. If you want instant reaction instead of a ≤1s delay, call
+`jukeboxAudioCoordinator.reconcile()` directly from
+`SongQueueServiceImpl` whenever a song is added/removed or
+`enableBackgroundMusic` is toggled — it's idempotent and cheap.
 
-4. **Configure defaults** (optional) in `application.yml`:
+**Step 4. Configure defaults** (optional) in `application.yml`:
 
-   ```yaml
-   jukebox:
-     audio:
-       line-in:
-         default-volume: 75
-         preferred-mixer-name: ""   # e.g. "Line In" — see step 5
-   ```
+```yaml
+jukebox:
+  audio:
+    line-in:
+      default-volume: 75
+      preferred-mixer-name: ""   # e.g. "Line In" — see step 5
+```
 
-5. **Run `MixerDiagnostics.main()` on the actual jukebox hardware** before
-   relying on auto-detection. Java Sound's mixer names are driver-specific;
-   auto-detection looks for names containing "line in", "aux", etc., and
-   falls back to the first capture-capable device otherwise — which could
-   be a built-in microphone instead of the line-in jack on some sound
-   cards. If it picks the wrong one, set
-   `jukebox.audio.line-in.preferred-mixer-name` to a substring of the
-   correct mixer's name from the diagnostic output.
+**Step 5. Run `MixerDiagnostics.main()` on the actual jukebox hardware** before
+relying on auto-detection. Java Sound's mixer names are driver-specific;
+auto-detection looks for names containing "line in", "aux", etc., and
+falls back to the first capture-capable device otherwise — which could
+be a built-in microphone instead of the line-in jack on some sound
+cards. If it picks the wrong one, set
+`jukebox.audio.line-in.preferred-mixer-name` to a substring of the
+correct mixer's name from the diagnostic output.
 
 ## How the behavior maps to your requirement
 

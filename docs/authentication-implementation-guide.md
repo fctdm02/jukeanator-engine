@@ -736,7 +736,7 @@ No body. Auth header added by the collection-level script below.
 
 ### Collection-Level Authorization (applies to all existing requests automatically)
 
-In the Postman Collection settings → **Authorization** tab:
+In the Postman Collection settings -> **Authorization** tab:
 - Type: `Bearer Token`
 - Token: `{{authToken}}`
 
@@ -755,7 +755,7 @@ This propagates to every request in the collection. No need to edit each request
 
 ### Testing the full flow in Postman
 
-1. Run **POST /register** or **POST /login** → `authToken` is set in environment
+1. Run **POST /register** or **POST /login** -> `authToken` is set in environment
 2. Run any protected endpoint — the collection-level Bearer token is sent automatically
 3. To test admin endpoints, log in with an account that has `role = ROLE_ADMIN` in the database
 

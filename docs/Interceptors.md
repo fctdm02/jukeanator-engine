@@ -41,7 +41,7 @@ Application startup
 
 Any thread (EDT, song-queue-thread, Spring event thread…)
   └── calls service method
-        ├── ServiceSecurityAspect (@Order 1)  — sees LOCAL auth in global context → OK
+        ├── ServiceSecurityAspect (@Order 1)  — sees LOCAL auth in global context -> OK
         └── ServiceLoggingAspect  (@Order 2)  — logs "user='LOCAL'"
 ```
 
@@ -56,7 +56,7 @@ any wrapper.
 ```
 HTTP request thread (JWT populated by Spring Security filter)
   └── calls service method
-        ├── ServiceSecurityAspect — sees JWT auth in ThreadLocal context → OK
+        ├── ServiceSecurityAspect — sees JWT auth in ThreadLocal context -> OK
         └── ServiceLoggingAspect  — logs the email address from the JWT
 
 song-queue-thread (executor, no HTTP context)
@@ -64,7 +64,7 @@ song-queue-thread (executor, no HTTP context)
         ├── installs SystemAuthenticationToken in ThreadLocal context
         ├── calls processQueue()
         │     └── songQueueService.dequeueNextSong()
-        │           ├── ServiceSecurityAspect — sees SYSTEM auth → OK
+        │           ├── ServiceSecurityAspect — sees SYSTEM auth -> OK
         │           └── ServiceLoggingAspect  — logs "user='SYSTEM'"
         └── clears ThreadLocal context (finally block)
 ```
