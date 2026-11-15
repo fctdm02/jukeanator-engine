@@ -567,12 +567,7 @@ public class JukeANatorFrame extends JFrame {
             }
           }),
 
-          () -> SwingUtilities.invokeLater(() -> {
-
-            if (screenSaverWindow.isVisible()) {
-              screenSaverWindow.setVisible(false);
-            }
-          }));
+          () -> SwingUtilities.invokeLater(this::hideScreenSaver));
     }
 
     // After 10 minutes of no mouse/keyboard activity, reset every tab to its default
@@ -618,6 +613,7 @@ public class JukeANatorFrame extends JFrame {
                 if (hibernationActive) {
                   hibernationActive = false;
                   hibernationWindow.setVisible(false);
+                  returnActivationToFrame();
                   songPlayerService.unlockQueue(songLibraryService.getOwnLocationId());
                 }
               }));
@@ -730,8 +726,7 @@ public class JukeANatorFrame extends JFrame {
     // A patron is paying, so get the screen saver out of the way. Hibernation is left alone: it
     // runs on the clock, and the credits simply wait on the balance until it ends.
     if (screenSaverFocused) {
-      screenSaverWindow.setVisible(false);
-      requestFocusInWindow();
+      hideScreenSaver();
     }
 
     action.actionPerformed(new java.awt.event.ActionEvent(this,
@@ -747,9 +742,7 @@ public class JukeANatorFrame extends JFrame {
 
     log.info("Card purchase complete: ${} charged, {} credits added", dollars, creditsAdded);
 
-    if (screenSaverWindow != null && screenSaverWindow.isVisible()) {
-      screenSaverWindow.setVisible(false);
-    }
+    hideScreenSaver();
 
     if (cardPaymentConfirmationCard != null) {
       cardPaymentConfirmationCard.dismiss();
@@ -832,6 +825,7 @@ public class JukeANatorFrame extends JFrame {
       hibernationActive = false;
 
       hibernationWindow.setVisible(false);
+      returnActivationToFrame();
 
       // Re-enable the queue so patrons can queue songs again.
       songPlayerService.unlockQueue(songLibraryService.getOwnLocationId());
@@ -1074,7 +1068,10 @@ public class JukeANatorFrame extends JFrame {
         new JukeboxTabComponent("SEARCH", "🔍", ColorTheme.get().frameTabAccentSearch));
     tabs.setTabComponentAt(3,
         new JukeboxTabComponent("HOT HERE", "🔥", ColorTheme.get().frameTabAccentHotHere));
-    tabs.setTabComponentAt(4, new JukeboxTabComponent("GENRES", "🎸", ColorTheme.get().textPrimary));
+    // The guitar is painted rather than drawn from the U+1F3B8 emoji glyph, which some Linux
+    // installs (e.g. Linux Mint with the distribution OpenJDK) have no font for.
+    tabs.setTabComponentAt(4, new JukeboxTabComponent("GENRES",
+        new GuitarIcon(LayoutTheme.get().tabIconFontSize), ColorTheme.get().textPrimary));
     tabs.setTabComponentAt(5,
         new JukeboxTabComponent("QUEUE", "♫", ColorTheme.get().frameTabAccentQueue));
 
@@ -1131,6 +1128,16 @@ public class JukeANatorFrame extends JFrame {
     private final Color accentColor;
 
     public JukeboxTabComponent(String title, String iconText, Color accentColor) {
+      this(title, iconText, null, accentColor);
+    }
+
+    // For tabs whose symbol is painted rather than taken from a font glyph (see GuitarIcon).
+    public JukeboxTabComponent(String title, javax.swing.Icon icon, Color accentColor) {
+      this(title, null, icon, accentColor);
+    }
+
+    private JukeboxTabComponent(String title, String iconText, javax.swing.Icon icon,
+        Color accentColor) {
 
       this.accentColor = accentColor;
       setOpaque(false);
@@ -1142,7 +1149,7 @@ public class JukeANatorFrame extends JFrame {
       //
       // ICON
       //
-      JLabel iconLabel = new JLabel(iconText);
+      JLabel iconLabel = icon != null ? new JLabel(icon) : new JLabel(iconText);
       iconLabel.setAlignmentX(CENTER_ALIGNMENT);
       iconLabel.setForeground(accentColor);
       iconLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().tabIconFontSize));
@@ -1607,10 +1614,46 @@ public class JukeANatorFrame extends JFrame {
 
     if (!this.alwaysOnTop) {
       setAlwaysOnTop(false);
+      // Window#setAlwaysOnTop propagates to owned windows, so un-pinning the frame also un-pinned
+      // the screensaver and hibernation overlays. Without this, when always-on-top is false they
+      // could appear below another window (e.g. the console) instead of covering the screen.
+      repinOverlayWindows();
     }
 
     ForegroundWindowUtil.forceToForeground(this);
     requestFocus();
+  }
+
+  private void repinOverlayWindows() {
+    if (screenSaverWindow != null) {
+      screenSaverWindow.setAlwaysOnTop(true);
+    }
+    if (hibernationWindow != null) {
+      hibernationWindow.setAlwaysOnTop(true);
+    }
+  }
+
+  /**
+   * Hides the screensaver, if showing, and hands window activation back to the frame. While idle the
+   * screensaver is the active window; hiding it without this lets Windows activate the next window
+   * in the z-order, which with always-on-top false can be the console that launched the app.
+   */
+  private void hideScreenSaver() {
+    if (screenSaverWindow == null || !screenSaverWindow.isVisible()) {
+      return;
+    }
+    screenSaverWindow.setVisible(false);
+    returnActivationToFrame();
+  }
+
+  /**
+   * Re-activates the frame after a full-screen overlay (screensaver or hibernation) is hidden. A
+   * plain toFront() suffices: the hide is triggered either by user input or while this process
+   * already owns the foreground, so the Windows foreground lock does not apply.
+   */
+  private void returnActivationToFrame() {
+    toFront();
+    requestFocusInWindow();
   }
 
   private Window findShowingOwnedModalDialog() {
@@ -1671,6 +1714,10 @@ public class JukeANatorFrame extends JFrame {
         return;
       }
 
+      // initializeUi() re-pushes the current song after a library scan; only a real song change
+      // should swap the screensaver's cover art.
+      boolean songChanged = !songDto.equals(currentNowPlayingSong);
+
       songLabel.setText(songDto.songName());
       artistLabel.setText(songDto.artistName());
       albumLabel.setText(songDto.albumName());
@@ -1699,11 +1746,19 @@ public class JukeANatorFrame extends JFrame {
             LayoutTheme.get().nowPlayingGifW, topPanelProfile.iconSize()));
       }
 
-      refreshScreenSaverIfVisible();
+      if (songChanged) {
+        refreshScreenSaverIfVisible();
+      }
     });
   }
 
   private void clearNowPlaying() {
+
+    // With an empty queue, SongPlayerServiceImpl publishes AllSongsDonePlayingEvent on every
+    // watchdog tick, so this runs repeatedly while nothing is playing. Refreshing the screensaver
+    // each time picked a new random cover every few seconds; it should only change when playback
+    // actually stops (or when the screensaver's own 30-second move timer fires).
+    boolean wasPlaying = currentNowPlayingSong != null;
 
     songLabel.setText("");
     artistLabel.setText("");
@@ -1721,7 +1776,9 @@ public class JukeANatorFrame extends JFrame {
 
     nowPlayingPanel.setVisible(false);
 
-    refreshScreenSaverIfVisible();
+    if (wasPlaying) {
+      refreshScreenSaverIfVisible();
+    }
   }
 
   // The screensaver only redraws its cover art when it (re)appears or, if idle,
