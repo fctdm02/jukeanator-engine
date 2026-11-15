@@ -326,6 +326,7 @@ hosts. Still not covered, and required before a public master and a real jukebox
   but the location API key travels in request headers, so a public master needs TLS.
 - [ ] Braintree production credentials on master (the trial never charged real money).
 - [ ] Master database backups.
-- [ ] Known gaps accepted or fixed: location-scoped `addAlbum`/`addMultipleSongs` don't charge
-  credits; a mobile spend that reaches the slave only after its period was finalized is stored
+- [x] Location-scoped `addAlbum`/`addMultipleSongs` don't charge credits. Addressed:
+  `addMultipleSongs` now charges web users per song queued, and `addAlbum` is admin-only.
+- [ ] Known gap accepted or fixed: a mobile spend that reaches the slave only after its period was finalized is stored
   but not counted in that split (master's records remain authoritative for reconciling it).

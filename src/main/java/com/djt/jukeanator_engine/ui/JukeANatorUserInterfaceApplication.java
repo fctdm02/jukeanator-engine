@@ -118,13 +118,15 @@ public class JukeANatorUserInterfaceApplication {
     String legacyScanPath =
         LegacyInstallMigrator.takePendingScanPath(Path.of(appProperties.getDataDir()));
 
-    if (Boolean.TRUE.equals(songLibraryService.isLibraryLoadFailedAtStartup())) {
+    // Not just isLibraryLoadFailedAtStartup(): a library that loads but has no music folder or no
+    // albums (e.g. one persisted by an earlier run closed before its first scan) needs a scan too.
+    if (Boolean.TRUE.equals(songLibraryService.isInitialLibraryScanNeeded())) {
       if (legacyScanPath != null) {
-        log.info("No song library could be loaded at startup — scanning the legacy install's "
+        log.info("No usable song library at startup — scanning the legacy install's "
             + "music folder {}", legacyScanPath);
         frame.startInitialLibraryScan(legacyScanPath);
       } else {
-        log.info("No song library could be loaded at startup — prompting for initial library scan");
+        log.info("No usable song library at startup — prompting for initial library scan");
         frame.promptForInitialLibraryScan();
       }
     }

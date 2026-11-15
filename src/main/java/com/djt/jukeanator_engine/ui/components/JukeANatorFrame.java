@@ -2086,8 +2086,9 @@ public class JukeANatorFrame extends JFrame {
    * Switches directly to the Admin panel and opens its "scan file system" directory picker,
    * bypassing the normal Admin login. Called once at startup by
    * {@link com.djt.jukeanator_engine.ui.JukeANatorUserInterfaceApplication#launch()} when
-   * {@code SongLibraryService#isLibraryLoadFailedAtStartup()} reports that no persisted song library
-   * could be loaded (e.g. a fresh install) — this is the app itself asking for a music folder, not
+   * {@code SongLibraryService#isInitialLibraryScanNeeded()} reports that there is no usable song
+   * library (e.g. a fresh install, or a library with no albums) — this is the app itself asking for
+   * a music folder, not
    * an operator-initiated Admin visit, so no credentials are required. Cancelling the directory
    * picker, or the resulting scan from its progress overlay, exits the application, as there is no
    * library to fall back on.

@@ -171,6 +171,7 @@ public final class UiComponentNames {
   public static final String ADMIN_OVERLAY_MESSAGE_LABEL = "AdminPanel.overlayMessageLabel";
   public static final String ADMIN_OVERLAY_PRIMARY_BUTTON = "AdminPanel.overlayPrimaryButton";
   public static final String ADMIN_OVERLAY_SECONDARY_BUTTON = "AdminPanel.overlaySecondaryButton";
+  public static final String ADMIN_OVERLAY_TERTIARY_BUTTON = "AdminPanel.overlayTertiaryButton";
 
   // ── AdminPanel: forms and dialogs ───────────────────────────────────────────
   public static final String ADMIN_FORM_CANCEL_BUTTON = "AdminPanel.formCancelButton";

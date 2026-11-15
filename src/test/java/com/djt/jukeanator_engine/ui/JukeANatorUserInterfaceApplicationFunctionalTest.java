@@ -629,7 +629,14 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     click(admin, UiComponentNames.ADMIN_RESET_STATS_BUTTON);
     confirmAdminOverlay("Reset Statistics");
 
-    // Rescan the existing library root (no chooser); ends with a Scan Complete notice
+    // Rescan Library asks Re-scan Current Folder / Scan New Folder / Cancel; Cancel does nothing
+    click(admin, UiComponentNames.ADMIN_RESCAN_LIBRARY_BUTTON);
+    awaitAdminOverlay("Rescan Library", SwingTestSupport.DEFAULT_TIMEOUT_MS);
+    click(admin, UiComponentNames.ADMIN_OVERLAY_TERTIARY_BUTTON);
+    assertFalse(isAdminOverlayShowing(), "Cancel should close the Rescan Library choice");
+
+    // Re-scan Current Folder rescans the existing library root (no chooser); ends with a Scan
+    // Complete notice
     click(admin, UiComponentNames.ADMIN_RESCAN_LIBRARY_BUTTON);
     confirmAdminOverlay("Rescan Library");
     awaitAdminOverlay("Scan Complete", SCAN_TIMEOUT_MS);

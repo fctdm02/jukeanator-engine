@@ -386,4 +386,23 @@ public interface SongLibraryService {
    * @return true if the last load attempt fell back to an empty library
    */
   Boolean isLibraryLoadFailedAtStartup();
+
+  /**
+   * Indicates whether this instance has no usable song library yet and the operator should be
+   * asked to pick a music folder: either nothing could be loaded (see
+   * {@link #isLibraryLoadFailedAtStartup()}), or what was loaded has no music folder or no albums
+   * (e.g. an empty library persisted by an earlier run that was closed before its first scan
+   * completed). Always false on master, which owns no library of its own.
+   *
+   * @return true if the UI should prompt for a music folder to scan
+   */
+  Boolean isInitialLibraryScanNeeded();
+
+  /**
+   * Returns the music folder this instance's own song library was last scanned from, i.e. the
+   * folder a plain re-scan ({@link #scanFileSystemForSongs()}) would scan again.
+   *
+   * @return the folder path, or an empty string if no folder has been scanned yet (or on master)
+   */
+  String getOwnLibraryRootPath();
 }

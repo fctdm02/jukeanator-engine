@@ -13,6 +13,8 @@ The project is a **Spring Boot** app with a **Swing UI** running as a desktop ju
 
 ### 1. `JukeANatorFrame` is a God Class (~900 lines)
 
+**Status: Addressed.** `GenrePanel`, `QueuePanel`, `SearchPanel` and `HotHerePanel` were extracted.
+
 This is the biggest issue. The frame handles UI construction, state management, pagination logic, image loading, and cell rendering all in one file. It should be split:
 
 - **`GenresPanel`** — extract `buildGenresPanel()`, `buildGenreTile()`, `showGenreDetails()`, `refreshGenresPage()`, `rebuildGenresPagination()` into its own `JPanel` subclass
@@ -28,6 +30,8 @@ The frame itself should only assemble these components and wire them together.
 
 ### 2. No Presenter / Controller Layer
 
+**Status: Open.**
+
 All UI update logic (`setGenres()`, `setQueue()`, `setNowPlaying()`) lives directly on the `JFrame`. This tightly couples the data model to the view. A **Presenter** or **Controller** (even a simple POJO) should own the update logic and call methods on a view interface:
 
 ```java
@@ -42,17 +46,23 @@ public interface JukeANatorView {
 
 ### 3. Image Loading Has No Caching for Queue / Now Playing
 
+**Status: Open.**
+
 `genreIconCache` exists for genres but cover art in `QueueListCellRenderer` and `showQueueSongDetails()` reloads from disk on every render cycle. A shared `CoverArtCache` service (backed by a `LinkedHashMap` with a max size for LRU eviction) should be extracted and injected.
 
 ---
 
 ### 4. `QueueListCellRenderer` Loads Images Inside `getListCellRendererComponent`
 
+**Status: Open.**
+
 This is a Swing anti-pattern — cell renderers are called very frequently. Disk I/O inside `getListCellRendererComponent` will cause jank. Image loading should be async (via `SwingWorker` or an executor) with a placeholder shown until loaded.
 
 ---
 
 ### 5. Magic Numbers and Inline Colors
+
+**Status: Addressed.** Constants now live in `LayoutTheme` and `ColorTheme`.
 
 Colors and sizes are hardcoded throughout:
 - `new Color(70, 70, 70)`, `new Color(180, 180, 180)`, `new Dimension(180, 60)`, font sizes like `34`, `20`, `24`
@@ -73,11 +83,15 @@ public final class JukeANatorTheme {
 
 ### 6. Genres Pagination State on the Frame
 
+**Status: Addressed.** The state moved into `GenrePanel`.
+
 `currentGenresPage`, `genresListModel`, `genreIconCache`, `genresCardLayout`, etc. are all fields on `JukeANatorFrame`. Once `GenresPanel` is extracted, this state moves with it and becomes properly encapsulated.
 
 ---
 
 ### 7. `buildCreditsDescription()` Should Live on a Model/ViewModel
+
+**Status: Open.**
 
 The credit math (`(5 * creditsPer) + fiveBonusCredits`) is business logic sitting in the view. It belongs in a `CreditsService` or at minimum a `CreditsViewModel`.
 
@@ -85,11 +99,15 @@ The credit math (`(5 * creditsPer) + fiveBonusCredits`) is business logic sittin
 
 ### 8. `setGenres` / `setQueue` / `setNowPlaying` Are the Only Public API
 
+**Status: Open.** Tied to item 2.
+
 These are fine as the view's public interface, but they should be extracted to an interface (see point 2) so the frame can be swapped or tested without instantiating a full Swing window.
 
 ---
 
 ### 9. `javaFX.txt`, `javaFX2.txt`, `javaFX3.txt`, `scratchpad.txt`, `swing.txt`, `player.txt` in Root
+
+**Status: Addressed.** The scratch files were deleted from the repository.
 
 These scratch files should be deleted or moved to a `notes/` or `docs/` folder and gitignored. They shouldn't be in the repo root.
 

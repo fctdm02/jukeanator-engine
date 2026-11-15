@@ -151,6 +151,8 @@ public class AdminPanel extends JPanel {
   private final JLabel overlayMessageLabel = new JLabel();
   private final JButton overlayPrimaryBtn = overlayButton("");
   private final JButton overlaySecondaryBtn = overlayButton("");
+  /** Third choice (Cancel) -- only shown by {@link #showOverlayChoice}. */
+  private final JButton overlayTertiaryBtn = overlayButton("");
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONSTRUCTOR
@@ -250,6 +252,7 @@ public class AdminPanel extends JPanel {
     overlayMessageLabel.setName(UiComponentNames.ADMIN_OVERLAY_MESSAGE_LABEL);
     overlayPrimaryBtn.setName(UiComponentNames.ADMIN_OVERLAY_PRIMARY_BUTTON);
     overlaySecondaryBtn.setName(UiComponentNames.ADMIN_OVERLAY_SECONDARY_BUTTON);
+    overlayTertiaryBtn.setName(UiComponentNames.ADMIN_OVERLAY_TERTIARY_BUTTON);
 
     overlayCard.setOpaque(false);
     overlayCard.setLayout(new BoxLayout(overlayCard, BoxLayout.Y_AXIS));
@@ -272,6 +275,7 @@ public class AdminPanel extends JPanel {
     buttonRow.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
     buttonRow.add(overlayPrimaryBtn);
     buttonRow.add(overlaySecondaryBtn);
+    buttonRow.add(overlayTertiaryBtn);
 
     overlayCard.add(overlayTitleLabel);
     overlayCard.add(Box.createVerticalStrut(10));
@@ -295,47 +299,70 @@ public class AdminPanel extends JPanel {
 
   /** Shows an OK-only overlay notice. */
   private void showOverlayMessage(String title, String message, Color accent) {
-    showOverlay(title, message, accent, false, null);
+    showOverlay(title, message, accent, "OK", null, null, null, null);
   }
 
   /** Shows a Yes/No overlay, running {@code onConfirm} only if the user picks Yes. */
   private void showOverlayConfirm(String title, String message, Color accent, Runnable onConfirm) {
-    showOverlay(title, message, accent, true, onConfirm);
+    showOverlay(title, message, accent, "Yes", onConfirm, "No", null, null);
   }
 
-  private void showOverlay(String title, String message, Color accent, boolean confirmMode,
-      Runnable onConfirm) {
+  /**
+   * Shows a three-way overlay: two actions plus Cancel. The chosen action runs after the overlay
+   * closes; Cancel only closes it.
+   */
+  private void showOverlayChoice(String title, String message, Color accent, String primaryText,
+      Runnable onPrimary, String secondaryText, Runnable onSecondary) {
+    showOverlay(title, message, accent, primaryText, onPrimary, secondaryText, onSecondary,
+        "Cancel");
+  }
+
+  /**
+   * Shows the shared overlay card with up to three buttons, left to right. A {@code null} button
+   * text hides that button. Every button closes the overlay, then runs its action if it has one.
+   * The rightmost visible button -- the one that does nothing (OK / No / Cancel) -- gets the focus,
+   * so a stray Enter never starts an action.
+   */
+  private void showOverlay(String title, String message, Color accent,
+      String primaryText, Runnable onPrimary,
+      String secondaryText, Runnable onSecondary,
+      String tertiaryText) {
 
     overlayCardAccent = accent;
     overlayTitleLabel.setText(title);
     overlayTitleLabel.setForeground(accent);
     overlayMessageLabel.setText(htmlWrap(message));
 
-    overlaySecondaryBtn.setVisible(confirmMode);
-    overlaySecondaryBtn.setText("No");
-    overlayPrimaryBtn.setText(confirmMode ? "Yes" : "OK");
-
-    for (java.awt.event.ActionListener al : overlayPrimaryBtn.getActionListeners()) {
-      overlayPrimaryBtn.removeActionListener(al);
-    }
-    for (java.awt.event.ActionListener al : overlaySecondaryBtn.getActionListeners()) {
-      overlaySecondaryBtn.removeActionListener(al);
-    }
-    overlayPrimaryBtn.addActionListener(e -> {
-      hideOverlay();
-      if (confirmMode && onConfirm != null) {
-        onConfirm.run();
-      }
-    });
-    overlaySecondaryBtn.addActionListener(e -> hideOverlay());
+    configureOverlayButton(overlayPrimaryBtn, primaryText, onPrimary);
+    configureOverlayButton(overlaySecondaryBtn, secondaryText, onSecondary);
+    configureOverlayButton(overlayTertiaryBtn, tertiaryText, null);
 
     overlayFormCard.setVisible(false);
     overlayCard.setVisible(true);
     overlayScrim.setVisible(true);
     overlayCard.repaint();
     overlayScrim.revalidate();
-    JButton toFocus = confirmMode ? overlaySecondaryBtn : overlayPrimaryBtn;
+    JButton toFocus = tertiaryText != null ? overlayTertiaryBtn
+        : secondaryText != null ? overlaySecondaryBtn : overlayPrimaryBtn;
     SwingUtilities.invokeLater(toFocus::requestFocusInWindow);
+  }
+
+  private void configureOverlayButton(JButton button, String text, Runnable action) {
+
+    for (java.awt.event.ActionListener al : button.getActionListeners()) {
+      button.removeActionListener(al);
+    }
+    button.setVisible(text != null);
+    if (text == null) {
+      return;
+    }
+    button.setText(text);
+    button.addActionListener(e -> {
+      hideOverlay();
+      if (action != null) {
+        action.run();
+      }
+    });
   }
 
   /**
@@ -600,8 +627,9 @@ public class AdminPanel extends JPanel {
   /**
    * Opens a directory chooser so the operator can pick the file-system folder to scan for music,
    * then kicks off a scan against the selected path. Invoked automatically at startup (via
-   * {@link JukeANatorFrame#promptForInitialLibraryScan()}) when no persisted song library could be
-   * loaded, so the operator can point the app at a music folder on first use.
+   * {@link JukeANatorFrame#promptForInitialLibraryScan()}) when there is no usable song library, so
+   * the operator can point the app at a music folder on first use, and from Rescan Library's
+   * "Scan New Folder" choice.
    *
    * @param firstTimeUse true when there is no song library yet; cancelling either the directory
    *        chooser or the scan then exits the application instead of returning to the Admin panel
@@ -663,10 +691,25 @@ public class AdminPanel extends JPanel {
     new ScanProgressForm(scanPath, firstTimeUse).start();
   }
 
+  /**
+   * Asks whether to re-scan the current music folder or pick a new one. With no music folder
+   * scanned yet there is nothing to re-scan, so it goes straight to the folder chooser.
+   */
   private void doRescan() {
 
-    showOverlayConfirm("Rescan Library", "Rescan the song library? This may take a while.",
-        ColorTheme.get().accentViolet, () -> new ScanProgressForm(null, false).start());
+    String currentFolder = songLibraryService.getOwnLibraryRootPath();
+
+    if (currentFolder == null || currentFolder.isBlank()) {
+      showScanFileSystemDialog(false);
+      return;
+    }
+
+    showOverlayChoice("Rescan Library",
+        "Re-scan the current music folder (" + currentFolder + "), or scan a new folder? "
+            + "This may take a while.",
+        ColorTheme.get().accentViolet,
+        "Re-scan Current Folder", () -> new ScanProgressForm(null, false).start(),
+        "Scan New Folder", () -> showScanFileSystemDialog(false));
   }
 
   /**

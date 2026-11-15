@@ -376,6 +376,9 @@ public class SongLibraryServiceImplTest {
     verify(songLibraryRepository).storeAggregateRoot(any(RootFolderEntity.class));
     assertSame(rehydratedRoot, service.getSongLibraryRoot(1));
     assertFalse(service.isLibraryLoadFailedAtStartup());
+    assertEquals("/scan/path", service.getOwnLibraryRootPath());
+    // The adopted library loaded fine but has no albums, so the operator is still asked to scan
+    assertTrue(service.isInitialLibraryScanNeeded());
   }
 
   @Test
@@ -433,7 +436,15 @@ public class SongLibraryServiceImplTest {
 
     verify(songLibraryRepository, never()).storeAggregateRoot(any(RootFolderEntity.class));
     assertTrue(service.isLibraryLoadFailedAtStartup());
+    assertTrue(service.isInitialLibraryScanNeeded());
     assertEquals("", service.getSongLibraryRoot(1).getRootPath());
+    assertEquals("", service.getOwnLibraryRootPath());
+
+    // The shutdown/daily store must not persist the empty placeholder: an empty library on disk
+    // would load cleanly next time and suppress the first-time-use folder prompt.
+    assertEquals(Integer.valueOf(0), service.storeSongLibraryAndStatistics());
+    verify(songLibraryRepository, never()).storeAggregateRoot(any(RootFolderEntity.class));
+    assertFalse(Files.exists(tempDir.resolve(RootFolderEntity.CD_STATS)));
   }
 
   // ─────────────────────────────────────────────────────────────────────────

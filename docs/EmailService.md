@@ -223,10 +223,10 @@ The nested `${receipt.from-address:...}` keeps a legacy external `receipt.from-a
 ### 7. Operational notes
 
 - SMTP credentials come from `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` and `MAIL_FROM_ADDRESS`. With a Yahoo From address, use `smtp.mail.yahoo.com` and a Yahoo app password.
-- Remove the legacy `receipt:` block from `C:\kiosk\config\application.yml` so `email.from-address` takes effect.
+- **Open:** Remove the legacy `receipt:` block from `C:\kiosk\config\application.yml` so `email.from-address` takes effect.
 - On the master, set `email.verification-base-url` to the public web address so links are correct behind a proxy.
 - Split emails are sent from the kiosk that performs the split, so that instance needs working mail settings.
-- Abandoned PENDING accounts are not purged.
+- **Open:** Abandoned PENDING accounts are not purged.
 
 ### 8. Verification
 

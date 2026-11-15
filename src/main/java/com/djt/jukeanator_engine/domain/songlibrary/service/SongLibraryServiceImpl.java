@@ -1156,6 +1156,15 @@ public class SongLibraryServiceImpl
 
     requireNotMaster();
 
+    // Before the first scan completes, ownRoot is the empty placeholder with no music folder (see
+    // initialize()). Persisting it -- e.g. from SongLibraryScheduler's shutdown hook when the app is
+    // closed before choosing a folder -- would leave an empty library behind that loads cleanly on
+    // the next start, so the operator would never be asked for a music folder again.
+    if (!hasOwnLibraryRootPath()) {
+      log.info("No music folder has been scanned yet -- not storing the empty song library.");
+      return Integer.valueOf(0);
+    }
+
     try {
 
       // Store the song library
@@ -1282,6 +1291,29 @@ public class SongLibraryServiceImpl
   @Override
   public Boolean isLibraryLoadFailedAtStartup() {
     return this.libraryLoadFailedAtStartup;
+  }
+
+  @Override
+  public Boolean isInitialLibraryScanNeeded() {
+
+    if (this.isMaster) {
+      return Boolean.FALSE;
+    }
+    // getAllAlbums() rather than getAlbums(): the latter is only populated by initialize(), which
+    // a freshly-loaded root may not have had yet.
+    return this.libraryLoadFailedAtStartup
+        || !hasOwnLibraryRootPath()
+        || this.ownRoot.getAllAlbums().isEmpty();
+  }
+
+  @Override
+  public String getOwnLibraryRootPath() {
+    return hasOwnLibraryRootPath() ? this.ownRoot.getRootPath() : "";
+  }
+
+  private boolean hasOwnLibraryRootPath() {
+    return this.ownRoot != null && this.ownRoot.getRootPath() != null
+        && !this.ownRoot.getRootPath().isBlank();
   }
 
   // Repository methods
