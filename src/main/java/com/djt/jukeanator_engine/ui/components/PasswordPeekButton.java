@@ -1,11 +1,14 @@
 package com.djt.jukeanator_engine.ui.components;
 
+import java.awt.AWTEvent;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.Toolkit;
+import java.awt.event.AWTEventListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
@@ -21,13 +24,14 @@ import javax.swing.Timer;
  * typing on the on-screen keyboard can check for mistyped characters.
  *
  * <p>
- * It supports two gestures so it works in both touch-driver modes (see {@link TouchInput}):
- * <ul>
- * <li>Press and hold: the password is shown while the finger stays down and is masked again on
- * release. This needs "Mouse Emulation" mode, where the press arrives on touch-down.</li>
- * <li>Quick tap: the password is shown for {@link #TAP_REVEAL_MS} and then masked again. This also
- * covers "Click on Touch" mode, where press and release arrive together on lift.</li>
- * </ul>
+ * The password is shown only while the finger (or mouse button) is held down on the icon and is
+ * masked again the moment it is released. This relies on the touch driver's "Mouse Emulation"
+ * mode, where the press arrives on touch-down (see {@link TouchInput}).
+ *
+ * <p>
+ * The release is also watched for globally, so it is caught even when AWT delivers it to another
+ * component, and a reveal is capped at {@link #MAX_REVEAL_MS} in case no release is reported at
+ * all.
  *
  * <p>
  * The component does not touch the password field itself. The owner supplies a callback that is
@@ -38,17 +42,26 @@ public class PasswordPeekButton extends JComponent {
 
   private static final long serialVersionUID = 1L;
 
-  /** How long a quick tap reveals the password. */
-  public static final int TAP_REVEAL_MS = 3000;
-  /** A press held at least this long counts as press-and-hold; the reveal ends on release. */
-  public static final int HOLD_THRESHOLD_MS = 400;
+  /** Upper bound on a reveal, in case the release is never reported. */
+  public static final int MAX_REVEAL_MS = 15000;
 
   private final transient Consumer<Boolean> onRevealChanged;
   private final transient Runnable onInteraction;
-  private final Timer hideTimer = new Timer(TAP_REVEAL_MS, e -> conceal());
+  /** Backstop only: masks the password after {@link #MAX_REVEAL_MS} if no release was seen. */
+  private final Timer safetyTimer = new Timer(MAX_REVEAL_MS, e -> conceal());
+  /**
+   * Catches the release wherever AWT delivers it, not only on this component. Installed only while
+   * a press is in progress.
+   */
+  private final transient AWTEventListener releaseWatcher = event -> {
+    if (event.getID() == MouseEvent.MOUSE_RELEASED && event instanceof MouseEvent me
+        && SwingUtilities.isLeftMouseButton(me)) {
+      onRelease();
+    }
+  };
 
   private boolean revealed = false;
-  private long pressedAt;
+  private boolean releaseWatcherInstalled = false;
 
   /**
    * @param onRevealChanged called with {@code true} when the password should be shown and
@@ -59,31 +72,20 @@ public class PasswordPeekButton extends JComponent {
   public PasswordPeekButton(Consumer<Boolean> onRevealChanged, Runnable onInteraction) {
     this.onRevealChanged = onRevealChanged;
     this.onInteraction = onInteraction;
-    hideTimer.setRepeats(false);
+    safetyTimer.setRepeats(false);
     setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
     addMouseListener(new MouseAdapter() {
       @Override
       public void mousePressed(MouseEvent e) {
-        if (!SwingUtilities.isLeftMouseButton(e))
-          return;
-        pressedAt = System.currentTimeMillis();
-        hideTimer.stop();
-        setRevealed(true);
-        if (PasswordPeekButton.this.onInteraction != null)
-          PasswordPeekButton.this.onInteraction.run();
+        if (SwingUtilities.isLeftMouseButton(e))
+          onPress();
       }
 
       @Override
       public void mouseReleased(MouseEvent e) {
-        if (!SwingUtilities.isLeftMouseButton(e))
-          return;
-        long heldMs = System.currentTimeMillis() - pressedAt;
-        if (heldMs >= HOLD_THRESHOLD_MS) {
-          conceal();
-        } else {
-          hideTimer.restart();
-        }
+        if (SwingUtilities.isLeftMouseButton(e))
+          onRelease();
       }
     });
   }
@@ -95,8 +97,36 @@ public class PasswordPeekButton extends JComponent {
 
   /** Masks the password immediately (no-op if it is already masked). */
   public void conceal() {
-    hideTimer.stop();
+    safetyTimer.stop();
+    uninstallReleaseWatcher();
     setRevealed(false);
+  }
+
+  private void onPress() {
+    if (onInteraction != null)
+      onInteraction.run();
+    installReleaseWatcher();
+    setRevealed(true);
+    safetyTimer.restart();
+  }
+
+  /** Any left-button release ends the reveal (a duplicate report of it is a harmless no-op). */
+  private void onRelease() {
+    conceal();
+  }
+
+  private void installReleaseWatcher() {
+    if (!releaseWatcherInstalled) {
+      Toolkit.getDefaultToolkit().addAWTEventListener(releaseWatcher, AWTEvent.MOUSE_EVENT_MASK);
+      releaseWatcherInstalled = true;
+    }
+  }
+
+  private void uninstallReleaseWatcher() {
+    if (releaseWatcherInstalled) {
+      Toolkit.getDefaultToolkit().removeAWTEventListener(releaseWatcher);
+      releaseWatcherInstalled = false;
+    }
   }
 
   private void setRevealed(boolean value) {
