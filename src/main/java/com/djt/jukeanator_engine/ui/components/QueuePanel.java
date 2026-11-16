@@ -35,6 +35,7 @@ import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
+import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.ChangeSongQueueRequest;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongPlayHistoryEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
@@ -90,20 +91,20 @@ public class QueuePanel extends JPanel {
   /** Whether the "Genre" column is shown (the song library's {@code use-genre} setting). */
   private final boolean useGenre;
 
-  // ── Text columns ──────────────────────────────────────────────────────────
-  /*
-   * Relative widths of the text columns. Album is the baseline (1.0); Artist is 30% narrower, and
-   * the space taken from Artist and Genre goes to Song. When Genre is hidden the other three share
-   * its space in the same proportions.
+  // ── Row text ──────────────────────────────────────────────────────────────
+  /** Header text of the priority column; the column is sized to fit it. */
+  private static final String PRI_HEADER_TEXT = "Priority";
+  /** Extra width added to the "Priority" and "Time" columns beyond their measured text width. */
+  private static final int LEAD_COL_PAD = 8;
+  /** Header text of the history view's start-time column. */
+  private static final String TIME_HEADER_TEXT = "Time";
+  /**
+   * Widest possible start time in {@link #HISTORY_TIME_FORMAT} ("h:mma"): two-digit hour, using
+   * the widest digit, so the Time column always fits without wasting space.
    */
-  private static final double GENRE_COL_WEIGHT = 0.5;
-  private static final double ARTIST_COL_WEIGHT = 0.7;
-  private static final double ALBUM_COL_WEIGHT = 1.0;
-  private static final double SONG_COL_WEIGHT = 1.4;
-  /** Horizontal gap between a column's text and the divider on its right. */
-  private static final int TEXT_COL_GAP = 8;
-  /** Padding between a column divider and the text to its right. */
-  private static final int TEXT_COL_PAD_LEFT = 8;
+  private static final String[] WIDEST_TIME_SAMPLES = {"88:88AM", "88:88PM"};
+  /** Separator between genre, artist and album on a row's second line. */
+  private static final String DETAILS_SEPARATOR = "  ·  ";
 
   // ── Queue list ────────────────────────────────────────────────────────────
   // Mutable snapshot of the visible (capped) queue rows, rendered as AlbumViewCard-style
@@ -282,16 +283,16 @@ public class QueuePanel extends JPanel {
 
   /**
    * Builds the "Song Queue" header — same {@link DetailHeaderPanel} style as Home / Hot Here /
-   * Genre Details, with the "Show History" toggle and the priority legend (formerly its own
-   * "Queued Songs:" row) in the header's east slot. No back button and no artist/album/song
+   * Genre Details, with the "Show History" toggle in the header's east slot (each row shows its
+   * priority number in the "Priority" column, so there is no priority legend). No back button and no
+   * artist/album/song
    * subtitle — there's nothing to navigate back from and nothing meaningful to count here.
    */
   private DetailHeaderPanel buildHeaderPanel() {
     int iconSize = LayoutTheme.get().detailHeaderImageW;
     ImageIcon queueIcon = imageLoader.loadImage("Queue_Header_Image.png", iconSize, iconSize);
 
-    // "Show History:" label + toggle, styled exactly like the Home tab's "Legacy:" toggle,
-    // followed by the priority legend on the same row.
+    // "Show History:" label + toggle, styled exactly like the Home tab's "Legacy:" toggle.
     JPanel eastRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
     eastRow.setOpaque(false);
 
@@ -305,9 +306,6 @@ public class QueuePanel extends JPanel {
     historyToggle.setName(UiComponentNames.QUEUE_HISTORY_TOGGLE);
     historyToggle.setToggleListener(this::applyHistoryMode);
     eastRow.add(historyToggle);
-
-    eastRow.add(Box.createHorizontalStrut(14));
-    eastRow.add(SongTrackCellRenderer.buildPriorityLegend());
 
     // BorderLayout.EAST stretches the east panel to the header's full height, and the row's
     // own FlowLayout then lays it out starting from the top — pinning it level with the title
@@ -391,7 +389,7 @@ public class QueuePanel extends JPanel {
     queueRowsScroll.setOpaque(false);
     queueRowsScroll.getViewport().setOpaque(false);
     queueRowsScroll.setBorder(null);
-    queueRowsScroll.getVerticalScrollBar().setUnitIncrement(LayoutTheme.get().albumViewRowH);
+    queueRowsScroll.getVerticalScrollBar().setUnitIncrement(minRowH());
     // Big touch-friendly scroll bar unless user-interface.use-big-scrollbars is off (same as
     // LegacyAlbumGridPanel's track list).
     ScrollBars.apply(queueRowsScroll.getVerticalScrollBar());
@@ -425,13 +423,12 @@ public class QueuePanel extends JPanel {
 
     @Override
     public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
-      return LayoutTheme.get().albumViewRowH;
+      return minRowH();
     }
 
     @Override
     public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
-      return Math.max(visibleRect.height - LayoutTheme.get().albumViewRowH,
-          LayoutTheme.get().albumViewRowH);
+      return Math.max(visibleRect.height - minRowH(), minRowH());
     }
 
     @Override
@@ -446,11 +443,74 @@ public class QueuePanel extends JPanel {
     }
   }
 
+  /** Font of the column-name header row ("Time" / "Priority" / "Song"). */
+  private static Font headerFont() {
+    return new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist);
+  }
+
+  /** Font of the song name (row line 1) — same as the Hot Here song rows. */
+  private static Font songNameFont() {
+    return new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAlbumLabel);
+  }
+
   /**
-   * Builds the column-name header row above the queue rows — same style as {@code AlbumViewCard}'s
-   * track-list header, with "Plays" followed by the "Genre" (only when genres are in use) /
-   * "Artist" / "Album" / "Song" text columns (see {@link #buildTextColumns}). The history view adds
-   * a "Time" column to the left of "Plays".
+   * Width of the "Priority" column: just wide enough for its header label (or a two-digit priority
+   * in the row font, whichever is wider) plus a little padding, since priorities stay in single
+   * digits in practice.
+   */
+  private int priColW() {
+    int header = getFontMetrics(headerFont()).stringWidth(PRI_HEADER_TEXT);
+    int value = getFontMetrics(songNameFont()).stringWidth("88");
+    return Math.max(header, value) + LEAD_COL_PAD;
+  }
+
+  /**
+   * Width of the history view's "Time" column: just wide enough for the widest possible start time
+   * in the row font (or the header label, whichever is wider) plus a little padding. The time
+   * format is fixed, so the column never needs more.
+   */
+  private int timeColW() {
+    int width = getFontMetrics(headerFont()).stringWidth(TIME_HEADER_TEXT);
+    FontMetrics fm = getFontMetrics(songNameFont());
+    for (String sample : WIDEST_TIME_SAMPLES) {
+      width = Math.max(width, fm.stringWidth(sample));
+    }
+    return width + LEAD_COL_PAD;
+  }
+
+  /**
+   * Minimum height of a queue/history row: tall enough for the album art thumbnail plus the row's
+   * top/bottom padding, and never less than the shared {@link LayoutTheme#albumViewRowH}. The queue
+   * view fits as many rows of this height as it can, then stretches them to fill the list.
+   */
+  private static int minRowH() {
+    LayoutTheme lt = LayoutTheme.get();
+    return Math.max(lt.albumViewRowH, lt.resultThumbSize + 2 * lt.albumViewRowPadV);
+  }
+
+  /**
+   * Builds the leading fixed-width cluster shared by the header and every row, so they line up:
+   * [Time] (history view only) then Priority.
+   */
+  private JPanel buildLeadCluster(JLabel timeLabel, JLabel priLabel) {
+    priLabel.setPreferredSize(new Dimension(priColW(), 30));
+    priLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+    JPanel cluster = new JPanel(new BorderLayout(6, 0));
+    cluster.setOpaque(false);
+    if (timeLabel != null) {
+      timeLabel.setPreferredSize(new Dimension(timeColW(), 30));
+      timeLabel.setHorizontalAlignment(SwingConstants.LEFT);
+      cluster.add(timeLabel, BorderLayout.WEST);
+    }
+    cluster.add(priLabel, BorderLayout.CENTER);
+    return cluster;
+  }
+
+  /**
+   * Builds the column-name header row above the queue rows: "Priority" over the priority column and
+   * "Song" over the play bars, album art and song text. The history view adds a "Time" column to
+   * the left of "Priority".
    */
   private JPanel buildColumnHeaderPanel(boolean history) {
     JPanel headerPanel = new JPanel(new BorderLayout(10, 0));
@@ -458,55 +518,73 @@ public class QueuePanel extends JPanel {
     headerPanel.setBorder(new EmptyBorder(8, 16, 8, 16));
     headerPanel.setPreferredSize(new Dimension(headerPanel.getPreferredSize().width, 45));
 
-    Font headerFont = new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist);
+    Font font = headerFont();
+    JLabel timeHeaderLabel = history ? headerLabel(TIME_HEADER_TEXT, font) : null;
+    JLabel priHeaderLabel = headerLabel(PRI_HEADER_TEXT, font);
+    JLabel songHeaderLabel = headerLabel("Song", font);
 
-    JLabel popHeaderLabel = new JLabel("Plays");
-    popHeaderLabel.setForeground(TEXT_SECONDARY);
-    popHeaderLabel.setFont(headerFont);
-    popHeaderLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewPlaysColW, 30));
-    popHeaderLabel.setHorizontalAlignment(SwingConstants.LEFT);
-
-    JPanel headerLeftCluster = new JPanel(new BorderLayout(6, 0));
-    headerLeftCluster.setOpaque(false);
-    headerLeftCluster.add(popHeaderLabel, BorderLayout.WEST);
-
-    JPanel headerCenterCluster =
-        buildTextColumns("Genre", "Artist", "Album", "Song", TEXT_SECONDARY, headerFont);
-
-    if (history) {
-      JLabel timeHeaderLabel = new JLabel("Time");
-      timeHeaderLabel.setForeground(TEXT_SECONDARY);
-      timeHeaderLabel
-          .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
-      timeHeaderLabel
-          .setPreferredSize(new Dimension(LayoutTheme.get().songQueueHistoryTimeColW, 30));
-      timeHeaderLabel.setHorizontalAlignment(SwingConstants.LEFT);
-
-      JPanel timeAndLeft = new JPanel(new BorderLayout(6, 0));
-      timeAndLeft.setOpaque(false);
-      timeAndLeft.add(timeHeaderLabel, BorderLayout.WEST);
-      timeAndLeft.add(headerLeftCluster, BorderLayout.CENTER);
-      headerPanel.add(timeAndLeft, BorderLayout.WEST);
-    } else {
-      headerPanel.add(headerLeftCluster, BorderLayout.WEST);
-    }
-    headerPanel.add(headerCenterCluster, BorderLayout.CENTER);
-
+    headerPanel.add(buildLeadCluster(timeHeaderLabel, priHeaderLabel), BorderLayout.WEST);
+    headerPanel.add(songHeaderLabel, BorderLayout.CENTER);
     return headerPanel;
   }
 
+  private static JLabel headerLabel(String text, Font font) {
+    JLabel label = new JLabel(text);
+    label.setForeground(TEXT_SECONDARY);
+    label.setFont(font);
+    return label;
+  }
+
   /**
-   * Builds a single queue or history row — same sizing and popularity-bar widget as
-   * {@code AlbumViewCard.buildTrackRow} ([Time] | Plays | [Genre] | Artist | Album | Song). The
-   * text columns share one font and are all tinted by the entry's queue priority (matching the
-   * legend), switching to the accent colour when the row is the current selection for the
-   * move/remove buttons.
+   * Second line of a row, e.g. "Rock  ·  Moby  ·  Play": the genre (only when genres are in use),
+   * artist and album, skipping any that are blank.
+   */
+  private String songDetailsText(SongDto song) {
+    List<String> parts = new ArrayList<>();
+    if (useGenre) {
+      addIfNotBlank(parts, song.genreName());
+    }
+    addIfNotBlank(parts, song.artistName());
+    addIfNotBlank(parts, song.albumName());
+    return String.join(DETAILS_SEPARATOR, parts);
+  }
+
+  private static void addIfNotBlank(List<String> parts, String text) {
+    if (text != null && !text.isBlank()) {
+      parts.add(text);
+    }
+  }
+
+  /**
+   * Zeroes a label's preferred/minimum width while keeping its font-driven height, so long text is
+   * truncated with an ellipsis instead of widening the row (same as {@code
+   * ResultsColumnPanel.capTextWidth}).
+   */
+  private static void capTextWidth(JLabel label) {
+    Dimension d = new Dimension(0, label.getPreferredSize().height);
+    label.setMinimumSize(d);
+    label.setPreferredSize(d);
+  }
+
+  /** Wraps a component so it keeps its preferred size and sits vertically centred in the row. */
+  private static JPanel centered(java.awt.Component c) {
+    JPanel wrapper = new JPanel(new java.awt.GridBagLayout());
+    wrapper.setOpaque(false);
+    wrapper.add(c);
+    return wrapper;
+  }
+
+  /**
+   * Builds a single queue or history row, styled like the Hot Here Songs rows ({@code
+   * ResultsColumnPanel.buildItemRow}) but without a rank number: [Time] | Priority | play bars | album
+   * art | two-line text (song name over "Genre · Artist · Album"). The text uses the Hot Here
+   * colours; a selected row keeps them and only changes its background.
    *
    * @param timeText start time shown in the leading "Time" column (history view), or
    *        {@code null} for a queue row, which has no such column
    * @param selectable whether the row can be clicked to select it for the move/remove buttons
-   * @param rowHeight row height in pixels: {@link LayoutTheme#albumViewRowH} in the history view,
-   *        stretched in the queue view so the visible rows fill the list
+   * @param rowHeight row height in pixels: {@link #minRowH()} in the history view, stretched in
+   *        the queue view so the visible rows fill the list
    */
   private JPanel buildRow(SongQueueEntryDto entry, int index, String timeText,
       boolean selectable, int rowHeight) {
@@ -525,49 +603,84 @@ public class QueuePanel extends JPanel {
     }
 
     boolean selected = selectable && index == selectedIndex;
-    Color textColor = selected ? ACCENT_BLUE : priorityColor(entry);
-    Font textFont = new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackSong);
+    LayoutTheme lt = LayoutTheme.get();
+    SongDto song = entry.song();
+    Font songFont = songNameFont();
 
-    // ── Popularity bars (WEST) ────────────────────────────────────────────
-    int plays = entry.song().numPlays() == null ? 0 : entry.song().numPlays();
-    int bars = SongTrackCellRenderer.barsForPlays(plays, popularityT1, popularityT2, popularityT3);
-    JPanel barsPanel = new SongTrackCellRenderer.PopularityBarsPanel(bars);
-    barsPanel.setOpaque(false);
-    int barW = SongTrackCellRenderer.BAR_WIDTH;
-    int barGap = SongTrackCellRenderer.BAR_GAP;
-    int barMaxH = SongTrackCellRenderer.BAR_MAX_H;
-    barsPanel.setPreferredSize(new Dimension(3 * (barW + barGap) + 6, barMaxH + 4));
-
-    JPanel left = new JPanel(new BorderLayout(6, 0));
-    left.setOpaque(false);
-
-    JPanel barsAlignmentPanel = new JPanel(new BorderLayout());
-    barsAlignmentPanel.setOpaque(false);
-    barsAlignmentPanel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewPlaysColW, 30));
-    barsAlignmentPanel.add(barsPanel, BorderLayout.WEST);
-
-    left.add(barsAlignmentPanel, BorderLayout.WEST);
-
+    // ── [Time] | Priority (WEST) ──────────────────────────────────────────────
+    JLabel timeLabel = null;
     if (timeText != null) {
-      JLabel timeLabel = new JLabel(timeText);
-      timeLabel.setForeground(textColor);
-      timeLabel.setFont(textFont);
-      timeLabel.setPreferredSize(new Dimension(LayoutTheme.get().songQueueHistoryTimeColW, 30));
-      timeLabel.setHorizontalAlignment(SwingConstants.LEFT);
+      timeLabel = new JLabel(timeText);
+      timeLabel.setForeground(ColorTheme.get().textPrimary);
+      timeLabel.setFont(songFont);
+    }
+    int priority = entry.priority() == null ? 0 : entry.priority();
+    JLabel priLabel = new JLabel(String.valueOf(priority));
+    priLabel.setForeground(ColorTheme.get().textPrimary);
+    priLabel.setFont(songFont);
+    row.add(buildLeadCluster(timeLabel, priLabel), BorderLayout.WEST);
 
-      JPanel timeAndLeft = new JPanel(new BorderLayout(6, 0));
-      timeAndLeft.setOpaque(false);
-      timeAndLeft.add(timeLabel, BorderLayout.WEST);
-      timeAndLeft.add(left, BorderLayout.CENTER);
-      row.add(timeAndLeft, BorderLayout.WEST);
-    } else {
-      row.add(left, BorderLayout.WEST);
+    // ── Popularity bars — the small Hot Here variant ──────────────────────
+    int plays = song.numPlays() == null ? 0 : song.numPlays();
+    int active = SongTrackCellRenderer.barsForPlays(plays, popularityT1, popularityT2, popularityT3);
+    SongTrackCellRenderer.PopularityBarsPanel bars = new SongTrackCellRenderer.PopularityBarsPanel(
+        active, lt.popularityBarWidthSmall, lt.popularityBarGapSmall,
+        SongTrackCellRenderer.computeBarHeights(lt.popularityBarMaxHSmall));
+    bars.setOpaque(false);
+    bars.setPreferredSize(new Dimension(3 * (lt.popularityBarWidthSmall + lt.popularityBarGapSmall),
+        lt.popularityBarMaxHSmall + 4));
+
+    // ── Album art ─────────────────────────────────────────────────────────
+    JLabel thumb = new JLabel();
+    thumb.setPreferredSize(new Dimension(lt.resultThumbSize, lt.resultThumbSize));
+    thumb.setHorizontalAlignment(SwingConstants.CENTER);
+    thumb.setOpaque(true);
+    thumb.setBackground(ColorTheme.get().bgThumb);
+    if (song.coverArtPath() != null && imageLoader != null) {
+      try {
+        ImageIcon icon = imageLoader.loadFilesystemImage(song.coverArtPath(), lt.resultThumbSize,
+            lt.resultThumbSize);
+        if (icon != null) {
+          thumb.setIcon(icon);
+        }
+      } catch (Exception ignored) {
+        // no art: leave the placeholder thumbnail background showing
+      }
     }
 
-    // ── Genre / Artist / Album / Song columns (CENTER) ────────────────────
-    row.add(buildTextColumns(entry.song().genreName(), entry.song().artistName(),
-        entry.song().albumName(), entry.song().songName(), textColor, textFont),
-        BorderLayout.CENTER);
+    JPanel barsAndThumb = new JPanel(new BorderLayout(6, 0));
+    barsAndThumb.setOpaque(false);
+    barsAndThumb.add(centered(bars), BorderLayout.WEST);
+    barsAndThumb.add(centered(thumb), BorderLayout.CENTER);
+
+    // ── Two-line text: song name over "Genre · Artist · Album" ──────────
+    JLabel line1 = new JLabel(song.songName());
+    line1.setFont(songFont);
+    line1.setForeground(ColorTheme.get().textPrimary);
+    JLabel line2 = new JLabel(songDetailsText(song));
+    line2.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, lt.fontSizeResultLine2));
+    line2.setForeground(ColorTheme.get().textResultsSecondary);
+    capTextWidth(line1);
+    capTextWidth(line2);
+    line1.setAlignmentX(LEFT_ALIGNMENT);
+    line2.setAlignmentX(LEFT_ALIGNMENT);
+    line1.setMaximumSize(new Dimension(Integer.MAX_VALUE, line1.getPreferredSize().height));
+    line2.setMaximumSize(new Dimension(Integer.MAX_VALUE, line2.getPreferredSize().height));
+
+    JPanel textPanel = new JPanel();
+    textPanel.setOpaque(false);
+    textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
+    textPanel.add(Box.createVerticalGlue());
+    textPanel.add(line1);
+    textPanel.add(Box.createVerticalStrut(3));
+    textPanel.add(line2);
+    textPanel.add(Box.createVerticalGlue());
+
+    JPanel songCluster = new JPanel(new BorderLayout(10, 0));
+    songCluster.setOpaque(false);
+    songCluster.add(barsAndThumb, BorderLayout.WEST);
+    songCluster.add(textPanel, BorderLayout.CENTER);
+    row.add(songCluster, BorderLayout.CENTER);
 
     if (selected) {
       row.setOpaque(true);
@@ -609,65 +722,6 @@ public class QueuePanel extends JPanel {
     });
 
     return row;
-  }
-
-  /**
-   * Builds the Genre / Artist / Album / Song text columns shared by the header row and every queue
-   * or history row, so the header and rows always line up. The columns fill the available width by
-   * weight alone (every label's preferred width is 0), using the {@code *_COL_WEIGHT} constants.
-   * The Genre column is omitted entirely when genres are not in use. Every column after the first
-   * has a thin vertical divider on its left edge, and text too long for its column is truncated
-   * with an ellipsis before it reaches the next divider.
-   */
-  private JPanel buildTextColumns(String genre, String artist, String album, String song,
-      Color color, Font font) {
-    JPanel panel = new JPanel(new java.awt.GridBagLayout());
-    panel.setOpaque(false);
-
-    List<String> texts = new ArrayList<>();
-    List<Double> weights = new ArrayList<>();
-    if (useGenre) {
-      texts.add(genre);
-      weights.add(GENRE_COL_WEIGHT);
-    }
-    texts.add(artist);
-    weights.add(ARTIST_COL_WEIGHT);
-    texts.add(album);
-    weights.add(ALBUM_COL_WEIGHT);
-    texts.add(song);
-    weights.add(SONG_COL_WEIGHT);
-
-    for (int i = 0; i < texts.size(); i++) {
-      JLabel label = new JLabel(texts.get(i) == null ? "" : texts.get(i));
-      label.setForeground(color);
-      label.setFont(font);
-      label.setHorizontalAlignment(SwingConstants.LEFT);
-      label.setPreferredSize(new Dimension(0, 30));
-      label.setMinimumSize(new Dimension(0, 30));
-      if (i > 0) {
-        // Divider on the left edge, with padding so the text does not touch it
-        label.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 1, 0, 0, SEPARATOR),
-            new EmptyBorder(0, TEXT_COL_PAD_LEFT, 0, 0)));
-      }
-
-      java.awt.GridBagConstraints c = new java.awt.GridBagConstraints();
-      c.gridx = i;
-      c.gridy = 0;
-      c.weightx = weights.get(i);
-      c.weighty = 1.0;
-      c.fill = java.awt.GridBagConstraints.BOTH; // full height, so the dividers span the row
-      c.insets = new java.awt.Insets(0, 0, 0, i < texts.size() - 1 ? TEXT_COL_GAP : 0);
-      panel.add(label, c);
-    }
-    return panel;
-  }
-
-  /** The legend colour for the entry's queue priority (5 and above share the last colour). */
-  private static Color priorityColor(SongQueueEntryDto entry) {
-    int priority = entry.priority() == null ? 0 : entry.priority();
-    int slot = Math.max(0, Math.min(priority, SongTrackCellRenderer.PRIORITY_COLORS.length - 1));
-    return SongTrackCellRenderer.PRIORITY_COLORS[slot];
   }
 
   // ── Action area (buttons + timeout row) ──────────────────────────────────
@@ -888,7 +942,7 @@ public class QueuePanel extends JPanel {
       for (int i = 0; i < history.size(); i++) {
         SongPlayHistoryEntryDto played = history.get(i);
         queueRowsPanel.add(buildRow(played.entry(), i,
-            HISTORY_TIME_FORMAT.format(played.startedAt()), false, LayoutTheme.get().albumViewRowH));
+            HISTORY_TIME_FORMAT.format(played.startedAt()), false, minRowH()));
         if (i < history.size() - 1) {
           queueRowsPanel.add(buildSeparator());
         }
@@ -917,7 +971,7 @@ public class QueuePanel extends JPanel {
       // bottom that would suggest the queue ends there. The heights are the same whether or not
       // the queue is full, so a short queue keeps its rows the same size and its gap is real.
       // Leftover pixels go one each to the first rows.
-      int rowH = LayoutTheme.get().albumViewRowH;
+      int rowH = minRowH();
       int extraPx = 0;
       if (viewportH > 0) {
         int avail = viewportH - 2 * ROWS_PANEL_PAD_V - (fitRows - 1) * ROW_SEPARATOR_H;
@@ -949,7 +1003,7 @@ public class QueuePanel extends JPanel {
   }
 
   /**
-   * Number of whole queue rows (at the minimum {@link LayoutTheme#albumViewRowH}) that fit in the
+   * Number of whole queue rows (at the minimum {@link #minRowH()}) that fit in the
    * viewport's current height: n rows take {@code n * rowH + (n - 1) * separator + top/bottom
    * padding}. {@link #rebuildRows(boolean)} then stretches those rows to fill the list. Capped at
    * {@link LayoutTheme#songQueueMaxVisible}, and falls back to that cap before the first layout
@@ -964,8 +1018,8 @@ public class QueuePanel extends JPanel {
     if (viewportH <= 0) {
       return max;
     }
-    int rowH = LayoutTheme.get().albumViewRowH;
-    int fit = (viewportH - 2 * ROWS_PANEL_PAD_V + ROW_SEPARATOR_H) / (rowH + ROW_SEPARATOR_H);
+    int rowH = minRowH();
+    int fit =(viewportH - 2 * ROWS_PANEL_PAD_V + ROW_SEPARATOR_H) / (rowH + ROW_SEPARATOR_H);
     return Math.max(1, Math.min(max, fit));
   }
 
