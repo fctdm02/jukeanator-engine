@@ -229,6 +229,9 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
 
     boolean explicit = Boolean.TRUE.equals(album.hasExplicit());
     Color borderColor = explicit ? ColorTheme.get().accentExplicit : ColorTheme.get().legacyPanelBorder;
+    // Text drawn on the border-colored strips (title bar, publisher/release-year line): black on
+    // the white frame, white on the red explicit frame so it stays legible.
+    Color frameTextColor = explicit ? Color.WHITE : Color.BLACK;
 
     JPanel card = new JPanel(new BorderLayout(0, 0));
     card.setName(UiComponentNames.LEGACY_ALBUM_CARD);
@@ -237,13 +240,13 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
     card.setBorder(BorderFactory.createLineBorder(borderColor, 2));
 
     // ── Title bar — solid fill matching the card border color (white, or red for explicit
-    // albums) with black text, so it reads as one continuous colored frame around the card. ──
+    // albums) with black text (white on red), so it reads as one continuous colored frame around the card. ──
     JLabel title = new JLabel(
         (album.artistName() != null ? album.artistName() + " - " : "")
             + AlbumGridPanel.albumDisplayName(album.albumName(), album.genreName()));
     title.setOpaque(true);
     title.setBackground(borderColor);
-    title.setForeground(Color.BLACK);
+    title.setForeground(frameTextColor);
     title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, profile.headerFontSize()));
     title.setBorder(new EmptyBorder(2, 6, 2, 6));
     card.add(title, BorderLayout.NORTH);
@@ -282,7 +285,7 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
       JLabel publisherLabel = new JLabel(publisherLine, SwingConstants.LEFT);
       publisherLabel.setOpaque(true);
       publisherLabel.setBackground(borderColor);
-      publisherLabel.setForeground(Color.BLACK);
+      publisherLabel.setForeground(frameTextColor);
       publisherLabel.setFont(
           new Font(Font.SANS_SERIF, Font.PLAIN, Math.max(8, profile.headerFontSize() - 2)));
       publisherLabel.setBorder(new EmptyBorder(1, 4, 1, 4));
