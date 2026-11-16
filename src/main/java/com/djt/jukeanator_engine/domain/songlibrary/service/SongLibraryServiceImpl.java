@@ -417,6 +417,19 @@ public class SongLibraryServiceImpl
   }
 
   @Override
+  public Integer getSongsWithPlaysCount(Integer locationId) {
+
+    int count = 0;
+    for (SongFileEntity song : getOrLoadRoot(locationId).getSongs()) {
+      Integer numPlays = song.getNumPlays();
+      if (numPlays != null && numPlays.intValue() > 0) {
+        count++;
+      }
+    }
+    return Integer.valueOf(count);
+  }
+
+  @Override
   public Integer getSearchResultPageSize() {
     return searchResultPageSize;
   }

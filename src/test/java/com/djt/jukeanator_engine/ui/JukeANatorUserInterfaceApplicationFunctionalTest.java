@@ -260,9 +260,10 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     assertFalse(albums.isEmpty(), "the fixture library should have been scanned");
     chooseFixtureSongs(albums);
 
-    // The scan's ScanFileSystemForSongsEvent reloads every tab through JukeANatorEventListener
+    // The scan's ScanFileSystemForSongsEvent reloads every tab through JukeANatorEventListener.
+    // Home starts in the Legacy view (user-interface.show-legacy-home-view defaults to true).
     await(() -> onEdt(
-        () -> !findAll(tab(TAB_HOME), UiComponentNames.ALBUM_TILE, JPanel.class).isEmpty()),
+        () -> !findAll(tab(TAB_HOME), UiComponentNames.LEGACY_ALBUM_CARD, JPanel.class).isEmpty()),
         "Home to show the scanned albums");
 
     // Keep queued songs in the queue until step 12 deliberately plays one
@@ -273,7 +274,9 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
 
     // The first-time scan opened Admin without a login; Esc returns to the default tab
     pressEscape();
-    assertEquals(TAB_HOT_HERE, selectedTabTitle(), "HOT HERE should be the default tab");
+    // A freshly scanned library has far fewer than 500 played songs, so HOME (not HOT HERE) is
+    // the default tab.
+    assertEquals(TAB_HOME, selectedTabTitle(), "HOME should be the default tab");
     assertEquals(0, credits(), "the test profile starts with no credits");
     assertTrue(onEdt(() -> creditsLabel().getText().startsWith("CREDITS: ")),
         "credits label: " + onEdt(() -> creditsLabel().getText()));
@@ -300,15 +303,23 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
 
     selectTab(TAB_HOME);
     Container home = tab(TAB_HOME);
-    int tileCount = showingCount(home, UiComponentNames.ALBUM_TILE);
-    assertTrue(tileCount > 0, "Home should show album tiles");
 
-    // Order By buttons re-sort without re-querying; Legacy switches to the legacy grid and back
+    // user-interface.show-legacy-home-view defaults to true: Home starts in the Legacy view
+    assertTrue(showingCount(home, UiComponentNames.LEGACY_ALBUM_CARD) > 0,
+        "Home should start in Legacy mode, showing legacy album cards");
+
+    // The Legacy toggle switches to the album-tile grid
+    click(home, UiComponentNames.HOME_LEGACY_TOGGLE);
+    int tileCount = showingCount(home, UiComponentNames.ALBUM_TILE);
+    assertTrue(tileCount > 0, "Home should show album tiles with Legacy off");
+
+    // Order By buttons re-sort without re-querying
     click(home, UiComponentNames.HOME_SORT_ALBUM_BUTTON);
     assertEquals(tileCount, showingCount(home, UiComponentNames.ALBUM_TILE));
     click(home, UiComponentNames.HOME_SORT_ARTIST_BUTTON);
     assertEquals(tileCount, showingCount(home, UiComponentNames.ALBUM_TILE));
 
+    // Legacy switches back to the legacy grid and off again
     click(home, UiComponentNames.HOME_LEGACY_TOGGLE);
     assertTrue(showingCount(home, UiComponentNames.LEGACY_ALBUM_CARD) > 0,
         "Legacy mode should show legacy album cards");

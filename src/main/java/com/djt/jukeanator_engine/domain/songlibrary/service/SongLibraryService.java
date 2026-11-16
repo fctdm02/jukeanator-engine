@@ -36,6 +36,14 @@ public interface SongLibraryService {
   SearchResultDto getMusicByPopularity(Integer locationId);
 
   /**
+   * The number of songs in the library that have been played at least once. The JFC/Swing UI uses
+   * this to decide whether there are enough song statistics to make HOT HERE its default tab.
+   *
+   * @return the count of songs whose play count is greater than zero
+   */
+  Integer getSongsWithPlaysCount(Integer locationId);
+
+  /**
    * The number of items returned per category (artists/albums/songs) by one server page of
    * {@link #getMusicByPopularity}/{@link #getMusicByTitle}/{@link #getMusicBySearch}/{@link
    * #getGenreMusicByPopularity}/{@link #getGenreMusicByTitle}. UI callers use this to size their

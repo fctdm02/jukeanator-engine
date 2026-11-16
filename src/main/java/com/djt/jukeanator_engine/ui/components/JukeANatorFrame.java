@@ -229,6 +229,15 @@ public class JukeANatorFrame extends JFrame {
    */
   private static final int[] CARD_LINE_PRICE_DOLLARS = {5, 10, 20};
 
+  /**
+   * Below this many played songs there are too few song statistics for HOT HERE to be worth
+   * showing as the default tab (at startup and after inactivity), so HOME is shown instead.
+   */
+  private static final int MIN_SONGS_WITH_PLAYS_FOR_HOT_HERE = 500;
+
+  private static final int TAB_INDEX_HOME = 1;
+  private static final int TAB_INDEX_HOT_HERE = 3;
+
   private CardPulseBurstTracker cardPulseBurstTracker;
   private final char incrementCreditsKey;
   private final char incrementCreditsCreditCardReaderKey;
@@ -571,9 +580,10 @@ public class JukeANatorFrame extends JFrame {
     }
 
     // After 10 minutes of no mouse/keyboard activity, reset every tab to its default
-    // view and bring the jukebox to rest on the HOT HERE tab (index 3), so an idle
-    // machine settles back on the promotional screen exactly as it looks after a
-    // fresh start — regardless of which tab was active, or how far the user had
+    // view and bring the jukebox to rest on the default tab (HOT HERE once the library has
+    // enough played songs, otherwise HOME — see defaultTabIndex()), so an idle machine
+    // settles back exactly as it looks after a fresh start — regardless of which tab was
+    // active, or how far the user had
     // navigated into any of them. Don't yank the Admin panel (tab index 6) out from
     // under a technician who is reading the screen with no input. idleResetDone
     // holds the reset to once per idle episode — the IdleMonitor timer ticks every
@@ -597,7 +607,7 @@ public class JukeANatorFrame extends JFrame {
           genrePanel.resetToDefaultView();
           queuePanel.resetToDefaultView();
 
-          contentPanelTabs.setSelectedIndex(3);
+          contentPanelTabs.setSelectedIndex(defaultTabIndex());
         }),
 
         () -> idleResetDone = false);
@@ -1083,8 +1093,10 @@ public class JukeANatorFrame extends JFrame {
     invisibleTabHeader.setPreferredSize(new Dimension(0, 0));
     tabs.setTabComponentAt(6, invisibleTabHeader);
 
-    // Select HOT HERE (index 3) as the default visible tab
-    tabs.setSelectedIndex(3);
+    // Start on HOME: the library has not loaded yet, so whether there are enough song statistics
+    // for HOT HERE is not known. selectDefaultTab() switches to HOT HERE, if warranted, once the
+    // initial data load completes.
+    tabs.setSelectedIndex(TAB_INDEX_HOME);
 
     // Fires on both a user click and a programmatic setSelectedIndex(...) (e.g. the ESC-key
     // handler, the idle-reset handler), so this one listener catches every tab switch regardless
@@ -1206,6 +1218,7 @@ public class JukeANatorFrame extends JFrame {
     return new HomePanel(incrementCreditsKey, creditManager, songLibraryService, songQueueService,
         userActivityService, imageLoader, priorityCostMultiplier, POPULARITY_THRESHOLD_1,
         POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, albumGridProfile, legacyGridProfile,
+        jukeANatorUserInterfaceProperties.isShowLegacyHomeView(),
         song -> showAddSongToQueueCard(song));
   }
 
@@ -1668,6 +1681,35 @@ public class JukeANatorFrame extends JFrame {
   /** Called by AdminPanel immediately before it iconifies the window. */
   public void setAdminMinimizeRequested(boolean requested) {
     adminMinimizeRequested = requested;
+  }
+
+  /**
+   * Called once the initial library data has loaded: switches from the startup tab (HOME) to the
+   * default tab, unless the user has already moved to another tab.
+   */
+  public void selectDefaultTab() {
+
+    if (contentPanelTabs.getSelectedIndex() == TAB_INDEX_HOME) {
+      contentPanelTabs.setSelectedIndex(defaultTabIndex());
+    }
+  }
+
+  /**
+   * HOT HERE when the library has at least {@link #MIN_SONGS_WITH_PLAYS_FOR_HOT_HERE} played songs,
+   * otherwise HOME. Re-evaluated on every call, since play counts grow over time.
+   */
+  private int defaultTabIndex() {
+
+    try {
+      Integer songsWithPlays =
+          songLibraryService.getSongsWithPlaysCount(songLibraryService.getOwnLocationId());
+      if (songsWithPlays != null && songsWithPlays.intValue() >= MIN_SONGS_WITH_PLAYS_FOR_HOT_HERE) {
+        return TAB_INDEX_HOT_HERE;
+      }
+    } catch (RuntimeException e) {
+      log.debug("Could not count songs with plays; defaulting to the HOME tab", e);
+    }
+    return TAB_INDEX_HOME;
   }
 
   // HOT HERE

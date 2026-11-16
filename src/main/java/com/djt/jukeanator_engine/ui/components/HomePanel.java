@@ -108,8 +108,10 @@ public class HomePanel extends JPanel implements TabNavigator {
   private JButton btnTitle;
   private JButton btnArtist;
 
-  // ── Legacy view toggle — defaults off; always reset to off by resetToDefaultView() ──
-  private boolean legacyMode = false;
+  // ── Legacy view toggle — starts at, and is always reset by resetToDefaultView() to,
+  // defaultLegacyMode (user-interface.show-legacy-home-view) ──
+  private final boolean defaultLegacyMode;
+  private boolean legacyMode;
   private ToggleSwitch legacyToggle;
 
   // ── Currently-playing song, pushed down from JukeANatorFrame#setNowPlaying/clearNowPlaying.
@@ -125,7 +127,7 @@ public class HomePanel extends JPanel implements TabNavigator {
       UserActivityService userActivityService, ImageLoader imageLoader,
       int priorityCostMultiplier, int popularityT1, int popularityT2, int popularityT3,
       LayoutTheme.GridProfile albumGridProfile, LayoutTheme.LegacyGridProfile legacyGridProfile,
-      Consumer<SongDto> onSongQueue) {
+      boolean showLegacyHomeView, Consumer<SongDto> onSongQueue) {
 
     this.incrementCreditsKey = incrementCreditsKey;
     this.creditManager = creditManager;
@@ -139,6 +141,8 @@ public class HomePanel extends JPanel implements TabNavigator {
     this.popularityT3 = popularityT3;
     this.albumGridProfile = albumGridProfile;
     this.legacyGridProfile = legacyGridProfile;
+    this.defaultLegacyMode = showLegacyHomeView;
+    this.legacyMode = showLegacyHomeView;
     this.onSongQueue = onSongQueue;
 
     setLayout(new BorderLayout());
@@ -221,14 +225,14 @@ public class HomePanel extends JPanel implements TabNavigator {
     detailReturnCard = CARD_GRID;
 
     // Unlike sort order / page / letter (left exactly as the user last had them), the Legacy
-    // toggle always resets to off here so an idle kiosk doesn't stay in Legacy view for the
-    // next user.
-    if (legacyMode) {
+    // toggle always resets to its configured default (user-interface.show-legacy-home-view)
+    // here, so an idle kiosk doesn't keep the previous user's choice for the next user.
+    if (legacyMode != defaultLegacyMode) {
       String selectedLetter = currentSelectedLetter();
       int pageOffset = currentPageOffset();
-      legacyMode = false;
+      legacyMode = defaultLegacyMode;
       if (legacyToggle != null) {
-        legacyToggle.setOn(false);
+        legacyToggle.setOn(defaultLegacyMode);
       }
       rebuildGridPanel(selectedLetter, pageOffset);
     }

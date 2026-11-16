@@ -61,6 +61,13 @@ public class JukeANatorUserInterfaceProperties {
   private boolean useBigScrollbars = true;
 
   //
+  // HOME VIEW
+  //
+  // If true, the JFC/Swing Home tab starts in (and returns to after inactivity) the Legacy view,
+  // with its Legacy toggle on; if false, the album-tile view with the toggle off.
+  private boolean showLegacyHomeView = true;
+
+  //
   // MOUSE POINTER
   //
   // If true, the mouse pointer is hidden inside the JFC/Swing kiosk window (for touch screens).
@@ -214,6 +221,14 @@ public class JukeANatorUserInterfaceProperties {
 
   public void setUseBigScrollbars(boolean useBigScrollbars) {
     this.useBigScrollbars = useBigScrollbars;
+  }
+
+  public boolean isShowLegacyHomeView() {
+    return showLegacyHomeView;
+  }
+
+  public void setShowLegacyHomeView(boolean showLegacyHomeView) {
+    this.showLegacyHomeView = showLegacyHomeView;
   }
 
   public boolean isHideMousePointer() {

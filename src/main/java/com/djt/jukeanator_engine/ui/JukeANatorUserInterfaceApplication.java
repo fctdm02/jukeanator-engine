@@ -182,6 +182,9 @@ public class JukeANatorUserInterfaceApplication {
       frame.setNowPlaying(playing);
       frame.setQueue(queue);
 
+      // HOT HERE replaces the startup HOME tab only when there are enough song statistics.
+      frame.selectDefaultTab();
+
       // Grab native OS foreground and keyboard focus now that the UI is fully initialized
       // with real data, so the UI (or, on first use, the scan dialog) is not left behind the
       // command prompt or Winamp, and hardware inputs (e.g. the bill acceptor's 'a'
