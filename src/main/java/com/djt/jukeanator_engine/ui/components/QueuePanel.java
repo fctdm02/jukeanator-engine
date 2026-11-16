@@ -87,6 +87,23 @@ public class QueuePanel extends JPanel {
   private final int popularityT1;
   private final int popularityT2;
   private final int popularityT3;
+  /** Whether the "Genre" column is shown (the song library's {@code use-genre} setting). */
+  private final boolean useGenre;
+
+  // ── Text columns ──────────────────────────────────────────────────────────
+  /*
+   * Relative widths of the text columns. Album is the baseline (1.0); Artist is 30% narrower, and
+   * the space taken from Artist and Genre goes to Song. When Genre is hidden the other three share
+   * its space in the same proportions.
+   */
+  private static final double GENRE_COL_WEIGHT = 0.5;
+  private static final double ARTIST_COL_WEIGHT = 0.7;
+  private static final double ALBUM_COL_WEIGHT = 1.0;
+  private static final double SONG_COL_WEIGHT = 1.4;
+  /** Horizontal gap between a column's text and the divider on its right. */
+  private static final int TEXT_COL_GAP = 8;
+  /** Padding between a column divider and the text to its right. */
+  private static final int TEXT_COL_PAD_LEFT = 8;
 
   // ── Queue list ────────────────────────────────────────────────────────────
   // Mutable snapshot of the visible (capped) queue rows, rendered as AlbumViewCard-style
@@ -135,9 +152,10 @@ public class QueuePanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   public QueuePanel(List<SongQueueEntryDto> initialQueue, SongQueueService songQueueService,
       CreditManager creditManager, ImageLoader imageLoader, int popularityT1, int popularityT2,
-      int popularityT3) {
+      int popularityT3, boolean useGenre) {
 
     this.queue = initialQueue;
+    this.useGenre = useGenre;
     this.songQueueService = songQueueService;
     this.creditManager = creditManager;
     this.imageLoader = imageLoader;
@@ -429,10 +447,10 @@ public class QueuePanel extends JPanel {
   }
 
   /**
-   * Builds the column-name header row above the queue rows — same layout and style as
-   * {@code AlbumViewCard}'s track-list header, using the "Artist" / "Song" compilation columns
-   * since queue entries typically span multiple artists/albums. The history view adds a "Time"
-   * column to the left of "Plays".
+   * Builds the column-name header row above the queue rows — same style as {@code AlbumViewCard}'s
+   * track-list header, with "Plays" followed by the "Genre" (only when genres are in use) /
+   * "Artist" / "Album" / "Song" text columns (see {@link #buildTextColumns}). The history view adds
+   * a "Time" column to the left of "Plays".
    */
   private JPanel buildColumnHeaderPanel(boolean history) {
     JPanel headerPanel = new JPanel(new BorderLayout(10, 0));
@@ -440,49 +458,20 @@ public class QueuePanel extends JPanel {
     headerPanel.setBorder(new EmptyBorder(8, 16, 8, 16));
     headerPanel.setPreferredSize(new Dimension(headerPanel.getPreferredSize().width, 45));
 
-    JPanel headerLeftCluster = new JPanel(new BorderLayout(6, 0));
-    headerLeftCluster.setOpaque(false);
+    Font headerFont = new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist);
 
     JLabel popHeaderLabel = new JLabel("Plays");
     popHeaderLabel.setForeground(TEXT_SECONDARY);
-    popHeaderLabel
-        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
+    popHeaderLabel.setFont(headerFont);
     popHeaderLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewPlaysColW, 30));
     popHeaderLabel.setHorizontalAlignment(SwingConstants.LEFT);
 
-    JLabel trackHeaderLabel = new JLabel("Track");
-    trackHeaderLabel.setForeground(TEXT_SECONDARY);
-    trackHeaderLabel
-        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
-    trackHeaderLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewTrkNumColW, 30));
-    trackHeaderLabel.setHorizontalAlignment(SwingConstants.CENTER);
-
+    JPanel headerLeftCluster = new JPanel(new BorderLayout(6, 0));
+    headerLeftCluster.setOpaque(false);
     headerLeftCluster.add(popHeaderLabel, BorderLayout.WEST);
-    headerLeftCluster.add(trackHeaderLabel, BorderLayout.CENTER);
 
-    JPanel headerCenterCluster = new JPanel(new BorderLayout(10, 0));
-    headerCenterCluster.setOpaque(false);
-
-    JPanel textCluster = new JPanel(new BorderLayout(10, 0));
-    textCluster.setOpaque(false);
-
-    JLabel artistHeaderLabel = new JLabel("Artist");
-    artistHeaderLabel.setForeground(TEXT_SECONDARY);
-    artistHeaderLabel
-        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
-    artistHeaderLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationArtistW, 30));
-
-    JLabel songHeaderLabel = new JLabel("Song");
-    songHeaderLabel.setForeground(TEXT_SECONDARY);
-    songHeaderLabel
-        .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeTrackArtist));
-    songHeaderLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationSongW, 30));
-
-    textCluster.add(artistHeaderLabel, BorderLayout.WEST);
-    textCluster.add(songHeaderLabel, BorderLayout.CENTER);
-
-    headerCenterCluster.add(textCluster, BorderLayout.WEST);
-    headerCenterCluster.add(Box.createHorizontalGlue(), BorderLayout.CENTER);
+    JPanel headerCenterCluster =
+        buildTextColumns("Genre", "Artist", "Album", "Song", TEXT_SECONDARY, headerFont);
 
     if (history) {
       JLabel timeHeaderLabel = new JLabel("Time");
@@ -507,11 +496,11 @@ public class QueuePanel extends JPanel {
   }
 
   /**
-   * Builds a single queue or history row — same layout, sizing, and popularity-bar widget as
-   * {@code AlbumViewCard.buildTrackRow}'s compilation-album branch ([Time] | Plays | Track |
-   * Artist | Song). Track, Artist and Song share one font and are all tinted by the entry's queue
-   * priority (matching the legend), switching to the accent colour when the row is the current
-   * selection for the move/remove buttons.
+   * Builds a single queue or history row — same sizing and popularity-bar widget as
+   * {@code AlbumViewCard.buildTrackRow} ([Time] | Plays | [Genre] | Artist | Album | Song). The
+   * text columns share one font and are all tinted by the entry's queue priority (matching the
+   * legend), switching to the accent colour when the row is the current selection for the
+   * move/remove buttons.
    *
    * @param timeText start time shown in the leading "Time" column (history view), or
    *        {@code null} for a queue row, which has no such column
@@ -549,14 +538,6 @@ public class QueuePanel extends JPanel {
     int barMaxH = SongTrackCellRenderer.BAR_MAX_H;
     barsPanel.setPreferredSize(new Dimension(3 * (barW + barGap) + 6, barMaxH + 4));
 
-    // ── Queue position ─────────────────────────────────────────────────────
-    int trackNumber = entry.song().trackNumber();
-    JLabel numLabel = new JLabel(String.format("%02d", trackNumber));
-    numLabel.setForeground(textColor);
-    numLabel.setFont(textFont);
-    numLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewTrkNumColW, 30));
-    numLabel.setHorizontalAlignment(SwingConstants.CENTER);
-
     JPanel left = new JPanel(new BorderLayout(6, 0));
     left.setOpaque(false);
 
@@ -566,7 +547,6 @@ public class QueuePanel extends JPanel {
     barsAlignmentPanel.add(barsPanel, BorderLayout.WEST);
 
     left.add(barsAlignmentPanel, BorderLayout.WEST);
-    left.add(numLabel, BorderLayout.CENTER);
 
     if (timeText != null) {
       JLabel timeLabel = new JLabel(timeText);
@@ -584,30 +564,10 @@ public class QueuePanel extends JPanel {
       row.add(left, BorderLayout.WEST);
     }
 
-    // ── Artist / Song columns (CENTER) ────────────────────────────────────
-    JPanel columnsPanel = new JPanel(new BorderLayout(10, 0));
-    columnsPanel.setOpaque(false);
-
-    JPanel textCluster = new JPanel(new BorderLayout(10, 0));
-    textCluster.setOpaque(false);
-
-    JLabel artistLabel = new JLabel(entry.song().artistName());
-    artistLabel.setForeground(textColor);
-    artistLabel.setFont(textFont);
-    artistLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationArtistW, 30));
-
-    JLabel songLabel = new JLabel(entry.song().songName());
-    songLabel.setForeground(textColor);
-    songLabel.setFont(textFont);
-    songLabel.setPreferredSize(new Dimension(LayoutTheme.get().albumViewCompilationSongW, 30));
-
-    textCluster.add(artistLabel, BorderLayout.WEST);
-    textCluster.add(songLabel, BorderLayout.CENTER);
-
-    columnsPanel.add(textCluster, BorderLayout.WEST);
-    columnsPanel.add(Box.createHorizontalGlue(), BorderLayout.CENTER);
-
-    row.add(columnsPanel, BorderLayout.CENTER);
+    // ── Genre / Artist / Album / Song columns (CENTER) ────────────────────
+    row.add(buildTextColumns(entry.song().genreName(), entry.song().artistName(),
+        entry.song().albumName(), entry.song().songName(), textColor, textFont),
+        BorderLayout.CENTER);
 
     if (selected) {
       row.setOpaque(true);
@@ -649,6 +609,58 @@ public class QueuePanel extends JPanel {
     });
 
     return row;
+  }
+
+  /**
+   * Builds the Genre / Artist / Album / Song text columns shared by the header row and every queue
+   * or history row, so the header and rows always line up. The columns fill the available width by
+   * weight alone (every label's preferred width is 0), using the {@code *_COL_WEIGHT} constants.
+   * The Genre column is omitted entirely when genres are not in use. Every column after the first
+   * has a thin vertical divider on its left edge, and text too long for its column is truncated
+   * with an ellipsis before it reaches the next divider.
+   */
+  private JPanel buildTextColumns(String genre, String artist, String album, String song,
+      Color color, Font font) {
+    JPanel panel = new JPanel(new java.awt.GridBagLayout());
+    panel.setOpaque(false);
+
+    List<String> texts = new ArrayList<>();
+    List<Double> weights = new ArrayList<>();
+    if (useGenre) {
+      texts.add(genre);
+      weights.add(GENRE_COL_WEIGHT);
+    }
+    texts.add(artist);
+    weights.add(ARTIST_COL_WEIGHT);
+    texts.add(album);
+    weights.add(ALBUM_COL_WEIGHT);
+    texts.add(song);
+    weights.add(SONG_COL_WEIGHT);
+
+    for (int i = 0; i < texts.size(); i++) {
+      JLabel label = new JLabel(texts.get(i) == null ? "" : texts.get(i));
+      label.setForeground(color);
+      label.setFont(font);
+      label.setHorizontalAlignment(SwingConstants.LEFT);
+      label.setPreferredSize(new Dimension(0, 30));
+      label.setMinimumSize(new Dimension(0, 30));
+      if (i > 0) {
+        // Divider on the left edge, with padding so the text does not touch it
+        label.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 1, 0, 0, SEPARATOR),
+            new EmptyBorder(0, TEXT_COL_PAD_LEFT, 0, 0)));
+      }
+
+      java.awt.GridBagConstraints c = new java.awt.GridBagConstraints();
+      c.gridx = i;
+      c.gridy = 0;
+      c.weightx = weights.get(i);
+      c.weighty = 1.0;
+      c.fill = java.awt.GridBagConstraints.BOTH; // full height, so the dividers span the row
+      c.insets = new java.awt.Insets(0, 0, 0, i < texts.size() - 1 ? TEXT_COL_GAP : 0);
+      panel.add(label, c);
+    }
+    return panel;
   }
 
   /** The legend colour for the entry's queue priority (5 and above share the last colour). */
@@ -894,6 +906,11 @@ public class QueuePanel extends JPanel {
       }
       if (selectedIndex >= displayedQueue.size()) {
         selectedIndex = displayedQueue.isEmpty() ? -1 : displayedQueue.size() - 1;
+      }
+      // Select the first song by default when the queue is non-empty, so the move/remove buttons
+      // show straight away what can be done and what it costs (or how many credits to add).
+      if (selectedIndex < 0 && !displayedQueue.isEmpty()) {
+        selectedIndex = 0;
       }
 
       // Stretch the rows so that fitRows of them exactly fill the list, leaving no gap at the

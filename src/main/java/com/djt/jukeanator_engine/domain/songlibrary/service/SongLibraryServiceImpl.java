@@ -1369,6 +1369,11 @@ public class SongLibraryServiceImpl
   }
 
   @Override
+  public boolean isUseGenre() {
+    return this.songScanner.isUseGenre();
+  }
+
+  @Override
   public void reinitializeOwnLocation() {
     initialize();
   }

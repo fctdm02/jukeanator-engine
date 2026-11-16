@@ -74,6 +74,11 @@ public final class SongScanner {
     }
   }
 
+  /** Whether genres are in use (the {@code song-library.use-genre} setting). */
+  public boolean isUseGenre() {
+    return useGenre;
+  }
+
   public Set<String> getAcceptedSongFileExtensions() {
     return this.acceptedSongFileExtensions;
   }

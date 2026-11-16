@@ -1276,8 +1276,9 @@ public class JukeANatorFrame extends JFrame {
    */
   private QueuePanel buildQueuePanel() {
 
+    boolean useGenre = songLibraryService != null && songLibraryService.isUseGenre();
     return new QueuePanel(currentQueue, songQueueService, creditManager, imageLoader,
-        POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3);
+        POPULARITY_THRESHOLD_1, POPULARITY_THRESHOLD_2, POPULARITY_THRESHOLD_3, useGenre);
   }
 
   // ============================================================

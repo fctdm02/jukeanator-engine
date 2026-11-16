@@ -360,6 +360,15 @@ public interface SongLibraryService {
   LocationEntity getOwnLocation();
 
   /**
+   * Whether genres are in use (the {@code song-library.use-genre} setting). UI callers use this to
+   * decide whether to show genre information, e.g. the Queue tab's "Genre" column.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   */
+  @PublicServiceMethod
+  boolean isUseGenre();
+
+  /**
    * Re-runs the same startup discovery {@code SongLibraryServiceImpl}'s constructor uses, so that
    * {@link #getOwnLocationId()}/{@link #getSongLibraryRoot(Integer)} reflect the current state of
    * whatever is persisted on disk/in the repository. Used by {@code SlaveConnectionManager} after
