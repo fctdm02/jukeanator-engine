@@ -812,6 +812,9 @@ public class QueuePanel extends JPanel {
         selectedIndex = idx + 1;
         rebuildRows(true);
       }
+      // Otherwise this is the last displayed row with more songs queued behind it: the selected
+      // song moves out of view, and selectedIndex stays on this row so that, once the server
+      // round trip (setQueue) rebuilds the rows, the song that was moved up is selected.
     });
   }
 
@@ -860,7 +863,9 @@ public class QueuePanel extends JPanel {
             : null;
     int currentCredits = creditManager.getCredits();
     int idx = selectedIndex;
-    int size = displayedQueue.size();
+    // The full queue, not just the rows that fit on screen: the last displayed song can still be
+    // moved down when more songs are queued behind it.
+    int size = Math.max(displayedQueue.size(), queue == null ? 0 : queue.size());
 
     if (selected == null) {
       // No selection — all buttons go fully grey
@@ -878,7 +883,7 @@ public class QueuePanel extends JPanel {
         applyState(moveUpButton, afford ? ButtonState.NORMAL : ButtonState.WARN, cost);
       }
 
-      // Move Down: not available when last item, warn/normal otherwise
+      // Move Down: not available when last item in the whole queue, warn/normal otherwise
       if (idx >= size - 1) {
         applyState(moveDownButton, ButtonState.UNAVAILABLE, cost);
       } else {
