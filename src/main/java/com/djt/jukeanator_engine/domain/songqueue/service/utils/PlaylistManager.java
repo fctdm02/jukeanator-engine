@@ -55,14 +55,15 @@ public final class PlaylistManager {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Reads a playlist file and returns the contained song file paths.
+   * Reads a playlist file and returns its lines.
    *
    * <p>
-   * Blank lines and comment lines (starting with {@code #}) are skipped. Non-existent paths are
-   * included so the caller can decide how to handle missing files.
+   * Blank lines and comment lines (starting with {@code #}) are skipped. A line is usually a song
+   * file path, but may be free text such as an artist and title copied from a chart; resolving each
+   * line to a song is left to the caller (see {@link PlaylistSongResolver}).
    *
    * @param file Source file.
-   * @return Ordered list of song file paths (never {@code null}).
+   * @return Ordered list of trimmed lines (never {@code null}).
    * @throws IOException if the file cannot be read.
    */
   public static List<String> loadPlayList(File file) throws IOException {
@@ -80,20 +81,5 @@ public final class PlaylistManager {
     }
 
     return paths;
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // DEFAULT FILE HELPER
-  // ─────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Returns a suggested default playlist file using the current timestamp, placed under
-   * {@code ~/JukeANator/playlists/}.
-   */
-  public static File defaultPlayListFile() {
-
-    String ts = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
-    return new File(System.getProperty("user.home"),
-        "JukeANator" + File.separator + "playlists" + File.separator + "playlist_" + ts + ".txt");
   }
 }

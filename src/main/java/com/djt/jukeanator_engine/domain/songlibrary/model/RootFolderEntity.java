@@ -555,8 +555,9 @@ public class RootFolderEntity extends FolderEntity {
   /**
    * Normalizes a song path for comparison across operating systems: backslashes become forward
    * slashes, doubled separators collapse, trailing separators are dropped, and case is ignored.
+   * Also used to match playlist file paths written on another machine.
    */
-  static String normalizeStatsPath(String path) {
+  public static String normalizeStatsPath(String path) {
 
     if (path == null) {
       return "";
@@ -576,7 +577,7 @@ public class RootFolderEntity extends FolderEntity {
    * "van halen/album/song.mp3", "album/song.mp3" -- so it works whether the old root was
    * "C:\Music" or "C:\Music\Rock", without needing to know the old root.
    */
-  private static SongFileEntity findSongByRelativeSuffix(String normalizedPath,
+  public static SongFileEntity findSongByRelativeSuffix(String normalizedPath,
       Map<String, SongFileEntity> songsByRelativePath) {
 
     String[] segments = normalizedPath.split("/");

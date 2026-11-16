@@ -9,9 +9,13 @@ import java.time.ZoneId;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -59,6 +63,7 @@ import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueEntryEntity;
 import com.djt.jukeanator_engine.domain.songqueue.model.SongQueueRootEntity;
 import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository;
 import com.djt.jukeanator_engine.domain.songqueue.service.utils.PlaylistManager;
+import com.djt.jukeanator_engine.domain.songqueue.service.utils.PlaylistSongResolver;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 /**
@@ -1065,26 +1070,73 @@ public class SongQueueServiceImpl
     String username = loadPlaylistIntoQueueRequest.username();
     String filename = loadPlaylistIntoQueueRequest.filename();
 
+    List<String> lines;
     try {
-      List<SongIdentifier> songIdentifiers = new ArrayList<>();
-      Integer priority = 0;
-
-      for (String songPathname : PlaylistManager.loadPlayList(new File(filename))) {
-        SongFileEntity song = this.songLibraryRoot.getSongByPath(songPathname);
-        songIdentifiers.add(new SongIdentifier(locationId, song.getAlbum().getId(),
-            song.getId()));
-      }
-
-      AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest =
-          new AddMultipleSongsToQueueRequest(username, songIdentifiers, priority);
-
-      addMultipleSongsToQueue(locationId, addMultipleSongsToQueueRequest);
-      return Integer.valueOf(songIdentifiers.size());
+      lines = PlaylistManager.loadPlayList(new File(filename));
     } catch (Exception e) {
       throw new SongQueueServiceException(
           "Could not load playlist into queue: username: " + username + ", filename: " + filename,
           e);
     }
+
+    // Each line is resolved on its own: a line that matches no song is logged and skipped, so one
+    // missing song never stops the rest of the playlist from loading.
+    PlaylistSongResolver resolver = new PlaylistSongResolver(this.songLibraryRoot);
+    Map<PlaylistSongResolver.MatchType, Integer> countsByMatchType =
+        new EnumMap<>(PlaylistSongResolver.MatchType.class);
+    Set<String> queuedSongKeys = new HashSet<>();
+    List<SongIdentifier> songIdentifiers = new ArrayList<>();
+    int unmatched = 0;
+    int duplicates = 0;
+
+    for (int i = 0; i < lines.size(); i++) {
+      String line = lines.get(i);
+      try {
+        Optional<PlaylistSongResolver.Resolution> resolution = resolver.resolve(line);
+        if (resolution.isEmpty()) {
+          unmatched++;
+          log.warn("Playlist {}: line {} matched no song in the library: {}", filename, i + 1,
+              line);
+          continue;
+        }
+
+        SongFileEntity song = resolution.get().song();
+        countsByMatchType.merge(resolution.get().matchType(), 1, Integer::sum);
+        if (resolution.get().matchType() == PlaylistSongResolver.MatchType.WORD_SEARCH) {
+          log.debug("Playlist {}: line {} [{}] matched {}", filename, i + 1, line,
+              song.getNaturalIdentity());
+        }
+
+        if (!queuedSongKeys.add(song.getAlbum().getId() + "__" + song.getId())) {
+          duplicates++;
+          log.info("Playlist {}: line {} repeats a song already in this playlist: {}", filename,
+              i + 1, song.getNaturalIdentity());
+          continue;
+        }
+        songIdentifiers.add(new SongIdentifier(locationId, song.getAlbum().getId(), song.getId()));
+
+      } catch (Exception e) {
+        unmatched++;
+        log.warn("Playlist {}: line {} could not be resolved: {} ({})", filename, i + 1, line,
+            e.toString());
+      }
+    }
+
+    Integer priority = 0;
+    AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest =
+        new AddMultipleSongsToQueueRequest(username, songIdentifiers, priority);
+    addMultipleSongsToQueue(locationId, addMultipleSongsToQueueRequest);
+
+    log.info(
+        "Loaded {} songs from {} playlist lines in {} ({} by exact path, {} by relocated path, "
+            + "{} by word search, {} duplicates, {} unmatched)",
+        songIdentifiers.size(), lines.size(), filename,
+        countsByMatchType.getOrDefault(PlaylistSongResolver.MatchType.EXACT_PATH, 0),
+        countsByMatchType.getOrDefault(PlaylistSongResolver.MatchType.RELOCATED_PATH, 0),
+        countsByMatchType.getOrDefault(PlaylistSongResolver.MatchType.WORD_SEARCH, 0), duplicates,
+        unmatched);
+
+    return Integer.valueOf(songIdentifiers.size());
   }
 
   @Override

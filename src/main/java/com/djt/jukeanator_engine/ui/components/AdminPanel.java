@@ -107,6 +107,7 @@ public class AdminPanel extends JPanel {
   private final Frame ownerFrame;
   private final ImageLoader imageLoader;
   private final List<String> splitSummaryRecipients; // email.financial-ledger-recipients
+  private final String dataDir; // e.g. C:\kiosk\data
 
   // ── Album list ────────────────────────────────────────────────────────────
   private final DefaultListModel<AlbumDto> albumListModel = new DefaultListModel<>();
@@ -160,9 +161,11 @@ public class AdminPanel extends JPanel {
       SongQueueService songQueueService, SongPlayerService songPlayerService,
       UserService userService, LocationService locationService,
       FinancialLedgerService financialLedgerService, UserActivityService userActivityService,
-      CreditManager creditManager, ImageLoader imageLoader, List<String> splitSummaryRecipients) {
+      CreditManager creditManager, ImageLoader imageLoader, List<String> splitSummaryRecipients,
+      String dataDir) {
 
     this.ownerFrame = ownerFrame;
+    this.dataDir = dataDir;
     this.songLibraryService = songLibraryService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
@@ -628,7 +631,8 @@ public class AdminPanel extends JPanel {
    * once shown. On first use the scan dialog appears during startup, when Windows may still be
    * keeping the launching command prompt in the foreground; without this the dialog can open hidden
    * behind that console. It also makes sure the dialog (a separate window, opened over the
-   * full-screen frame) receives the physical keyboard, e.g. for typing a playlist file name.
+   * full-screen frame) receives the physical keyboard. Playlist load/save do not use it: they
+   * embed their chooser in the in-window overlay instead (see showPlaylistChooser).
    * Skipped on Linux/macOS (see ForegroundWindowUtil#isApplicable()), which get the plain dialog.
    */
   private static JFileChooser newForegroundFileChooser() {
@@ -2333,26 +2337,111 @@ public class AdminPanel extends JPanel {
     creditManager.deductCredits(1);
   }
 
+  /**
+   * The folder playlists are loaded from and saved to by default ({@code <dataDir>/playlists}, e.g.
+   * {@code C:\kiosk\data\playlists}), created if missing so the operator can copy playlists into it.
+   */
+  private File playlistsDir() {
+
+    File dir = new File(dataDir == null || dataDir.isBlank() ? "." : dataDir, "playlists");
+    if (!dir.isDirectory() && !dir.mkdirs()) {
+      System.err.println("Could not create playlists directory: " + dir.getAbsolutePath());
+    }
+    return dir;
+  }
+
+  /**
+   * Shows a playlist file chooser inside the in-window overlay rather than as a separate dialog
+   * window. While the frame holds full-screen exclusive mode, Windows does not reliably give a new
+   * top-level window the foreground (see the overlay comment above), and the first JFileChooser is
+   * slow to build, so a dialog could open behind another window. Embedding the chooser avoids that.
+   *
+   * @param onApprove receives the chosen file once the overlay has closed
+   */
+  private void showPlaylistChooser(String title, boolean save, Color accent,
+      java.util.function.Consumer<File> onApprove) {
+
+    JFileChooser chooser = new JFileChooser(playlistsDir());
+    chooser.setDialogType(save ? JFileChooser.SAVE_DIALOG : JFileChooser.OPEN_DIALOG);
+    chooser.setDialogTitle(title);
+    chooser.setApproveButtonText(save ? "Save" : "Load");
+    chooser.setFileFilter(
+        new FileNameExtensionFilter("Playlist files (*.pl, *.txt)", "pl", "txt"));
+    chooser.setPreferredSize(new Dimension(Math.max(640, getWidth() * 3 / 5),
+        Math.max(420, getHeight() * 3 / 5)));
+
+    chooser.addActionListener(e -> {
+      if (JFileChooser.APPROVE_SELECTION.equals(e.getActionCommand())) {
+        File selected = chooser.getSelectedFile();
+        hideOverlay();
+        if (selected != null) {
+          onApprove.accept(selected);
+        }
+      } else if (JFileChooser.CANCEL_SELECTION.equals(e.getActionCommand())) {
+        hideOverlay();
+      }
+    });
+
+    JLabel titleLabel = new JLabel(title);
+    titleLabel.setForeground(accent);
+    titleLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+    titleLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+
+    JPanel content = new JPanel(new BorderLayout(0, 12));
+    content.setOpaque(false);
+    content.add(titleLabel, BorderLayout.NORTH);
+    content.add(chooser, BorderLayout.CENTER);
+
+    // Escape cancels, like the other admin overlay forms (instead of leaving the Admin panel).
+    content.registerKeyboardAction(e -> hideOverlay(),
+        javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+        JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+    showOverlayForm(accent, content);
+    SwingUtilities.invokeLater(() -> {
+      JTextField fileNameField = findFirstTextField(chooser);
+      if (fileNameField != null) {
+        fileNameField.requestFocusInWindow();
+      } else {
+        chooser.requestFocusInWindow();
+      }
+    });
+  }
+
+  private static JTextField findFirstTextField(java.awt.Container container) {
+
+    for (Component child : container.getComponents()) {
+      if (child instanceof JTextField textField) {
+        return textField;
+      }
+      if (child instanceof java.awt.Container nested) {
+        JTextField found = findFirstTextField(nested);
+        if (found != null) {
+          return found;
+        }
+      }
+    }
+    return null;
+  }
+
   private void doLoadPlaylist() {
+    showPlaylistChooser("Load Playlist", false, ColorTheme.get().accentGreen, this::loadPlaylist);
+  }
 
-    JFileChooser chooser = newForegroundFileChooser();
-    chooser.setDialogTitle("Load Playlist");
-    chooser.setFileFilter(new FileNameExtensionFilter("Playlist files (*.txt)", "txt"));
-    chooser.setCurrentDirectory(new File(""));
+  private void loadPlaylist(File file) {
 
-    if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION)
-      return;
-
-    String filename = chooser.getSelectedFile().getAbsolutePath();
+    String filename = file.getAbsolutePath();
     SwingSecurityUtil.runAsync(() -> {
       try {
 
         LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest =
             new LoadPlaylistIntoQueueRequest(SongQueueService.LOCAL_USERNAME, filename);
-        this.songQueueService.loadPlaylistIntoQueue(songQueueService.getOwnLocationId(),
-            loadPlaylistIntoQueueRequest);
+        Integer numSongs = this.songQueueService.loadPlaylistIntoQueue(
+            songQueueService.getOwnLocationId(), loadPlaylistIntoQueueRequest);
 
-        SwingUtilities.invokeLater(() -> showOverlayMessage("Playlist Loaded", "Loaded " + filename,
+        SwingUtilities.invokeLater(() -> showOverlayMessage("Playlist Loaded",
+            "Queued " + numSongs + " songs from " + file.getName()
+                + " (songs not found in the library are listed in the log)",
             ColorTheme.get().accentGreen));
 
       } catch (Exception ex) {
@@ -2364,15 +2453,14 @@ public class AdminPanel extends JPanel {
   }
 
   private void doSavePlaylist() {
+    showPlaylistChooser("Save Playlist", true, ColorTheme.get().accentBlue, this::savePlaylist);
+  }
 
-    JFileChooser chooser = newForegroundFileChooser();
-    chooser.setDialogTitle("Save Playlist");
-    chooser.setFileFilter(new FileNameExtensionFilter("Playlist files (*.txt)", "txt"));
+  private void savePlaylist(File file) {
 
-    if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION)
-      return;
-
-    String filename = chooser.getSelectedFile().getAbsolutePath();
+    String lowerName = file.getName().toLowerCase(java.util.Locale.ROOT);
+    boolean hasPlaylistExtension = lowerName.endsWith(".pl") || lowerName.endsWith(".txt");
+    String filename = file.getAbsolutePath() + (hasPlaylistExtension ? "" : ".pl");
     SwingSecurityUtil.runAsync(() -> {
       try {
         this.songQueueService.saveQueueAsPlaylist(songQueueService.getOwnLocationId(), filename);

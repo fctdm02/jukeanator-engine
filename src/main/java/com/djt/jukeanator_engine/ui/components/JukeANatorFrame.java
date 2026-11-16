@@ -75,6 +75,7 @@ public class JukeANatorFrame extends JFrame {
   private final List<String> splitSummaryRecipients; // email.financial-ledger-recipients
 
   private final ImageLoader imageLoader;
+  private final String dataDir; // e.g. C:\kiosk\data (playlists live in its playlists folder)
   public static final int POPULARITY_THRESHOLD_1 = 10;
   public static final int POPULARITY_THRESHOLD_2 = 25;
   public static final int POPULARITY_THRESHOLD_3 = 50;
@@ -287,6 +288,7 @@ public class JukeANatorFrame extends JFrame {
     this.userActivityService = userActivityService;
     this.splitSummaryRecipients = List.copyOf(splitSummaryRecipients);
     this.imageLoader = new ImageLoader(dataDir);
+    this.dataDir = dataDir;
 
     this.alwaysOnTop = jukeANatorUserInterfaceProperties.isAlwaysOnTop();
 
@@ -1262,7 +1264,7 @@ public class JukeANatorFrame extends JFrame {
 
     return new AdminPanel(this, songLibraryService, songQueueService, songPlayerService,
         userService, locationService, financialLedgerService, userActivityService, creditManager,
-        imageLoader, splitSummaryRecipients);
+        imageLoader, splitSummaryRecipients, dataDir);
   }
 
   // ============================================================
