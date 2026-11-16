@@ -251,7 +251,7 @@ public class LayoutTheme {
     toggleSwitchH = 28;
 
     // ── SongQueueCard ─────────────────────────────────────────────────────────
-    songQueueMaxVisible = 10; // business invariant — queue never holds more than 10 entries
+    songQueueMaxVisible = 10; // upper limit; QueuePanel shows only the rows that fit
     songTrackCellHeight = resultRowMaxH;
     songQueueActionBtnW = 200;
     songQueueActionBtnH = 80;
@@ -428,7 +428,7 @@ public class LayoutTheme {
       toggleSwitchH = 28;
 
       // SongQueueCard — same as landscape for portrait
-      songQueueMaxVisible = 10; // business invariant — queue never holds more than 10 entries
+      songQueueMaxVisible = 10; // upper limit; QueuePanel shows only the rows that fit
       songTrackCellHeight = resultRowMaxH;
       songQueueActionBtnW = 200;
       songQueueActionBtnH = 80;
@@ -759,9 +759,9 @@ public class LayoutTheme {
       // Reduce top padding to bring the header section closer to the top of the card.
       //
       songQueueCardPadTop = 8; // landscape default: 16
-      // Removing the now-playing display and folding the "Queued Songs:" row into
-      // the DetailHeaderPanel frees up enough vertical room for 10 rows on 1024 x 768.
-      songQueueMaxVisible = 10; // business invariant — queue never holds more than 10 entries
+      // Upper limit only: QueuePanel shows as many rows as fit in the available height
+      // (about 8 at 1024 x 768), never more than this.
+      songQueueMaxVisible = 10;
       songTrackCellHeight = resultRowMaxH; // matches the 54px small-landscape result row height
       // Inner usable width now spans the full tab width (no left/right card padding).
       // Action buttons: (fullWidth - 2x16 gap) / 3, rounded down to a clean value.
@@ -2135,8 +2135,8 @@ public class LayoutTheme {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Maximum number of queued song entries visible at once in the SongQueueCard list. Determines the
-   * fixed list height (no scroll bar).
+   * Maximum number of queued song entries visible at once in the Queue tab list. The panel shows
+   * as many rows as fit in the available height (no scroll bar), never more than this.
    */
   public final int songQueueMaxVisible;
 

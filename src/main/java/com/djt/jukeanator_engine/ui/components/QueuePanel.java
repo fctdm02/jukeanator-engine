@@ -13,6 +13,8 @@ import java.awt.LinearGradientPaint;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.geom.Point2D;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -95,6 +97,16 @@ public class QueuePanel extends JPanel {
   private JScrollPane queueRowsScroll;
   /** Holds the column-name header row, which is rebuilt when switching queue/history views. */
   private JPanel columnHeaderHolder;
+  /**
+   * Viewport height the queue rows were last sized for, or -1 before the first queue-view rebuild.
+   * Lets the viewport resize listener skip rebuilds when the available height has not changed.
+   */
+  private int lastQueueViewportH = -1;
+
+  /** Top + bottom {@code EmptyBorder} padding on {@link #queueRowsPanel}. */
+  private static final int ROWS_PANEL_PAD_V = 4;
+  /** Height of each separator between rows (see {@link #buildSeparator()}). */
+  private static final int ROW_SEPARATOR_H = 1;
 
   // ── "Show History" view ───────────────────────────────────────────────────
   /** Start times in the history view, e.g. "9:30PM". */
@@ -194,6 +206,10 @@ public class QueuePanel extends JPanel {
     columnHeaderHolder.repaint();
 
     actionArea.setVisible(!on);
+
+    // Only the history view scrolls; the queue view shows just the rows that fit.
+    queueRowsScroll.setVerticalScrollBarPolicy(on ? JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED
+        : JScrollPane.VERTICAL_SCROLLBAR_NEVER);
 
     if (on) {
       history = List.of();
@@ -299,9 +315,9 @@ public class QueuePanel extends JPanel {
    * <p>
    * The list itself is rendered exactly like {@link AlbumViewCard}'s track listing — same column
    * header row, same row layout/height/padding, same gradient card backdrop — rather than a JList
-   * with a custom cell renderer. Unlike {@code AlbumViewCard} there is no footer nav panel: the
-   * queue is capped at {@link LayoutTheme#songQueueMaxVisible} entries for normal users, so
-   * pagination is never needed.
+   * with a custom cell renderer. Unlike {@code AlbumViewCard} there is no footer nav panel and no
+   * scroll bar: the queue view shows only as many rows as fit in the available height (see
+   * {@link #fitRowCount()}), capped at {@link LayoutTheme#songQueueMaxVisible}.
    */
   private JPanel buildQueueBody() {
     JPanel section = new JPanel(new BorderLayout(0, 8));
@@ -336,13 +352,24 @@ public class QueuePanel extends JPanel {
     queueRowsPanel = new RowsPanel();
     queueRowsPanel.setOpaque(false);
     queueRowsPanel.setLayout(new BoxLayout(queueRowsPanel, BoxLayout.Y_AXIS));
-    queueRowsPanel.setBorder(new EmptyBorder(4, 0, 4, 0));
+    queueRowsPanel.setBorder(new EmptyBorder(ROWS_PANEL_PAD_V, 0, ROWS_PANEL_PAD_V, 0));
 
-    // Scrolls only in the history view — the queue never holds more than songQueueMaxVisible
-    // rows, so no scroll bar appears there and it looks exactly as before. Transparent so the
-    // gradient card above shows through.
-    queueRowsScroll = new JScrollPane(queueRowsPanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+    // Scrolls only in the history view (applyHistoryMode switches the policy). The queue view
+    // never shows a scroll bar: it renders only the rows that fit. Transparent so the gradient
+    // card above shows through.
+    queueRowsScroll = new JScrollPane(queueRowsPanel, JScrollPane.VERTICAL_SCROLLBAR_NEVER,
         JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+    // Re-fit (row count and row height) whenever the available height changes (first layout,
+    // resize, the action buttons reappearing after the history view).
+    queueRowsScroll.getViewport().addComponentListener(new ComponentAdapter() {
+      @Override
+      public void componentResized(ComponentEvent e) {
+        if (!showingHistory
+            && queueRowsScroll.getViewport().getHeight() != lastQueueViewportH) {
+          rebuildRows(true);
+        }
+      }
+    });
     queueRowsScroll.setOpaque(false);
     queueRowsScroll.getViewport().setOpaque(false);
     queueRowsScroll.setBorder(null);
@@ -354,7 +381,7 @@ public class QueuePanel extends JPanel {
 
     wrapper.add(body, BorderLayout.CENTER);
 
-    // Populate rows (up to songQueueMaxVisible entries)
+    // Populate rows (up to songQueueMaxVisible until the first layout, then however many fit)
     rebuildRows(false);
 
     section.add(wrapper, BorderLayout.CENTER);
@@ -489,18 +516,20 @@ public class QueuePanel extends JPanel {
    * @param timeText start time shown in the leading "Time" column (history view), or
    *        {@code null} for a queue row, which has no such column
    * @param selectable whether the row can be clicked to select it for the move/remove buttons
+   * @param rowHeight row height in pixels: {@link LayoutTheme#albumViewRowH} in the history view,
+   *        stretched in the queue view so the visible rows fill the list
    */
   private JPanel buildRow(SongQueueEntryDto entry, int index, String timeText,
-      boolean selectable) {
+      boolean selectable, int rowHeight) {
     JPanel row = new JPanel(new BorderLayout(10, 0));
     row.setName(selectable ? UiComponentNames.QUEUE_ROW : UiComponentNames.QUEUE_HISTORY_ROW);
     row.setOpaque(false);
     int padV = LayoutTheme.get().albumViewRowPadV;
     row.setBorder(new EmptyBorder(padV, 16, padV, 16));
 
-    Dimension rowSize = new Dimension(Integer.MAX_VALUE, LayoutTheme.get().albumViewRowH);
+    Dimension rowSize = new Dimension(Integer.MAX_VALUE, rowHeight);
     row.setPreferredSize(rowSize);
-    row.setMinimumSize(new Dimension(0, LayoutTheme.get().albumViewRowH));
+    row.setMinimumSize(new Dimension(0, rowHeight));
     row.setMaximumSize(rowSize);
     if (selectable) {
       row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -847,15 +876,18 @@ public class QueuePanel extends JPanel {
       for (int i = 0; i < history.size(); i++) {
         SongPlayHistoryEntryDto played = history.get(i);
         queueRowsPanel.add(buildRow(played.entry(), i,
-            HISTORY_TIME_FORMAT.format(played.startedAt()), false));
+            HISTORY_TIME_FORMAT.format(played.startedAt()), false, LayoutTheme.get().albumViewRowH));
         if (i < history.size() - 1) {
           queueRowsPanel.add(buildSeparator());
         }
       }
     } else {
       displayedQueue.clear();
+      int viewportH = queueRowsScroll == null ? 0 : queueRowsScroll.getViewport().getHeight();
+      lastQueueViewportH = viewportH;
+      int fitRows = fitRowCount();
       if (queue != null) {
-        int limit = Math.min(queue.size(), LayoutTheme.get().songQueueMaxVisible);
+        int limit = Math.min(queue.size(), fitRows);
         for (int i = 0; i < limit; i++) {
           displayedQueue.add(queue.get(i));
         }
@@ -864,8 +896,20 @@ public class QueuePanel extends JPanel {
         selectedIndex = displayedQueue.isEmpty() ? -1 : displayedQueue.size() - 1;
       }
 
+      // Stretch the rows so that fitRows of them exactly fill the list, leaving no gap at the
+      // bottom that would suggest the queue ends there. The heights are the same whether or not
+      // the queue is full, so a short queue keeps its rows the same size and its gap is real.
+      // Leftover pixels go one each to the first rows.
+      int rowH = LayoutTheme.get().albumViewRowH;
+      int extraPx = 0;
+      if (viewportH > 0) {
+        int avail = viewportH - 2 * ROWS_PANEL_PAD_V - (fitRows - 1) * ROW_SEPARATOR_H;
+        rowH = Math.max(rowH, avail / fitRows);
+        extraPx = rowH * fitRows < avail ? avail - rowH * fitRows : 0;
+      }
       for (int i = 0; i < displayedQueue.size(); i++) {
-        queueRowsPanel.add(buildRow(displayedQueue.get(i), i, null, true));
+        int h = rowH + (i < extraPx ? 1 : 0);
+        queueRowsPanel.add(buildRow(displayedQueue.get(i), i, null, true, h));
         if (i < displayedQueue.size() - 1) {
           queueRowsPanel.add(buildSeparator());
         }
@@ -887,11 +931,32 @@ public class QueuePanel extends JPanel {
     updateButtonStates();
   }
 
+  /**
+   * Number of whole queue rows (at the minimum {@link LayoutTheme#albumViewRowH}) that fit in the
+   * viewport's current height: n rows take {@code n * rowH + (n - 1) * separator + top/bottom
+   * padding}. {@link #rebuildRows(boolean)} then stretches those rows to fill the list. Capped at
+   * {@link LayoutTheme#songQueueMaxVisible}, and falls back to that cap before the first layout
+   * (viewport height 0). Always at least 1 so a queued song is never hidden entirely.
+   */
+  private int fitRowCount() {
+    int max = LayoutTheme.get().songQueueMaxVisible;
+    if (queueRowsScroll == null) {
+      return max;
+    }
+    int viewportH = queueRowsScroll.getViewport().getHeight();
+    if (viewportH <= 0) {
+      return max;
+    }
+    int rowH = LayoutTheme.get().albumViewRowH;
+    int fit = (viewportH - 2 * ROWS_PANEL_PAD_V + ROW_SEPARATOR_H) / (rowH + ROW_SEPARATOR_H);
+    return Math.max(1, Math.min(max, fit));
+  }
+
   private static JSeparator buildSeparator() {
     JSeparator sep = new JSeparator();
     sep.setForeground(SEPARATOR);
     sep.setBackground(SEPARATOR);
-    sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+    sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROW_SEPARATOR_H));
     return sep;
   }
 
