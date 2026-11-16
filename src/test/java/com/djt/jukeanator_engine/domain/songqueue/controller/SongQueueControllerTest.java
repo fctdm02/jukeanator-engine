@@ -156,8 +156,6 @@ class SongQueueControllerTest extends AbstractControllerTest {
 
   @Test
   void addSong_webUserNormalPlay_ignoresTheSessionLevel() throws Exception {
-    when(songQueueService.getQueuedSongs(LOCATION_ID))
-        .thenReturn(List.of(queuedEntry(WEB_USER, 10, 3)));
     when(songQueueService.addSongToQueue(any(), any(AddSongToQueueRequest.class)))
         .thenReturn(aQueueEntry());
 
@@ -166,6 +164,8 @@ class SongQueueControllerTest extends AbstractControllerTest {
 
     verify(songQueueService).addSongToQueue(LOCATION_ID,
         new AddSongToQueueRequest(WEB_USER, 3, 4, 1, false));
+    // A normal play never consults the queue for the patron's session level.
+    verify(songQueueService, never()).getQueuedSongs(any());
   }
 
   @Test

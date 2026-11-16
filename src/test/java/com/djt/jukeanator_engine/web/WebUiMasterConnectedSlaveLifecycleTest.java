@@ -556,7 +556,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
       songQueue = new SongQueueServiceImpl(new SongQueueProperties(), songLibraryService,
           backgroundMusic, new SongQueueRepositoryFileSystemImpl(dataDir.toString(),
               songLibraryService),
-          this::publishLocally, Optional.empty(), dataDir.resolve("RecentSongPlays.json"));
+          this::publishLocally, Optional.empty());
     }
 
     void connect(String apiKey) throws Exception {

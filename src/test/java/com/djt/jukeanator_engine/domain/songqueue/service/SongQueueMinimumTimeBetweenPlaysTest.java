@@ -32,8 +32,8 @@ import com.djt.jukeanator_engine.domain.songqueue.repository.SongQueueRepository
 /**
  * Rule A of {@link SongQueueServiceImpl#isSongEligibleForQueue}: a song is never queued twice, and
  * never replayed within {@code minimum-minutes-between-song-plays} of when it last started
- * playing -- measured from the play, not from when it was queued, and remembered across a
- * restart. Runs against a small in-memory library and real filesystem storage in a temp dir.
+ * playing -- measured from the play, not from when it was queued, and counting only the plays of
+ * the running instance (a restart forgets them). Runs against a small in-memory library and real filesystem storage in a temp dir.
  */
 class SongQueueMinimumTimeBetweenPlaysTest {
 
@@ -56,7 +56,6 @@ class SongQueueMinimumTimeBetweenPlaysTest {
 
   private RootFolderEntity library;
   private SongLibraryService songLibraryService;
-  private Path recentPlaysFile;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -64,7 +63,6 @@ class SongQueueMinimumTimeBetweenPlaysTest {
     songLibraryService = mock(SongLibraryService.class);
     when(songLibraryService.getOwnLocationId()).thenReturn(LOCATION_ID);
     when(songLibraryService.getSongLibraryRoot(LOCATION_ID)).thenReturn(library);
-    recentPlaysFile = dataDir.resolve("JukeANator_RecentSongPlays.json");
   }
 
   @Test
@@ -90,7 +88,7 @@ class SongQueueMinimumTimeBetweenPlaysTest {
   }
 
   @Test
-  void aSongThatJustPlayed_isRefusedForTheMinimumTime_evenAfterARestart() {
+  void aSongThatJustPlayed_isRefusedForTheMinimumTime() {
 
     SongQueueServiceImpl queue = newService(true);
     queue.addSongToQueue(LOCATION_ID, new AddSongToQueueRequest(LOCAL, ALBUM_ONE, SONG_A, 1, false));
@@ -103,17 +101,34 @@ class SongQueueMinimumTimeBetweenPlaysTest {
     assertEquals("has already been played in the last 60 min. Try again in 60 min", reason);
     assertEquals(reason, eligibility(queue, COMPILATION, SONG_A_ON_COMPILATION));
     assertNull(eligibility(queue, OTHER_ALBUM, OTHER_SONG_A));
+  }
 
-    // The jukebox restarts: the play is remembered.
-    assertTrue(Files.isRegularFile(recentPlaysFile));
+  @Test
+  void aSongThatPlayedBeforeARestart_mayBePlayedRightAwayAfterIt() {
+
+    SongQueueServiceImpl queue = newService(true);
+    queue.addSongToQueue(LOCATION_ID, new AddSongToQueueRequest(LOCAL, ALBUM_ONE, SONG_A, 1, false));
+    queue.dequeueNextSong();
+    assertEquals("has already been played in the last 60 min. Try again in 60 min",
+        eligibility(queue, ALBUM_ONE, SONG_A));
+
+    // The jukebox restarts: only this instance's plays count, so the song is eligible again.
     SongQueueServiceImpl restarted = newService(true);
-    assertEquals(reason, eligibility(restarted, ALBUM_ONE, SONG_A));
+    assertNull(eligibility(restarted, ALBUM_ONE, SONG_A));
+    assertNull(eligibility(restarted, COMPILATION, SONG_A_ON_COMPILATION));
+
+    // ...and once it plays in the new instance, the minimum time applies again.
+    restarted.addSongToQueue(LOCATION_ID,
+        new AddSongToQueueRequest(LOCAL, ALBUM_ONE, SONG_A, 1, false));
+    restarted.dequeueNextSong();
+    assertEquals("has already been played in the last 60 min. Try again in 60 min",
+        eligibility(restarted, ALBUM_ONE, SONG_A));
   }
 
   @Test
   void aPlayOlderThanTheMinimumTime_isForgotten() {
 
-    RecentSongPlays plays = new RecentSongPlays(Duration.ofMinutes(60), recentPlaysFile);
+    RecentSongPlays plays = new RecentSongPlays(Duration.ofMinutes(60));
     SongFileEntity songA = song(ALBUM_ONE, SONG_A);
     Instant playedAt = Instant.now().minus(Duration.ofMinutes(61));
     plays.recordPlay(songA, playedAt);
@@ -124,14 +139,15 @@ class SongQueueMinimumTimeBetweenPlaysTest {
         .toEpochMilli());
     // ...and forgotten once the window has passed.
     assertTrue(plays.lastPlayedWithinWindow(songA, Instant.now()).isEmpty());
-    assertTrue(new RecentSongPlays(Duration.ofMinutes(60), recentPlaysFile)
-        .lastPlayedWithinWindow(songA, Instant.now()).isEmpty());
   }
 
   @Test
-  void anUnreadablePlaysFile_startsEmpty_ratherThanBreakingTheQueue() throws Exception {
+  void aPlaysFileLeftByAnEarlierVersion_isIgnored() throws Exception {
 
-    Files.writeString(recentPlaysFile, "not json");
+    // Earlier versions kept plays in this file across restarts; it must no longer count.
+    Files.writeString(dataDir.resolve("JukeANator_RecentSongPlays.json"),
+        "[{\"songName\":\"Song A\",\"artistName\":\"Artist One\",\"albumArtistName\":\"Artist One\","
+            + "\"startedAtEpochMillis\":" + Instant.now().toEpochMilli() + "}]");
 
     SongQueueServiceImpl queue = newService(true);
 
@@ -148,7 +164,7 @@ class SongQueueMinimumTimeBetweenPlaysTest {
     properties.setResetQueueAtStartup(resetQueueAtStartup);
 
     return new SongQueueServiceImpl(properties, songLibraryService, backgroundMusic, repository(),
-        mock(ApplicationEventPublisher.class), Optional.empty(), recentPlaysFile);
+        mock(ApplicationEventPublisher.class), Optional.empty());
   }
 
   private SongQueueRepositoryFileSystemImpl repository() {

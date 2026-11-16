@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.domain.songqueue.service;
 
 import static java.util.Objects.requireNonNull;
 import java.io.File;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -141,23 +140,15 @@ public class SongQueueServiceImpl
    */
   private volatile boolean isSongQueueLocked = false;
 
-  /** Keeps recent song plays in memory only -- see the overload taking the file to keep them in. */
-  public SongQueueServiceImpl(SongQueueProperties songQueueProperties,
-      SongLibraryService songLibraryService, BackgroundMusicService backgroundMusicService,
-      SongQueueRepository songQueueRepository, ApplicationEventPublisher eventPublisher,
-      Optional<SlaveCommandGateway> slaveCommandGateway) {
-    this(songQueueProperties, songLibraryService, backgroundMusicService, songQueueRepository,
-        eventPublisher, slaveCommandGateway, null);
-  }
-
   /**
-   * @param recentSongPlaysFile where the time each song last started playing is kept across
-   *        restarts (see {@link RecentSongPlays}), or null to keep it in memory only
+   * The play restrictions (Rules A and B) are enforced against the plays of this running instance
+   * only: the play history they use is kept in memory and starts empty, so after a restart any
+   * song may be played again right away.
    */
   public SongQueueServiceImpl(SongQueueProperties songQueueProperties,
       SongLibraryService songLibraryService, BackgroundMusicService backgroundMusicService,
       SongQueueRepository songQueueRepository, ApplicationEventPublisher eventPublisher,
-      Optional<SlaveCommandGateway> slaveCommandGateway, Path recentSongPlaysFile) {
+      Optional<SlaveCommandGateway> slaveCommandGateway) {
 
     requireNonNull(songQueueProperties, "songQueueProperties cannot be null");
     requireNonNull(songLibraryService, "songLibraryService cannot be null");
@@ -185,8 +176,7 @@ public class SongQueueServiceImpl
     // below still enforces the normal, shorter wait for every other artist against this history.
     this.recentSongPlays = new RecentSongPlays(
         Duration.ofMinutes((long) this.minimumMinutesBetweenSongPlays
-            * CREED_MINUTES_BETWEEN_PLAYS_MULTIPLIER),
-        recentSongPlaysFile);
+            * CREED_MINUTES_BETWEEN_PLAYS_MULTIPLIER));
 
     initialize();
   }
@@ -546,40 +536,44 @@ public class SongQueueServiceImpl
       }
 
       // Simulate inserting the incoming candidate using the real prioritization logic
-      mirrorSongQueueRoot.addSongToQueue("ELIGIBILITY_CHECK", targetSong, priority);
+      SongQueueEntryEntity candidateEntry =
+          mirrorSongQueueRoot.addSongToQueue("ELIGIBILITY_CHECK", targetSong, priority);
 
-      // Append the sorted queue state onto our timeline
+      // Append the sorted queue state onto our timeline, noting where the candidate landed
+      int candidateIndex = -1;
       for (SongQueueEntryEntity entry : mirrorSongQueueRoot.getSongs()) {
+        if (entry == candidateEntry) {
+          candidateIndex = fullTimeline.size();
+        }
         fullTimeline.add(entry.getSong());
       }
 
-      // Linear scan to ensure no cluster beats the consecutive limit
-      int consecutiveCount = 0;
-      String lastArtist = null;
+      // Measure only the run of same-artist songs the candidate would be part of. A run elsewhere
+      // in the timeline that is already over the limit (e.g. an album or playlist added without
+      // the eligibility check, or a queue restored at startup) must not block unrelated songs.
+      String candidateArtist = targetSong.getArtistName();
+      int consecutiveCount = 1;
+      for (int i = candidateIndex - 1; i >= 0
+          && Objects.equals(fullTimeline.get(i).getArtistName(), candidateArtist); i--) {
+        consecutiveCount++;
+      }
+      for (int i = candidateIndex + 1; i < fullTimeline.size()
+          && Objects.equals(fullTimeline.get(i).getArtistName(), candidateArtist); i++) {
+        consecutiveCount++;
+      }
 
-      for (SongFileEntity song : fullTimeline) {
-        String currentArtist = song.getArtistName();
+      int effectiveMaxConsecutiveSongPlaysByArtist = isCreed(candidateArtist)
+          ? Math.max(1, maximumConsecutiveSongPlaysByArtist / CREED_MAX_CONSECUTIVE_PLAYS_DIVISOR)
+          : maximumConsecutiveSongPlaysByArtist;
 
-        if (currentArtist.equals(lastArtist)) {
-          consecutiveCount++;
-        } else {
-          consecutiveCount = 1;
-          lastArtist = currentArtist;
+      if (consecutiveCount > effectiveMaxConsecutiveSongPlaysByArtist) {
+        if (isCreed(candidateArtist)) {
+          log.info(
+              "Creed override triggered (Rule B): blocked after {} consecutive plays, "
+                  + "halved max is {}",
+              consecutiveCount, effectiveMaxConsecutiveSongPlaysByArtist);
         }
-
-        int effectiveMaxConsecutiveSongPlaysByArtist = isCreed(currentArtist)
-            ? Math.max(1, maximumConsecutiveSongPlaysByArtist / CREED_MAX_CONSECUTIVE_PLAYS_DIVISOR)
-            : maximumConsecutiveSongPlaysByArtist;
-
-        if (consecutiveCount > effectiveMaxConsecutiveSongPlaysByArtist) {
-          if (isCreed(currentArtist)) {
-            log.info(
-                "Creed override triggered (Rule B): blocked after {} consecutive plays, "
-                    + "halved max is {}",
-                consecutiveCount, effectiveMaxConsecutiveSongPlaysByArtist);
-          }
-          return "the consecutive play count for '" + currentArtist + "' has been exceeded";
-        }
+        return "the consecutive play count for '" + candidateArtist + "' has been exceeded";
       }
 
 

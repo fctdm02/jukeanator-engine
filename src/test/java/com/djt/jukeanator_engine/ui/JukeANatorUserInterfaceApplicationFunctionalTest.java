@@ -141,8 +141,6 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
   private static final Path TEST_DATA_DIR =
       Path.of("src/test/resources/com/djt/jukeanator_engine/test-data-dir");
   private static final Path ADMIN_PASSWORD_FILE = TEST_DATA_DIR.resolve("admin.sha");
-  private static final Path RECENT_SONG_PLAYS_FILE =
-      TEST_DATA_DIR.resolve("JukeANator_RecentSongPlays.json");
 
   private static final String SCAN_DIALOG_TITLE = "Select Music Folder to Scan";
   private static final String ADMIN_USERNAME = "ADMIN";
@@ -206,10 +204,6 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     originalAdminPassword =
         Files.exists(ADMIN_PASSWORD_FILE) ? Files.readString(ADMIN_PASSWORD_FILE) : null;
     Files.writeString(ADMIN_PASSWORD_FILE, sha256Hex(ADMIN_PASSWORD), StandardCharsets.UTF_8);
-
-    // Songs played by an earlier run within minimum-minutes-between-song-plays would otherwise be
-    // refused by the queue rules
-    Files.deleteIfExists(RECENT_SONG_PLAYS_FILE);
   }
 
   @AfterAll
