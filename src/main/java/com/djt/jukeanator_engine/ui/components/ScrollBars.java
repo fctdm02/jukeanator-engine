@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.ui.components;
 
+import java.awt.Color;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 
@@ -40,12 +41,31 @@ public final class ScrollBars {
   }
 
   /**
-   * Applies the configured scroll bar to {@code bar}. Does nothing when big scroll bars are off,
-   * leaving the look and feel's default.
+   * Applies the configured scroll bar to both of {@code scrollPane}'s bars, framed in
+   * {@code frameColor} (normally the border color of the panel hosting the scroll pane). Does
+   * nothing when big scroll bars are off.
+   */
+  public static void apply(JScrollPane scrollPane, Color frameColor) {
+    apply(scrollPane.getVerticalScrollBar(), frameColor);
+    apply(scrollPane.getHorizontalScrollBar(), frameColor);
+  }
+
+  /**
+   * Applies the configured scroll bar to {@code bar}, framed in the default frame color (the
+   * legacy CD card's white border). Does nothing when big scroll bars are off, leaving the look
+   * and feel's default.
    */
   public static void apply(JScrollBar bar) {
+    apply(bar, ColorTheme.get().legacyPanelBorder);
+  }
+
+  /**
+   * Applies the configured scroll bar to {@code bar}, framed in {@code frameColor}. Does nothing
+   * when big scroll bars are off, leaving the look and feel's default.
+   */
+  public static void apply(JScrollBar bar, Color frameColor) {
     if (useBigScrollBars) {
-      bar.setUI(new TouchScrollBarUI());
+      bar.setUI(new TouchScrollBarUI(frameColor));
     }
   }
 }

@@ -44,12 +44,14 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.ScanRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchTotalsDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
+import com.djt.jukeanator_engine.domain.songlibrary.event.AlbumMetadataChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.SongStatisticsChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongLibraryServiceException;
 import com.djt.jukeanator_engine.domain.songlibrary.exception.SongScanFailedException;
 import com.djt.jukeanator_engine.domain.songlibrary.mapper.SongLibraryMapper;
 import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumFolderEntity;
+import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.ArtistFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.GenreFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.LibraryItem;
@@ -749,6 +751,10 @@ public class SongLibraryServiceImpl
    * Slices out one 0-based server page of size {@code pageSize} from an already-sorted list. A
    * {@code pageIndex} past the end returns an empty list rather than throwing.
    */
+  private static boolean isBlank(String value) {
+    return value == null || value.isBlank();
+  }
+
   private static <T> List<T> slicePage(List<T> sorted, int pageIndex, int pageSize) {
 
     int from = Math.min(Math.max(pageIndex, 0) * pageSize, sorted.size());
@@ -1233,10 +1239,27 @@ public class SongLibraryServiceImpl
     try {
 
       AlbumFolderEntity album = this.ownRoot.getAlbumById(albumId);
+      AlbumMetaDataFileEntity existing = album.getMetaData();
 
-      album.getMetaData().writeMetadataToFileSystem(albumMetadata);
+      // Edits only change the record label, release date and explicit flag; a blank genre or
+      // cover art URL in the request keeps the value already stored rather than wiping it.
+      String genre = isBlank(albumMetadata.genre()) ? existing.getGenre() : albumMetadata.genre();
+      String coverArtUrl = isBlank(albumMetadata.coverArtUrl()) ? existing.getCoverArtUrl()
+          : albumMetadata.coverArtUrl();
 
-      return albumMetadata;
+      AlbumMetadataDto merged = new AlbumMetadataDto(albumMetadata.artistName(),
+          albumMetadata.albumName(), albumMetadata.recordLabel(), albumMetadata.releaseDate(),
+          genre, coverArtUrl, albumMetadata.hasExplicit(), albumMetadata.isEmpty());
+
+      existing.writeMetadataToFileSystem(merged);
+
+      // Persist to the repository too (with JPA, album metadata is read from the database on the
+      // next startup, not from the file just written), then let views refresh their album data.
+      Integer locationId = getOwnLocationId();
+      this.songLibraryRepository.updateAlbumMetadata(this.ownRoot, locationId, albumId, existing);
+      eventPublisher.publishEvent(new AlbumMetadataChangedEvent(locationId, albumId));
+
+      return merged;
 
     } catch (Exception e) {
       throw new SongLibraryServiceException("Could not update metadata for album: " + albumId, e);

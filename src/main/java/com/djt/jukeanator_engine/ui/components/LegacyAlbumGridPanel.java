@@ -314,12 +314,14 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
     scroll.setBorder(null);
     scroll.getVerticalScrollBar().setUnitIncrement(profile.trackRowH());
     scroll.getHorizontalScrollBar().setUnitIncrement(profile.trackRowH());
-    // Big touch-friendly scroll bars unless user-interface.use-big-scrollbars is off.
-    ScrollBars.apply(scroll);
-    // Fill the bottom-right gap left when both scroll bars are showing, so it matches the black
-    // tracks rather than the look and feel's default corner color.
+    // Big touch-friendly scroll bars unless user-interface.use-big-scrollbars is off, framed in
+    // the card's border color (white, or red for explicit albums) so they blend into the frame.
+    ScrollBars.apply(scroll, borderColor);
+    // Fill the bottom-right gap left when both scroll bars are showing: the card's border color
+    // when the big framed bars are in use, otherwise black to match the tracks, rather than the
+    // look and feel's default corner color.
     JPanel corner = new JPanel();
-    corner.setBackground(Color.BLACK);
+    corner.setBackground(ScrollBars.isUseBigScrollBars() ? borderColor : Color.BLACK);
     scroll.setCorner(JScrollPane.LOWER_RIGHT_CORNER, corner);
 
     JPanel content = new JPanel(new BorderLayout(0, 0));

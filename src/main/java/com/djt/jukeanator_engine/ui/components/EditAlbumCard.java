@@ -43,6 +43,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumMetadataDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.DownloadAlbumCoverArtRequest;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
+import com.djt.jukeanator_engine.ui.security.SwingSecurityUtil;
 
 // ─────────────────────────────────────────────────────────────────────────
 // CONSTRUCTOR
@@ -261,7 +262,9 @@ public class EditAlbumCard extends JPanel {
     gbc.gridwidth = 2;
     chbHasExplicit = new JCheckBox("Has Explicit Lyrics");
     setupCheckBox(chbHasExplicit);
-    chbHasExplicit.setEnabled(false);
+    // Always editable (unlike the read-only year/label fields): toggling it saves the album's
+    // explicit flag immediately, so it can be set without an internet search.
+    chbHasExplicit.addActionListener(e -> doExplicitFlagUpdate());
     fieldsForm.add(chbHasExplicit, gbc);
 
     leftPanel.add(fieldsForm);
@@ -665,7 +668,8 @@ public class EditAlbumCard extends JPanel {
     setStatus(null, ColorTheme.get().editAlbumStatusInfo);
     lblSearchStatus.setText("Searching...");
 
-    new Thread(() -> {
+    // Propagate the EDT's security context so ServiceSecurityAspect accepts the service call.
+    SwingSecurityUtil.runAsync(() -> {
       try {
 
         List<AlbumMetadataDto> results =
@@ -688,7 +692,35 @@ public class EditAlbumCard extends JPanel {
               ColorTheme.get().editAlbumStatusError);
         });
       }
-    }).start();
+    });
+  }
+
+  /**
+   * Saves the left panel's "Has Explicit Lyrics" checkbox, keeping the album's current release
+   * year and record label.
+   */
+  private void doExplicitFlagUpdate() {
+
+    if (currentAlbum == null)
+      return;
+
+    String year = tfReleaseDate.getText().trim();
+    String label = tfRecordLabel.getText().trim();
+    boolean explicit = chbHasExplicit.isSelected();
+
+    try {
+      AlbumMetadataDto metadata =
+          new AlbumMetadataDto("", "", label, year, "", "", explicit, year.isBlank());
+
+      songLibraryService.updateAlbumMetadata(currentAlbum.albumId(), metadata);
+
+      setStatus("Updated — Explicit: " + explicit, ColorTheme.get().editAlbumStatusSuccess);
+
+    } catch (Exception e) {
+      chbHasExplicit.setSelected(!explicit);
+      setStatus("Failed updating explicit flag: " + e.getMessage(),
+          ColorTheme.get().editAlbumStatusError);
+    }
   }
 
   private void doMetadataUpdate() {

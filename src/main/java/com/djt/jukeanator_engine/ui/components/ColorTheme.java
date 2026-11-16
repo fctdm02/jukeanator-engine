@@ -113,6 +113,23 @@ public final class ColorTheme {
   /** Neutral white border for non-explicit Legacy-view album panels (HomePanel). */
   public final Color legacyPanelBorder = Color.WHITE;
 
+  // ── Touch scroll bars (TouchScrollBarUI) ──────────────────────────────────
+
+  /** Lightest stop of the 3D black thumb / arrow-button gradient (lit edge). */
+  public final Color scrollKnobLight = new Color(0x6a, 0x6a, 0x6a);
+
+  /** Middle stop of the 3D black thumb / arrow-button gradient. */
+  public final Color scrollKnobMid = new Color(0x2a, 0x2a, 0x2a);
+
+  /** Darkest stop of the 3D black thumb / arrow-button gradient (shaded edge). */
+  public final Color scrollKnobDark = new Color(0x0a, 0x0a, 0x0a);
+
+  /** Shaded side of the recessed track groove; the lit side is white. */
+  public final Color scrollGrooveShade = new Color(0xbd, 0xbd, 0xbd);
+
+  /** Chevron color on the scroll bar arrow buttons. */
+  public final Color scrollChevron = Color.WHITE;
+
   /** Yellow accent — admin queue locked symbol. */
   public final Color accentYellow = new Color(255, 255, 0);
   

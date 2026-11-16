@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.ui.event;
 
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import com.djt.jukeanator_engine.domain.songlibrary.event.AlbumMetadataChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.SongStatisticsChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -96,6 +97,18 @@ public class JukeANatorEventListener {
     frame.setNowPlaying(null);
   }
   
+  @EventListener
+  public void handleAlbumMetadataChangedEvent(AlbumMetadataChangedEvent event) {
+
+    if (frame == null) return;
+
+    // HomePanel holds the album list it loaded at startup; reload it so the edited album's
+    // record label / release date / explicit flag show up without a restart.
+    Integer locationId = songLibraryService.getOwnLocationId();
+    frame.setAlbums(songLibraryService.getAlbums(locationId),
+        songLibraryService.getArtists(locationId).size());
+  }
+
   @EventListener
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
 

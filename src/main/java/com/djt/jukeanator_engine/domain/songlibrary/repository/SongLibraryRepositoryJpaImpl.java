@@ -516,4 +516,38 @@ public final class SongLibraryRepositoryJpaImpl implements SongLibraryRepository
     this.root = root;
     return numPlays;
   }
+
+  @Override
+  public void updateAlbumMetadata(RootFolderEntity root, Integer locationId, Integer albumId,
+      AlbumMetaDataFileEntity metaData) throws EntityDoesNotExistException {
+
+    requireNonNull(locationId, "locationId cannot be null");
+    requireNonNull(albumId, "albumId cannot be null");
+    requireNonNull(metaData, "metaData cannot be null");
+
+    // Album metadata lives on the ALBUM row's own columns (see applyAlbumFields), so a single
+    // targeted UPDATE is enough -- no need for a full diff-based storeAggregateRoot.
+    int rowsUpdated = transactionTemplate.execute(status -> entityManager
+        .createQuery("update SongLibraryJpaEntity e set e.albumGenre = :genre, "
+            + "e.albumCoverArtUrl = :coverArtUrl, e.albumRecordLabel = :recordLabel, "
+            + "e.albumReleaseDate = :releaseDate, e.albumHasExplicit = :hasExplicit "
+            + "where e.locationId = :locationId and e.id = :albumId "
+            + "and e.classDiscriminator = :albumType")
+        .setParameter("genre", metaData.getGenre())
+        .setParameter("coverArtUrl", metaData.getCoverArtUrl())
+        .setParameter("recordLabel", metaData.getRecordLabel())
+        .setParameter("releaseDate", metaData.getReleaseDate())
+        .setParameter("hasExplicit", metaData.hasExplicit())
+        .setParameter("locationId", locationId)
+        .setParameter("albumId", albumId)
+        .setParameter("albumType", SongLibraryJpaEntity.LibraryItemType.ALBUM)
+        .executeUpdate());
+
+    if (rowsUpdated == 0) {
+      throw new EntityDoesNotExistException("No album found for locationId: [" + locationId
+          + "], albumId: [" + albumId + "].");
+    }
+
+    this.root = root;
+  }
 }

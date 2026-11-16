@@ -1,4 +1,5 @@
 package com.djt.jukeanator_engine.domain.songlibrary.event;
 
-public sealed interface SongLibraryEvent permits SongStatisticsChangedEvent, ScanFileSystemForSongsEvent {
+public sealed interface SongLibraryEvent permits SongStatisticsChangedEvent, ScanFileSystemForSongsEvent,
+    AlbumMetadataChangedEvent {
 }

@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.songlibrary.repository;
 
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.repository.AggregateRootRepository;
+import com.djt.jukeanator_engine.domain.songlibrary.model.AlbumMetaDataFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 
 /**
@@ -36,6 +37,19 @@ public interface SongLibraryRepository extends AggregateRootRepository<RootFolde
    * (e.g. JPA) have no per-location file to rename.
    */
   default void renameLocationLibraryFile(String oldLocationName, String newLocationName) {
+    // no-op by default
+  }
+
+  /**
+   * Persists one album's metadata (genre, cover art URL, record label, release date, explicit
+   * flag) after it was edited in place on {@code root} -- e.g. from the Admin Panel's Edit Album
+   * screen. A no-op by default: the filesystem implementation reads album metadata lazily from
+   * each album's own metadata file, which the caller has already rewritten.
+   *
+   * @throws EntityDoesNotExistException if no album row exists for the given ids
+   */
+  default void updateAlbumMetadata(RootFolderEntity root, Integer locationId, Integer albumId,
+      AlbumMetaDataFileEntity metaData) throws EntityDoesNotExistException {
     // no-op by default
   }
 
