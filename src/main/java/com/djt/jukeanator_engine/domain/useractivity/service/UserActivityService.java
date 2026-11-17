@@ -66,6 +66,17 @@ public interface UserActivityService {
   void markSyncedToMaster(List<PendingUserActivity> acknowledged);
 
   /**
+   * Standalone/slave only. Empties the outbox to master: every activity record not yet sent is
+   * marked as sent, so it never will be. Used when a location is provisioned as a slave, alongside
+   * {@code FinancialLedgerService.purgeLocalLedger}. The records stay in the local activity view.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   *
+   * @return how many records were discarded
+   */
+  int discardPendingMasterSync();
+
+  /**
    * Master-only. Stores a batch of activity records mirrored from {@code locationId}'s slave,
    * attributed to {@code locationId} regardless of what each record carries. Idempotent: a record
    * whose {@code (locationId, activityId)} is already stored is skipped, so a retried batch is a

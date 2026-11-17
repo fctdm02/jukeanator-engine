@@ -133,6 +133,12 @@ record and produces everything master needs, so you provision without ever calli
 - [ ] Click **Generate API Key**, then **Confirm New Key**. Copy the **API Key** shown -- it is
   shown **once**; only its hash is saved. On a location that is already connected to master, a
   new key locks it out until master's row has the new hash, which is why the dialog asks twice.
+  Generating a key is the provisioning step, so it also starts this instance's books from
+  scratch: its financial ledger (split periods, cash and card transactions) is deleted and a new
+  split period starts, and user activity not yet sent to master is discarded. Anything recorded
+  while testing in standalone mode therefore never reaches master's ledger. The song library,
+  play statistics, queue and settings are kept. Never do this on a slave that is already taking
+  real money.
 - [ ] Click **Copy SQL**. It saves the form, then copies the SQL for master to the clipboard and
   writes it to `<data-dir>/location.sql`. It refuses until a key has been generated, since the SQL
   needs the key's hash. The SQL looks like this:
@@ -189,17 +195,17 @@ UPDATE persistent_identity_seq SET next_val = (SELECT MAX(id) + 1 FROM location)
   key in the slave's `application.yml` (step 3; `printf '%s' '<key>' | sha256sum` must equal the
   row's `api_key_lookup`). The slave disconnects and keeps retrying every few seconds, so it
   connects as soon as master's row is fixed, without a restart of either instance.
-- [ ] Until the slave has learned its id, its syncs carry its old local id, and master rejects
-  them, for example `Master rejected mirrored CASH <n> for locationId <m>: 401 UNAUTHORIZED`.
-  Do not edit the slave's locations JSON to change the id by hand: the slave's other stored rows
-  (financial ledger outbox, users, user activity, background music) are also tagged with the old
-  id, and only the automatic id change re-tags them. Rejected entries are not lost; they stay
-  queued and are pushed under the new id once it is learned.
-- [ ] If the id was already changed by hand, the slave repairs it on connect: when its
-  financial-ledger or user-activity outbox still holds data tagged with an id other than its own,
-  it logs `Local data is still tagged with locationId [<m>], which is not a local location;
-  re-tagging it with this instance's own locationId [<n>]` before the connected line, and the
-  rejected entries are pushed under `<n>` on the next sync.
+- [ ] When the slave connects with data recorded before it was provisioned, it purges that data
+  before the connected line, and logs `Local financial ledger and user activity were recorded
+  under locationId [<m>], before this slave was provisioned as locationId [<n>]; purging them so
+  they are never sent to master`, followed by the purge counts. This happens when master assigns
+  a different id, or when the financial-ledger or user-activity outbox still holds data tagged
+  with an id other than master's (for example, after the locations JSON was edited by hand). The
+  financial ledger is deleted and a new split period starts; unsent user activity is discarded.
+  Everything else (song library, statistics, queue, settings) is kept. A slave is never switched
+  from standalone to slave at a location that is already taking money, so that data is testing,
+  not revenue.
+- [ ] Do not edit the slave's locations JSON to change the id by hand; leave it to the handshake.
 - [ ] From either machine, `GET http://<master-ip>:8080/api/locations` shows the location as
   online.
 - [ ] Trigger a library scan on the slave (Admin Panel); master receives the library snapshot

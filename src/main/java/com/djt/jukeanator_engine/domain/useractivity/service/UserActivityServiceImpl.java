@@ -22,6 +22,8 @@ public class UserActivityServiceImpl implements UserActivityService {
 
   private static final Logger log = LoggerFactory.getLogger(UserActivityServiceImpl.class);
 
+  private static final int DISCARD_BATCH_SIZE = 500;
+
   private final UserActivityRepository userActivityRepository;
   private final ApplicationEventPublisher eventPublisher;
   // Looked up lazily: SongQueueActivityTrackingAspect depends on this service, and aspects are
@@ -69,6 +71,25 @@ public class UserActivityServiceImpl implements UserActivityService {
   @Override
   public void markSyncedToMaster(List<PendingUserActivity> acknowledged) {
     userActivityRepository.markSyncedToMaster(acknowledged);
+  }
+
+  @Override
+  public synchronized int discardPendingMasterSync() {
+
+    // Marking them synced is what keeps them from ever being pushed; the records themselves stay
+    // for the Admin Panel's activity view until the retention purge removes them. Batched, because
+    // the outbox is read a limited number of records at a time.
+    int discarded = 0;
+    List<PendingUserActivity> batch;
+    while (!(batch = userActivityRepository.findPendingMasterSync(DISCARD_BATCH_SIZE)).isEmpty()) {
+      userActivityRepository.markSyncedToMaster(batch);
+      discarded += batch.size();
+    }
+    if (discarded > 0) {
+      log.warn("Discarded {} user activity records from the outbox to master; they will never be "
+          + "sent", discarded);
+    }
+    return discarded;
   }
 
   @Override

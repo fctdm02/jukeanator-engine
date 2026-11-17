@@ -3,8 +3,6 @@ package com.djt.jukeanator_engine.domain.location.client;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -89,8 +87,8 @@ public class SlaveConnectionManager {
   private static final Logger log = LoggerFactory.getLogger(SlaveConnectionManager.class);
 
   private static final long RECONNECT_CHECK_INTERVAL_SECONDS = 5;
-  // The user-activity outbox is read oldest first, so stale-id records (left over from before an
-  // id change) are within the first this-many.
+  // The user-activity outbox is read oldest first, so records left over from before an id change
+  // are within the first this-many.
   private static final int STALE_LOCATION_ID_SCAN_LIMIT = 1000;
 
   private final AppProperties appProperties;
@@ -449,8 +447,10 @@ public class SlaveConnectionManager {
     connectionProblemLogged.set(false);
 
     runAsSystemIfUnauthenticated(() -> {
+      Integer localLocationId = null;
+      boolean locationIdChanged = false;
       try {
-        Integer localLocationId = songLibraryService.getOwnLocationId();
+        localLocationId = songLibraryService.getOwnLocationId();
         if (!masterLocationId.equals(localLocationId)) {
           log.info("Master assigned locationId {} (was {} locally) — correcting local location record",
               masterLocationId, localLocationId);
@@ -458,12 +458,13 @@ public class SlaveConnectionManager {
           // Re-key SongLibraryServiceImpl's own locationId->root cache under the corrected id --
           // it was populated under the old (pre-correction) id at startup.
           songLibraryService.reinitializeOwnLocation();
+          locationIdChanged = true;
         }
       } catch (Exception e) {
         log.warn("Could not reconcile master's locationId {} with local location record",
             masterLocationId, e);
       }
-      adoptDataTaggedWithStaleLocationIds(masterLocationId);
+      purgeDataFromBeforeProvisioning(masterLocationId, locationIdChanged, localLocationId);
       log.info("Connected to master at {} using location id [{}]", masterUrl, masterLocationId);
       sendPricingConfig(session);
       sendLocationInfo(session);
@@ -471,36 +472,51 @@ public class SlaveConnectionManager {
   }
 
   /**
-   * Everything queued on a slave for master belongs to its own location, so any other id on the
-   * financial-ledger or user-activity outbox is left over from before the own location's id
-   * changed outside reconcileOwnLocationId (for example, a hand-edited locations JSON). Master
-   * would reject those pushes forever, so re-tag that data with the own id first.
+   * Purges the local financial ledger and empties the user-activity outbox when they hold data
+   * recorded before this slave was provisioned: either master just assigned this slave a different
+   * location id, or something queued for master still carries an id other than master's (left over
+   * from an id change made outside reconcileOwnLocationId, e.g. a hand-edited locations JSON). A
+   * slave is never switched from standalone to slave at a location that is already taking money,
+   * so that data is testing, not revenue, and must never reach master's ledger. Everything else on
+   * the slave (song library, statistics, queue, settings) is kept.
    */
-  private void adoptDataTaggedWithStaleLocationIds(Integer ownLocationId) {
+  private void purgeDataFromBeforeProvisioning(Integer ownLocationId, boolean locationIdChanged,
+      Integer previousLocationId) {
 
-    Set<Integer> staleLocationIds = new TreeSet<>();
     try {
-      for (MasterSyncOutboxEntry entry : financialLedgerService.getPendingMasterSync()) {
-        addIfStale(staleLocationIds, entry.locationId(), ownLocationId);
+      Integer staleLocationId = locationIdChanged ? previousLocationId
+          : findOutboxLocationIdOtherThan(ownLocationId);
+      if (!locationIdChanged && staleLocationId == null) {
+        return;
       }
-      for (PendingUserActivity pending : userActivityService
-          .getPendingMasterSync(STALE_LOCATION_ID_SCAN_LIMIT)) {
-        addIfStale(staleLocationIds, pending.record().locationId(), ownLocationId);
-      }
-      for (Integer staleLocationId : staleLocationIds) {
-        locationService.adoptLocalDataTaggedWithStaleLocationId(staleLocationId);
-      }
+      log.warn("Local financial ledger and user activity were recorded under locationId [{}], "
+          + "before this slave was provisioned as locationId [{}]; purging them so they are never "
+          + "sent to master", staleLocationId, ownLocationId);
+      financialLedgerService.purgeLocalLedger();
+      userActivityService.discardPendingMasterSync();
     } catch (Exception e) {
-      log.warn("Could not re-tag local data still tagged with locationIds {}", staleLocationIds, e);
+      log.warn("Could not purge local data recorded before this slave was provisioned", e);
     }
   }
 
-  // Untagged (null) data is attributed to the own location when it is pushed, so it is not stale.
-  private static void addIfStale(Set<Integer> staleLocationIds, Integer locationId,
-      Integer ownLocationId) {
-    if (locationId != null && !locationId.equals(ownLocationId)) {
-      staleLocationIds.add(locationId);
+  // The first id other than ownLocationId on the financial-ledger or user-activity outbox, or
+  // null. Untagged (null) entries are attributed to the own location when pushed, so they are not
+  // counted.
+  private Integer findOutboxLocationIdOtherThan(Integer ownLocationId) {
+
+    for (MasterSyncOutboxEntry entry : financialLedgerService.getPendingMasterSync()) {
+      if (entry.locationId() != null && !entry.locationId().equals(ownLocationId)) {
+        return entry.locationId();
+      }
     }
+    for (PendingUserActivity pending : userActivityService
+        .getPendingMasterSync(STALE_LOCATION_ID_SCAN_LIMIT)) {
+      Integer locationId = pending.record().locationId();
+      if (locationId != null && !locationId.equals(ownLocationId)) {
+        return locationId;
+      }
+    }
+    return null;
   }
 
   // Warns once per run of failed connects (they repeat every reconnect interval), then logs the

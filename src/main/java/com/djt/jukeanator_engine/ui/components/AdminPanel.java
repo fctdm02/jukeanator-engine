@@ -1770,7 +1770,10 @@ public class AdminPanel extends JPanel {
    *
    * <ul>
    * <li><b>Generate API Key</b> -- {@link LocationService#generateOwnLocationApiKey}; the
-   * plaintext key is shown once, for {@code app.location-api-key}.</li>
+   * plaintext key is shown once, for {@code app.location-api-key}. As this is the provisioning
+   * step, it also purges the financial ledger and discards unsent user activity ({@link
+   * FinancialLedgerService#purgeLocalLedger}, {@link UserActivityService#discardPendingMasterSync}),
+   * so nothing recorded while testing is ever pushed to master.</li>
    * <li><b>Copy SQL</b> -- saves, then builds the insert for master's {@code location} table from
    * the saved record (including the key's hash and lookup value), copies it to the clipboard and
    * writes it to {@code <dataDir>/location.sql}.</li>
@@ -2054,9 +2057,11 @@ public class AdminPanel extends JPanel {
       if (!confirmingKeyGeneration) {
         confirmingKeyGeneration = true;
         generateKeyBtn.setText("Confirm New Key");
-        showWarning("A new key replaces this location's current one. Master rejects this "
-            + "instance until its location row has the new key's hash (see Copy SQL). Click "
-            + "Confirm New Key to continue.");
+        showWarning("A new key replaces this location's current one, and provisions this "
+            + "instance as a new slave: its financial ledger (every split period and cash and "
+            + "card transaction) is deleted, and user activity not yet sent to master is "
+            + "discarded. Master rejects this instance until its location row has the new key's "
+            + "hash (see Copy SQL). Click Confirm New Key to continue.");
         return;
       }
 
@@ -2066,6 +2071,10 @@ public class AdminPanel extends JPanel {
       SwingSecurityUtil.runAsync(() -> {
         try {
           ProvisionedLocationDto provisioned = locationService.generateOwnLocationApiKey();
+          // Provisioning: anything recorded so far (testing while standalone) is not revenue
+          // and must never be pushed to master once this instance runs as a slave.
+          financialLedgerService.purgeLocalLedger();
+          userActivityService.discardPendingMasterSync();
           SwingUtilities.invokeLater(() -> {
             apiKeyField.setText(provisioned.apiKey());
             apiKeyField.setCaretPosition(0);

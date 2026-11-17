@@ -592,28 +592,6 @@ public class LocationServiceImpl implements LocationService {
   }
 
   @Override
-  public void adoptLocalDataTaggedWithStaleLocationId(Integer staleLocationId) {
-
-    requireNonNull(staleLocationId, "staleLocationId cannot be null");
-
-    if (this.locationRoot.getLocations().isEmpty()) {
-      return;
-    }
-    Integer ownLocationId = this.locationRoot.getLocations().iterator().next().getPersistentIdentity();
-    if (staleLocationId.equals(ownLocationId)
-        || this.locationRoot.getLocationByIdNullIfNotExists(staleLocationId) != null) {
-      return;
-    }
-
-    log.warn("Local data is still tagged with locationId [{}], which is not a local location; "
-        + "re-tagging it with this instance's own locationId [{}]", staleLocationId, ownLocationId);
-    // The same event reconcileOwnLocationId publishes, so every service holding location-tagged
-    // rows re-tags them the same way. The location itself already has the right id, so it (and
-    // its repository row) is left alone.
-    this.eventPublisher.publishEvent(new OwnLocationIdChangedEvent(staleLocationId, ownLocationId));
-  }
-
-  @Override
   public ProvisionedLocationDto generateOwnLocationApiKey() {
 
     LocationEntity location = getOrCreateOwnLocation(null);

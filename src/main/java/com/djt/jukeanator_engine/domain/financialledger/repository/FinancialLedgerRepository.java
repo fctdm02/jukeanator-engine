@@ -14,4 +14,12 @@ public interface FinancialLedgerRepository
    * {@code persistent_identity_seq} every {@code AbstractPersistentEntity} shares.
    */
   Integer nextPersistentIdentity();
+
+  /**
+   * Standalone/slave only. Deletes every stored split period, local transaction and mirrored
+   * mobile spend -- the stored half of {@code FinancialLedgerService.purgeLocalLedger}. The
+   * filesystem implementation needs nothing here, because storing the (cleared) root rewrites its
+   * one file; the JPA implementation deletes the rows, because its store never deletes any.
+   */
+  void deleteAllLedgerData();
 }

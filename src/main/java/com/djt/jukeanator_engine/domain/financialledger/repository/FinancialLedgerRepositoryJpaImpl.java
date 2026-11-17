@@ -126,6 +126,18 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
   }
 
   @Override
+  public void deleteAllLedgerData() {
+
+    transactionTemplate.executeWithoutResult(status -> {
+      entityManager.createNativeQuery("delete from location_transaction").executeUpdate();
+      entityManager.createNativeQuery("delete from location_mobile_credit_usage").executeUpdate();
+      entityManager.createNativeQuery("delete from location_jukebox_split").executeUpdate();
+      // Native deletes bypass the persistence context; drop anything it still holds for them.
+      entityManager.clear();
+    });
+  }
+
+  @Override
   public Integer nextPersistentIdentity() {
 
     // Same read-then-increment allocation against persistent_identity_seq as

@@ -256,6 +256,28 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
   }
 
   @Override
+  public synchronized void purgeLocalLedger() {
+
+    if (songLibraryService.getOwnLocation() == null) {
+      return; // master: no ledger of its own
+    }
+
+    int periods = ledgerRoot.getSplitPeriods().size();
+    int cash = ledgerRoot.getLocalCashTransactions().size();
+    int card = ledgerRoot.getLocalCreditCardTransactions().size();
+    int mobile = ledgerRoot.getMobileCreditUsages().size();
+
+    ledgerRoot.clear();
+    financialLedgerRepository.deleteAllLedgerData();
+    openNewPeriod(Instant.now());
+    financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+
+    log.warn("Purged the local financial ledger ({} split periods, {} cash and {} card "
+        + "transactions, {} mirrored mobile spends); a new split period starts now", periods, cash,
+        card, mobile);
+  }
+
+  @Override
   public List<UserSongCreditUsageDto> getMobileCreditUsageForSync(Integer locationId,
       String apiKey, Instant since) throws LocationServiceException {
 

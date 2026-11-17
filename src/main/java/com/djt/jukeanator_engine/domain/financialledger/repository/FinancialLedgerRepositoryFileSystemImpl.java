@@ -65,6 +65,12 @@ public final class FinancialLedgerRepositoryFileSystemImpl extends AbstractRepos
     return getNextPersistentIdentityValue();
   }
 
+  @Override
+  public void deleteAllLedgerData() {
+    // Nothing to do: storing the cleared root rewrites the one ledger file. The identity counter
+    // is deliberately left where it is, so ids are never reused.
+  }
+
   private void seedIdentityCounter(FinancialLedgerRootEntity root) {
 
     seedNextPersistentIdentityFrom(Stream.of(

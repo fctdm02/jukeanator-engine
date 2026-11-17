@@ -74,6 +74,17 @@ public interface FinancialLedgerService {
   void markSyncedToMaster(List<MasterSyncOutboxEntry> entries);
 
   /**
+   * Standalone/slave only. Deletes this instance's whole financial ledger (every split period,
+   * local cash and card transaction, and mirrored mobile spend) and opens a fresh split period
+   * starting now. Used when a location is provisioned as a slave: anything recorded before that
+   * (e.g. testing while standalone) is not real revenue and must never be pushed to master. Does
+   * nothing on master, which has no ledger of its own to purge.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   */
+  void purgeLocalLedger();
+
+  /**
    * Master-only. The mobile/web song-credit spends master has recorded against {@code locationId}
    * at or after {@code since} -- the slave's catch-up pull for any live mirror push it missed.
    * Spends recorded before cross-instance sync ids existed are omitted (they can't be mirrored

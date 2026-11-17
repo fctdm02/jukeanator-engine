@@ -35,6 +35,17 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
     return "FinancialLedgerRootEntity";
   }
 
+  /**
+   * Removes every split period, local transaction and mirrored mobile spend -- the in-memory half
+   * of {@code FinancialLedgerService.purgeLocalLedger}.
+   */
+  public void clear() {
+    splitPeriods.clear();
+    localCashTransactions.clear();
+    localCreditCardTransactions.clear();
+    mobileCreditUsages.clear();
+  }
+
   /** Every split period, ordered oldest-first (the last entry, if any, is the open period). */
   public List<JukeboxSplitPeriodEntity> getSplitPeriods() {
     return Collections.unmodifiableList(splitPeriods);
