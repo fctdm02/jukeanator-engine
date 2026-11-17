@@ -70,6 +70,10 @@ import org.springframework.test.context.ActiveProfiles;
 import com.djt.jukeanator_engine.AbstractServiceIntegrationTest;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
+import com.djt.jukeanator_engine.domain.license.legacy.LegacyCrypto;
+import com.djt.jukeanator_engine.domain.license.legacy.LegacyCtlFiles;
+import com.djt.jukeanator_engine.domain.license.legacy.LicenseTier;
+import com.djt.jukeanator_engine.domain.license.service.LicenseService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -80,6 +84,7 @@ import com.djt.jukeanator_engine.ui.components.GenrePanel;
 import com.djt.jukeanator_engine.ui.components.HomePanel;
 import com.djt.jukeanator_engine.ui.components.HotHerePanel;
 import com.djt.jukeanator_engine.ui.components.JukeANatorFrame;
+import com.djt.jukeanator_engine.ui.components.LicenseDetailPromptCard;
 import com.djt.jukeanator_engine.ui.components.SearchPanel;
 import com.djt.jukeanator_engine.ui.components.SongTrackCellRenderer;
 import com.djt.jukeanator_engine.ui.components.UiComponentNames;
@@ -113,6 +118,12 @@ import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
  * in the test data dir are set up here (see {@link #prepareTestDataDir()}). One fixture song is
  * really played through the configured player for a few seconds.
  *
+ * <h3>Licensing</h3>
+ * The test license directory is emptied before each run, so the application starts unlicensed and
+ * shows the registration card. The license server is disabled in the test profile, so step 1
+ * licenses the jukebox with Import File, using a Commercial license file generated for this
+ * computer's machine id, and then answers the Customer Name and Location Name prompts.
+ *
  * <h3>Deliberately not exercised</h3>
  * Exit and first-time-use Cancel ({@code System.exit}), Minimize, Load/Save Playlist and the Edit
  * Album "Browse..." button ({@code JFileChooser}), Edit Album internet Search / Google / Download
@@ -141,6 +152,11 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
   private static final Path TEST_DATA_DIR =
       Path.of("src/test/resources/com/djt/jukeanator_engine/test-data-dir");
   private static final Path ADMIN_PASSWORD_FILE = TEST_DATA_DIR.resolve("admin.sha");
+  /** {@code license.directory} in application-test.yml. */
+  private static final Path TEST_LICENSE_DIR =
+      Path.of(System.getProperty("java.io.tmpdir"), "jukeanator-test-license");
+  private static final String LICENSE_CUSTOMER_NAME = "FUNCTIONAL TEST";
+  private static final String LICENSE_LOCATION_NAME = "TEST LOCATION";
 
   private static final String SCAN_DIALOG_TITLE = "Select Music Folder to Scan";
   private static final String ADMIN_USERNAME = "ADMIN";
@@ -185,6 +201,9 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
   @Autowired
   private JukeANatorUserInterfaceProperties userInterfaceProperties;
 
+  @Autowired
+  private LicenseService licenseService;
+
   /** Marks the run as failed so the remaining ordered steps are skipped. */
   static class SkipAfterFailure implements TestWatcher {
     @Override
@@ -204,6 +223,10 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     originalAdminPassword =
         Files.exists(ADMIN_PASSWORD_FILE) ? Files.readString(ADMIN_PASSWORD_FILE) : null;
     Files.writeString(ADMIN_PASSWORD_FILE, sha256Hex(ADMIN_PASSWORD), StandardCharsets.UTF_8);
+
+    // Start unlicensed on every run, so the registration card is always shown (the license
+    // directory from application-test.yml would otherwise keep the license from an earlier run)
+    deleteRecursively(TEST_LICENSE_DIR);
   }
 
   @AfterAll
@@ -245,6 +268,10 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
       chooser.setSelectedFile(Path.of(SCAN_PATH).toAbsolutePath().toFile());
       chooser.approveSelection();
     });
+
+    // Once the initial data load finishes, the unlicensed instance shows the registration card
+    // over the whole frame (it can come up before or after the scan completes)
+    registerWithImportedLicenseFile(frame);
 
     // The scan runs in the Admin panel's progress overlay and ends with a Scan Complete notice
     awaitAdminOverlay("Scan Complete", SCAN_TIMEOUT_MS);
@@ -846,6 +873,33 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
         MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
   }
 
+  private static void deleteRecursively(Path dir) throws Exception {
+    if (!Files.exists(dir)) {
+      return;
+    }
+    try (var paths = Files.walk(dir)) {
+      for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+        Files.delete(path);
+      }
+    }
+  }
+
+  /**
+   * Writes a perpetual Commercial {@code JukeANator.CTL} for this computer's machine id, as the
+   * license server would issue it, to a temporary folder (outside the license directory, so the
+   * import really installs it).
+   */
+  private Path createCommercialLicenseFile() throws Exception {
+    String machineId = licenseService.getStatus().machineId();
+    assertNotNull(machineId, "the machine id is needed to issue a license file");
+    Path file = Files.createTempDirectory("jukeanator-test-license-import")
+        .resolve(LegacyCtlFiles.LICENSE_KEY_FILENAME);
+    LegacyCtlFiles.writeLicenseKey(file, LegacyCrypto.licenseKeyBytes(LicenseTier.C, machineId));
+    file.toFile().deleteOnExit();
+    file.getParent().toFile().deleteOnExit();
+    return file;
+  }
+
   private Integer locationId() {
     return songLibraryService.getOwnLocationId();
   }
@@ -903,6 +957,72 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
 
   private boolean isScanDialog(java.awt.Window window) {
     return window instanceof JDialog dialog && SCAN_DIALOG_TITLE.equals(dialog.getTitle());
+  }
+
+  /**
+   * Licenses the jukebox through the registration card: Import File installs a license file
+   * issued for this computer (the license server is disabled in the test profile, so Register
+   * cannot be used), Try closes the card, and the Customer Name and Location Name prompts that
+   * follow are answered with the on-screen keyboard. Commercial operation enables the bill
+   * acceptor, which later steps use.
+   */
+  private void registerWithImportedLicenseFile(JukeANatorFrame frame) throws Exception {
+
+    await(() -> isCardShowing(frame, UiComponentNames.REGISTRATION_IMPORT_BUTTON),
+        "the registration card", SCAN_TIMEOUT_MS);
+    assertTrue(licenseService.getStatus().isTrial(), "the test run should start unlicensed");
+    Path licenseFile = createCommercialLicenseFile();
+
+    // Import File swaps the form for an embedded file chooser
+    click(frame, UiComponentNames.REGISTRATION_IMPORT_BUTTON);
+    JFileChooser chooser = onEdt(() -> descendants(frame, JFileChooser.class).stream()
+        .filter(Component::isShowing).findFirst()
+        .orElseThrow(() -> new AssertionError("the license file chooser is not showing")));
+    runOnEdt(() -> {
+      chooser.setSelectedFile(licenseFile.toFile());
+      chooser.approveSelection();
+    });
+
+    // The import runs in the background; the card then reports the license and stays up
+    await(() -> onEdt(() -> findShowing(frame, UiComponentNames.REGISTRATION_MESSAGE_LABEL,
+        JLabel.class).map(l -> l.getText().contains("Licensed:")).orElse(false)),
+        "the registration card to report the imported license");
+    assertTrue(licenseService.getStatus().commercialEnabled(),
+        "the imported Commercial license should enable commercial operation");
+
+    click(frame, UiComponentNames.REGISTRATION_TRY_BUTTON);
+    assertFalse(isCardShowing(frame, UiComponentNames.REGISTRATION_IMPORT_BUTTON),
+        "Try should close the registration card");
+
+    // A licensed instance then asks for the customer and location names it does not have yet
+    answerLicenseDetailPrompt(frame, "Customer Name", LICENSE_CUSTOMER_NAME);
+    answerLicenseDetailPrompt(frame, "Location Name", LICENSE_LOCATION_NAME);
+    await(() -> !isCardShowing(frame, UiComponentNames.LICENSE_DETAIL_FIELD),
+        "the license detail prompts to close");
+    assertEquals(LICENSE_CUSTOMER_NAME, licenseService.getCustomerName());
+    assertEquals(LICENSE_LOCATION_NAME, licenseService.getLocationName());
+  }
+
+  /** Waits for the license detail prompt titled {@code title}, types {@code value} and saves. */
+  private static void answerLicenseDetailPrompt(JukeANatorFrame frame, String title, String value)
+      throws Exception {
+
+    await(() -> onEdt(() -> showingLicenseDetailPrompt(frame)
+        .map(card -> containsLabelText(card, title)).orElse(false)),
+        "the " + title + " prompt");
+    Container card = onEdt(() -> showingLicenseDetailPrompt(frame).orElseThrow());
+    typeOnKeyboard(card, value);
+    assertEquals(value, onEdt(() -> requireShowing(card, UiComponentNames.LICENSE_DETAIL_FIELD,
+        JLabel.class).getText()));
+    click(card, UiComponentNames.LICENSE_DETAIL_SAVE_BUTTON);
+    // Saving runs in the background, then closes this prompt (and may open the next one)
+    await(() -> onEdt(() -> !card.isShowing()), "the " + title + " prompt to close");
+  }
+
+  private static Optional<LicenseDetailPromptCard> showingLicenseDetailPrompt(Container root) {
+    return findShowing(root, UiComponentNames.LICENSE_DETAIL_FIELD, JLabel.class)
+        .map(field -> (LicenseDetailPromptCard) javax.swing.SwingUtilities
+            .getAncestorOfClass(LicenseDetailPromptCard.class, field));
   }
 
   private static JTabbedPane tabs() throws Exception {
