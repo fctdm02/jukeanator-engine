@@ -60,7 +60,10 @@ each is a separate host, there's no port clash to avoid:
   `C:\kiosk-trial\config\application.yml`, set `app.master-instance-url` to the master machine's
   LAN address, e.g. `http://192.168.1.50:8080` (use the IP/hostname you noted in step 0 --
   `localhost` here would point the slave at itself). Also point its song-player root folder at a
-  small test music folder. `location-id`/`location-api-key` are filled in at step 3.
+  small test music folder. `location-api-key` is filled in at step 3. Note that `app.mode: slave`
+  refuses to start while it is blank (`AppModeValidator`), so if you provision with Option B in
+  step 3, do that part in `app.mode: standalone` as described there. `location-id` can stay blank:
+  master assigns the slave its id when it connects.
 - [ ] Set the **same** `JWT_SECRET` environment variable (32+ characters) on both machines, and in
   the environment `GeneratePostmanJwtToken` runs in. The sample configs read `app.jwt.secret` from
   it; if it is unset, each instance signs with its own random per-run key.
@@ -83,8 +86,9 @@ matters (see step 10).
 
 ## 3. Provision the location
 
-Two ways to do this -- pick one. Both end with the same `locationId`/`apiKey` pair landing in the
-**slave machine**'s config.
+Two ways to do this -- pick one. Both end with the location's `apiKey` in the **slave machine**'s
+config. The slave needs no location id: master identifies it by its API key alone and tells it
+its id when it connects (step 4).
 
 ### Option A: curl against master's API
 
@@ -96,63 +100,82 @@ Two ways to do this -- pick one. Both end with the same `locationId`/`apiKey` pa
   ```
   Note the returned `locationId` and `apiKey` -- the key is shown **once** (only its hash is
   stored).
-- [ ] Put both into the **slave machine**'s config (`app.location-id`, `app.location-api-key`). To
-  also exercise the id-correction handshake, deliberately set `app.location-id` to a *different*
-  number.
+- [ ] Put the key into the **slave machine**'s config (`app.location-api-key`). Leave
+  `app.location-id` blank; the handshake in step 4 gives the slave master's id.
 
 ### Option B: the slave machine's own Admin Panel (no curl)
 
-`LocationService`/`registerLocation()` exist regardless of `app.mode`, specifically so a
-standalone or slave instance can locally register a location and hand the operator a ready-made
-record to turn into a SQL insert against master's database (see `LocationConfig`'s class javadoc).
-This lets you provision without ever calling master's API directly.
+A standalone or slave instance runs as exactly one location: its *own* location, the lowest-id
+entry in its `JukeANator_Locations.json`, created automatically on first startup (named
+`Location Name`, with default coordinates). The Admin Panel's **Location** dialog edits that one
+record and produces everything master needs, so you provision without ever calling master's API.
 
-- [ ] **On the slave machine**, launch the instance once with its config as copied in step 1
-  (placeholder `location-id`/`location-api-key` still in place). It'll fail to connect to the
-  master with those placeholder credentials -- harmless, same failure mode as step 11 -- but the
-  Swing Admin Panel comes up regardless.
-- [ ] Open the Admin Panel and click **Add Location**. Enter the same name/latitude/longitude
-  you'd otherwise pass to curl (e.g. `Trial Tavern` / `42.33` / `-83.04`) and click **Register
-  Location**. Note the **Location ID** and **API Key** shown -- the key is shown **once**, same as
-  the curl response.
-- [ ] Still on the slave machine, open `C:\kiosk-trial\data\JukeANator_Locations.json` and copy the
-  `apiKeyHash` value for the location you just registered (the dialog doesn't display the hash
-  itself, only the plaintext key).
-- [ ] Stop the instance.
-- [ ] **On the master machine**, run this as one script: read the next free id off the shared
-  sequence table, insert the location row with it, then advance the sequence past it so nothing
-  allocated later -- of any entity type; `persistent_identity_seq` is one row shared by every
-  `AbstractPersistentEntity` subclass (users, locations, playlists, song-queue entries, ...), not
-  location-specific -- can collide with this row, since a hand-written insert bypasses that
-  sequence entirely:
+- [ ] If master already has a location with the name you are about to use (for example, an
+  existing jukebox being demoted to a development instance), rename that one first: on its own
+  machine, while connected to master, open **Location**, change the name, and click **Save
+  Changes**. The new name syncs to master's `location` row. Master ignores a name sync that would
+  duplicate another location's name, so do this before the new location exists on master.
+- [ ] **On the slave machine**, set `app.mode: standalone` in its `application.yml` (leave
+  `app.master-instance-url` as is) and launch the instance. Standalone mode is required here:
+  `app.mode: slave` with a blank `app.location-api-key` fails at startup with `app.mode=slave
+  requires app.location-api-key to be set, but it was blank/missing.` Standalone mode skips that
+  check and never contacts master.
+- [ ] Open the Admin Panel and click **Location**. Fill in:
+  - **Name**, **Latitude**, **Longitude**, and **Geo-fenced** as wanted.
+  - **Logo**: click **Choose...** and pick an image. It is copied into `<data-dir>/images` and its
+    file name is filled in. A thumbnail shows below the field. (You can also type the name of a
+    file already in `<data-dir>/images`.)
+- [ ] Click **Save Changes** if you want to save before continuing; **Copy SQL** below also
+  saves. Saving a new name also renames the song library's `.oos` file to match. There is no
+  location id to enter: master picks it when you run the SQL below.
+- [ ] Click **Generate API Key**, then **Confirm New Key**. Copy the **API Key** shown -- it is
+  shown **once**; only its hash is saved. On a location that is already connected to master, a
+  new key locks it out until master's row has the new hash, which is why the dialog asks twice.
+- [ ] Click **Copy SQL**. It saves the form, then copies the SQL for master to the clipboard and
+  writes it to `<data-dir>/location.sql`. It refuses until a key has been generated, since the SQL
+  needs the key's hash. The SQL looks like this:
 
 ```sql
-SELECT next_val FROM jukeanator.persistent_identity_seq;
+-- Run in master's database. Master assigns the id; the slave learns it when it connects.
+INSERT INTO location (id, name, latitude, longitude, logo_name, api_key_hash, api_key_lookup, status, is_geo_fenced)
+SELECT COALESCE(MAX(id), 0) + 1, 'Rock On Third', 42.4894, -83.1438, 'RockOnThirdLogo.jpg', '$2a$10$...', 'df15...', 'PROVISIONED', 1 FROM location;
+UPDATE persistent_identity_seq SET next_val = (SELECT MAX(id) + 1 FROM location) WHERE next_val <= (SELECT MAX(id) FROM location);
 
-INSERT INTO jukeanator.location (id, name, latitude, longitude, api_key_hash, status, is_geo_fenced)
-VALUES (1, 'Rock On Third', 42.4894, -83.1438, '$2a$10$BQeVHfzEdZDDjAffQo05jeXNlaYGh0CII9wKXpKKQ.3uISS0saOM2', 'PROVISIONED', 0);
-
-UPDATE jukeanator.persistent_identity_seq SET next_val = 2 WHERE next_val <= 1;
+-- If master already has this location's row and only the API key changed, run this instead of the statements above (check the id against master's location table):
+-- UPDATE location SET api_key_hash = '$2a$10$...', api_key_lookup = 'df15...' WHERE id = 1;
 ```
-  Swap in the id the `SELECT` just returned (on a freshly-migrated database, `1`), along with your
-  own name/latitude/longitude and the `apiKeyHash` from `JukeANator_Locations.json` -- then point
-  the `UPDATE` one past whichever id you used. Leave `api_key_lookup` out of the statement (NULL)
-  -- it's the newer SHA-256 index column, and it's optional: master self-backfills it via a
-  one-time bcrypt check the first time this slave connects (see
-  `LocationServiceImpl.verifyLegacyApiKey`). Add Location doesn't ask for a geo-fence flag, so set
-  `is_geo_fenced` to whatever you want this trial location's fencing to be.
-- [ ] Back on the **slave machine**, edit `application.yml`: set `app.location-id` and
-  `app.location-api-key` to the Location ID / API Key the dialog showed you (`app.mode` and
-  `app.master-instance-url` are already correct from step 1). Since this is the same instance,
-  `JukeANator_Locations.json` already has the matching row at that id, so nothing else to change.
+
+- [ ] Stop the instance.
+- [ ] **On the master machine**, run the SQL in master's database (for example, in phpMyAdmin).
+  The `INSERT` gives the new row one past the highest existing location id. The
+  `UPDATE persistent_identity_seq` line is a safeguard for one case only: master's own
+  `POST /api/locations` (Option A) allocates location ids from `persistent_identity_seq`, which
+  every `AbstractPersistentEntity` subclass shares, so if that sequence's `next_val` were at or
+  below the new id, a later API-provisioned location would collide with it. On a master that
+  already has users, playlists and so on, `next_val` is normally well past it, and the line changes
+  nothing.
+- [ ] Back on the **slave machine**, edit `application.yml`: set `app.mode` back to `slave` and
+  set `app.location-api-key` to the API Key the dialog showed you (`app.master-instance-url` is
+  already correct from step 1). Leave `app.location-id` blank. During the handshake (step 4),
+  master finds the location by its API key and tells the slave its id; the slave renumbers its own
+  location to match and re-tags its locally stored rows.
+- [ ] Nothing needs to be created on master's filesystem. Master keeps each location's synced
+  data under `{location.storage-root}/{locationId}/` (`library.json`, `cover-art/`), named by
+  id rather than by location name, and creates that folder on the location's first library sync.
+  Renaming a location does not move or rename its folder. The logo needs no copying either: the
+  slave uploads it into master's `<data-dir>/images` each time it connects and whenever the
+  location is saved.
+- [ ] A changed logo appears on the slave's own screen after a restart; master's Web/Mobile UI
+  picks it up after the upload above.
 
 ## 4. Start the slave and confirm the handshake
 
 - [ ] Slave starts with its Swing UI; the log shows `Running with app.mode=slave` and
   `Connected to master at http://<master-ip>:8080`.
-- [ ] If you used a wrong `location-id`: the log shows `Master assigned locationId <n> (was <m>
-  locally)`, followed by the local location record being corrected, and the slave uses `<n>` from
-  then on.
+- [ ] If master's id for the location differs from the slave's local id (usually `1` on a fresh
+  install), the log shows `Master assigned locationId <n> (was <m> locally)`, followed by the local
+  location record being corrected, and the slave uses `<n>` from then on. If they already match,
+  nothing is logged.
 - [ ] From either machine, `GET http://<master-ip>:8080/api/locations` shows the location as
   online.
 - [ ] Trigger a library scan on the slave (Admin Panel); master receives the library snapshot
@@ -274,7 +297,7 @@ JFC/Swing kiosk are never fenced. It is enforced only on master, and only with
 
 How it works:
 - The slave pushes its own name, logo, latitude, longitude and geo-fence flag to master on every
-  connect, and again whenever **Edit Location Info** is saved.
+  connect, and again whenever the Admin Panel's **Location** dialog is saved.
 - The Web UI asks `GET /api/locations/{id}/geo-fence` whether the fence is enforced. If it is,
   each queue request carries the device position in `X-Geo-Latitude`, `X-Geo-Longitude`,
   `X-Geo-Accuracy`, `X-Geo-Timestamp` (and `X-Geo-Simulated` for a hand-entered position).
@@ -295,7 +318,7 @@ app:
     allow-simulated-position: true   # QA only
 ```
 
-- [ ] On the **slave machine**, tick **Geo-fenced** in Edit Location Info and save. The **master
+- [ ] On the **slave machine**, tick **Geo-fenced** in the **Location** dialog and click **Save Changes**. The **master
   machine**'s log shows `Syncing location info for locationId [...]` with the new values.
 - [ ] Browser on the **master machine** itself (`http://localhost:8080`), logged in as a patron:
   allow location access, then Play Song. It is refused with "You must be at ... to queue songs."

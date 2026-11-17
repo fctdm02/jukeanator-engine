@@ -142,8 +142,7 @@ public final class UiComponentNames {
   public static final String ADMIN_RESET_STATS_BUTTON = "AdminPanel.resetStatsButton";
   public static final String ADMIN_RESCAN_LIBRARY_BUTTON = "AdminPanel.rescanLibraryButton";
   public static final String ADMIN_ADD_ADMIN_USER_BUTTON = "AdminPanel.addAdminUserButton";
-  public static final String ADMIN_ADD_LOCATION_BUTTON = "AdminPanel.addLocationButton";
-  public static final String ADMIN_EDIT_LOCATION_INFO_BUTTON = "AdminPanel.editLocationInfoButton";
+  public static final String ADMIN_LOCATION_BUTTON = "AdminPanel.locationButton";
   public static final String ADMIN_LICENSE_BUTTON = "AdminPanel.licenseButton";
   public static final String ADMIN_MINIMIZE_BUTTON = "AdminPanel.minimizeButton";
   public static final String ADMIN_EXIT_BUTTON = "AdminPanel.exitButton";
@@ -180,8 +179,8 @@ public final class UiComponentNames {
   public static final String ADMIN_USER_PASSWORD_FIELD = "AdminPanel.addAdminUser.passwordField";
   public static final String ADMIN_USER_ERROR_LABEL = "AdminPanel.addAdminUser.errorLabel";
   public static final String ADMIN_USER_CREATE_BUTTON = "AdminPanel.addAdminUser.createButton";
-  public static final String ADMIN_LOCATION_NAME_FIELD = "AdminPanel.editLocationInfo.nameField";
-  public static final String ADMIN_LOCATION_SAVE_BUTTON = "AdminPanel.editLocationInfo.saveButton";
+  public static final String ADMIN_LOCATION_NAME_FIELD = "AdminPanel.location.nameField";
+  public static final String ADMIN_LOCATION_SAVE_BUTTON = "AdminPanel.location.saveButton";
   public static final String ADMIN_LEDGER_CONTENT = "AdminPanel.financialLedger.content";
   public static final String ADMIN_LEDGER_TABLE = "AdminPanel.financialLedger.table";
   public static final String ADMIN_LEDGER_DISMISS = "AdminPanel.financialLedger.dismiss";

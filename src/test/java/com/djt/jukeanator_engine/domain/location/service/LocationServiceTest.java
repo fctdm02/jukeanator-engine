@@ -133,6 +133,43 @@ public class LocationServiceTest {
   }
 
   @Test
+  void reconcileOwnLocationId_removesALeftoverLocalRecordAlreadyHoldingTheTargetId() {
+
+    // e.g. the record the old Add Location dialog created just to produce an API key
+    Integer targetLocationId = Integer.valueOf(2);
+    locationRoot.addLocation(
+        new LocationEntity(targetLocationId, "Leftover", 1.0, 2.0, "leftover-hash"));
+    LocationEntity ownLocation = registeredLocation();
+
+    locationServiceImpl.reconcileOwnLocationId(targetLocationId);
+
+    assertEquals(1, locationRoot.getLocations().size(), "only the own location remains");
+    assertEquals(ownLocation, locationRoot.getLocationByIdNullIfNotExists(targetLocationId));
+    assertEquals("Rock On Third", ownLocation.getName());
+    verify(locationRepository).changeLocationId(REGISTERED_LOCATION_ID, targetLocationId);
+  }
+
+  // ── generateOwnLocationApiKey ───────────────────────────────────────────
+
+  @Test
+  void generateOwnLocationApiKey_replacesTheOwnLocationsKeyAndReturnsThePlaintextOnce() {
+
+    when(passwordEncoder.encode(anyString())).thenReturn("new-bcrypt-hash");
+    LocationEntity ownLocation = registeredLocation();
+    ownLocation.setStatus(LocationStatus.PENDING);
+
+    ProvisionedLocationDto result = locationServiceImpl.generateOwnLocationApiKey();
+
+    assertEquals(REGISTERED_LOCATION_ID, result.locationId());
+    assertNotNull(result.apiKey());
+    assertEquals("new-bcrypt-hash", ownLocation.getApiKeyHash());
+    assertEquals(ApiKeyLookup.of(result.apiKey()), ownLocation.getApiKeyLookup());
+    assertEquals(LocationStatus.PROVISIONED, ownLocation.getStatus());
+    assertEquals(1, locationRoot.getLocations().size(), "no second location is created");
+    verify(locationRepository).storeAggregateRoot(locationRoot);
+  }
+
+  @Test
   void registerLocation_addsToRootAndReturnsPlaintextApiKeyOnce() {
 
     when(passwordEncoder.encode(anyString())).thenReturn("hashed-new-key");

@@ -272,7 +272,7 @@ public class SlaveConnectionManager {
   }
 
   /**
-   * Pushes this slave's own location info (as set through the JFC/Swing "Edit Location Info"
+   * Pushes this slave's own location info (as set through the JFC/Swing "Location"
    * dialog) to master, which needs the coordinates and geo-fence flag to geo-fence this location's
    * Web/Mobile UI. Sent on every (re)connect and again whenever the info is edited.
    */

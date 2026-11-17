@@ -734,11 +734,11 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     click(admin, UiComponentNames.ADMIN_OVERLAY_PRIMARY_BUTTON);
     assertNotNull(userService.getProfile(email), "the admin user should exist");
 
-    // Edit Location Info opens pre-filled; Cancel leaves it unchanged
-    click(admin, UiComponentNames.ADMIN_EDIT_LOCATION_INFO_BUTTON);
+    // Location opens pre-filled; Cancel leaves it unchanged
+    click(admin, UiComponentNames.ADMIN_LOCATION_BUTTON);
     await(() -> onEdt(() -> findShowing(admin, UiComponentNames.ADMIN_LOCATION_NAME_FIELD,
         JTextField.class).map(f -> !f.getText().isBlank()).orElse(false)),
-        "the Edit Location Info form with the current name");
+        "the Location form with the current name");
     click(admin, UiComponentNames.ADMIN_FORM_CANCEL_BUTTON);
     assertFalse(isAdminOverlayShowing(), "Cancel should close the form");
 

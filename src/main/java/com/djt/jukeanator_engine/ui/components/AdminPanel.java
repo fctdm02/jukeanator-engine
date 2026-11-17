@@ -65,9 +65,9 @@ import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
-import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
 import com.djt.jukeanator_engine.domain.location.dto.UpdateLocationInfoRequest;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
+import com.djt.jukeanator_engine.domain.location.model.LocationStatus;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
@@ -140,7 +140,7 @@ public class AdminPanel extends JPanel {
    * dialog in its own window would appear unfocused and force the user to Alt+Tab back to it.
    * Painting the notice inside the existing window (via {@link JLayeredPane}) avoids that entirely.
    * {@link #overlayFormCard} below reuses the same trick for the admin panel's data-entry forms
-   * (Add Admin User, Add Location, Edit Location Info), which used to be separate {@code JDialog}
+   * (Add Admin User, Location), which used to be separate {@code JDialog}
    * windows and suffered exactly this focus loss.
    */
   private Color overlayCardAccent = Color.WHITE;
@@ -469,8 +469,7 @@ public class AdminPanel extends JPanel {
     strip.add(sideButton(UiComponentNames.ADMIN_RESCAN_LIBRARY_BUTTON, "Rescan\nLibrary", ColorTheme.get().accentViolet, e -> doRescan()));
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton(UiComponentNames.ADMIN_ADD_ADMIN_USER_BUTTON, "Add Admin\nUser", ColorTheme.get().accentGold, e -> doAddAdminUser()));
-    strip.add(sideButton(UiComponentNames.ADMIN_ADD_LOCATION_BUTTON, "Add\nLocation", ColorTheme.get().accentGold, e -> doAddLocation()));
-    strip.add(sideButton(UiComponentNames.ADMIN_EDIT_LOCATION_INFO_BUTTON, "Edit Location\nInfo", ColorTheme.get().accentGold, e -> doEditLocationInfo()));
+    strip.add(sideButton(UiComponentNames.ADMIN_LOCATION_BUTTON, "Location", ColorTheme.get().accentGold, e -> doLocation()));
     strip.add(sideButton(UiComponentNames.ADMIN_LICENSE_BUTTON, "License", ColorTheme.get().accentGold, e -> doLicense()));
     strip.add(Box.createVerticalGlue());
     strip.add(sideButton(UiComponentNames.ADMIN_MINIMIZE_BUTTON, "⊟ Minimize", ColorTheme.get().accentBlue, e -> doMinimize()));
@@ -1171,7 +1170,7 @@ public class AdminPanel extends JPanel {
   // ─────────────────────────────────────────────────────────────────────────
   // FINANCIAL LEDGER ACTIONS (FinancialLedgerService)
   // ─────────────────────────────────────────────────────────────────────────
-  // Reused across every open rather than constructed fresh per click (unlike AddLocationForm and
+  // Reused across every open rather than constructed fresh per click (unlike LocationForm and
   // friends) -- IdleMonitor registers a permanent, application-lifetime AWT event listener with
   // no way to unregister it (see its own class javadoc), so a new FinancialLedgerDialog per click
   // would leak one more of those listeners every time the operator opens this screen.
@@ -1672,243 +1671,6 @@ public class AdminPanel extends JPanel {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // LOCATION ACTIONS (LocationService)
-  // ─────────────────────────────────────────────────────────────────────────
-  private void doAddLocation() {
-    new AddLocationForm().show();
-  }
-
-  /**
-   * Custom (non-{@code JOptionPane}) modal prompt collecting the fields for a
-   * {@link RegisterLocationRequest}, then calling
-   * {@link LocationService#registerLocation(RegisterLocationRequest)}. Available regardless of
-   * {@code app.mode} — on a standalone/slave instance, this just appends the location to this
-   * instance's own JSON-backed location store, giving the operator a ready-made record (including
-   * the {@code apiKeyHash}) to hand-write into a SQL insert against the master's hosted database.
-   * On success, the response's {@code apiKey} is shown in a selectable field since it is returned
-   * exactly once and can never be recovered afterward — only its hash is persisted. Shown via
-   * {@link #showOverlayForm} rather than a separate {@code JDialog} window -- see {@link
-   * #overlayCard}.
-   */
-  private class AddLocationForm {
-
-    private final JTextField nameField = new JTextField(18);
-    private final JTextField latitudeField = new JTextField(18);
-    private final JTextField longitudeField = new JTextField(18);
-    private final JLabel errorLabel = new JLabel(" ");
-    private final JPanel content = new JPanel(new BorderLayout(0, 16));
-
-    AddLocationForm() {
-
-      content.setOpaque(false);
-
-      JLabel title = new JLabel("Register Location");
-      title.setForeground(ColorTheme.get().accentGold);
-      title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
-      content.add(title, BorderLayout.NORTH);
-
-      content.add(buildFieldsPanel(), BorderLayout.CENTER);
-      content.add(buildButtonRow(), BorderLayout.SOUTH);
-
-      content.registerKeyboardAction(e -> hideOverlay(),
-          javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
-          JComponent.WHEN_IN_FOCUSED_WINDOW);
-
-      // Physical keyboard: Enter in any field submits, like the Register Location button.
-      for (JTextField field : new JTextField[] {nameField, latitudeField, longitudeField}) {
-        field.addActionListener(e -> attemptRegister());
-      }
-    }
-
-    void show() {
-      showOverlayForm(ColorTheme.get().accentGold, content);
-      SwingUtilities.invokeLater(nameField::requestFocusInWindow);
-    }
-
-    private JPanel buildFieldsPanel() {
-
-      JPanel fields = new JPanel(new GridBagLayout());
-      fields.setOpaque(false);
-
-      GridBagConstraints c = new GridBagConstraints();
-      c.insets = new Insets(6, 6, 6, 6);
-      c.anchor = GridBagConstraints.WEST;
-
-      addFieldRow(fields, c, 0, "Name:", nameField);
-      addFieldRow(fields, c, 1, "Latitude:", latitudeField);
-      addFieldRow(fields, c, 2, "Longitude:", longitudeField);
-
-      c.gridx = 0;
-      c.gridy = 3;
-      c.gridwidth = 2;
-      c.insets = new Insets(2, 6, 0, 6);
-      errorLabel.setForeground(ColorTheme.get().accentRed);
-      errorLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
-      fields.add(errorLabel, c);
-
-      return fields;
-    }
-
-    private void addFieldRow(JPanel fields, GridBagConstraints c, int row, String labelText,
-        JTextField field) {
-
-      JLabel label = new JLabel(labelText);
-      label.setForeground(ColorTheme.get().textSecondary);
-      label.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
-
-      field.setForeground(ColorTheme.get().textPrimary);
-      field.setBackground(ColorTheme.get().bgFieldDark);
-      field.setCaretColor(ColorTheme.get().accentBlue);
-      field.setBorder(BorderFactory.createCompoundBorder(
-          BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
-          new EmptyBorder(4, 6, 4, 6)));
-
-      c.gridx = 0;
-      c.gridy = row;
-      c.gridwidth = 1;
-      fields.add(label, c);
-
-      c.gridx = 1;
-      fields.add(field, c);
-    }
-
-    private JPanel buildButtonRow() {
-
-      JButton registerBtn = overlayButton("Register Location");
-      registerBtn.addActionListener(e -> attemptRegister());
-
-      JButton cancelBtn = overlayButton("Cancel");
-      cancelBtn.addActionListener(e -> hideOverlay());
-
-      JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
-      row.setOpaque(false);
-      row.add(registerBtn);
-      row.add(cancelBtn);
-      return row;
-    }
-
-    private void attemptRegister() {
-
-      String name = nameField.getText().trim();
-      String latitudeText = latitudeField.getText().trim();
-      String longitudeText = longitudeField.getText().trim();
-
-      if (name.isEmpty() || latitudeText.isEmpty() || longitudeText.isEmpty()) {
-        errorLabel.setText("All fields are required.");
-        return;
-      }
-
-      final double latitude;
-      final double longitude;
-      try {
-        latitude = Double.parseDouble(latitudeText);
-        longitude = Double.parseDouble(longitudeText);
-      } catch (NumberFormatException nfe) {
-        errorLabel.setText("Latitude and longitude must be numbers.");
-        return;
-      }
-
-      if (latitude < -90 || latitude > 90) {
-        errorLabel.setText("Latitude must be between -90 and 90.");
-        return;
-      }
-      if (longitude < -180 || longitude > 180) {
-        errorLabel.setText("Longitude must be between -180 and 180.");
-        return;
-      }
-
-      RegisterLocationRequest request =
-          new RegisterLocationRequest(name, Double.valueOf(latitude), Double.valueOf(longitude));
-
-      SwingSecurityUtil.runAsync(() -> {
-        try {
-          ProvisionedLocationDto provisioned = locationService.registerLocation(request);
-          SwingUtilities.invokeLater(() -> showProvisionedResult(provisioned));
-        } catch (Exception ex) {
-          SwingUtilities.invokeLater(() -> errorLabel.setText(
-              ex.getMessage() != null ? ex.getMessage() : "Could not register location."));
-        }
-      });
-    }
-
-    /**
-     * Swaps the form for a one-time result view. {@code apiKey} is never recoverable after this
-     * dialog closes — only its bcrypt hash is persisted — so it is shown here in a selectable
-     * (copyable) field rather than a transient overlay toast that the operator could dismiss before
-     * copying it down.
-     */
-    private void showProvisionedResult(ProvisionedLocationDto provisioned) {
-
-      content.removeAll();
-
-      JLabel resultTitle = new JLabel("Location Registered");
-      resultTitle.setForeground(ColorTheme.get().accentGreen);
-      resultTitle
-          .setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
-      content.add(resultTitle, BorderLayout.NORTH);
-
-      JPanel result = new JPanel(new GridBagLayout());
-      result.setOpaque(false);
-      GridBagConstraints c = new GridBagConstraints();
-      c.insets = new Insets(6, 6, 6, 6);
-      c.anchor = GridBagConstraints.WEST;
-
-      addReadOnlyRow(result, c, 0, "Location ID:", String.valueOf(provisioned.locationId()));
-      addReadOnlyRow(result, c, 1, "API Key:", provisioned.apiKey());
-
-      JLabel warning = new JLabel("<html><body style='width: 260px;'>Copy this API key now "
-          + "— it will not be shown again. Only its hash is saved.</body></html>");
-      warning.setForeground(ColorTheme.get().accentOrange);
-      warning.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
-      c.gridx = 0;
-      c.gridy = 2;
-      c.gridwidth = 2;
-      c.insets = new Insets(12, 6, 0, 6);
-      result.add(warning, c);
-
-      content.add(result, BorderLayout.CENTER);
-
-      JButton doneBtn = overlayButton("Done");
-      doneBtn.addActionListener(e -> hideOverlay());
-      JPanel buttonRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
-      buttonRow.setOpaque(false);
-      buttonRow.add(doneBtn);
-      content.add(buttonRow, BorderLayout.SOUTH);
-
-      content.revalidate();
-      content.repaint();
-      overlayScrim.revalidate();
-      overlayScrim.repaint();
-    }
-
-    private void addReadOnlyRow(JPanel panel, GridBagConstraints c, int row, String labelText,
-        String value) {
-
-      JLabel label = new JLabel(labelText);
-      label.setForeground(ColorTheme.get().textSecondary);
-      label.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
-
-      JTextField field = new JTextField(value, 24);
-      field.setEditable(false);
-      field.setForeground(ColorTheme.get().textPrimary);
-      field.setBackground(ColorTheme.get().bgFieldDark);
-      field.setCaretColor(ColorTheme.get().accentBlue);
-      field.setBorder(BorderFactory.createCompoundBorder(
-          BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
-          new EmptyBorder(4, 6, 4, 6)));
-      field.setCaretPosition(0);
-
-      c.gridx = 0;
-      c.gridy = row;
-      c.gridwidth = 1;
-      panel.add(label, c);
-
-      c.gridx = 1;
-      panel.add(field, c);
-    }
-  }
-
   /**
    * Called by {@link JukeANatorFrame#setLicenseService} once the license service is known.
    *
@@ -1976,12 +1738,15 @@ public class AdminPanel extends JPanel {
     });
   }
 
-  private void doEditLocationInfo() {
+  // ─────────────────────────────────────────────────────────────────────────
+  // LOCATION (LocationService)
+  // ─────────────────────────────────────────────────────────────────────────
+  private void doLocation() {
 
     SwingSecurityUtil.runAsync(() -> {
       try {
         LocationEntity current = locationService.getOrCreateOwnLocation(null);
-        SwingUtilities.invokeLater(() -> new EditLocationInfoForm(current).show());
+        SwingUtilities.invokeLater(() -> new LocationForm(current).show());
       } catch (Exception ex) {
         ex.printStackTrace();
         SwingUtilities.invokeLater(() -> showOverlayMessage("Error",
@@ -1993,36 +1758,66 @@ public class AdminPanel extends JPanel {
   }
 
   /**
-   * Custom (non-{@code JOptionPane}) modal prompt for editing this standalone/slave instance's own
-   * {@link LocationEntity} -- name, coordinates, logo, geofencing -- via
-   * {@link LocationService#updateOwnLocationInfo(UpdateLocationInfoRequest)}. Pre-filled from the
-   * current record (fetched on {@link #doEditLocationInfo}, before this form is constructed).
+   * Custom (non-{@code JOptionPane}) modal prompt for this standalone/slave instance's single own
+   * {@link LocationEntity}: its name, coordinates, logo and geofencing, plus what provisioning it
+   * on master needs. Replaces the former separate Add Location and Edit Location Info forms; Add
+   * Location created a second, unrelated location record just to produce an API key, which left
+   * the instance's own location (the one it actually runs as) unprovisioned.
+   *
+   * <p>There is deliberately no location id field: master picks the id when the SQL below is run,
+   * and tells the slave its id on every {@code /ws-slave} connection, since it identifies a slave
+   * by its API key alone (see {@link LocationService#reconcileOwnLocationId}).
+   *
+   * <ul>
+   * <li><b>Generate API Key</b> -- {@link LocationService#generateOwnLocationApiKey}; the
+   * plaintext key is shown once, for {@code app.location-api-key}.</li>
+   * <li><b>Copy SQL</b> -- saves, then builds the insert for master's {@code location} table from
+   * the saved record (including the key's hash and lookup value), copies it to the clipboard and
+   * writes it to {@code <dataDir>/location.sql}.</li>
+   * <li><b>Logo</b> -- a file name under {@code <dataDir>/images}; Choose copies a picked image
+   * there.</li>
+   * </ul>
+   *
    * Shown via {@link #showOverlayForm} rather than a separate {@code JDialog} window -- see
    * {@link #overlayCard}.
    */
-  private class EditLocationInfoForm {
+  private class LocationForm {
+
+    private static final int LOGO_PREVIEW_SIZE = 64;
+    private static final String SQL_FILE_NAME = "location.sql";
 
     private final JTextField nameField = new JTextField(18);
     private final JTextField latitudeField = new JTextField(18);
     private final JTextField longitudeField = new JTextField(18);
-    private final JTextField logoNameField = new JTextField(18);
+    private final JTextField logoNameField = new JTextField(12);
+    private final JLabel logoPreview = new JLabel();
     private final JCheckBox geoFencedCheckBox = new JCheckBox("Geo-fenced");
-    private final JLabel errorLabel = new JLabel(" ");
+    private final JLabel apiKeyLabel = new JLabel("API Key:");
+    private final JTextField apiKeyField = new JTextField(24);
+    private final JLabel statusLabel = new JLabel(" ");
+    private final JButton generateKeyBtn = overlayButton("Generate API Key");
     private final JPanel content = new JPanel(new BorderLayout(0, 16));
 
-    // Captured before any edit, so the song-library file can be renamed from its old name to
-    // whatever the name field is saved as -- current.getName() itself can't be read again after
-    // the save, since updateOwnLocationInfo mutates this same LocationEntity instance in place.
-    private final String originalName;
+    // The own location itself: the service methods called below mutate this same instance in
+    // place, so it always reflects what was last saved.
+    private final LocationEntity location;
 
-    EditLocationInfoForm(LocationEntity current) {
+    // The name the song-library file is currently stored under, so a save can rename it from this
+    // to the new name -- location.getName() can't be used, since the save mutates it first.
+    private String savedName;
 
-      this.originalName = current.getName();
+    // Generate API Key asks for a second click before replacing the key.
+    private boolean confirmingKeyGeneration;
+
+    LocationForm(LocationEntity current) {
+
+      this.location = current;
+      this.savedName = current.getName();
 
       nameField.setName(UiComponentNames.ADMIN_LOCATION_NAME_FIELD);
       content.setOpaque(false);
 
-      JLabel title = new JLabel("Edit Location Info");
+      JLabel title = new JLabel("Location");
       title.setForeground(ColorTheme.get().accentGold);
       title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
       content.add(title, BorderLayout.NORTH);
@@ -2045,8 +1840,16 @@ public class AdminPanel extends JPanel {
       // Physical keyboard: Enter in any field saves, like the Save Changes button.
       for (JTextField field : new JTextField[] {nameField, latitudeField, longitudeField,
           logoNameField}) {
-        field.addActionListener(e -> attemptSave());
+        field.addActionListener(e -> attemptSave(this::closeAfterSave));
       }
+      logoNameField.addFocusListener(new java.awt.event.FocusAdapter() {
+        @Override
+        public void focusLost(java.awt.event.FocusEvent e) {
+          refreshLogoPreview();
+        }
+      });
+
+      refreshLogoPreview();
     }
 
     void show() {
@@ -2063,24 +1866,45 @@ public class AdminPanel extends JPanel {
       c.insets = new Insets(6, 6, 6, 6);
       c.anchor = GridBagConstraints.WEST;
 
-      addFieldRow(fields, c, 0, "Name:", nameField);
-      addFieldRow(fields, c, 1, "Latitude:", latitudeField);
-      addFieldRow(fields, c, 2, "Longitude:", longitudeField);
-      addFieldRow(fields, c, 3, "Logo Name:", logoNameField);
+      int row = 0;
+      addFieldRow(fields, c, row++, "Name:", nameField);
+      addFieldRow(fields, c, row++, "Latitude:", latitudeField);
+      addFieldRow(fields, c, row++, "Longitude:", longitudeField);
+
+      styleField(logoNameField);
+      JButton chooseLogoBtn = overlayButton("Choose...");
+      chooseLogoBtn.addActionListener(e -> chooseLogo());
+      JPanel logoRow = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 6, 0));
+      logoRow.setOpaque(false);
+      logoRow.add(logoNameField);
+      logoRow.add(chooseLogoBtn);
+      addComponentRow(fields, c, row++, "Logo:", logoRow);
+
+      logoPreview.setForeground(ColorTheme.get().textSecondary);
+      logoPreview.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      addComponentRow(fields, c, row++, "", logoPreview);
 
       geoFencedCheckBox.setOpaque(false);
       geoFencedCheckBox.setForeground(ColorTheme.get().textPrimary);
       geoFencedCheckBox.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
       c.gridx = 0;
-      c.gridy = 4;
+      c.gridy = row++;
       c.gridwidth = 2;
       fields.add(geoFencedCheckBox, c);
 
-      c.gridy = 5;
+      // Shown only once a key has been generated -- it is never recoverable afterward.
+      apiKeyField.setEditable(false);
+      styleField(apiKeyField);
+      addComponentRow(fields, c, row++, "API Key:", apiKeyField, apiKeyLabel);
+      apiKeyLabel.setVisible(false);
+      apiKeyField.setVisible(false);
+
+      c.gridx = 0;
+      c.gridy = row;
+      c.gridwidth = 2;
       c.insets = new Insets(2, 6, 0, 6);
-      errorLabel.setForeground(ColorTheme.get().accentRed);
-      errorLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
-      fields.add(errorLabel, c);
+      statusLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, LayoutTheme.get().fontSizeAdminAlbum));
+      fields.add(statusLabel, c);
 
       return fields;
     }
@@ -2088,9 +1912,34 @@ public class AdminPanel extends JPanel {
     private void addFieldRow(JPanel fields, GridBagConstraints c, int row, String labelText,
         JTextField field) {
 
-      JLabel label = new JLabel(labelText);
+      styleField(field);
+      addComponentRow(fields, c, row, labelText, field);
+    }
+
+    private void addComponentRow(JPanel fields, GridBagConstraints c, int row, String labelText,
+        JComponent component) {
+
+      addComponentRow(fields, c, row, labelText, component, new JLabel(labelText));
+    }
+
+    private void addComponentRow(JPanel fields, GridBagConstraints c, int row, String labelText,
+        JComponent component, JLabel label) {
+
+      label.setText(labelText);
       label.setForeground(ColorTheme.get().textSecondary);
       label.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminArtist));
+
+      c.gridx = 0;
+      c.gridy = row;
+      c.gridwidth = 1;
+      c.insets = new Insets(6, 6, 6, 6);
+      fields.add(label, c);
+
+      c.gridx = 1;
+      fields.add(component, c);
+    }
+
+    private void styleField(JTextField field) {
 
       field.setForeground(ColorTheme.get().textPrimary);
       field.setBackground(ColorTheme.get().bgFieldDark);
@@ -2098,21 +1947,18 @@ public class AdminPanel extends JPanel {
       field.setBorder(BorderFactory.createCompoundBorder(
           BorderFactory.createLineBorder(ColorTheme.get().colorAdminSeparator, 1),
           new EmptyBorder(4, 6, 4, 6)));
-
-      c.gridx = 0;
-      c.gridy = row;
-      c.gridwidth = 1;
-      fields.add(label, c);
-
-      c.gridx = 1;
-      fields.add(field, c);
     }
 
     private JPanel buildButtonRow() {
 
       JButton saveBtn = overlayButton("Save Changes");
       saveBtn.setName(UiComponentNames.ADMIN_LOCATION_SAVE_BUTTON);
-      saveBtn.addActionListener(e -> attemptSave());
+      saveBtn.addActionListener(e -> attemptSave(this::closeAfterSave));
+
+      generateKeyBtn.addActionListener(e -> attemptGenerateKey());
+
+      JButton copySqlBtn = overlayButton("Copy SQL");
+      copySqlBtn.addActionListener(e -> attemptCopySql());
 
       JButton cancelBtn = overlayButton("Cancel");
       cancelBtn.setName(UiComponentNames.ADMIN_FORM_CANCEL_BUTTON);
@@ -2121,11 +1967,19 @@ public class AdminPanel extends JPanel {
       JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 12, 0));
       row.setOpaque(false);
       row.add(saveBtn);
+      row.add(generateKeyBtn);
+      row.add(copySqlBtn);
       row.add(cancelBtn);
       return row;
     }
 
-    private void attemptSave() {
+    // ── Save ──────────────────────────────────────────────────────────────
+
+    /**
+     * Validates and saves the form, then runs {@code afterSave} on the EDT once the save succeeded.
+     * On failure, shows the error and leaves the form open.
+     */
+    private void attemptSave(Runnable afterSave) {
 
       String name = nameField.getText().trim();
       String latitudeText = latitudeField.getText().trim();
@@ -2133,7 +1987,7 @@ public class AdminPanel extends JPanel {
       String logoName = logoNameField.getText().trim();
 
       if (name.isEmpty() || latitudeText.isEmpty() || longitudeText.isEmpty()) {
-        errorLabel.setText("Name, latitude, and longitude are required.");
+        showError("Name, latitude, and longitude are required.");
         return;
       }
 
@@ -2143,22 +1997,23 @@ public class AdminPanel extends JPanel {
         latitude = Double.parseDouble(latitudeText);
         longitude = Double.parseDouble(longitudeText);
       } catch (NumberFormatException nfe) {
-        errorLabel.setText("Latitude and longitude must be numbers.");
+        showError("Latitude and longitude must be numbers.");
         return;
       }
 
       if (latitude < -90 || latitude > 90) {
-        errorLabel.setText("Latitude must be between -90 and 90.");
+        showError("Latitude must be between -90 and 90.");
         return;
       }
       if (longitude < -180 || longitude > 180) {
-        errorLabel.setText("Longitude must be between -180 and 180.");
+        showError("Longitude must be between -180 and 180.");
         return;
       }
 
       UpdateLocationInfoRequest request = new UpdateLocationInfoRequest(name,
           Double.valueOf(latitude), Double.valueOf(longitude), logoName.isEmpty() ? null : logoName,
           geoFencedCheckBox.isSelected());
+      String previousName = savedName;
 
       SwingSecurityUtil.runAsync(() -> {
         try {
@@ -2168,20 +2023,280 @@ public class AdminPanel extends JPanel {
             // fallback (SongLibraryRepositoryFileSystemImpl.loadAggregateRoot) reconciles a
             // stale filename on next restart regardless -- so a rename failure here shouldn't
             // undo/block the location info that was just saved.
-            songLibraryService.renameOwnLocationLibraryFileIfNameChanged(originalName);
+            songLibraryService.renameOwnLocationLibraryFileIfNameChanged(previousName);
           } catch (Exception renameEx) {
             renameEx.printStackTrace();
           }
           SwingUtilities.invokeLater(() -> {
-            hideOverlay();
-            showOverlayMessage("Location Updated", "Location info saved.",
-                ColorTheme.get().accentGreen);
+            savedName = name;
+            refreshLogoPreview();
+            afterSave.run();
           });
         } catch (Exception ex) {
-          SwingUtilities.invokeLater(() -> errorLabel.setText(
+          SwingUtilities.invokeLater(() -> showError(
               ex.getMessage() != null ? ex.getMessage() : "Could not update location info."));
         }
       });
+    }
+
+    private void closeAfterSave() {
+
+      hideOverlay();
+      showOverlayMessage("Location Updated",
+          "Location info saved. A changed logo appears on this screen after a restart.",
+          ColorTheme.get().accentGreen);
+    }
+
+    // ── API key ───────────────────────────────────────────────────────────
+
+    private void attemptGenerateKey() {
+
+      if (!confirmingKeyGeneration) {
+        confirmingKeyGeneration = true;
+        generateKeyBtn.setText("Confirm New Key");
+        showWarning("A new key replaces this location's current one. Master rejects this "
+            + "instance until its location row has the new key's hash (see Copy SQL). Click "
+            + "Confirm New Key to continue.");
+        return;
+      }
+
+      confirmingKeyGeneration = false;
+      generateKeyBtn.setText("Generate API Key");
+
+      SwingSecurityUtil.runAsync(() -> {
+        try {
+          ProvisionedLocationDto provisioned = locationService.generateOwnLocationApiKey();
+          SwingUtilities.invokeLater(() -> {
+            apiKeyField.setText(provisioned.apiKey());
+            apiKeyField.setCaretPosition(0);
+            apiKeyLabel.setVisible(true);
+            apiKeyField.setVisible(true);
+            showWarning("Copy this API key into app.location-api-key now. It will not be shown "
+                + "again; only its hash is saved.");
+            content.revalidate();
+            content.repaint();
+          });
+        } catch (Exception ex) {
+          SwingUtilities.invokeLater(() -> showError(
+              ex.getMessage() != null ? ex.getMessage() : "Could not generate an API key."));
+        }
+      });
+    }
+
+    // ── SQL for master ────────────────────────────────────────────────────
+
+    private void attemptCopySql() {
+
+      attemptSave(() -> {
+
+        if (location.getStatus() == null
+            || location.getStatus() == LocationStatus.PENDING) {
+          showError("Generate an API key first. The SQL needs the key's hash.");
+          return;
+        }
+
+        String sql = buildMasterSql();
+        StringBuilder outcome = new StringBuilder("Saved.");
+
+        try {
+          java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
+              .setContents(new java.awt.datatransfer.StringSelection(sql), null);
+          outcome.append(" SQL copied to the clipboard");
+        } catch (Exception ex) {
+          outcome.append(" Could not copy the SQL to the clipboard");
+        }
+
+        java.nio.file.Path sqlFile = dataDirPath().resolve(SQL_FILE_NAME);
+        try {
+          java.nio.file.Files.writeString(sqlFile, sql);
+          outcome.append(" and saved to ").append(sqlFile).append('.');
+        } catch (Exception ex) {
+          outcome.append(", and could not save it to ").append(sqlFile).append('.');
+        }
+
+        showSuccess(outcome.toString());
+      });
+    }
+
+    /**
+     * The insert for master's {@code location} table, built from the saved own location. Master
+     * picks the id itself (one past the highest existing id), and the slave learns it on its first
+     * connection. Also carries the sequence safeguard (see docs/master-slave-local-trial.md) and,
+     * commented out, the update to use instead when the row already exists on master and only the
+     * key changed. That update matches by this instance's id, which is master's id once this
+     * instance has connected at least once.
+     */
+    private String buildMasterSql() {
+
+      String hash = sqlString(location.getApiKeyHash());
+      String lookup = sqlString(location.getApiKeyLookup());
+
+      return "-- Run in master's database. Master assigns the id; the slave learns it when it "
+          + "connects.\n"
+          + "INSERT INTO location (id, name, latitude, longitude, logo_name, api_key_hash, "
+          + "api_key_lookup, status, is_geo_fenced)\n"
+          + "SELECT COALESCE(MAX(id), 0) + 1, " + sqlString(location.getName()) + ", "
+          + sqlNumber(location.getLatitude()) + ", " + sqlNumber(location.getLongitude()) + ", "
+          + sqlString(location.getLogoName()) + ", " + hash + ", " + lookup + ", 'PROVISIONED', "
+          + (location.isGeoFenced() ? 1 : 0) + " FROM location;\n"
+          + "UPDATE persistent_identity_seq SET next_val = (SELECT MAX(id) + 1 FROM location) "
+          + "WHERE next_val <= (SELECT MAX(id) FROM location);\n"
+          + "\n"
+          + "-- If master already has this location's row and only the API key changed, run this "
+          + "instead of the statements above (check the id against master's location table):\n"
+          + "-- UPDATE location SET api_key_hash = " + hash + ", api_key_lookup = " + lookup
+          + " WHERE id = " + location.getPersistentIdentity() + ";\n";
+    }
+
+    private String sqlString(String value) {
+      return value == null ? "NULL"
+          : "'" + value.replace("\\", "\\\\").replace("'", "''") + "'";
+    }
+
+    private String sqlNumber(Double value) {
+      return value == null ? "NULL" : java.math.BigDecimal.valueOf(value).toPlainString();
+    }
+
+    // ── Logo ──────────────────────────────────────────────────────────────
+
+    private java.nio.file.Path dataDirPath() {
+      return java.nio.file.Path.of(dataDir == null || dataDir.isBlank() ? "." : dataDir);
+    }
+
+    private java.nio.file.Path imagesDir() {
+      return dataDirPath().resolve("images");
+    }
+
+    /**
+     * Shows an image chooser in place of the form (embedded in the overlay, like the playlist
+     * chooser -- see {@link #showPlaylistChooser}), then returns to the form either way.
+     */
+    private void chooseLogo() {
+
+      JFileChooser chooser = new JFileChooser(System.getProperty("user.home"));
+      chooser.setDialogType(JFileChooser.OPEN_DIALOG);
+      chooser.setDialogTitle("Choose Location Logo");
+      chooser.setApproveButtonText("Use as Logo");
+      chooser.setAcceptAllFileFilterUsed(false);
+      chooser.setFileFilter(new FileNameExtensionFilter("Images (*.jpg, *.jpeg, *.png, *.gif)",
+          "jpg", "jpeg", "png", "gif"));
+      chooser.setPreferredSize(new Dimension(Math.max(640, getWidth() * 3 / 5),
+          Math.max(420, getHeight() * 3 / 5)));
+
+      chooser.addActionListener(e -> {
+        if (JFileChooser.APPROVE_SELECTION.equals(e.getActionCommand())) {
+          File selected = chooser.getSelectedFile();
+          show();
+          if (selected != null) {
+            importLogo(selected);
+          }
+        } else if (JFileChooser.CANCEL_SELECTION.equals(e.getActionCommand())) {
+          show();
+        }
+      });
+
+      JLabel titleLabel = new JLabel("Choose Location Logo");
+      titleLabel.setForeground(ColorTheme.get().accentGold);
+      titleLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeAdminSection));
+      titleLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+
+      JPanel chooserContent = new JPanel(new BorderLayout(0, 12));
+      chooserContent.setOpaque(false);
+      chooserContent.add(titleLabel, BorderLayout.NORTH);
+      chooserContent.add(chooser, BorderLayout.CENTER);
+
+      // Escape returns to the Location form rather than closing everything.
+      chooserContent.registerKeyboardAction(e -> show(),
+          javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+          JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+      showOverlayForm(ColorTheme.get().accentGold, chooserContent);
+    }
+
+    /**
+     * Copies {@code source} into {@code <dataDir>/images} (where the kiosk, and the logo upload to
+     * master, look for it) and puts its file name in the Logo field. Saving applies it.
+     */
+    private void importLogo(File source) {
+
+      java.nio.file.Path target = imagesDir().resolve(source.getName());
+      try {
+        java.nio.file.Files.createDirectories(imagesDir());
+        if (!java.nio.file.Files.exists(target)
+            || !java.nio.file.Files.isSameFile(source.toPath(), target)) {
+          java.nio.file.Files.copy(source.toPath(), target,
+              java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+      } catch (Exception ex) {
+        showError("Could not copy the logo to " + imagesDir() + ": "
+            + (ex.getMessage() != null ? ex.getMessage() : ex.toString()));
+        return;
+      }
+
+      logoNameField.setText(source.getName());
+      refreshLogoPreview();
+      showSuccess("Logo copied to " + target + ". Save Changes to use it.");
+    }
+
+    /**
+     * Shows a thumbnail of the logo named in the Logo field. Read straight from disk with
+     * {@link ImageIO} rather than through {@code ImageIcon(URL)}, which caches by URL and would
+     * keep showing the old image after a same-named file is replaced.
+     */
+    private void refreshLogoPreview() {
+
+      logoPreview.setIcon(null);
+      String logoName = logoNameField.getText().trim();
+      if (logoName.isEmpty()) {
+        logoPreview.setText("(no logo: the default is shown)");
+        return;
+      }
+
+      File file = imagesDir().resolve(logoName).toFile();
+      if (!file.isFile()) {
+        logoPreview.setText("(not found in " + imagesDir() + ")");
+        return;
+      }
+
+      try {
+        java.awt.image.BufferedImage image = ImageIO.read(file);
+        if (image == null) {
+          logoPreview.setText("(not a readable image)");
+          return;
+        }
+        double scale = Math.min((double) LOGO_PREVIEW_SIZE / image.getWidth(),
+            (double) LOGO_PREVIEW_SIZE / image.getHeight());
+        int width = Math.max(1, (int) Math.round(image.getWidth() * scale));
+        int height = Math.max(1, (int) Math.round(image.getHeight() * scale));
+        logoPreview.setText("");
+        logoPreview.setIcon(new javax.swing.ImageIcon(
+            image.getScaledInstance(width, height, java.awt.Image.SCALE_SMOOTH)));
+      } catch (Exception ex) {
+        logoPreview.setText("(not a readable image)");
+      }
+    }
+
+    // ── Status line ───────────────────────────────────────────────────────
+
+    private void showError(String message) {
+      showStatus(message, ColorTheme.get().accentRed);
+    }
+
+    private void showWarning(String message) {
+      showStatus(message, ColorTheme.get().accentOrange);
+    }
+
+    private void showSuccess(String message) {
+      showStatus(message, ColorTheme.get().accentGreen);
+    }
+
+    private void showStatus(String message, Color color) {
+
+      String escaped = message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+      statusLabel.setForeground(color);
+      statusLabel.setText("<html><body style='width: 420px;'>" + escaped + "</body></html>");
+      content.revalidate();
+      content.repaint();
     }
   }
 

@@ -35,7 +35,9 @@ public class AppProperties {
   // library to the master and accepts remote commands over a persistent connection.
   private String mode = "standalone";
   private String masterInstanceUrl; // slave-only: e.g. https://jukeanator.com
-  private Integer locationId; // slave-only: this slave's own initial guess at its locationId
+  // Optional. Only seeds the own location's id the first time it is created; master assigns a
+  // slave its real id (by API key) on connection, overriding this.
+  private Integer locationId;
   private String locationApiKey; // slave-only: secret issued at provisioning
 
   // slave-only, local/testing only -- never true in production. A slave never charges web users

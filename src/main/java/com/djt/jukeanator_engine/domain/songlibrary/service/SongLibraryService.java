@@ -386,7 +386,7 @@ public interface SongLibraryService {
    * name, so the file takes effect immediately rather than waiting for the next restart's
    * load-time reconciliation. Called right after {@code
    * LocationService#updateOwnLocationInfo} edits this instance's own location's name (e.g. via
-   * the Admin Panel's "Edit Location Info" dialog) -- a no-op if {@code previousLocationName}
+   * the Admin Panel's "Location" dialog) -- a no-op if {@code previousLocationName}
    * matches the (already-updated) current name, or on master, which owns no location/library of
    * its own.
    *

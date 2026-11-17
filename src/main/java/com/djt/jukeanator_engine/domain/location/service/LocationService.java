@@ -15,9 +15,10 @@ import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 
 /**
  * Provisions locations and receives their library syncs. {@link #registerLocation} and
- * {@link #listLocations} are usable in any {@code app.mode} — e.g. a standalone/slave instance can
- * register a location locally so its JSON persistence gives the operator a ready-made record to
- * turn into a SQL insert against the master's hosted database. The sync-receiving methods below are
+ * {@link #listLocations} are usable in any {@code app.mode}. A standalone/slave instance provisions
+ * its own location instead, through {@link #generateOwnLocationApiKey} (the Swing admin panel's
+ * Location dialog), which gives the operator a ready-made SQL insert against the master's hosted
+ * database; master then assigns its id on connection. The sync-receiving methods below are
  * meaningful only when this instance is the master actually being synced to by slaves.
  *
  * @author tmyers
@@ -96,10 +97,9 @@ public interface LocationService {
    * meaningful on master, which owns no location of its own.
    *
    * <p>{@code preferredPersistentIdentity} is only consulted the first time a location is
-   * created: slave mode must pass its {@code app.location-id} (the id master already assigned via
-   * {@link #registerLocation}, so the slave's local record and master's agree); standalone mode
-   * (no master to agree with) passes {@code null} to auto-generate one the same way {@link
-   * #registerLocation} does.
+   * created. Callers pass the optional {@code app.location-id}, or {@code null} to auto-generate
+   * one the same way {@link #registerLocation} does. On a slave, master overrides whichever id
+   * results on its first connection (see {@link #reconcileOwnLocationId}).
    *
    * NOTE: System method, not to be invoked on behalf of a user.
    */
@@ -120,6 +120,16 @@ public interface LocationService {
    */
   @PublicServiceMethod
   void reconcileOwnLocationId(Integer confirmedLocationId);
+
+  /**
+   * Gives this standalone/slave instance's own location a new API key, replacing its stored
+   * bcrypt hash and lookup value, and returns the plaintext key exactly once (it is never stored).
+   * The plaintext goes into this instance's {@code app.location-api-key}; the stored hash and
+   * lookup value go into the own location's row in master's {@code location} table. Backs the
+   * Swing admin panel's Location dialog. A master row still holding the previous hash no longer
+   * authenticates this instance until it is updated.
+   */
+  ProvisionedLocationDto generateOwnLocationApiKey();
 
   /**
    * Updates this standalone/slave instance's own location's operator-editable info (name,

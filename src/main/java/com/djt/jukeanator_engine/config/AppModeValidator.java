@@ -29,8 +29,9 @@ public class AppModeValidator implements ApplicationRunner {
   public void run(ApplicationArguments args) {
 
     if (appProperties.isSlave()) {
+      // app.location-id is deliberately not required: master identifies a slave by its API key
+      // alone and tells it its location id on every connection (see SlaveConnectionManager).
       requireNonBlank("app.master-instance-url", appProperties.getMasterInstanceUrl());
-      requireNonNull("app.location-id", appProperties.getLocationId());
       requireNonBlank("app.location-api-key", appProperties.getLocationApiKey());
     }
 
@@ -70,10 +71,4 @@ public class AppModeValidator implements ApplicationRunner {
     }
   }
 
-  private void requireNonNull(String propertyName, Object value) {
-    if (value == null) {
-      throw new IllegalStateException(
-          "app.mode=slave requires " + propertyName + " to be set, but it was blank/missing.");
-    }
-  }
 }

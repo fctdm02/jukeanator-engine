@@ -494,6 +494,19 @@ public class LocationServiceImpl implements LocationService {
       return;
     }
 
+    // A standalone/slave instance only ever has one meaningful location -- its own (the lowest id,
+    // see getOrCreateOwnLocation). Any other local record already holding the target id is a
+    // leftover, e.g. one made by the old Swing "Add Location" dialog purely to produce an API key
+    // for master's SQL insert, and nothing on this instance references it. Drop it first, so the
+    // re-key below doesn't collide with it (a duplicate primary key under JPA).
+    LocationEntity occupying = this.locationRoot.getLocationByIdNullIfNotExists(confirmedLocationId);
+    if (occupying != null) {
+      log.warn("Removing local location record [{}] ({}): its id is now this instance's own "
+          + "location id", confirmedLocationId, occupying.getName());
+      this.locationRoot.removeLocation(confirmedLocationId);
+      this.locationRepository.storeAggregateRoot(this.locationRoot);
+    }
+
     // persistentIdentity is this entity's actual DB/JSON key, so re-keying it also requires
     // re-keying LocationRootEntity's own id-keyed map. changeLocationId() re-keys the persisted
     // row in place (plus every row referencing it) first, so storeAggregateRoot's delete/merge
@@ -506,12 +519,47 @@ public class LocationServiceImpl implements LocationService {
     location.setPersistentIdentity(confirmedLocationId);
     this.locationRoot.addLocation(location);
     this.locationRepository.storeAggregateRoot(this.locationRoot);
+    storeFilesystemBackup();
 
     // Services holding location-tagged rows in memory (user, background music, financial ledger)
     // re-tag them on this event -- otherwise their next store would write the previous id back
     // over the rows changeLocationId() just re-pointed.
     this.eventPublisher.publishEvent(
         new OwnLocationIdChangedEvent(currentLocationId, confirmedLocationId));
+  }
+
+  @Override
+  public ProvisionedLocationDto generateOwnLocationApiKey() {
+
+    LocationEntity location = getOrCreateOwnLocation(null);
+
+    // Replaces the throwaway key getOrCreateOwnLocation() gave the own location with a real one:
+    // its hash/lookup values go into master's location row (see the Location dialog's SQL), and
+    // the plaintext goes into this instance's app.location-api-key. Only the plaintext is
+    // returned, once -- it is never stored.
+    String apiKey = generateApiKey();
+    location.setApiKeyHash(passwordEncoder.encode(apiKey));
+    location.setApiKeyLookup(ApiKeyLookup.of(apiKey));
+    // Marks the own location as having a real key (getOrCreateOwnLocation leaves it PENDING with a
+    // throwaway one), so the Location dialog knows its hash is worth putting into master's SQL.
+    location.setStatus(LocationStatus.PROVISIONED);
+
+    this.locationRepository.storeAggregateRoot(this.locationRoot);
+    storeFilesystemBackup();
+
+    log.info("Generated a new API key for own location [{}]", location.getPersistentIdentity());
+
+    return new ProvisionedLocationDto(location.getPersistentIdentity(), apiKey,
+        location.getName());
+  }
+
+  // Under JPA, keeps the filesystem (JukeANator_Locations.json) copy of the location list in step
+  // with the database -- see updateOwnLocationInfo().
+  private void storeFilesystemBackup() {
+
+    if (this.filesystemBackupRepository != null) {
+      this.filesystemBackupRepository.storeAggregateRoot(this.locationRoot);
+    }
   }
 
   @Override
