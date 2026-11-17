@@ -41,14 +41,14 @@ public class SecurityConfig {
             // No/invalid/expired JWT on a protected endpoint → 401, not the default 403, so the
             // web UI can tell "you need to log in" apart from "you're logged in but not allowed".
             .authenticationEntryPoint((request, response, authException) -> {
-              log.warn("[SECURITY] 401 Unauthorized: {} {} — {}", request.getMethod(),
-                  request.getRequestURI(), authException.getMessage());
+              log.warn("[SECURITY] 401 Unauthorized: {} {} from {} — {}", request.getMethod(),
+                  request.getRequestURI(), request.getRemoteAddr(), authException.getMessage());
               response.sendError(HttpStatus.UNAUTHORIZED.value(), authException.getMessage());
             })
             // Authenticated but lacking the required role (e.g. non-admin hitting an admin route).
             .accessDeniedHandler((request, response, accessDeniedException) -> {
-              log.warn("[SECURITY] 403 Forbidden: {} {} — {}", request.getMethod(),
-                  request.getRequestURI(), accessDeniedException.getMessage());
+              log.warn("[SECURITY] 403 Forbidden: {} {} from {} — {}", request.getMethod(),
+                  request.getRequestURI(), request.getRemoteAddr(), accessDeniedException.getMessage());
               response.sendError(HttpStatus.FORBIDDEN.value(), accessDeniedException.getMessage());
             }))
         .authorizeHttpRequests(auth -> auth
