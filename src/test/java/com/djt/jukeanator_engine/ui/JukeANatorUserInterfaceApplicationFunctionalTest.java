@@ -35,8 +35,10 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -152,6 +154,13 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
   private static final Path TEST_DATA_DIR =
       Path.of("src/test/resources/com/djt/jukeanator_engine/test-data-dir");
   private static final Path ADMIN_PASSWORD_FILE = TEST_DATA_DIR.resolve("admin.sha");
+  /**
+   * The play counts a scan restores (see {@code RootFolderEntity.restoreSongStatisticsForRootPath}).
+   * Other tests share this data dir and leave plays in them, so they are set aside for this run:
+   * the steps rely on a freshly scanned library having no plays (Hot Here lists only played songs).
+   */
+  private static final List<Path> PLAY_COUNT_FILES =
+      List.of(TEST_DATA_DIR.resolve("CDStats.TXT"), TEST_DATA_DIR.resolve("CDStats_backup.TXT"));
   /** {@code license.directory} in application-test.yml. */
   private static final Path TEST_LICENSE_DIR =
       Path.of(System.getProperty("java.io.tmpdir"), "jukeanator-test-license");
@@ -176,6 +185,9 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
 
   /** Admin password file content present before this test, restored afterwards (or null). */
   private static String originalAdminPassword;
+
+  /** Content of each {@link #PLAY_COUNT_FILES} file present before this test (absent if none). */
+  private static final Map<Path, byte[]> originalPlayCounts = new HashMap<>();
 
   // Songs and albums chosen from the scanned library in step 1 and used by later steps
   private static SongDto homeSong;
@@ -224,6 +236,15 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
         Files.exists(ADMIN_PASSWORD_FILE) ? Files.readString(ADMIN_PASSWORD_FILE) : null;
     Files.writeString(ADMIN_PASSWORD_FILE, sha256Hex(ADMIN_PASSWORD), StandardCharsets.UTF_8);
 
+    // Start with no plays: the first-time scan would otherwise restore other tests' play counts
+    originalPlayCounts.clear();
+    for (Path file : PLAY_COUNT_FILES) {
+      if (Files.exists(file)) {
+        originalPlayCounts.put(file, Files.readAllBytes(file));
+        Files.delete(file);
+      }
+    }
+
     // Start unlicensed on every run, so the registration card is always shown (the license
     // directory from application-test.yml would otherwise keep the license from an earlier run)
     deleteRecursively(TEST_LICENSE_DIR);
@@ -239,6 +260,14 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
       Files.writeString(ADMIN_PASSWORD_FILE, originalAdminPassword, StandardCharsets.UTF_8);
     } else {
       Files.deleteIfExists(ADMIN_PASSWORD_FILE);
+    }
+    for (Path file : PLAY_COUNT_FILES) {
+      byte[] original = originalPlayCounts.get(file);
+      if (original != null) {
+        Files.write(file, original);
+      } else {
+        Files.deleteIfExists(file);
+      }
     }
   }
 
@@ -331,21 +360,24 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
 
     // The Legacy toggle switches to the album-tile grid
     click(home, UiComponentNames.HOME_LEGACY_TOGGLE);
-    int tileCount = showingCount(home, UiComponentNames.ALBUM_TILE);
-    assertTrue(tileCount > 0, "Home should show album tiles with Legacy off");
+    assertTrue(showingCount(home, UiComponentNames.ALBUM_TILE) > 0,
+        "Home should show album tiles with Legacy off");
+    // The All Albums grid opens at a random letter, so its first page can start part-way through
+    // the library; page back to the start so every count below covers the same albums.
+    int tileCount = firstAlbumPageTileCount(home);
 
     // Order By buttons re-sort without re-querying
     click(home, UiComponentNames.HOME_SORT_ALBUM_BUTTON);
-    assertEquals(tileCount, showingCount(home, UiComponentNames.ALBUM_TILE));
+    assertEquals(tileCount, firstAlbumPageTileCount(home));
     click(home, UiComponentNames.HOME_SORT_ARTIST_BUTTON);
-    assertEquals(tileCount, showingCount(home, UiComponentNames.ALBUM_TILE));
+    assertEquals(tileCount, firstAlbumPageTileCount(home));
 
     // Legacy switches back to the legacy grid and off again
     click(home, UiComponentNames.HOME_LEGACY_TOGGLE);
     assertTrue(showingCount(home, UiComponentNames.LEGACY_ALBUM_CARD) > 0,
         "Legacy mode should show legacy album cards");
     click(home, UiComponentNames.HOME_LEGACY_TOGGLE);
-    assertEquals(tileCount, showingCount(home, UiComponentNames.ALBUM_TILE));
+    assertEquals(tileCount, firstAlbumPageTileCount(home));
 
     // Album tile → album detail → track row → Add Song card → Play Song
     clickComponent(requireShowingWithText(home, UiComponentNames.ALBUM_TILE,
@@ -509,12 +541,16 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     JButton moveUp = button(queue, UiComponentNames.QUEUE_MOVE_UP_BUTTON);
     JButton moveDown = button(queue, UiComponentNames.QUEUE_MOVE_DOWN_BUTTON);
     JButton remove = button(queue, UiComponentNames.QUEUE_REMOVE_BUTTON);
-    assertEquals("GREY", buttonState(moveUp), "nothing selected yet");
-    assertEquals("GREY", buttonState(remove), "nothing selected yet");
-
-    // Select the bottom (priority 1) song: cost 3, more than the credits left after step 5
+    // The first song is selected by default, so the buttons show straight away what can be done:
+    // the top song cannot move up, and its moves (priority 2 or more, so at least 6 credits) are
+    // more than the credits left after step 6
     int cost = 3;
     assertTrue(credits() < cost, "this step expects to start short of credits");
+    assertEquals("UNAVAILABLE", buttonState(moveUp), "the top song is selected by default");
+    assertEquals("WARN", buttonState(moveDown), "the top song is selected by default");
+    assertEquals("WARN", buttonState(remove), "the top song is selected by default");
+
+    // Select the bottom (priority 1) song: cost 3, more than the credits left after step 6
     selectQueueRow(bottom);
     assertEquals("WARN", buttonState(moveUp));
     assertEquals("UNAVAILABLE", buttonState(moveDown), "the last row cannot move down");
@@ -1099,6 +1135,22 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
 
   private static int showingCount(Container root, String name) throws Exception {
     return onEdt(() -> findAllShowing(root, name, Component.class).size());
+  }
+
+  /**
+   * Presses the album grid's Prev button until it hides (the grid is on its first page), then
+   * returns how many album tiles that page shows.
+   */
+  private static int firstAlbumPageTileCount(Container root) throws Exception {
+    for (int presses = 0; presses < 100; presses++) {
+      Optional<JButton> prev = onEdt(
+          () -> findShowing(root, UiComponentNames.ALBUM_GRID_PREV_BUTTON, JButton.class));
+      if (prev.isEmpty()) {
+        return showingCount(root, UiComponentNames.ALBUM_TILE);
+      }
+      click(prev.get());
+    }
+    throw new AssertionError("the album grid never reached its first page");
   }
 
   private static JPanel requireShowingWithText(Container root, String name, String text)

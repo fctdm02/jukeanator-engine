@@ -3,6 +3,7 @@ package com.djt.jukeanator_engine.web;
 import static com.djt.jukeanator_engine.web.WebUiTestClient.key;
 import static com.djt.jukeanator_engine.web.WebUiTestClient.keys;
 import static com.djt.jukeanator_engine.web.WebUiTestClient.list;
+import static com.djt.jukeanator_engine.web.WebUiTestClient.tamperSignature;
 import static com.djt.jukeanator_engine.web.WebUiTestClient.uniqueEmail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -338,7 +339,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     PatronSocket aliceSocket = connectPatron(aliceToken);
     PatronSocket bobSocket = connectPatron(bobToken);
     PatronSocket signedOut = connectPatron(null);
-    PatronSocket forged = connectPatron(aliceToken + "x");
+    PatronSocket forged = connectPatron(tamperSignature(aliceToken));
 
     // Alice buys credits and queues a song.
     ui.post(aliceToken, "/api/users/add-funds", new AddFundsRequest("pkg-7", "fake-nonce"))

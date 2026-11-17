@@ -463,12 +463,16 @@ public class SongLibraryServiceImplTest {
 
     // initialize() adopts this leftover local .oos file into the (mocked, empty) JPA store, so
     // ownRoot ends up populated without needing a full scan -- see
-    // initialize_adoptsLocalOosFile_intoJpaStore_whenDatabaseHasNoRowYet above.
-    RootFolderEntity localRoot = newEmptyRoot("/scan/path", 1, ownLocation);
+    // initialize_adoptsLocalOosFile_intoJpaStore_whenDatabaseHasNoRowYet above. The library needs
+    // at least one song: RootFolderEntity.storeSongStatistics() deliberately leaves CDStats.TXT
+    // untouched for an empty library (so a legacy CDStats.TXT is not overwritten before a scan).
+    RootFolderEntity localRoot = buildSmallRoot("/scan/path", "Album");
+    localRoot.setParentLocation(ownLocation);
     Path oosFile = tempDir.resolve("Location_Name.oos");
     new SongLibraryObjectPersistor().writeSongLibraryToDisk(localRoot, oosFile.toString());
 
-    RootFolderEntity rehydratedRoot = newEmptyRoot("/scan/path", 1, ownLocation);
+    RootFolderEntity rehydratedRoot = buildSmallRoot("/scan/path", "Album");
+    rehydratedRoot.setParentLocation(ownLocation);
 
     when(locationService.getOrCreateOwnLocation(null)).thenReturn(ownLocation);
     when(songLibraryRepository.loadAggregateRoot(1))

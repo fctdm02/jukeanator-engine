@@ -4,6 +4,7 @@ import static com.djt.jukeanator_engine.web.BrokerMessageCapture.userDestination
 import static com.djt.jukeanator_engine.web.WebUiTestClient.key;
 import static com.djt.jukeanator_engine.web.WebUiTestClient.keys;
 import static com.djt.jukeanator_engine.web.WebUiTestClient.list;
+import static com.djt.jukeanator_engine.web.WebUiTestClient.tamperSignature;
 import static com.djt.jukeanator_engine.web.WebUiTestClient.texts;
 import static com.djt.jukeanator_engine.web.WebUiTestClient.uniqueEmail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -125,16 +126,21 @@ class WebUiPatronLifecycleTest {
       Integer ownLocationId = songLibraryService.getOwnLocationId();
 
       // Hot Here lists only music that has been played -- queueing a song counts as a play -- so
-      // a freshly scanned library gets one play per song, queued at the kiosk.
-      if (songLibraryService.getMusicByPopularity(ownLocationId).songs().isEmpty()) {
-        for (AlbumDto album : songLibraryService.getAlbums(ownLocationId)) {
-          for (SongDto song : album.songs()) {
+      // every song not yet played gets one play, queued at the kiosk. Checked per song, not just
+      // when Hot Here is empty: the play counts live in the shared test data dir's CDStats.TXT,
+      // which other tests rewrite, and a library where only some songs have plays would leave
+      // Hot Here too small for these narratives. Each song is flushed right after it is queued
+      // so the consecutive-plays-by-one-artist rule never refuses the next one.
+      songQueueService.flushQueue(ownLocationId);
+      for (AlbumDto album : songLibraryService.getAlbums(ownLocationId)) {
+        for (SongDto song : album.songs()) {
+          if (song.numPlays() == null || song.numPlays() == 0) {
             songQueueService.addSongToQueue(ownLocationId, new AddSongToQueueRequest(
                 SongQueueService.LOCAL_USERNAME, album.albumId(), song.songId(), 1, false));
+            songQueueService.flushQueue(ownLocationId);
           }
         }
       }
-      songQueueService.flushQueue(ownLocationId);
     });
     stomp.clear();
 
@@ -754,7 +760,7 @@ class WebUiPatronLifecycleTest {
     String token = registerWithCredits(email, "pkg-7");
 
     assertEquals(401, ui.get("not-a-jwt", "/api/users/me").status());
-    assertEquals(401, ui.get(token + "x", "/api/users/me").status(), "a tampered signature");
+    assertEquals(401, ui.get(tamperSignature(token), "/api/users/me").status(), "a tampered signature");
     // Public endpoints stay usable with a bad token, as with none.
     ui.get("not-a-jwt", "/api/users/home-public").expect(200);
 

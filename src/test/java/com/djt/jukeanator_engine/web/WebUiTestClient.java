@@ -81,6 +81,19 @@ final class WebUiTestClient {
     return name + "+" + System.nanoTime() + "@example.com";
   }
 
+  /**
+   * The JWT with one character in the middle of its signature changed, so it no longer verifies.
+   * Appending a character is not enough: when the signature's base64url form has no spare bits
+   * (HS384's 48 bytes are exactly 64 characters, which the test profile's 54-byte secret selects),
+   * the decoder discards a lone trailing character and the token still verifies.
+   */
+  static String tamperSignature(String token) {
+    int signatureStart = token.lastIndexOf('.') + 1;
+    int i = signatureStart + (token.length() - signatureStart) / 2;
+    char replacement = token.charAt(i) == 'A' ? 'B' : 'A';
+    return token.substring(0, i) + replacement + token.substring(i + 1);
+  }
+
   /** Serializes a request body the same way {@code JSON.stringify} would. */
   String toJson(Object body) {
     try {
