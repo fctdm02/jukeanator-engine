@@ -175,8 +175,9 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
     } catch (Exception e1) {
 
-      // NOTE: If unable to load BackgroundMusic.TXT, then fall back to using the most popular
-      // songs. The retry below will self-heal the repository from the freshly-created file.
+      // NOTE: If unable to load BackgroundMusic.TXT (missing or empty), then fall back to using
+      // the most popular songs. The retry below will self-heal the repository from the
+      // freshly-created file.
       log.error("Unable to initialize background music playlist, error: " + e1.getMessage());
 
       try {
@@ -216,6 +217,13 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         .map(backgroundMusicHelper::normalizeDriveLetterBackslashes)
         .distinct()
         .collect(Collectors.toList());
+
+    // An empty playlist (e.g. a zero-byte file left by a failed copy) is treated the same as a
+    // missing one, so the caller's top-songs fallback runs instead of silently loading an empty
+    // pool that never queues anything.
+    if (playlistPaths.isEmpty()) {
+      throw new IOException("Background music playlist file is empty in: " + this.dataDir);
+    }
     this.currentPlaylistPaths = new HashSet<>(playlistPaths);
 
     List<String> genreExclusions =

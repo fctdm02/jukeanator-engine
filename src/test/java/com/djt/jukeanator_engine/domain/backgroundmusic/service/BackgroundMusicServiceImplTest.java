@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.backgroundmusic.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -77,6 +78,7 @@ class BackgroundMusicServiceImplTest {
   private static final String OWN_SONG_PATH = "C:\\Music\\Own.mp3";
   private static final String OTHER_SONG_PATH = "C:\\Music\\Other.mp3";
   private static final String UNIDENTIFIED_SONG_PATH = "C:\\Music\\Unidentified.mp3";
+  private static final String SMART_CYCLE_PLACEHOLDER_PATH = "C:\\Music\\Placeholder.mp3";
 
   @TempDir
   private Path dataDir;
@@ -191,6 +193,54 @@ class BackgroundMusicServiceImplTest {
     assertEquals(new SongIdentifier(CONFIRMED_LOCATION_ID, 40, 41),
         smartSong.getSourceSongIdentifier());
     verify(smartBackgroundMusicRepository, times(1)).storeAll(anyList());
+  }
+
+  // ── empty playlist file ──────────────────────────────────────────────────
+
+  private static SongFileEntity librarySong(String path, int numPlays) {
+
+    SongFileEntity song = mock(SongFileEntity.class);
+    when(song.getNaturalIdentity()).thenReturn(path);
+    when(song.getNumPlays()).thenReturn(Integer.valueOf(numPlays));
+    return song;
+  }
+
+  @Test
+  void emptyPlaylistFile_fallsBackToTopSongs_likeAMissingFile() throws Exception {
+
+    Files.write(dataDir.resolve("BackgroundMusic.TXT"), List.of());
+    when(backgroundMusicRepository.loadAll()).thenReturn(List.of());
+
+    String leastPlayed = "C:\\Music\\Least.mp3";
+    String mostPlayed = "C:\\Music\\Most.mp3";
+    RootFolderEntity root = mock(RootFolderEntity.class);
+    when(root.getSongs())
+        .thenReturn(List.of(librarySong(leastPlayed, 1), librarySong(mostPlayed, 50)));
+    when(songLibraryService.getSongLibraryRoot(PREVIOUS_LOCATION_ID)).thenReturn(root);
+
+    BackgroundMusicServiceImpl service = newService();
+
+    assertTrue(service.isEnabled(),
+        "An empty playlist should be regenerated from top songs, not leave the feature idle");
+    assertEquals(List.of(mostPlayed, leastPlayed),
+        Files.readAllLines(dataDir.resolve("BackgroundMusic.TXT")),
+        "The empty playlist should be rewritten from the library, most-played first");
+  }
+
+  @Test
+  void emptyPlaylistFile_withEmptyLibrary_disablesBackgroundMusic() throws Exception {
+
+    Files.write(dataDir.resolve("BackgroundMusic.TXT"), List.of());
+    when(backgroundMusicRepository.loadAll()).thenReturn(List.of());
+
+    RootFolderEntity root = mock(RootFolderEntity.class);
+    when(root.getSongs()).thenReturn(List.of());
+    when(songLibraryService.getSongLibraryRoot(PREVIOUS_LOCATION_ID)).thenReturn(root);
+
+    BackgroundMusicServiceImpl service = newService();
+
+    assertFalse(service.isEnabled(),
+        "With nothing in the library to fall back to, background music should be disabled");
   }
 
   // ── no-op cases ──────────────────────────────────────────────────────────
@@ -597,7 +647,9 @@ class BackgroundMusicServiceImplTest {
 
   private BackgroundMusicServiceImpl newSmartCycleService(List<String> paths) throws Exception {
 
-    Files.write(dataDir.resolve("BackgroundMusic.TXT"), List.of());
+    // A single unrelated placeholder entry: an empty playlist would trigger the top-songs fallback
+    // (and, with no library stubbed yet, disable the feature before the smart pool is loaded).
+    Files.write(dataDir.resolve("BackgroundMusic.TXT"), List.of(SMART_CYCLE_PLACEHOLDER_PATH));
     List<SmartBackgroundMusicSongEntity> songs = new ArrayList<>();
     for (int i = 0; i < paths.size(); i++) {
       songs.add(smartSong(i + 1, paths.get(i), null, null));

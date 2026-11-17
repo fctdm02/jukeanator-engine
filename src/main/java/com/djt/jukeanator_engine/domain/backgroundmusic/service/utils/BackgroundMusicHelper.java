@@ -69,7 +69,7 @@ public class BackgroundMusicHelper extends FileSystemHelper {
 
   /**
    * Writes a fresh {@code BackgroundMusic.TXT} populated from the given top-played song paths. Used
-   * as a fallback when no playlist file exists yet.
+   * as a fallback when no playlist file exists yet, or when it exists but has no entries.
    */
   public void createBackgroundMusicFromTopSongs(String rootPath, List<String> topSongPathNames)
       throws IOException {
