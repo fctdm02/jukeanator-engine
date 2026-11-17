@@ -5,7 +5,9 @@ In production a jukeanator-engine **master** instance replaces the legacy JSP si
 
 - `/` and `/*.html`, `/assets/**`, `/images/**`: public marketing site (ported from the legacy
   JSP pages)
-- `/app/`: Web/Mobile jukebox UI (Braintree Add Funds)
+- `/app/`: Web/Mobile jukebox UI (Braintree Add Funds), so `https://www.jukeanator.com/app/` in
+  production (`/app` redirects there). It starts with a location picker, since master serves
+  every location. The root URL `/` is the marketing home page, not the jukebox UI.
 - `/FrontController`, `/servlet/FrontController`: legacy license protocol used by MP3Jukeboxx
   installs **and** jukeanator-engine standalone/slave instances
 - `/temp/**`, `/webstart/**`: legacy auto-update downloads, served from

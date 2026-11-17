@@ -83,6 +83,11 @@ matters (see step 10).
 - [ ] From the master machine, `GET http://localhost:8080/api/locations` returns `[]`.
 - [ ] From the **slave machine**, `GET http://<master-ip>:8080/api/locations` also returns `[]` --
   confirms the LAN path the slave will actually use is open before you rely on it.
+- [ ] The Web/Mobile UI is served under `/app/`: `http://<master-ip>:8080/app/` here, and
+  `https://www.jukeanator.com/app/` in production (`/app` without the trailing slash redirects
+  there). On master, the root URL `/` is the public website's home page, not the jukebox UI. On a
+  standalone or slave instance, `/` redirects to `/app/`. Master serves every location, so its UI
+  starts with a location picker.
 
 ## 3. Provision the location
 
@@ -266,7 +271,8 @@ code.
   Note the returned token. Do **not** top up credits by editing the database -- master holds users
   in memory and its next store would overwrite the edit.
 - [ ] Queue one song at the location as that patron -- via the web UI served by master
-  (`http://<master-ip>:8080`, reachable from either machine or a phone on the LAN), or:
+  (`http://<master-ip>:8080/app/`, reachable from either machine or a phone on the LAN; see step
+  2), or:
   ```bash
   curl -s -X POST http://<master-ip>:8080/api/locations/<id>/song-queue/addSong -H "Authorization: Bearer <patron-jwt>" -H "Content-Type: application/json" -d "{\"username\":\"pat@example.com\",\"albumId\":<albumId>,\"songId\":<songId>,\"priority\":1,\"priorityPlay\":false}"
   ```
@@ -412,3 +418,57 @@ hosts. Still not covered, and required before a public master and a real jukebox
   `addMultipleSongs` now charges web users per song queued, and `addAlbum` is admin-only.
 - [ ] Known gap accepted or fixed: a mobile spend that reaches the slave only after its period was finalized is stored
   but not counted in that split (master's records remain authoritative for reconciling it).
+
+---
+
+## Resetting test data before going live
+
+After provisioning a production slave, you will usually test it on site: award yourself credits,
+spend them from the Web/Mobile UI, feed the bill acceptor and swipe the card reader. Before the
+location starts taking real money, delete that test data on both the slave and master. The
+examples below use location id `2`; substitute the slave's own id (the one in its "Connected to
+master at ... using location id [n]" log line).
+
+Where the test data ends up:
+
+- Bill acceptor and card reader transactions: the slave's financial ledger, mirrored to master's
+  `location_transaction` (`location_id`).
+- Finalized split periods: the slave's financial ledger, mirrored to master's
+  `location_jukebox_split` (`parent_location_id`).
+- Web/Mobile credit spends at the location: master's `user_song_credit_usage` (`location_id`),
+  mirrored into the slave's financial ledger.
+- User activity: the slave's `activity` folder (or `user_activity` table under JPA), mirrored to
+  master's `user_activity` (`location_id`).
+
+Reset both sides in the same maintenance window. Deleting the slave's ledger restarts its
+transaction and period ids at 1, and master ignores a mirrored record whose id it already holds
+for that location. If master still has the test rows, the first real transactions after the reset
+reuse those ids and are dropped without any error.
+
+**Step 1.** Stop the slave. It holds the ledger in memory and would write it back to disk on the
+next change if it kept running.
+
+**Step 2.** On master's database, run:
+
+```sql
+DELETE FROM location_transaction   WHERE location_id = 2;
+DELETE FROM location_jukebox_split WHERE parent_location_id = 2;
+DELETE FROM user_song_credit_usage WHERE location_id = 2;
+DELETE FROM user_activity          WHERE location_id = 2;  -- optional, not financial
+```
+
+**Step 3.** On the slave, delete `JukeANator_FinancialLedger.json` from its data directory (for a
+JPA slave, delete all rows from its own `location_transaction`, `location_mobile_credit_usage` and
+`location_jukebox_split` tables instead). This also removes the slave's copy of the Web/Mobile
+spends. Optionally delete the `activity` folder in the same directory (for a JPA slave, the rows
+of its `user_activity` table) to drop the test activity as well.
+
+**Step 4.** Start the slave. With no ledger, it creates an empty one and opens a new split period
+starting now. Confirm the "Connected to master" log line and no 401 or ledger errors.
+
+Not covered by the steps above:
+
+- Your own credit balance is `user_account.num_credits` on master. Set it back by hand if the
+  remaining test credits should not stay on your account.
+- Song play counts on the slave and the Web/Mobile play history on master
+  (`user_song_play_history`) still include the test plays. They have no effect on money.
