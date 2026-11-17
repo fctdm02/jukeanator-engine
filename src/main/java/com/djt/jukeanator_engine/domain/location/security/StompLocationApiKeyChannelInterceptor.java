@@ -18,10 +18,9 @@ import com.djt.jukeanator_engine.domain.location.service.LocationService;
  * row into master's database, so authentication can't require them to match up front. On success,
  * sets a {@link LocationPrincipal} on the session (enabling
  * {@code convertAndSendToUser(locationId, ...)} routing) and marks the location connected in
- * {@link ConnectedSlaveRegistry}; the resolved id is then pushed back to the slave as soon as the
- * session is fully established (see {@code LocationEventStompController}'s {@code
- * SessionConnectedEvent} listener), which corrects its local {@code locationMetadata.txt} if it
- * was wrong. Mirrors {@code StompJwtChannelInterceptor}'s shape for JWT.
+ * {@link ConnectedSlaveRegistry}. The slave then subscribes to learn the resolved id (see
+ * {@code LocationEventStompController.handleLocationIdSubscription}) and re-keys its own location
+ * if it was wrong. Mirrors {@code StompJwtChannelInterceptor}'s shape for JWT.
  */
 public class StompLocationApiKeyChannelInterceptor implements ChannelInterceptor {
 

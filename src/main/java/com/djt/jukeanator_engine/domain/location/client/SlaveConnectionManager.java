@@ -28,6 +28,7 @@ import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.common.exception.ResourceNotFoundException;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
+import com.djt.jukeanator_engine.domain.location.controller.LocationEventStompController;
 import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
@@ -359,7 +360,10 @@ public class SlaveConnectionManager {
       log.info("Connected to master at {}", appProperties.getMasterInstanceUrl());
       currentSession.set(session);
       session.subscribe("/user/queue/commands", new CommandFrameHandler());
-      session.subscribe("/user/queue/location-id-confirmed", new LocationIdConfirmedFrameHandler());
+      // Master answers this subscription directly with this slave's id (see
+      // LocationEventStompController.handleLocationIdSubscription).
+      session.subscribe(LocationEventStompController.LOCATION_ID_DESTINATION,
+          new LocationIdConfirmedFrameHandler());
       sendPricingConfig(session);
       sendLocationInfo(session);
     }
@@ -398,10 +402,10 @@ public class SlaveConnectionManager {
 
   /**
    * Receives the authoritative locationId master resolved via {@code location-api-key} alone
-   * (see {@code StompLocationApiKeyChannelInterceptor}) and corrects this slave's local {@code
-   * locationMetadata.txt} if it doesn't already match — this is the "communicate back the actual
-   * locationId" step of the manual-provisioning workflow: an admin's hand-inserted row on master
-   * can carry a different id than this slave's own initial guess.
+   * (see {@code StompLocationApiKeyChannelInterceptor}), as master's direct reply to this slave's
+   * subscription, and re-keys this slave's own location if it doesn't already match. This is the
+   * "communicate back the actual locationId" step of provisioning: the row an admin inserts on
+   * master can carry a different id than this slave's own local one.
    */
   private class LocationIdConfirmedFrameHandler
       implements org.springframework.messaging.simp.stomp.StompFrameHandler {
@@ -415,6 +419,19 @@ public class SlaveConnectionManager {
     public void handleFrame(StompHeaders headers, Object payload) {
 
       Integer confirmedLocationId = (Integer) payload;
+      if (confirmedLocationId == null) {
+        return;
+      }
+      // This runs on the STOMP client's message-handling thread. Without the Swing UI (whose
+      // global security context every thread already sees) that thread has no principal, and
+      // ServiceSecurityAspect would reject the service calls below.
+      boolean systemPrincipalSet = false;
+      if (SecurityContextHolder.getContext().getAuthentication() == null) {
+        SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+        ctx.setAuthentication(SystemPrincipal.SystemAuthenticationToken.INSTANCE);
+        SecurityContextHolder.setContext(ctx);
+        systemPrincipalSet = true;
+      }
       try {
         Integer currentLocationId = songLibraryService.getOwnLocationId();
         if (!confirmedLocationId.equals(currentLocationId)) {
@@ -428,6 +445,10 @@ public class SlaveConnectionManager {
       } catch (Exception e) {
         log.warn("Could not reconcile confirmed locationId {} with local location record",
             confirmedLocationId, e);
+      } finally {
+        if (systemPrincipalSet) {
+          SecurityContextHolder.clearContext();
+        }
       }
     }
   }

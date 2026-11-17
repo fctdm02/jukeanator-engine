@@ -4,11 +4,10 @@ import java.security.Principal;
 import java.util.Collections;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.annotation.SubscribeMapping;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
 import com.djt.jukeanator_engine.domain.location.dto.LocationInfoSyncDto;
@@ -31,7 +30,8 @@ import com.djt.jukeanator_engine.web.event.LocationTopics;
 @ConditionalOnProperty(name = "app.mode", havingValue = "master")
 public class LocationEventStompController {
 
-  private static final String LOCATION_ID_CONFIRMED_DESTINATION = "/queue/location-id-confirmed";
+  /** Subscribed to by a slave on every connect; see {@link #handleLocationIdSubscription}. */
+  public static final String LOCATION_ID_DESTINATION = "/location-id";
 
   private final SimpMessagingTemplate messagingTemplate;
   private final SlaveCommandGateway slaveCommandGateway;
@@ -97,19 +97,24 @@ public class LocationEventStompController {
   }
 
   /**
-   * Fires for every established {@code /ws-slave} session (this event type is shared with the
-   * browser-facing {@code /ws} endpoint, hence the {@code instanceof} guard). {@code
-   * StompLocationApiKeyChannelInterceptor} authenticates purely by API key, never trusting the
-   * slave's self-reported {@code location-id} header, so this is how the slave learns its true,
-   * master-assigned id — see {@code SlaveConnectionManager}'s subscription to this destination,
-   * which corrects the slave's local {@code locationMetadata.txt} if it was wrong.
+   * Answers a slave's subscription to {@value #LOCATION_ID_DESTINATION} with the location id
+   * {@code StompLocationApiKeyChannelInterceptor} resolved from its API key alone (never from the
+   * slave's self-reported {@code location-id} header). This is how the slave learns its true,
+   * master-assigned id; see {@code SlaveConnectionManager}, which re-keys its own location if it
+   * was wrong.
+   *
+   * <p>The id is the direct reply to the SUBSCRIBE frame, sent straight to that session and never
+   * through the broker, so it cannot arrive before the slave is listening. (Pushing it to a user
+   * queue when the session connected did not work: the broker dropped it, because the slave's
+   * subscription only arrives a network round trip after CONNECTED.)
    */
-  @EventListener
-  public void handleSessionConnected(SessionConnectedEvent event) {
+  @SubscribeMapping(LOCATION_ID_DESTINATION)
+  public Integer handleLocationIdSubscription(Principal principal) {
 
-    if (event.getUser() instanceof LocationPrincipal locationPrincipal) {
-      messagingTemplate.convertAndSendToUser(locationPrincipal.getName(),
-          LOCATION_ID_CONFIRMED_DESTINATION, locationPrincipal.locationId());
+    if (principal instanceof LocationPrincipal locationPrincipal) {
+      return locationPrincipal.locationId();
     }
+    // Not an authenticated slave (no or wrong API key): a null return sends no reply.
+    return null;
   }
 }
