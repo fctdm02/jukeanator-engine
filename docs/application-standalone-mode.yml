@@ -72,8 +72,8 @@ song-library:
   use-genre: true
   use-top-folder-for-genre: true
   discogs:
-    consumer-key: INSERT_VALUE_HERE
-    consumer-secret: INSERT_VALUE_HERE
+    consumer-key: ${DISCOGS_CONSUMER_KEY:dummy}
+    consumer-secret: ${DISCOGS_CONSUMER_SECRET:dummy}
   accepted-song-file-extensions:
     - .mp3
     - .flac
@@ -107,6 +107,7 @@ song-player:
   player-volume: 100 # 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software amplification)
   master-volume: 100
   enable-line-in-on-silence: false # mutually exclusive with enable-background-music
+  preferred-mixer-name: Line In # line-in only: the first audio input whose name contains this text (case-insensitive) is used
   line-in-volume: 75  
 
 location:   # repository/service beans exist regardless of app.mode; see LocationConfig
@@ -120,18 +121,29 @@ braintree:
   public-key: ${BRAINTREE_PUBLIC_KEY:}
   private-key: ${BRAINTREE_PRIVATE_KEY:}
 
+# Outbound email (account verification, Add Funds receipts, Financial Ledger split summaries); SMTP settings are under spring.mail
 email:
-  from-address: ${MAIL_FROM_ADDRESS:tmyers1@yahoo.com}
-  financial-ledger-recipients: tmyers1@yahoo.com   # receives the Financial Ledger split summary sent from this kiosk
+  from-address: ${MAIL_FROM_ADDRESS:${receipt.from-address:tmyers1@yahoo.com}}   # sender for every email; still honors a legacy receipt.from-address
+  financial-ledger-recipients: tmyers1@yahoo.com   # comma-separated list that receives the Financial Ledger split summary; blank = none
+  verification-required: true   # Create Account must verify its email address before it can sign in
+  verification-base-url: ~   # public URL of the web UI used in verification links (e.g. https://jukeanator.com); blank = the URL the request arrived on
+  verification-token-ttl: 24h   # how long a verification link stays valid
 
-# Web/Mobile UI Add Funds credit packages -- see docs/pricing.md. Keep each total (credits +
-# bonus-credits) divisible by user-interface.web-cost-multiplier, and every package more expensive
+financial-ledger:
+  jukebox-split-percentage: 50   # % of each period's total earnings due to the location owner; the operator gets the rest
+
+# Web/Mobile UI Add Funds credit packages -- see docs/pricing.md. Set these on the instance that
+# takes web payments (master, or standalone). Keep each total (credits + bonus-credits) divisible by
+# the Web/Mobile song cost (user-interface.web-cost-multiplier), and every package more expensive
 # per song than the card reader; a startup check logs a warning otherwise. One package per line.
 add-funds:
   packages:
     - { id: pkg-28, price-usd: 28.00, credits: 48, bonus-credits: 24, badge: Best Value }
     - { id: pkg-14, price-usd: 14.00, credits: 24, bonus-credits: 8 }
     - { id: pkg-7, price-usd: 7.00, credits: 12, bonus-credits: 2 }
+
+user-activity:
+  retention-days: 30   # activity records older than this are permanently deleted by a daily purge job
 
 license:   # legacy license key (JukeANator.CTL) and subscription (ExtendCode.CTL) checks; standalone and slave only
   directory: ~   # folder holding JukeANator.CTL / ExtendCode.CTL; blank = app.data-dir, then the working directory, then C:\kiosk
@@ -163,8 +175,8 @@ user-interface:
   hibernate-end: 9   # In 24 hour/military time  
   # CREDIT CONFIGURATION
   increment-credits-key: a
-  increment-credits-credit-card-reader-key: b
-  enable-credit-card-processing: false # must be true for the credit-card-reader key to award any credits
+  increment-credits-credit-card-reader-key: b # Nayax VPOS Touch, 1 pulse (keystroke) per $1 -- see docs/credit-card-reader.md
+  enable-credit-card-processing: false # must be true for the credit-card-reader key to award any credits; logs the Nayax Pulse Title 1-6 text at startup
   num-credits: 0
   priority-cost-multiplier: 2
   credits-per-dollar: 3

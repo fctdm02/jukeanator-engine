@@ -122,6 +122,7 @@ song-player:
   player-volume: 100 # 0: Completely muted 100: 100% of the normal volume 200: 200% volume (up to 2x software amplification)
   master-volume: 100
   enable-line-in-on-silence: false # mutually exclusive with enable-background-music
+  preferred-mixer-name: Line In # line-in only: the first audio input whose name contains this text (case-insensitive) is used
   line-in-volume: 75  
 
 location:   # repository/service beans exist regardless of app.mode; see LocationConfig
@@ -155,6 +156,9 @@ add-funds:
     - { id: pkg-28, price-usd: 28.00, credits: 48, bonus-credits: 24, badge: Best Value }
     - { id: pkg-14, price-usd: 14.00, credits: 24, bonus-credits: 8 }
     - { id: pkg-7, price-usd: 7.00, credits: 12, bonus-credits: 2 }
+
+user-activity:
+  retention-days: 30   # activity records older than this are permanently deleted by a daily purge job
 
 license:   # legacy license key (JukeANator.CTL) and subscription (ExtendCode.CTL) checks; standalone and slave only
   directory: ~   # folder holding JukeANator.CTL / ExtendCode.CTL; blank = app.data-dir, then the working directory, then C:\kiosk
