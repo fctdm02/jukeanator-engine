@@ -3,6 +3,8 @@ package com.djt.jukeanator_engine.domain.location.client;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -28,6 +30,7 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
 import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.common.exception.ResourceNotFoundException;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
+import com.djt.jukeanator_engine.domain.financialledger.dto.MasterSyncOutboxEntry;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.controller.LocationController;
 import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
@@ -54,6 +57,8 @@ import com.djt.jukeanator_engine.domain.songqueue.event.SongQueueChangedEvent;
 import com.djt.jukeanator_engine.domain.songqueue.exception.SongNotEligibleException;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
+import com.djt.jukeanator_engine.domain.useractivity.model.PendingUserActivity;
+import com.djt.jukeanator_engine.domain.useractivity.service.UserActivityService;
 import com.djt.jukeanator_engine.web.event.LocationTopics;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -84,6 +89,9 @@ public class SlaveConnectionManager {
   private static final Logger log = LoggerFactory.getLogger(SlaveConnectionManager.class);
 
   private static final long RECONNECT_CHECK_INTERVAL_SECONDS = 5;
+  // The user-activity outbox is read oldest first, so stale-id records (left over from before an
+  // id change) are within the first this-many.
+  private static final int STALE_LOCATION_ID_SCAN_LIMIT = 1000;
 
   private final AppProperties appProperties;
   private final SongQueueService songQueueService;
@@ -93,6 +101,7 @@ public class SlaveConnectionManager {
   private final ObjectMapper objectMapper;
   private final JukeANatorUserInterfaceProperties userInterfaceProperties;
   private final FinancialLedgerService financialLedgerService;
+  private final UserActivityService userActivityService;
 
   private final WebSocketStompClient stompClient;
   private final RestClient restClient;
@@ -121,10 +130,11 @@ public class SlaveConnectionManager {
       SongPlayerService songPlayerService, SongLibraryService songLibraryService,
       LocationService locationService, ObjectMapper objectMapper,
       JukeANatorUserInterfaceProperties userInterfaceProperties,
-      FinancialLedgerService financialLedgerService) {
+      FinancialLedgerService financialLedgerService, UserActivityService userActivityService) {
 
     this.appProperties = appProperties;
     this.financialLedgerService = financialLedgerService;
+    this.userActivityService = userActivityService;
     this.songQueueService = songQueueService;
     this.songPlayerService = songPlayerService;
     this.songLibraryService = songLibraryService;
@@ -453,10 +463,44 @@ public class SlaveConnectionManager {
         log.warn("Could not reconcile master's locationId {} with local location record",
             masterLocationId, e);
       }
+      adoptDataTaggedWithStaleLocationIds(masterLocationId);
       log.info("Connected to master at {} using location id [{}]", masterUrl, masterLocationId);
       sendPricingConfig(session);
       sendLocationInfo(session);
     });
+  }
+
+  /**
+   * Everything queued on a slave for master belongs to its own location, so any other id on the
+   * financial-ledger or user-activity outbox is left over from before the own location's id
+   * changed outside reconcileOwnLocationId (for example, a hand-edited locations JSON). Master
+   * would reject those pushes forever, so re-tag that data with the own id first.
+   */
+  private void adoptDataTaggedWithStaleLocationIds(Integer ownLocationId) {
+
+    Set<Integer> staleLocationIds = new TreeSet<>();
+    try {
+      for (MasterSyncOutboxEntry entry : financialLedgerService.getPendingMasterSync()) {
+        addIfStale(staleLocationIds, entry.locationId(), ownLocationId);
+      }
+      for (PendingUserActivity pending : userActivityService
+          .getPendingMasterSync(STALE_LOCATION_ID_SCAN_LIMIT)) {
+        addIfStale(staleLocationIds, pending.record().locationId(), ownLocationId);
+      }
+      for (Integer staleLocationId : staleLocationIds) {
+        locationService.adoptLocalDataTaggedWithStaleLocationId(staleLocationId);
+      }
+    } catch (Exception e) {
+      log.warn("Could not re-tag local data still tagged with locationIds {}", staleLocationIds, e);
+    }
+  }
+
+  // Untagged (null) data is attributed to the own location when it is pushed, so it is not stale.
+  private static void addIfStale(Set<Integer> staleLocationIds, Integer locationId,
+      Integer ownLocationId) {
+    if (locationId != null && !locationId.equals(ownLocationId)) {
+      staleLocationIds.add(locationId);
+    }
   }
 
   // Warns once per run of failed connects (they repeat every reconnect interval), then logs the

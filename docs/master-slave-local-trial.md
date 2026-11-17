@@ -192,9 +192,14 @@ UPDATE persistent_identity_seq SET next_val = (SELECT MAX(id) + 1 FROM location)
 - [ ] Until the slave has learned its id, its syncs carry its old local id, and master rejects
   them, for example `Master rejected mirrored CASH <n> for locationId <m>: 401 UNAUTHORIZED`.
   Do not edit the slave's locations JSON to change the id by hand: the slave's other stored rows
-  (financial ledger outbox, users, background music) are also tagged with the old id, and only the
-  automatic id change re-tags them. Rejected entries are not lost; they stay queued and are pushed
-  under the new id once it is learned.
+  (financial ledger outbox, users, user activity, background music) are also tagged with the old
+  id, and only the automatic id change re-tags them. Rejected entries are not lost; they stay
+  queued and are pushed under the new id once it is learned.
+- [ ] If the id was already changed by hand, the slave repairs it on connect: when its
+  financial-ledger or user-activity outbox still holds data tagged with an id other than its own,
+  it logs `Local data is still tagged with locationId [<m>], which is not a local location;
+  re-tagging it with this instance's own locationId [<n>]` before the connected line, and the
+  rejected entries are pushed under `<n>` on the next sync.
 - [ ] From either machine, `GET http://<master-ip>:8080/api/locations` shows the location as
   online.
 - [ ] Trigger a library scan on the slave (Admin Panel); master receives the library snapshot

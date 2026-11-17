@@ -122,6 +122,20 @@ public interface LocationService {
   void reconcileOwnLocationId(Integer confirmedLocationId);
 
   /**
+   * Re-tags local data (users' transactions, the financial ledger, user activity, background
+   * music) that still carries {@code staleLocationId} with this standalone/slave instance's own
+   * location id, without changing the location itself. Needed when the own location's id changed
+   * outside {@link #reconcileOwnLocationId} (for example, its locations JSON was edited by hand),
+   * which leaves rows recorded under the old id behind; a slave then pushes them to master under
+   * that old id, and master rejects them. A no-op if {@code staleLocationId} is the own id or
+   * belongs to another local location record.
+   *
+   * NOTE: System method, not to be invoked on behalf of a user.
+   */
+  @PublicServiceMethod
+  void adoptLocalDataTaggedWithStaleLocationId(Integer staleLocationId);
+
+  /**
    * Gives this standalone/slave instance's own location a new API key, replacing its stored
    * bcrypt hash and lookup value, and returns the plaintext key exactly once (it is never stored).
    * The plaintext goes into this instance's {@code app.location-api-key}; the stored hash and
