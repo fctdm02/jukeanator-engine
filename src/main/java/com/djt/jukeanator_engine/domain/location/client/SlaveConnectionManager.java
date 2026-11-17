@@ -21,6 +21,7 @@ import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
@@ -28,7 +29,7 @@ import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.common.exception.ResourceNotFoundException;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
-import com.djt.jukeanator_engine.domain.location.controller.LocationEventStompController;
+import com.djt.jukeanator_engine.domain.location.controller.LocationController;
 import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
@@ -102,17 +103,19 @@ public class SlaveConnectionManager {
         return t;
       });
 
-  // sendLocationInfo runs on the STOMP I/O thread (afterConnected / a heartbeat-driven event) and
-  // must never block on it -- see the class javadoc -- so the logo upload's blocking HTTP call
-  // happens here instead, off that thread.
-  private final ExecutorService logoUploadExecutor = Executors.newSingleThreadExecutor(r -> {
-    Thread t = new Thread(r, "logo-upload-thread");
+  // Blocking HTTP calls to master that start from the STOMP I/O thread (learning this slave's
+  // location id after a connect, uploading the logo) run here instead, because that thread must
+  // never block -- see the class javadoc.
+  private final ExecutorService masterHttpExecutor = Executors.newSingleThreadExecutor(r -> {
+    Thread t = new Thread(r, "slave-master-http-thread");
     t.setDaemon(true);
     return t;
   });
 
   private final AtomicReference<StompSession> currentSession = new AtomicReference<>();
   private final AtomicBoolean connecting = new AtomicBoolean(false);
+  // See logConnectionProblem().
+  private final AtomicBoolean connectionProblemLogged = new AtomicBoolean(false);
 
   public SlaveConnectionManager(AppProperties appProperties, SongQueueService songQueueService,
       SongPlayerService songPlayerService, SongLibraryService songLibraryService,
@@ -160,7 +163,7 @@ public class SlaveConnectionManager {
   @PreDestroy
   public void shutdown() {
     reconnectExecutor.shutdownNow();
-    logoUploadExecutor.shutdownNow();
+    masterHttpExecutor.shutdownNow();
     StompSession session = currentSession.get();
     if (session != null && session.isConnected()) {
       session.disconnect();
@@ -297,7 +300,7 @@ public class SlaveConnectionManager {
   /**
    * Pushes the logo file itself (not just its name) to master, so an operator-supplied logo
    * override under this slave's own {@code <dataDir>/images/} shows up on master's Web/Mobile UI
-   * without being copied there by hand. Runs on {@link #logoUploadExecutor}, off the STOMP I/O
+   * without being copied there by hand. Runs on {@link #masterHttpExecutor}, off the STOMP I/O
    * thread that calls {@link #sendLocationInfo} -- the blocking HTTP call here must never delay
    * the connect handshake or any other send on that thread.
    */
@@ -311,7 +314,7 @@ public class SlaveConnectionManager {
       return;
     }
 
-    logoUploadExecutor.submit(() -> {
+    masterHttpExecutor.submit(() -> {
       try {
         byte[] imageBytes = Files.readAllBytes(logoFile);
         restClient.post()
@@ -357,15 +360,11 @@ public class SlaveConnectionManager {
     @Override
     public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
 
-      log.info("Connected to master at {}", appProperties.getMasterInstanceUrl());
       currentSession.set(session);
       session.subscribe("/user/queue/commands", new CommandFrameHandler());
-      // Master answers this subscription directly with this slave's id (see
-      // LocationEventStompController.handleLocationIdSubscription).
-      session.subscribe(LocationEventStompController.LOCATION_ID_DESTINATION,
-          new LocationIdConfirmedFrameHandler());
-      sendPricingConfig(session);
-      sendLocationInfo(session);
+      // Learning this slave's id from master is a blocking HTTP call, so it runs off this STOMP
+      // I/O thread; the pricing config and location info are sent once the id is settled.
+      masterHttpExecutor.submit(() -> completeConnection(session));
     }
 
     @Override
@@ -401,55 +400,93 @@ public class SlaveConnectionManager {
   }
 
   /**
-   * Receives the authoritative locationId master resolved via {@code location-api-key} alone
-   * (see {@code StompLocationApiKeyChannelInterceptor}), as master's direct reply to this slave's
-   * subscription, and re-keys this slave's own location if it doesn't already match. This is the
-   * "communicate back the actual locationId" step of provisioning: the row an admin inserts on
-   * master can carry a different id than this slave's own local one.
+   * Finishes a new connection, on {@link #masterHttpExecutor}: asks master which location this
+   * slave's {@code app.location-api-key} belongs to, re-keys this slave's own location if master's
+   * id differs from the local one, and only then sends the pricing config and location info. This
+   * is the "communicate back the actual locationId" step of provisioning: the row an admin inserts
+   * on master can carry a different id than this slave's own local one.
+   *
+   * <p>If master rejects the key, the connection is closed, because master does not know which
+   * location this session is, and the reconnect loop tries again.
    */
-  private class LocationIdConfirmedFrameHandler
-      implements org.springframework.messaging.simp.stomp.StompFrameHandler {
+  private void completeConnection(StompSession session) {
 
-    @Override
-    public Type getPayloadType(StompHeaders headers) {
-      return Integer.class;
+    String masterUrl = appProperties.getMasterInstanceUrl();
+    Integer masterLocationId;
+    try {
+      masterLocationId = restClient.get()
+          .uri("/api/locations" + LocationController.LOCATION_ID_FOR_API_KEY_PATH)
+          .header(LocationController.LOCATION_API_KEY_HEADER, appProperties.getLocationApiKey())
+          .retrieve()
+          .body(Integer.class);
+    } catch (HttpClientErrorException.Unauthorized e) {
+      logConnectionProblem("Connected to master at " + masterUrl + ", but master does not accept "
+          + "this slave's app.location-api-key: no location row on master has its "
+          + "api_key_lookup (the SHA-256 of the key) or api_key_hash. Disconnecting; will retry.",
+          null);
+      session.disconnect();
+      return;
+    } catch (Exception e) {
+      logConnectionProblem("Connected to master at " + masterUrl + ", but could not learn this "
+          + "slave's location id from it. Disconnecting; will retry.", e);
+      session.disconnect();
+      return;
     }
+    if (masterLocationId == null) {
+      session.disconnect();
+      return;
+    }
+    connectionProblemLogged.set(false);
 
-    @Override
-    public void handleFrame(StompHeaders headers, Object payload) {
-
-      Integer confirmedLocationId = (Integer) payload;
-      if (confirmedLocationId == null) {
-        return;
-      }
-      // This runs on the STOMP client's message-handling thread. Without the Swing UI (whose
-      // global security context every thread already sees) that thread has no principal, and
-      // ServiceSecurityAspect would reject the service calls below.
-      boolean systemPrincipalSet = false;
-      if (SecurityContextHolder.getContext().getAuthentication() == null) {
-        SecurityContext ctx = SecurityContextHolder.createEmptyContext();
-        ctx.setAuthentication(SystemPrincipal.SystemAuthenticationToken.INSTANCE);
-        SecurityContextHolder.setContext(ctx);
-        systemPrincipalSet = true;
-      }
+    runAsSystemIfUnauthenticated(() -> {
       try {
-        Integer currentLocationId = songLibraryService.getOwnLocationId();
-        if (!confirmedLocationId.equals(currentLocationId)) {
+        Integer localLocationId = songLibraryService.getOwnLocationId();
+        if (!masterLocationId.equals(localLocationId)) {
           log.info("Master assigned locationId {} (was {} locally) — correcting local location record",
-              confirmedLocationId, currentLocationId);
-          locationService.reconcileOwnLocationId(confirmedLocationId);
+              masterLocationId, localLocationId);
+          locationService.reconcileOwnLocationId(masterLocationId);
           // Re-key SongLibraryServiceImpl's own locationId->root cache under the corrected id --
           // it was populated under the old (pre-correction) id at startup.
           songLibraryService.reinitializeOwnLocation();
         }
       } catch (Exception e) {
-        log.warn("Could not reconcile confirmed locationId {} with local location record",
-            confirmedLocationId, e);
-      } finally {
-        if (systemPrincipalSet) {
-          SecurityContextHolder.clearContext();
-        }
+        log.warn("Could not reconcile master's locationId {} with local location record",
+            masterLocationId, e);
       }
+      log.info("Connected to master at {} using location id [{}]", masterUrl, masterLocationId);
+      sendPricingConfig(session);
+      sendLocationInfo(session);
+    });
+  }
+
+  // Warns once per run of failed connects (they repeat every reconnect interval), then logs the
+  // repeats at debug, until a connect succeeds.
+  private void logConnectionProblem(String message, Exception e) {
+    if (connectionProblemLogged.compareAndSet(false, true)) {
+      if (e != null) {
+        log.warn(message, e);
+      } else {
+        log.warn(message);
+      }
+    } else {
+      log.debug(message, e);
+    }
+  }
+
+  // Background threads have no principal unless the Swing UI's global security context is in
+  // effect, and ServiceSecurityAspect rejects service calls without one.
+  private static void runAsSystemIfUnauthenticated(Runnable task) {
+    if (SecurityContextHolder.getContext().getAuthentication() != null) {
+      task.run();
+      return;
+    }
+    SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+    ctx.setAuthentication(SystemPrincipal.SystemAuthenticationToken.INSTANCE);
+    SecurityContextHolder.setContext(ctx);
+    try {
+      task.run();
+    } finally {
+      SecurityContextHolder.clearContext();
     }
   }
 

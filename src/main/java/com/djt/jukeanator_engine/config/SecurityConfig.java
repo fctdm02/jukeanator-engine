@@ -122,6 +122,9 @@ public class SecurityConfig {
 
             // ── Master-mode only: public location picker, admin-only provisioning ─
             .requestMatchers(HttpMethod.GET, "/api/locations").permitAll()
+            // A slave learning its master-assigned id right after connecting; the controller
+            // itself checks the location-api-key header (401 if it matches no location).
+            .requestMatchers(HttpMethod.GET, "/api/locations/id-for-api-key").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/locations").hasRole("ADMIN")
 
             // ── Master-mode only: bar-owner accounting, admin-only ─────────────

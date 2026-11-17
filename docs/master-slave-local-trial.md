@@ -179,20 +179,22 @@ UPDATE persistent_identity_seq SET next_val = (SELECT MAX(id) + 1 FROM location)
 ## 4. Start the slave and confirm the handshake
 
 - [ ] Slave starts with its Swing UI; the log shows `Running with app.mode=slave` and
-  `Connected to master at http://<master-ip>:8080`.
-- [ ] If master's id for the location differs from the slave's local id (usually `1` on a fresh
-  install), the log shows `Master assigned locationId <n> (was <m> locally)`, followed by the local
-  location record being corrected, and the slave uses `<n>` from then on. If they already match,
-  nothing is logged.
-- [ ] If the slave logs `Connected to master` but never `Master assigned locationId ...` while
-  the ids differ, and its log shows warnings such as `Master rejected mirrored CASH <n> for
-  locationId <m>: 401 UNAUTHORIZED`, the slave has not learned its id. Every sync it makes still
-  carries its old local id, which master rejects, because that id belongs to another location (or
-  to none). Builds before the handshake fix lost the id this way. Update master and the slave
-  together (see below). Do not edit the slave's locations JSON to change the id by hand: the
-  slave's other stored rows (financial ledger outbox, users, background music) are also tagged
-  with the old id, and only the automatic id change re-tags them. Rejected entries are not lost;
-  they stay queued and are pushed under the new id once it is learned.
+  `Connected to master at http://<master-ip>:8080 using location id [<n>]`, where `<n>` is the id
+  of master's row for this slave's API key.
+- [ ] If master's id differs from the slave's local id (usually `1` on a fresh install), that line
+  is preceded by `Master assigned locationId <n> (was <m> locally)`, and the slave uses `<n>` from
+  then on. If they already match, only the connected line is logged.
+- [ ] If instead the slave warns `Connected to master at ..., but master does not accept this
+  slave's app.location-api-key`, no row on master holds this key. Compare master's row with the
+  key in the slave's `application.yml` (step 3; `printf '%s' '<key>' | sha256sum` must equal the
+  row's `api_key_lookup`). The slave disconnects and keeps retrying every few seconds, so it
+  connects as soon as master's row is fixed, without a restart of either instance.
+- [ ] Until the slave has learned its id, its syncs carry its old local id, and master rejects
+  them, for example `Master rejected mirrored CASH <n> for locationId <m>: 401 UNAUTHORIZED`.
+  Do not edit the slave's locations JSON to change the id by hand: the slave's other stored rows
+  (financial ledger outbox, users, background music) are also tagged with the old id, and only the
+  automatic id change re-tags them. Rejected entries are not lost; they stay queued and are pushed
+  under the new id once it is learned.
 - [ ] From either machine, `GET http://<master-ip>:8080/api/locations` shows the location as
   online.
 - [ ] Trigger a library scan on the slave (Admin Panel); master receives the library snapshot
@@ -200,22 +202,29 @@ UPDATE persistent_identity_seq SET next_val = (SELECT MAX(id) + 1 FROM location)
 
 ### Updating a running pairing to a new build
 
-Master and every slave must run the same build. The id handshake changed: the slave now
-subscribes to `/location-id`, and master answers that subscription directly with the slave's id.
-An older slave cannot learn its id from a newer master, and a newer slave cannot learn it from an
-older master.
+"Update" here means installing the new application build. A slave's `application.yml` and its
+locations JSON stay as they are.
+
+The id handshake changed: right after connecting, the slave now asks master for its id with
+`GET /api/locations/id-for-api-key`. An older master has no such endpoint, and a newer slave
+disconnects when it cannot learn its id, so master must be updated first. An older slave never
+learns its id from a newer master, so any slave whose local id differs from master's must run the
+new build too. A slave whose local id already matches master's has nothing to learn and keeps
+syncing on an older build, but updating it too is recommended, so that every instance has the same
+code.
 
 - [ ] Stop all slaves.
 - [ ] Update master and start it. Wait until it is up.
 - [ ] Update the slave whose local id differs from master's (for example, a newly provisioned
   slave still at local id `1` while master has it as `2`). Start it without editing its locations
   JSON.
-- [ ] Its log shows `Connected to master at http://<master-ip>:8080`, then `Master assigned
-  locationId <n> (was <m> locally)`.
+- [ ] Its log shows `Master assigned locationId <n> (was <m> locally)`, then `Connected to master
+  at http://<master-ip>:8080 using location id [<n>]`.
 - [ ] Within one sync cycle, any `Master rejected mirrored ... 401 UNAUTHORIZED` warnings stop,
   and the entries they named are pushed under the new id.
-- [ ] Update and start each remaining slave. A slave whose local id already matches master's
-  logs only `Connected to master`.
+- [ ] Recommended: install the new build on each remaining slave (one whose local id already
+  matches master's) and restart it. It logs only `Connected to master at ... using location id
+  [<n>]`.
 - [ ] The order of the slaves does not matter, but each one's location row must already exist on
   master (step 3), and location names must be unique, so rename an existing location before
   inserting a row that reuses its name.

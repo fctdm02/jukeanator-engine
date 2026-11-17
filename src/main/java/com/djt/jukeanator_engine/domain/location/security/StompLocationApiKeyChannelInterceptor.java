@@ -18,9 +18,10 @@ import com.djt.jukeanator_engine.domain.location.service.LocationService;
  * row into master's database, so authentication can't require them to match up front. On success,
  * sets a {@link LocationPrincipal} on the session (enabling
  * {@code convertAndSendToUser(locationId, ...)} routing) and marks the location connected in
- * {@link ConnectedSlaveRegistry}. The slave then subscribes to learn the resolved id (see
- * {@code LocationEventStompController.handleLocationIdSubscription}) and re-keys its own location
- * if it was wrong. Mirrors {@code StompJwtChannelInterceptor}'s shape for JWT.
+ * {@link ConnectedSlaveRegistry}. The slave then learns the resolved id over REST (see
+ * {@code LocationController.getLocationIdForApiKey}) and re-keys its own location if it was
+ * wrong. A CONNECT whose key matches no location still connects, without a principal; the slave
+ * detects that through the same REST call and disconnects. Mirrors {@code StompJwtChannelInterceptor}'s shape for JWT.
  */
 public class StompLocationApiKeyChannelInterceptor implements ChannelInterceptor {
 

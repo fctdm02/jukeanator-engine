@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +36,8 @@ public class LocationController {
 
   public static final String LOCATION_ID_HEADER = "location-id";
   public static final String LOCATION_API_KEY_HEADER = "location-api-key";
+  /** Relative to {@code /api/locations}; see {@link #getLocationIdForApiKey}. */
+  public static final String LOCATION_ID_FOR_API_KEY_PATH = "/id-for-api-key";
 
   private final LocationService locationService;
   private final UserService userService;
@@ -58,6 +61,21 @@ public class LocationController {
   public ResponseEntity<List<LocationSummaryDto>> listLocations() {
 
     return ResponseEntity.ok(locationService.listLocations());
+  }
+
+  /**
+   * The id of the location whose API key this is, or 401 if the key matches no location. A slave
+   * calls this right after connecting (see {@code SlaveConnectionManager}) to learn the id master
+   * assigned it, since the row an admin inserts on master can carry a different id than the
+   * slave's own local one. The key is the only credential; no location id is sent.
+   */
+  @GetMapping(LOCATION_ID_FOR_API_KEY_PATH)
+  public ResponseEntity<Integer> getLocationIdForApiKey(
+      @RequestHeader(LOCATION_API_KEY_HEADER) String apiKey) {
+
+    Integer locationId = locationService.resolveAndVerifyByApiKey(apiKey);
+    return locationId != null ? ResponseEntity.ok(locationId)
+        : ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
   }
 
   @PostMapping("/{locationId}/library-sync/metadata")
