@@ -113,8 +113,10 @@ record and produces everything master needs, so you provision without ever calli
 - [ ] If master already has a location with the name you are about to use (for example, an
   existing jukebox being demoted to a development instance), rename that one first: on its own
   machine, while connected to master, open **Location**, change the name, and click **Save
-  Changes**. The new name syncs to master's `location` row. Master ignores a name sync that would
-  duplicate another location's name, so do this before the new location exists on master.
+  Changes**. The new name syncs to master's `location` row. Location names are unique (the
+  `location` table has a unique constraint on `name`), so the new location's `INSERT` below fails
+  while another row still has its name, and master ignores a name sync that would duplicate
+  another location's name. Check master's row shows the new name before continuing.
 - [ ] **On the slave machine**, set `app.mode: standalone` in its `application.yml` (leave
   `app.master-instance-url` as is) and launch the instance. Standalone mode is required here:
   `app.mode: slave` with a blank `app.location-api-key` fails at startup with `app.mode=slave
@@ -147,6 +149,12 @@ UPDATE persistent_identity_seq SET next_val = (SELECT MAX(id) + 1 FROM location)
 
 - [ ] Stop the instance.
 - [ ] **On the master machine**, run the SQL in master's database (for example, in phpMyAdmin).
+  Master does not need a restart: it loads the `location` table at startup, and when a slave
+  later connects with a key it doesn't recognize, it re-reads the table and picks up the new row
+  (its log shows `Picked up location [<id>] (<name>), added to the repository after startup`).
+  Hand edits to an existing `location` row are safe while master runs too: master writes only
+  the fields it changed itself, and copies your edit into memory at its next save of the location
+  list (for example, when a slave connects or syncs its library), or at a restart.
   The `INSERT` gives the new row one past the highest existing location id. The
   `UPDATE persistent_identity_seq` line is a safeguard for one case only: master's own
   `POST /api/locations` (Option A) allocates location ids from `persistent_identity_seq`, which

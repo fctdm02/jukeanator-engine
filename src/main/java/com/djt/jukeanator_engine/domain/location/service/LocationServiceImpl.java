@@ -11,6 +11,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -55,6 +56,9 @@ public class LocationServiceImpl implements LocationService {
 
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
+  // See addLocationsMissingFromMemory().
+  private static final long MISSING_LOCATIONS_CHECK_INTERVAL_MS = 5_000;
+
   private final LocationRepository locationRepository;
   private final PasswordEncoder passwordEncoder;
   private final ApplicationEventPublisher eventPublisher;
@@ -69,6 +73,9 @@ public class LocationServiceImpl implements LocationService {
   private final LocationRepository filesystemBackupRepository;
 
   private LocationRootEntity locationRoot;
+
+  // When addLocationsMissingFromMemory() last re-read the repository; 0 = never.
+  private long lastMissingLocationsCheckAtMs;
 
   public LocationServiceImpl(LocationRepository locationRepository,
       PasswordEncoder passwordEncoder, ApplicationEventPublisher eventPublisher,
@@ -161,8 +168,14 @@ public class LocationServiceImpl implements LocationService {
   @Override
   public boolean verifyApiKey(Integer locationId, String apiKey) {
 
+    if (apiKey == null) {
+      return false;
+    }
     LocationEntity location = this.locationRoot.getLocationByIdNullIfNotExists(locationId);
-    if (location == null || apiKey == null) {
+    if (location == null && addLocationsMissingFromMemory()) {
+      location = this.locationRoot.getLocationByIdNullIfNotExists(locationId);
+    }
+    if (location == null) {
       return false;
     }
     if (location.getApiKeyLookup() != null) {
@@ -175,7 +188,9 @@ public class LocationServiceImpl implements LocationService {
    * Finds the location by {@code apiKey}'s lookup value: one SHA-256 and a comparison per
    * location, never a bcrypt check -- so a wrong key costs almost nothing. Only locations still
    * without a lookup value (rows inserted by hand, whose slave has not yet authenticated) are
-   * bcrypt-checked, each at most until its slave first connects.
+   * bcrypt-checked, each at most until its slave first connects. When no location matches, rows
+   * added to the repository since startup (inserted by hand on master) are picked up and checked
+   * too, so a newly provisioned slave connects without a master restart.
    */
   @Override
   public Integer resolveAndVerifyByApiKey(String apiKey) {
@@ -183,6 +198,54 @@ public class LocationServiceImpl implements LocationService {
     if (apiKey == null) {
       return null;
     }
+    Integer locationId = findLocationIdByApiKey(apiKey);
+    if (locationId == null && addLocationsMissingFromMemory()) {
+      locationId = findLocationIdByApiKey(apiKey);
+    }
+    return locationId;
+  }
+
+  /**
+   * Adds to the in-memory root any location the repository has but memory does not -- a row
+   * inserted by hand (e.g. phpMyAdmin) while this instance runs, since the root is loaded only
+   * at startup. Existing in-memory locations are left as they are, and so are rows this instance
+   * itself removed but has not stored yet. Throttled, so a stream of wrong keys cannot turn every
+   * connect attempt into a full re-read of the location table.
+   *
+   * @return true if any location was added
+   */
+  private synchronized boolean addLocationsMissingFromMemory() {
+
+    long now = System.currentTimeMillis();
+    if (now - this.lastMissingLocationsCheckAtMs < MISSING_LOCATIONS_CHECK_INTERVAL_MS) {
+      return false;
+    }
+    this.lastMissingLocationsCheckAtMs = now;
+
+    LocationRootEntity stored;
+    try {
+      stored = this.locationRepository.loadAggregateRoot(this.storageRoot);
+    } catch (EntityDoesNotExistException ednee) {
+      return false;
+    }
+
+    Set<Integer> pendingRemoved = this.locationRoot.pendingRemovedLocationIds();
+    boolean added = false;
+    for (LocationEntity location : stored.getLocations()) {
+      Integer locationId = location.getPersistentIdentity();
+      if (this.locationRoot.getLocationByIdNullIfNotExists(locationId) == null
+          && !pendingRemoved.contains(locationId)) {
+        this.locationRoot.addLocation(location);
+        added = true;
+        log.info("Picked up location [{}] ({}), added to the repository after startup",
+            locationId, location.getName());
+      }
+    }
+    return added;
+  }
+
+  private Integer findLocationIdByApiKey(String apiKey) {
+
     String lookup = ApiKeyLookup.of(apiKey);
     for (LocationEntity location : this.locationRoot.getLocations()) {
       if (lookup.equals(location.getApiKeyLookup())) {

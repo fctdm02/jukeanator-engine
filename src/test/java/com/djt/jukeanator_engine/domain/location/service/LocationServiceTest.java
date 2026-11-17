@@ -149,6 +149,53 @@ public class LocationServiceTest {
     verify(locationRepository).changeLocationId(REGISTERED_LOCATION_ID, targetLocationId);
   }
 
+  // ── locations added to the repository after startup ─────────────────────
+
+  @Test
+  void resolveAndVerifyByApiKey_picksUpALocationInsertedByHandAfterStartup()
+      throws EntityDoesNotExistException {
+
+    // e.g. master's location row inserted in phpMyAdmin while master is running
+    LocationRootEntity storedRoot = new LocationRootEntity();
+    storedRoot.addLocation(registeredLocation());
+    LocationEntity insertedByHand =
+        new LocationEntity(Integer.valueOf(2), "Inserted By Hand", 1.0, 2.0, "hash");
+    insertedByHand.setApiKeyLookup(ApiKeyLookup.of("new-slave-key"));
+    storedRoot.addLocation(insertedByHand);
+    when(locationRepository.loadAggregateRoot(anyString())).thenReturn(storedRoot);
+
+    assertEquals(Integer.valueOf(2), locationServiceImpl.resolveAndVerifyByApiKey("new-slave-key"));
+    assertEquals(insertedByHand, locationRoot.getLocationByIdNullIfNotExists(Integer.valueOf(2)));
+    assertEquals("Rock On Third",
+        locationRoot.getLocationByIdNullIfNotExists(REGISTERED_LOCATION_ID).getName(),
+        "locations already in memory are left as they are");
+  }
+
+  @Test
+  void resolveAndVerifyByApiKey_rereadsTheRepositoryAtMostOncePerInterval_forWrongKeys()
+      throws EntityDoesNotExistException {
+
+    locationServiceImpl.resolveAndVerifyByApiKey("wrong-key-1");
+    locationServiceImpl.resolveAndVerifyByApiKey("wrong-key-2");
+
+    // once at construction, once for the first wrong key; the second is within the interval
+    verify(locationRepository, times(2)).loadAggregateRoot(anyString());
+  }
+
+  @Test
+  void verifyApiKey_picksUpALocationInsertedByHandAfterStartup()
+      throws EntityDoesNotExistException {
+
+    LocationRootEntity storedRoot = new LocationRootEntity();
+    LocationEntity insertedByHand =
+        new LocationEntity(Integer.valueOf(2), "Inserted By Hand", 1.0, 2.0, "hash");
+    insertedByHand.setApiKeyLookup(ApiKeyLookup.of("new-slave-key"));
+    storedRoot.addLocation(insertedByHand);
+    when(locationRepository.loadAggregateRoot(anyString())).thenReturn(storedRoot);
+
+    assertTrue(locationServiceImpl.verifyApiKey(Integer.valueOf(2), "new-slave-key"));
+  }
+
   // ── generateOwnLocationApiKey ───────────────────────────────────────────
 
   @Test

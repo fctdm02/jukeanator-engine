@@ -217,6 +217,91 @@ class LocationRepositoryJpaImplTest {
   }
 
   @Test
+  void storeAggregateRoot_keepsARowInsertedAfterTheRootWasLoaded() throws Exception {
+
+    insertLocation(OLD_LOCATION_ID, "loaded-at-startup");
+    LocationRepositoryJpaImpl repository = newRepository();
+    LocationRootEntity root = repository.loadAggregateRoot("ignored");
+
+    // e.g. a slave's row inserted by hand in phpMyAdmin while master is running
+    insertLocation(NEW_LOCATION_ID, "inserted-by-hand");
+    root.getLocationByIdNullIfNotExists(OLD_LOCATION_ID).setLogoName("Heartbeat.jpg");
+    repository.storeAggregateRoot(root);
+
+    assertEquals("inserted-by-hand|null|0.0|0.0|1", locationRow(NEW_LOCATION_ID));
+  }
+
+  @Test
+  void storeAggregateRoot_keepsAHandEdit_andPicksItUpIntoMemory() throws Exception {
+
+    insertLocation(OLD_LOCATION_ID, "loaded-at-startup");
+    LocationRepositoryJpaImpl repository = newRepository();
+    LocationRootEntity root = repository.loadAggregateRoot("ignored");
+    LocationEntity location = root.getLocationByIdNullIfNotExists(OLD_LOCATION_ID);
+
+    // e.g. a phpMyAdmin edit while master runs, then an unrelated in-memory change and a store
+    execute("update location set logo_name = ? where id = ?", "HandEdited.jpg", OLD_LOCATION_ID);
+    location.setLatitude(41.0);
+    repository.storeAggregateRoot(root);
+
+    assertEquals("loaded-at-startup|HandEdited.jpg|41.0|0.0|1", locationRow(OLD_LOCATION_ID));
+    assertEquals("HandEdited.jpg", location.getLogoName(), "memory picks up the hand edit");
+    assertEquals(Double.valueOf(41.0), location.getLatitude());
+  }
+
+  @Test
+  void storeAggregateRoot_writesAnInMemoryChange_overAnEarlierHandEditOfTheSameField()
+      throws Exception {
+
+    insertLocation(OLD_LOCATION_ID, "loaded-at-startup");
+    LocationRepositoryJpaImpl repository = newRepository();
+    LocationRootEntity root = repository.loadAggregateRoot("ignored");
+    LocationEntity location = root.getLocationByIdNullIfNotExists(OLD_LOCATION_ID);
+
+    execute("update location set logo_name = ? where id = ?", "HandEdited.jpg", OLD_LOCATION_ID);
+    location.setLogoName("SavedFromTheKiosk.jpg");
+    repository.storeAggregateRoot(root);
+
+    assertEquals("loaded-at-startup|SavedFromTheKiosk.jpg|0.0|0.0|1",
+        locationRow(OLD_LOCATION_ID));
+  }
+
+  @Test
+  void storeAggregateRoot_keepsAHandEdit_acrossRepeatedStores() throws Exception {
+
+    insertLocation(OLD_LOCATION_ID, "loaded-at-startup");
+    LocationRepositoryJpaImpl repository = newRepository();
+    LocationRootEntity root = repository.loadAggregateRoot("ignored");
+    LocationEntity location = root.getLocationByIdNullIfNotExists(OLD_LOCATION_ID);
+
+    location.setLogoName("First.jpg");
+    repository.storeAggregateRoot(root);
+    execute("update location set name = ? where id = ?", "renamed-by-hand", OLD_LOCATION_ID);
+    repository.storeAggregateRoot(root);
+    repository.storeAggregateRoot(root);
+
+    assertEquals("renamed-by-hand|First.jpg|0.0|0.0|1", locationRow(OLD_LOCATION_ID));
+    assertEquals("renamed-by-hand", location.getName());
+  }
+
+  @Test
+  void storeAggregateRoot_deletesARowTheRootRemoved() throws Exception {
+
+    insertLocation(OLD_LOCATION_ID, "to-remove");
+    insertLocation(NEW_LOCATION_ID, "to-keep");
+    LocationRepositoryJpaImpl repository = newRepository();
+    LocationRootEntity root = repository.loadAggregateRoot("ignored");
+
+    root.removeLocation(OLD_LOCATION_ID);
+    repository.storeAggregateRoot(root);
+
+    assertEquals(0, count("select count(*) from location where id = ?", OLD_LOCATION_ID));
+    assertEquals(1, count("select count(*) from location where id = ?", NEW_LOCATION_ID));
+    assertTrue(root.pendingRemovedLocationIds().isEmpty(),
+        "a stored removal is not deleted again on the next store");
+  }
+
+  @Test
   void storeAggregateRoot_persistsLogoChange_whenSongLibraryRootIsWiredIntoTheLocation()
       throws Exception {
 

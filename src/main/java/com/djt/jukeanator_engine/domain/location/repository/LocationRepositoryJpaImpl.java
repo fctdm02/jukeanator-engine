@@ -2,9 +2,16 @@ package com.djt.jukeanator_engine.domain.location.repository;
 
 import static java.util.Objects.requireNonNull;
 import java.sql.Statement;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.Session;
@@ -14,6 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
+import com.djt.jukeanator_engine.domain.location.model.LocationStatus;
 
 /**
  * JPA/Hibernate-backed implementation of {@link LocationRepository}. Server/database-type
@@ -25,8 +33,12 @@ import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
  * LocationRepositoryFileSystemImpl} treats it. {@link #loadOrCreateRoot()} loads every {@link
  * LocationEntity} row directly and assembles the root around them; {@link
  * #storeAggregateRoot(LocationRootEntity)} persists every location still in the root and
- * explicitly deletes any row that dropped out of it, since there's no parent-owned {@code
- * orphanRemoval} relationship to detect that for us.
+ * explicitly deletes the rows the root removed (see {@link
+ * LocationRootEntity#pendingRemovedLocationIds()}), since there's no parent-owned {@code
+ * orphanRemoval} relationship to detect that for us. Rows the root never loaded, such as one
+ * inserted by hand while master runs, are left alone. For a row it did load, a store writes only
+ * the fields this instance changed since, and copies every other field back from the database
+ * into memory, so hand edits made while it runs are kept and picked up rather than overwritten.
  *
  * @author tmyers
  */
@@ -34,8 +46,49 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
 
   private static final Integer LOCATION_ROOT_ID = Integer.valueOf(0);
 
+  /** One stored, operator- or slave-editable field of a location row. */
+  private record Field(String name, Function<LocationEntity, Object> getter,
+      BiConsumer<LocationEntity, Object> setter) {
+  }
+
+  // Every mapped field a store may write, in a fixed order (the Object[] values below follow it).
+  // Not version/dateAdded/dateUpdated: nothing in this application changes them on a location.
+  private static final List<Field> FIELDS = List.of(
+      new Field("name", LocationEntity::getName, (l, v) -> l.setName((String) v)),
+      new Field("latitude", LocationEntity::getLatitude, (l, v) -> l.setLatitude((Double) v)),
+      new Field("longitude", LocationEntity::getLongitude, (l, v) -> l.setLongitude((Double) v)),
+      new Field("logoName", LocationEntity::getLogoName, (l, v) -> l.setLogoName((String) v)),
+      new Field("geoFenced", LocationEntity::isGeoFenced,
+          (l, v) -> l.setGeoFenced(Boolean.TRUE.equals(v))),
+      new Field("apiKeyHash", LocationEntity::getApiKeyHash,
+          (l, v) -> l.setApiKeyHash((String) v)),
+      new Field("apiKeyLookup", LocationEntity::getApiKeyLookup,
+          (l, v) -> l.setApiKeyLookup((String) v)),
+      new Field("status", LocationEntity::getStatus, (l, v) -> l.setStatus((LocationStatus) v)),
+      new Field("lastSeenAt", LocationEntity::getLastSeenAt,
+          (l, v) -> l.setLastSeenAt((Instant) v)),
+      new Field("libraryLastSyncedAt", LocationEntity::getLibraryLastSyncedAt,
+          (l, v) -> l.setLibraryLastSyncedAt((Instant) v)),
+      new Field("priorityCostMultiplier", LocationEntity::getPriorityCostMultiplier,
+          (l, v) -> l.setPriorityCostMultiplier((Integer) v)),
+      new Field("creditsPerDollar", LocationEntity::getCreditsPerDollar,
+          (l, v) -> l.setCreditsPerDollar((Integer) v)),
+      new Field("fiveDollarBonusCredits", LocationEntity::getFiveDollarBonusCredits,
+          (l, v) -> l.setFiveDollarBonusCredits((Integer) v)),
+      new Field("tenDollarBonusCredits", LocationEntity::getTenDollarBonusCredits,
+          (l, v) -> l.setTenDollarBonusCredits((Integer) v)),
+      new Field("webCostMultiplier", LocationEntity::getWebCostMultiplier,
+          (l, v) -> l.setWebCostMultiplier((Integer) v)),
+      new Field("displayCurrencyForCost", LocationEntity::getDisplayCurrencyForCost,
+          (l, v) -> l.setDisplayCurrencyForCost((Boolean) v)));
+
   private final EntityManager entityManager;
   private final TransactionTemplate transactionTemplate;
+
+  // Each location row's field values as this repository last loaded or stored them, by location
+  // id. A store compares memory against these to tell what this instance changed (and so writes)
+  // from what it didn't (and so leaves to the database, which may hold a hand edit).
+  private final Map<Integer, Object[]> lastKnownValues = new ConcurrentHashMap<>();
 
   public LocationRepositoryJpaImpl(EntityManagerFactory entityManagerFactory,
       PlatformTransactionManager transactionManager) {
@@ -73,25 +126,26 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
 
     requireNonNull(root, "root cannot be null");
 
+    // Only rows the root itself removed are deleted -- never "every row missing from the root".
+    // Master loads this table once at startup, so a location row inserted by hand (phpMyAdmin)
+    // while it runs is missing from its in-memory root, and deleting rows by absence used to wipe
+    // that row the next time any slave connected and triggered a store.
+    Set<Integer> removedIds = root.pendingRemovedLocationIds();
+    Map<Integer, Object[]> inMemoryAtStore = new HashMap<>();
+    Map<Integer, Object[]> storedValues = new HashMap<>();
+
     transactionTemplate.executeWithoutResult(status -> {
 
-      Set<Integer> currentIds = new HashSet<>();
-      for (LocationEntity location : root.getLocations()) {
-        currentIds.add(location.getPersistentIdentity());
+      for (Integer removedId : removedIds) {
+        LocationEntity toRemove = entityManager.find(LocationEntity.class, removedId);
+        if (toRemove != null) {
+          entityManager.remove(toRemove);
+        }
       }
 
       List<Integer> persistedIds = entityManager
           .createQuery("select l.persistentIdentity from LocationEntity l", Integer.class)
           .getResultList();
-
-      for (Integer persistedId : persistedIds) {
-        if (!currentIds.contains(persistedId)) {
-          LocationEntity toRemove = entityManager.find(LocationEntity.class, persistedId);
-          if (toRemove != null) {
-            entityManager.remove(toRemove);
-          }
-        }
-      }
 
       // persistentIdentity is minted up front by nextPersistentIdentity() (see its own javadoc --
       // needed before the entity exists so registerLocation() can return the id immediately),
@@ -99,18 +153,91 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
       // persist() refuse that: merge() assumes a pre-set id means "update an existing row" (a
       // no-op update on a row that was never persisted surfaces as a concurrent-modification
       // conflict, not an insert), and persist() rejects a @GeneratedValue entity that already has
-      // an id outright ("detached entity passed to persist"). Only merge() rows already confirmed
-      // present (per persistedIds, queried above); INSERT anything new natively, the same
-      // workaround nextPersistentIdentity() already uses for allocating the id itself.
+      // an id outright ("detached entity passed to persist"). So anything new is INSERTed
+      // natively, the same workaround nextPersistentIdentity() already uses for allocating the id.
+      //
+      // A row already present (per persistedIds, queried above) is not merge()d wholesale
+      // either: only the fields that changed in memory since this repository last loaded or
+      // stored the row are written (see writeFieldsChangedInMemory), so a hand edit made to any
+      // other field while this instance runs survives.
       Set<Integer> persistedIdSet = new HashSet<>(persistedIds);
       for (LocationEntity location : root.getLocations()) {
-        if (persistedIdSet.contains(location.getPersistentIdentity())) {
-          entityManager.merge(location);
+        Integer locationId = location.getPersistentIdentity();
+        Object[] inMemory = fieldValues(location);
+        inMemoryAtStore.put(locationId, inMemory);
+        if (persistedIdSet.contains(locationId)) {
+          writeFieldsChangedInMemory(location, inMemory);
         } else {
           insertNewLocation(location);
         }
       }
+
+      // Read every row back as stored, hand edits included, so memory can mirror it below.
+      entityManager.flush();
+      for (LocationEntity location : root.getLocations()) {
+        LocationEntity stored =
+            entityManager.find(LocationEntity.class, location.getPersistentIdentity());
+        if (stored != null) {
+          entityManager.refresh(stored);
+          storedValues.put(location.getPersistentIdentity(), fieldValues(stored));
+        }
+      }
     });
+
+    // Committed: these rows are gone, so the next store need not delete them again.
+    root.forgetRemovedLocationIds(removedIds);
+    removedIds.forEach(this.lastKnownValues::remove);
+
+    // Bring memory in line with the database: this is how master picks up a hand edit made while
+    // it runs. A field that changed in memory while this store was running is left as it is (and,
+    // differing from the new last-known value, is written by the next store).
+    for (LocationEntity location : root.getLocations()) {
+      Integer locationId = location.getPersistentIdentity();
+      Object[] stored = storedValues.get(locationId);
+      if (stored == null) {
+        continue;
+      }
+      Object[] atStore = inMemoryAtStore.get(locationId);
+      for (int i = 0; i < FIELDS.size(); i++) {
+        Field field = FIELDS.get(i);
+        if (Objects.equals(field.getter().apply(location), atStore[i])
+            && !Objects.equals(atStore[i], stored[i])) {
+          field.setter().accept(location, stored[i]);
+        }
+      }
+      this.lastKnownValues.put(locationId, stored);
+    }
+  }
+
+  /**
+   * Writes to {@code location}'s row only the fields whose in-memory value differs from the value
+   * this repository last loaded or stored for it. Every other column keeps whatever the database
+   * holds now, which may be a hand edit (e.g. phpMyAdmin) made while this instance runs. With no
+   * last-known values for the row, every field counts as changed, as merge() used to.
+   */
+  private void writeFieldsChangedInMemory(LocationEntity location, Object[] inMemory) {
+
+    LocationEntity stored = entityManager.find(LocationEntity.class, location.getPersistentIdentity());
+    if (stored == null) {
+      return;
+    }
+    Object[] lastKnown = this.lastKnownValues.get(location.getPersistentIdentity());
+    for (int i = 0; i < FIELDS.size(); i++) {
+      Field field = FIELDS.get(i);
+      boolean changedInMemory = lastKnown == null || !Objects.equals(inMemory[i], lastKnown[i]);
+      if (changedInMemory && !Objects.equals(inMemory[i], field.getter().apply(stored))) {
+        field.setter().accept(stored, inMemory[i]);
+      }
+    }
+  }
+
+  private static Object[] fieldValues(LocationEntity location) {
+
+    Object[] values = new Object[FIELDS.size()];
+    for (int i = 0; i < FIELDS.size(); i++) {
+      values[i] = FIELDS.get(i).getter().apply(location);
+    }
+    return values;
   }
 
   @Override
@@ -184,6 +311,11 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
         setForeignKeyChecks(true);
       }
     });
+
+    Object[] lastKnown = this.lastKnownValues.remove(oldLocationId);
+    if (lastKnown != null) {
+      this.lastKnownValues.put(newLocationId, lastKnown);
+    }
   }
 
   // Runs directly on the JDBC connection bound to the current transaction (Session.doWork), so it
@@ -249,6 +381,11 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
       LocationRootEntity root = new LocationRootEntity();
       for (LocationEntity location : locations) {
         root.addLocation(location);
+        // putIfAbsent: a re-load (e.g. LocationServiceImpl picking up rows inserted by hand)
+        // must not replace the last-known values of a row already held in memory -- that would
+        // make a hand edit since then look like an in-memory change, and the next store would
+        // write the stale in-memory value back over it.
+        this.lastKnownValues.putIfAbsent(location.getPersistentIdentity(), fieldValues(location));
       }
       return root;
     });
