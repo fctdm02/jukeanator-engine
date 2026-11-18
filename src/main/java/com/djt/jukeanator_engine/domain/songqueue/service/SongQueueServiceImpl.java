@@ -1116,7 +1116,9 @@ public class SongQueueServiceImpl
       }
     }
 
-    Integer priority = 0;
+    Integer priority = loadPlaylistIntoQueueRequest.priority() != null
+        ? loadPlaylistIntoQueueRequest.priority()
+        : Integer.valueOf(0);
     AddMultipleSongsToQueueRequest addMultipleSongsToQueueRequest =
         new AddMultipleSongsToQueueRequest(username, songIdentifiers, priority);
     addMultipleSongsToQueue(locationId, addMultipleSongsToQueueRequest);

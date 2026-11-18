@@ -2559,7 +2559,7 @@ public class AdminPanel extends JPanel {
       try {
 
         LoadPlaylistIntoQueueRequest loadPlaylistIntoQueueRequest =
-            new LoadPlaylistIntoQueueRequest(SongQueueService.LOCAL_USERNAME, filename);
+            new LoadPlaylistIntoQueueRequest(SongQueueService.LOCAL_USERNAME, filename, 1);
         Integer numSongs = this.songQueueService.loadPlaylistIntoQueue(
             songQueueService.getOwnLocationId(), loadPlaylistIntoQueueRequest);
 
