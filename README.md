@@ -305,12 +305,13 @@ A line such as `input: Elo Serial TouchScreen` should appear. Tapping the screen
 If nothing registers, the controller uses a different Elo protocol. Stop the command with `Ctrl+C` and try each of these in turn:
 
 ```
-sudo inputattach --elotouch4b /dev/ttyS0
+sudo inputattach --elo261-281 /dev/ttyUSB0
+sudo inputattach --elo271-140 /dev/ttyS0
 sudo inputattach --elo4002 /dev/ttyS0
-sudo inputattach --elotouch3b /dev/ttyS0
+sudo inputattach --elo261-281 /dev/ttyS0
 ```
 
-(The short forms of these options are `-elo`, `-elo4b`, `-elo6b` and `-elo3b`, with a single dash.) If the controller has been set to a speed other than 9600 baud, add `--baud 19200` (or that speed) before the protocol option, for example `sudo inputattach --baud 19200 --elotouch /dev/ttyS0`. Stop the test with `Ctrl+C` once a working option is found.
+These are Elo's 4-byte, 6-byte and 3-byte protocols, named after the controller models that use them. Their short forms are `-elo4b`, `-elo6b` and `-elo3b` (and `-elo` for `--elotouch`), with a single dash. To see the exact option names supported by the installed version, run `inputattach --help | grep -i elo`. If the controller has been set to a speed other than 9600 baud, add `--baud 19200` (or that speed) before the protocol option, for example `sudo inputattach --baud 19200 --elotouch /dev/ttyS0`. Stop the test with `Ctrl+C` once a working option is found.
 
 *Attach it automatically at every boot.* Create a systemd service:
 
@@ -355,9 +356,10 @@ Note the name of the Elo entry (for example `Elo TouchSystems ...` or `Elo Seria
 
 ### Step 3: Use the evdev driver for the touchscreen
 
-Mint's default input driver ignores the calibration that `xinput_calibrator` produces, so assign the touchscreen to the `evdev` driver instead. Create the configuration file, then log out and back in (or reboot).
+Mint's default input driver ignores the calibration that `xinput_calibrator` produces, so assign the touchscreen to the `evdev` driver instead. Install the driver and the calibration tool, create the configuration file, then log out and back in (or reboot).
 
 ```
+sudo apt install xserver-xorg-input-evdev xinput-calibrator
 sudo mkdir -p /etc/X11/xorg.conf.d
 sudo nano /etc/X11/xorg.conf.d/99-elo-touch.conf
 ```
