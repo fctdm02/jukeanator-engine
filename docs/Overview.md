@@ -27,8 +27,8 @@ A fairly complete Swing frontend: genre panels with artwork, album grids, search
 - **JNA 5.17.0** — Windows native audio control  
 - **JAudioTagger 3.0.1** — MP3/FLAC tag reading  
 - **Discogs Java Client 1.1.3** — Album metadata  
-- **Flyway** — DB migrations (supports MySQL and Derby)
-- **H2 + Derby + MySQL** — three DB options
+- **Flyway** — DB migrations (MySQL)
+- **MySQL** — optional database (default storage is the filesystem)
 - **Live MySQL integration tests** — run against a local `jukeanator_test` database
 
 ### Also of Note
