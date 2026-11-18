@@ -6,13 +6,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 /**
- * Master-mode counterpart to {@link MySqlJukeanatorEngineApplicationTests}. {@code
+ * Master-mode counterpart to {@link JukeanatorEngineApplicationTests}. {@code
  * app.repository-type} defaults to {@code filesystem} in every other test context, so {@code
  * LocationRepositoryJpaImpl} is never constructed there. Forcing {@code app.mode=master} and
  * {@code app.repository-type=jpa} here is what actually exercises {@code LocationEntity}'s JPA
  * mapping against the {@code db/migration/mysql/V1__init_schema.sql} schema (Hibernate
  * {@code ddl-auto: validate}), the same way
- * {@link MySqlJukeanatorEngineApplicationTests} already proves out {@code UserEntity} against
+ * {@link JukeanatorEngineApplicationTests} already proves out {@code UserEntity} against
  * that same schema. {@code app.mode=master} is still set here so the master-only
  * beans that depend on {@code LocationService} (e.g. {@code LocationApiKeyAuthenticationFilter})
  * also get exercised.
@@ -20,7 +20,7 @@ import org.springframework.test.context.TestPropertySource;
  * <p>Requires a real MySQL server with a {@code jukeanator_test} database the {@code jukeanator}
  * user can access -- see {@code src/test/resources/application-test.yml}. Deliberately a
  * separate database from {@code application.yml}'s own {@code jukeanator}, which is reserved for
- * manual QA against a master instance running locally. No Docker/Testcontainers dependency.
+ * manual QA against a master instance running locally.
  */
 @SpringBootTest
 @ActiveProfiles("test")

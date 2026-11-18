@@ -46,7 +46,7 @@ OPEN ITEMS TRACKED IN OTHER DOCS
 - EmailService.md, "Operational notes": purge abandoned PENDING accounts; remove the legacy
   receipt: block from C:\kiosk\config\application.yml.
 - multi-tenant-mode.md and jpa-song-library-refactor-plan.md: run the JPA store and the
-  Testcontainers MySql*ApplicationTests against a real database.
+  MySql*ApplicationTests against a real database.
 - master-slave-local-trial.md, "Before a real pairing": HTTPS for the master URL, Braintree
   production credentials, master database backups, late mobile spend after a finalized period.
 - license/legacy-licensing-design.md, "Open items": unlicensed bill pulses, early renewals, order

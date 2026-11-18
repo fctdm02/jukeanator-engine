@@ -33,8 +33,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * Integration tests for {@link UserActivityRepositoryJpaImpl}, run against a live local MySQL
  * instance -- same setup as {@code FinancialLedgerRepositoryJpaImplTest} (see {@code
  * src/test/resources/application-test.yml}). Requires a real MySQL server with a {@code
- * jukeanator_test} database the {@code jukeanator} user can access. No Docker/Testcontainers
- * dependency.
+ * jukeanator_test} database the {@code jukeanator} user can access.
  */
 @SpringBootTest
 @ActiveProfiles("test")

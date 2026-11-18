@@ -37,9 +37,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryReposi
  * <p>The JPA half requires a real MySQL server with a {@code jukeanator_test} database the {@code
  * jukeanator} user can access (see {@code src/test/resources/application-test.yml} --
  * deliberately a separate database from {@code application.yml}'s own {@code jukeanator}, which
- * is reserved for manual QA against a master instance running locally), so this class lives in
- * the root package alongside {@link SongLibraryRepositoryJpaImplTest} for the same reason that one
- * does. No Docker/Testcontainers dependency.
+ * is reserved for manual QA against a master instance running locally).
  *
  * @author tmyers
  */

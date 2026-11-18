@@ -236,7 +236,7 @@ If master is unreachable — at slave startup or any time later — the physical
 
 # RootFolderEntity / LocationEntity Refactor — Integer Location IDs + Metadata File + Master ID Handoff
 
-**Status: Implemented.** Verified via `mvn clean compile`, `mvn test-compile`, and the full test suite (212 tests, 0 failures — 2 pre-existing network-dependent test errors and 2 Docker-dependent skips, both unrelated to this refactor).
+**Status: Implemented.** Verified via `mvn clean compile`, `mvn test-compile`, and the full test suite (212 tests, 0 failures — 2 pre-existing network-dependent test errors and 2 MySQL-dependent skips, both unrelated to this refactor).
 
 ## Context
 
@@ -346,7 +346,7 @@ Not in scope (explicitly deferred): `SongIdentifier` gaining a `locationId`, per
 ## Verification performed
 
 - `mvn clean compile` and `mvn test-compile` both succeed.
-- Full `mvn test`: 212 tests run, 0 failures. 2 errors (`CoverArtDownloaderTest`, `MusicBrainzClientWrapperTest`) are pre-existing, network-loopback failures unrelated to this refactor (no network access in the sandbox this was built in). 2 skipped are the Testcontainers-based MySQL context tests (`MySqlJukeanatorEngineApplicationTests`, `MySqlMasterModeJukeanatorEngineApplicationTests`), skipped for lack of a local Docker daemon — **these have not been exercised against this refactor and are worth running explicitly wherever Docker is available**, since they're the only tests that fully load the master-mode Spring context this refactor touches heavily (`LocationController`, `SlaveCommandGateway`, `LocationEventStompController`, etc.).
+- Full `mvn test`: 212 tests run, 0 failures. 2 errors (`CoverArtDownloaderTest`, `MusicBrainzClientWrapperTest`) are pre-existing, network-loopback failures unrelated to this refactor (no network access in the sandbox this was built in). 2 skipped are the MySQL context tests (`JukeanatorEngineApplicationTests`, `MySqlMasterModeJukeanatorEngineApplicationTests`), skipped for lack of a local MySQL database — **these have not been exercised against this refactor and are worth running explicitly against the local `jukeanator_test` MySQL database**, since they're the only tests that fully load the master-mode Spring context this refactor touches heavily (`LocationController`, `SlaveCommandGateway`, `LocationEventStompController`, etc.).
 - Still to do manually: standalone-mode smoke test (confirm `locationMetadata.txt` defaults and round-trips correctly, confirm the song library `.oos` file no longer moves when the location name is edited); master+slave smoke test with a deliberately mismatched `app.location-id` to confirm the API-key-only handshake and `locationMetadata.txt` correction actually converge end-to-end over real network sockets.
 
 ---
@@ -377,5 +377,5 @@ The design above shipped a real, working master/slave system, but it took a "sna
 ## Known gaps / follow-ups
 
 - **Status: Addressed.** `RootFolderEntity.initialize()` now derives `artistsFromSongs` from each loaded song's artist name (see the `SongLibraryRepositoryJpaImpl` javadoc). Original note: **Compilation-album artists** that only exist as a song-embedded artist name (no real `ArtistFolderEntity` folder — see `ArtistFromSongEntity`) are not round-tripped through the new JPA schema; `RootFolderEntity.artistsFromSongs` is populated by `SongScanner` at scan time, which a JPA-hydrated root never runs. Artist search for these may be incomplete on a JPA-backed master until a follow-up extends the schema.
-- **Status: Open.** **No live JPA verification**: there was no Docker/local MySQL available while this was built, so `SongLibraryRepositoryJpaImpl`'s actual round-trip (store -> reload -> confirm every field matches) has not been exercised against a real database — only unit/mock-level and filesystem-repository-type tests ran. Run it, and the Testcontainers-based `MySql*ApplicationTests`, wherever Docker becomes available.
+- **Status: Open.** **No live JPA verification**: there was no local MySQL available while this was built, so `SongLibraryRepositoryJpaImpl`'s actual round-trip (store -> reload -> confirm every field matches) has not been exercised against a real database — only unit/mock-level and filesystem-repository-type tests ran. Run it, and the `MySql*ApplicationTests`, against the local `jukeanator_test` MySQL database (see "Live Integration Tests" in the README).
 - `SongScanner`'s genre/artist scan-local id counters were not deeply audited against the new `UNIQUE (location_id, folder_type, source_id)` constraint — worth a close look before relying on this in production.

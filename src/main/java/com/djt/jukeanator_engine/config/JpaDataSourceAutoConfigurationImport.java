@@ -24,7 +24,7 @@ import org.springframework.context.annotation.Import;
  * on the underlying connection. {@code HibernateJpaAutoConfiguration} already registers its own
  * JPA-aware {@code JpaTransactionManager}; importing both created an unpredictable bean-priority
  * race that only surfaced against a real database, since this repository-type was never actually
- * exercised in CI/testing before Docker/a live MySQL instance was available.
+ * exercised in CI/testing before a live MySQL instance was available.
  */
 @Configuration
 @ConditionalOnProperty(name = "app.repository-type", havingValue = "jpa")

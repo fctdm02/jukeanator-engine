@@ -29,7 +29,7 @@ A fairly complete Swing frontend: genre panels with artwork, album grids, search
 - **Discogs Java Client 1.1.3** — Album metadata  
 - **Flyway** — DB migrations (supports MySQL and Derby)
 - **H2 + Derby + MySQL** — three DB options
-- **Testcontainers** — integration tests with real MySQL
+- **Live MySQL integration tests** — run against a local `jukeanator_test` database
 
 ### Also of Note
 There are several standalone utility scripts at the repo root (`BPMFilter.java`, `Mp3Normalize.java`, `Mp3Pruner.java`, etc.) — these look like one-off MP3 library management tools living outside the main package structure.

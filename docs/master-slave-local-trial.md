@@ -23,7 +23,7 @@ Tick each box as you go. Anything that fails is a finding to fix before a real p
 - [ ] Each machine has its own working copy of the project (a clone, or a copy of the built WAR) --
   they're separate hosts, so there's nothing to share between them.
 - [ ] The **master machine**'s database is on the current V1 schema (drop/recreate if Flyway
-  reports a checksum mismatch -- see README). The **slave machine** needs no database at all; it
+  reports a checksum mismatch -- see "Resetting the databases" in MasterConfig.md). The **slave machine** needs no database at all; it
   uses the filesystem repositories.
 - [ ] The two machines can reach each other on the LAN: note the master machine's IP address or
   hostname (`ipconfig` on Windows, `ip addr`/`ifconfig` on Linux/macOS), and confirm its firewall

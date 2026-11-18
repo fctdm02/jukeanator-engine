@@ -64,8 +64,8 @@ import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
  * every other direct-service-call integration test in this suite.
  *
  * <p>Requires a real MySQL server with a {@code jukeanator_test} database the {@code jukeanator}
- * user can access -- see {@code src/test/resources/application-test.yml}. No Docker/Testcontainers
- * dependency. Like {@code SongLibraryRepositoryJpaImplTest}, every location is provisioned with a
+ * user can access -- see {@code src/test/resources/application-test.yml}.
+ * Like {@code SongLibraryRepositoryJpaImplTest}, every location is provisioned with a
  * name unique to this test run (see {@link #uniqueLocationName}), so this test needs no table
  * truncation and is safe to run repeatedly against a persistent (non-ephemeral) database.
  *

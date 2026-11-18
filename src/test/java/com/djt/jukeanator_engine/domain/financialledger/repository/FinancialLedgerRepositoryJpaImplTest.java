@@ -33,7 +33,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
  * instance -- same setup as {@code SongQueueRepositoryJpaImplTest}/
  * {@code SongLibraryRepositoryJpaImplTest} (see {@code src/test/resources/application-test.yml}).
  * Requires a real MySQL server with a {@code jukeanator_test} database the {@code jukeanator} user
- * can access. No Docker/Testcontainers dependency.
+ * can access.
  *
  * <p>Unlike those tests, {@link FinancialLedgerRootEntity} is a true global singleton -- there is
  * no per-tenant key (such as {@code locationId}) to scope fixtures by, so every test run shares
@@ -43,9 +43,7 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
  * {@code application-test.yml}'s own javadoc on that separation).
  *
  * <p>Placed alongside {@link FinancialLedgerRepositoryFileSystemImplTest} in this domain's own
- * {@code repository} package (unlike {@code SongLibraryRepositoryJpaImplTest}/{@code
- * SongQueueRepositoryJpaImplTest}, which live in the root package only because they need access
- * to a package-private Testcontainers config class) -- this test has no such dependency.
+ * {@code repository} package.
  *
  * @author tmyers
  */
