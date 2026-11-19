@@ -42,7 +42,9 @@ public class LicenseConfig {
   @Bean
   public LicenseServerClient licenseServerClient(LicenseProperties properties,
       AppProperties appProperties) {
-    return new LicenseServerClient(properties, appVersion(), appProperties.getMode());
+    // The license server is always the master instance.
+    return new LicenseServerClient(properties, appProperties.getMasterInstanceUrl(), appVersion(),
+        appProperties.getMode());
   }
 
   @Bean
@@ -57,8 +59,8 @@ public class LicenseConfig {
 
   @Bean
   public LicenseScheduler licenseScheduler(LicenseService licenseService,
-      LicenseProperties properties) {
-    return new LicenseScheduler(licenseService, properties);
+      LicenseProperties properties, AppProperties appProperties) {
+    return new LicenseScheduler(licenseService, properties, appProperties.getMasterInstanceUrl());
   }
 
   @Bean

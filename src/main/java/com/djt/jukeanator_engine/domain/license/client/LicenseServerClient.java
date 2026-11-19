@@ -31,14 +31,19 @@ import com.djt.jukeanator_engine.domain.license.legacy.LegacyResponses;
  */
 public class LicenseServerClient {
 
-  private final LicenseProperties properties;
+  private final String serverUrl;
   private final RestClient restClient;
   private final String appVersion;
   private final String appMode;
   private final String buildDate;
 
-  public LicenseServerClient(LicenseProperties properties, String appVersion, String appMode) {
-    this.properties = properties;
+  /**
+   * @param serverUrl the license server's base URL: always the master instance
+   *        ({@code app.master-instance-url}); blank = not configured
+   */
+  public LicenseServerClient(LicenseProperties properties, String serverUrl, String appVersion,
+      String appMode) {
+    this.serverUrl = serverUrl;
     this.appVersion = appVersion;
     this.appMode = appMode;
     this.buildDate = legacyBuildDate();
@@ -169,9 +174,9 @@ public class LicenseServerClient {
    * own): blank parameters are omitted, as the legacy client did.
    */
   URI buildUri(String command, Map<String, String> params) {
-    String base = properties.getServerUrl() == null ? "" : properties.getServerUrl().trim();
+    String base = serverUrl == null ? "" : serverUrl.trim();
     if (base.isEmpty()) {
-      throw new RestClientException("license.server-url is not configured");
+      throw new RestClientException("app.master-instance-url (the license server) is not configured");
     }
     if (base.endsWith("/")) {
       base = base.substring(0, base.length() - 1);

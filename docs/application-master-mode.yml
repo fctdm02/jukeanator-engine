@@ -4,7 +4,7 @@ app:
   ui-enabled: false   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
   repository-type: jpa   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* below); governs song-library, song-queue, background-music, user, and location alike
   mode: master   # standalone | master | slave
-  master-instance-url: ~   # required if mode=slave, e.g. https://jukeanator.com
+  master-instance-url: ~   # the master instance; it is also the license server (standalone and slave); required if mode=slave
   location-id: ~            # optional: master assigns a slave its id on first connection, from its API key
   location-api-key: ~       # required if mode=slave, issued at provisioning
   # slave-only, local/testing only -- never true in production. A slave never charges web users

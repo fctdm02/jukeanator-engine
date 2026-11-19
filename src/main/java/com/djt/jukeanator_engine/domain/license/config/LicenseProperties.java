@@ -8,7 +8,8 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Properties bound to the {@code license:} YAML prefix: the legacy license key
  * ({@code JukeANator.CTL}) and subscription ({@code ExtendCode.CTL}) checks performed by
- * standalone and slave instances. Master instances are the license server and ignore these.
+ * standalone and slave instances. Master instances are the license server and ignore these. The
+ * license server is always the master instance, at {@code app.master-instance-url}.
  */
 @Validated
 @ConfigurationProperties(prefix = "license")
@@ -19,9 +20,6 @@ public class LicenseProperties {
    * {@code app.data-dir}, then the working directory, then {@code C:\kiosk} (legacy locations).
    */
   private String directory;
-
-  /** License server base URL (the master instance / legacy jukeanator.com site). */
-  private String serverUrl = "https://www.jukeanator.com";
 
   /** Registered customer email; required by the subscription tiers. */
   private String customerEmail;
@@ -62,14 +60,6 @@ public class LicenseProperties {
 
   public void setDirectory(String directory) {
     this.directory = directory;
-  }
-
-  public String getServerUrl() {
-    return serverUrl;
-  }
-
-  public void setServerUrl(String serverUrl) {
-    this.serverUrl = serverUrl;
   }
 
   public String getCustomerEmail() {

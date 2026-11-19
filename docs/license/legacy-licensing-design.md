@@ -292,7 +292,7 @@ Still to do:
    tier, machine id and quarter decode.
 2. End to end: master locally on 8080 with imported legacy data; a legacy MP3Jukeboxx with
    `ServerDebugMode=true` (targets `localhost:8080`) for provision, subscription check, heartbeat
-   and build-date check; a standalone engine with `license.server-url=http://localhost:8080` for
+   and build-date check; a standalone engine with `app.master-instance-url=http://localhost:8080` for
    registration, extend-code creation, payment gating and the admin page.
 3. Browser check of the marketing pages, `/app/` and `/admin/licenses.html`.
 

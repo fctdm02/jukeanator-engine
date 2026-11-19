@@ -377,7 +377,7 @@ Switch the PC off at the wall or cabinet switch, then switch it on again. Withou
 
 ## Network Security
 
-At a location the jukebox is usually on the bar's Wi-Fi, often an open guest network shared with anyone nearby. The jukebox never needs to accept a connection from that network: it only makes outgoing connections, to the master (`app.master-instance-url`) and the license server (`license.server-url`), the same way a web browser does. Patrons use the Web/Mobile UI on the master, not on the jukebox. The steps below make the PC accept nothing from the network. Do them before the jukebox is connected to a location's Wi-Fi.
+At a location the jukebox is usually on the bar's Wi-Fi, often an open guest network shared with anyone nearby. The jukebox never needs to accept a connection from that network: it only makes outgoing connections, to the master (`app.master-instance-url`, which is also the license server), the same way a web browser does. Patrons use the Web/Mobile UI on the master, not on the jukebox. The steps below make the PC accept nothing from the network. Do them before the jukebox is connected to a location's Wi-Fi.
 
 ### Step 1: Mark the Wi-Fi network as Public
 
@@ -442,7 +442,7 @@ app:
   master-instance-url: https://www.jukeanator.com
 ```
 
-Never use an `http://` master address on a location's network. `license.server-url` is already `https://www.jukeanator.com` by default.
+Never use an `http://` master address on a location's network. The master address is also the license server, so licensing uses the same `https://` address.
 
 ### Step 7: Keep the Wi-Fi connection up
 

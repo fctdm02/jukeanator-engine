@@ -144,4 +144,6 @@ License types: `R`/`A` subscription (legacy "ASCAP mode"; remote / standalone), 
 Instances check their license at startup and then in the background (see the `license:` block in
 `application.yml`). The license files (`JukeANator.CTL`, `ExtendCode.CTL`) are looked up in
 `license.directory`, or, when blank, in `app.data-dir`, the working directory, then `C:\kiosk`, the
-same places the legacy application used, so existing customers' files keep working.
+same places the legacy application used, so existing customers' files keep working. The license
+server is always the master instance, at `app.master-instance-url` (there is no separate license
+server setting).

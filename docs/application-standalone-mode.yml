@@ -4,7 +4,7 @@ app:
   ui-enabled: true   # if true, a JFC/Swing UI is launched, otherwise, a headless backend
   repository-type: filesystem   # filesystem | jpa (jpa is backed by MySQL -- see spring.datasource.* below); governs song-library, song-queue, background-music, user, and location alike
   mode: standalone   # standalone | master | slave
-  master-instance-url: ~   # required if mode=slave, e.g. https://jukeanator.com
+  master-instance-url: https://www.jukeanator.com   # the master instance; it is also the license server (standalone and slave); required if mode=slave
   location-id: ~            # optional: master assigns a slave its id on first connection, from its API key
   location-api-key: ~       # required if mode=slave, issued at provisioning
   # slave-only, local/testing only -- never true in production. A slave never charges web users
@@ -147,7 +147,6 @@ user-activity:
 
 license:   # legacy license key (JukeANator.CTL) and subscription (ExtendCode.CTL) checks; standalone and slave only
   directory: ~   # folder holding JukeANator.CTL / ExtendCode.CTL; blank = app.data-dir, then the working directory, then C:\kiosk
-  server-url: https://www.jukeanator.com   # license server (master instance) base URL
   customer-email: ~   # registered customer email; required for subscription tiers
   customer-name: ~
   location-name: ~

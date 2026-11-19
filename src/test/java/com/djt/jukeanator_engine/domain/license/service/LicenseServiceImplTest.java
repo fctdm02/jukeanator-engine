@@ -56,7 +56,6 @@ class LicenseServiceImplTest {
   void setUp() {
     properties = new LicenseProperties();
     properties.setDirectory(dir.toString());
-    properties.setServerUrl("http://license.test");
     properties.setTimeZone(ZONE.getId());
     properties.setCustomerEmail(EMAIL);
     client = new FakeClient(properties);
@@ -318,7 +317,7 @@ class LicenseServiceImplTest {
     String engineVersionReply = "";
 
     FakeClient(LicenseProperties properties) {
-      super(properties, "test", "standalone");
+      super(properties, "http://license.test", "test", "standalone");
     }
 
     @Override

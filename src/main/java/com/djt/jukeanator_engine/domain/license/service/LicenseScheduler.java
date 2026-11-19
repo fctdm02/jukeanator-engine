@@ -27,7 +27,8 @@ import com.djt.jukeanator_engine.domain.license.config.LicenseProperties;
  * <li>every {@code license.heartbeat-interval}: heartbeat.</li>
  * </ul>
  *
- * <p>Server calls are skipped when {@code license.server-url} is blank.
+ * <p>The license server is the master instance at {@code app.master-instance-url}; server calls
+ * are skipped when it is blank.
  */
 public class LicenseScheduler {
 
@@ -35,11 +36,15 @@ public class LicenseScheduler {
 
   private final LicenseService licenseService;
   private final LicenseProperties properties;
+  private final String serverUrl;
   private final ScheduledExecutorService executor;
 
-  public LicenseScheduler(LicenseService licenseService, LicenseProperties properties) {
+  /** @param serverUrl the license server, always {@code app.master-instance-url} */
+  public LicenseScheduler(LicenseService licenseService, LicenseProperties properties,
+      String serverUrl) {
     this.licenseService = licenseService;
     this.properties = properties;
+    this.serverUrl = serverUrl;
     this.executor = Executors.newSingleThreadScheduledExecutor(r -> {
       Thread t = new Thread(r, "license-scheduler");
       t.setDaemon(true);
@@ -100,7 +105,7 @@ public class LicenseScheduler {
   }
 
   private boolean serverEnabled() {
-    return properties.getServerUrl() != null && !properties.getServerUrl().isBlank();
+    return serverUrl != null && !serverUrl.isBlank();
   }
 
   private long minutesUntilRevalidation() {

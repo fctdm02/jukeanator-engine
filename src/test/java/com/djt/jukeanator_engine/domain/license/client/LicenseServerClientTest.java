@@ -21,8 +21,8 @@ class LicenseServerClientTest {
   @Test
   void provisionUri_doubleEncodesAndSendsLegacyBuildDate() {
     LicenseProperties properties = new LicenseProperties();
-    properties.setServerUrl("https://www.jukeanator.com/");
-    LicenseServerClient client = new LicenseServerClient(properties, "1.0.0-SNAPSHOT", "standalone");
+    LicenseServerClient client = new LicenseServerClient(properties,
+        "https://www.jukeanator.com/", "1.0.0-SNAPSHOT", "standalone");
 
     Map<String, String> params = new LinkedHashMap<>();
     params.put("customerEmail", "owner@example.com");
