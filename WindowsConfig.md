@@ -11,6 +11,7 @@ The sections below are in the order they are normally done:
 5. eGalax touchscreen (only if this touchscreen is used, for example in a converted TouchTunes Maestro)
 6. Kiosk Mode Settings
 7. Auto-Start JukeANator at Power-On
+8. Network Security (before connecting to a location's Wi-Fi)
 
 ## Prerequisite: Java 25
 
@@ -373,3 +374,94 @@ The `cd /d "%~dp0"` line at the top of `GO.CMD` (see "Install JukeANator") is re
 ### Verify
 
 Switch the PC off at the wall or cabinet switch, then switch it on again. Without touching anything, it must boot, sign in, and show JukeANator full screen.
+
+## Network Security
+
+At a location the jukebox is usually on the bar's Wi-Fi, often an open guest network shared with anyone nearby. The jukebox never needs to accept a connection from that network: it only makes outgoing connections, to the master (`app.master-instance-url`) and the license server (`license.server-url`), the same way a web browser does. Patrons use the Web/Mobile UI on the master, not on the jukebox. The steps below make the PC accept nothing from the network. Do them before the jukebox is connected to a location's Wi-Fi.
+
+### Step 1: Mark the Wi-Fi network as Public
+
+Windows treats a **Public** network as untrusted: network discovery and file and printer sharing are off, and Windows Firewall blocks incoming connections. In **Settings**, then **Network & internet**, then **Wi-Fi**, click the network's properties and set **Network profile type** to **Public network**. Do this for every Wi-Fi network the jukebox joins. To check it, run this in PowerShell; every network must show `Public`:
+
+```
+Get-NetConnectionProfile | Select-Object Name, NetworkCategory
+```
+
+### Step 2: Accept connections from this PC only
+
+By default the application listens on every network connection (port 8080). Add these lines to the end of the external `application.yml` (in `--app.config-dir`), then restart the application:
+
+```
+server:
+  address: 127.0.0.1
+```
+
+The jukebox screen talks to the application inside the same program, so nothing else needs port 8080. The templates [docs/application-slave-mode.yml](docs/application-slave-mode.yml) and [docs/application-standalone-mode.yml](docs/application-standalone-mode.yml) already contain these lines. Leave them out only for a standalone jukebox whose Web/Mobile UI must be opened from phones on the location's own network.
+
+### Step 3: Make MySQL local-only (only if MySQL is installed)
+
+The MySQL installer listens on every network connection and adds firewall rules (`Port 3306` and `Port 33060`) that allow incoming connections on all networks, including public ones. Skip this step if the application stores its data as files (no MySQL).
+
+Open the MySQL settings file in Notepad as Administrator. It is `my.ini` in `C:\ProgramData\MySQL\MySQL Server 8.4` (or `MySQL Server 8.0` for an older install; `C:\ProgramData` is hidden, so type the path into the address bar). Under the `[mysqld]` line, add:
+
+```
+bind-address=127.0.0.1
+mysqlx-bind-address=127.0.0.1
+```
+
+Save the file. Then, in an **Administrator** PowerShell, find the MySQL service name (`MySQL84` for 8.4, `MySQL80` for 8.0), restart it, and remove the two firewall rules:
+
+```
+Get-Service MySQL*
+Restart-Service MySQL84
+Get-NetFirewallRule -DisplayName "Port 3306", "Port 33060" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+```
+
+Use the service name the first command printed in the second command.
+
+### Step 4: Remove the Java firewall exceptions
+
+When a Java program first listens on the network, Windows asks whether to allow it, and clicking **Allow** creates inbound firewall rules named **Java(TM) Platform SE binary** or **OpenJDK Platform binary**. After Step 2 they are not needed. In an **Administrator** PowerShell:
+
+```
+Get-NetFirewallRule -Direction Inbound | Where-Object { $_.DisplayName -in "Java(TM) Platform SE binary", "OpenJDK Platform binary" } | Remove-NetFirewallRule
+```
+
+If Windows asks again whether to allow Java on a network, click **Cancel**.
+
+### Step 5: Turn off Remote Desktop
+
+In **Settings**, then **System**, then **Remote Desktop**, make sure **Remote Desktop** is **Off**. File and printer sharing is already blocked on a Public network (Step 1).
+
+### Step 6: Use HTTPS to reach the master
+
+On an open network, others nearby can read unencrypted traffic, including the jukebox's location API key. Once the master has its HTTPS certificate, set the master address in the external `application.yml` to its `https://` form:
+
+```
+app:
+  master-instance-url: https://www.jukeanator.com
+```
+
+Never use an `http://` master address on a location's network. `license.server-url` is already `https://www.jukeanator.com` by default.
+
+### Step 7: Keep the Wi-Fi connection up
+
+- Connect the jukebox to a network without a sign-in ("accept the terms") page. The jukebox cannot click through one, and many networks show it again every few days. A staff network, a network just for the jukebox, or a small 4G/5G router dedicated to the jukebox is more dependable than an open guest network.
+- When joining the network, tick **Connect automatically**.
+- In **Device Manager**, open **Network adapters**, double-click the Wi-Fi adapter, and on the **Power Management** tab untick **Allow the computer to turn off this device to save power**.
+
+The application reconnects to the master on its own after the connection drops.
+
+### Step 8: Keep up with security updates
+
+"Kiosk Mode Settings", Step 8 stops automatic Windows updates. On a public network, installing security updates by hand every month or two matters more. Leave Microsoft Defender on.
+
+### Verify
+
+With the application running, run this in a Command Prompt:
+
+```
+netstat -ano | findstr LISTENING | findstr ":8080 :3306 :33060"
+```
+
+Every line must show `127.0.0.1` (or `[::1]`) as the local address, never `0.0.0.0` or `[::]`.

@@ -137,6 +137,35 @@ class LicenseServerServiceImplTest {
   }
 
   @Test
+  void heartbeat_unknownSubscriptionSerial_isRegisteredUnpaid_soProvisionCannotGetAFreeKey() {
+    // The legacy server gave this serial next year's quarter, so the provision below succeeded
+    // without a license, using the auto-created customer's predictable passcode.
+    String email = "anyone@example.com";
+    assertEquals(LegacyResponses.OK, service.heartbeat(new LegacyClientRequest("S7",
+        LicenseTier.normalizeWireLicenseType("0"), email, null, "", "", null, null)));
+    assertEquals("", repository.findMachineBySerial("S7").orElseThrow().getLastPaidQuarter());
+
+    ProvisionOutcome outcome = service.provision(new LegacyClientRequest("S7",
+        LicenseTier.normalizeWireLicenseType("0"), email, null, "", "", null, null),
+        LegacyCrypto.sha1Hex(email));
+
+    assertFalse(outcome.isSuccess());
+    assertEquals("No more available licenses for given customer email: " + email,
+        outcome.message());
+  }
+
+  @Test
+  void heartbeatBeforeProvision_stillConsumesALicense() {
+    customer("A", 1);
+    service.heartbeat(request("S8", "0"));
+
+    assertTrue(service.provision(request("S8", "0"), PASSCODE_SHA1).isSuccess());
+    assertEquals(0, repository.customers.get(0).getAvailableLicenses());
+    assertEquals(NEXT_YEAR_QUARTER,
+        repository.findMachineBySerial("S8").orElseThrow().getLastPaidQuarter());
+  }
+
+  @Test
   void customerName() {
     customer("C", 1);
     assertEquals("Owner", service.getCustomerName(request("S1", "1")));

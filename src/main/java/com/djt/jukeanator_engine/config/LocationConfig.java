@@ -14,6 +14,7 @@ import com.djt.jukeanator_engine.domain.location.config.LocationProperties;
 import com.djt.jukeanator_engine.domain.location.repository.LocationRepository;
 import com.djt.jukeanator_engine.domain.location.repository.LocationRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.location.repository.LocationRepositoryJpaImpl;
+import com.djt.jukeanator_engine.domain.location.security.LocationAccessPolicy;
 import com.djt.jukeanator_engine.domain.location.security.LocationApiKeyAuthenticationFilter;
 import com.djt.jukeanator_engine.domain.location.security.StompLocationApiKeyChannelInterceptor;
 import com.djt.jukeanator_engine.domain.location.service.ConnectedSlaveRegistry;
@@ -97,13 +98,18 @@ public class LocationConfig {
   }
 
   @Bean
+  public LocationAccessPolicy locationAccessPolicy(LocationProperties locationProperties) {
+    return new LocationAccessPolicy(locationProperties.getPrivateLocations());
+  }
+
+  @Bean
   @ConditionalOnProperty(name = "app.mode", havingValue = "master")
   public SlaveCommandGateway slaveCommandGateway(SimpMessagingTemplate messagingTemplate,
       ObjectMapper objectMapper, ConnectedSlaveRegistry connectedSlaveRegistry,
-      LocationProperties locationProperties) {
+      LocationProperties locationProperties, LocationAccessPolicy locationAccessPolicy) {
 
     return new SlaveCommandGateway(messagingTemplate, objectMapper, connectedSlaveRegistry,
-        locationProperties.getCommandTimeoutMs());
+        locationProperties.getCommandTimeoutMs(), locationAccessPolicy);
   }
 
   // Governs only where synced per-location library.json/cover-art land (LocationServiceImpl's

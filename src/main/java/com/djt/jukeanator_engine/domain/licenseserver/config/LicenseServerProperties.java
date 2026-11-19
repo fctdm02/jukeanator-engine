@@ -21,9 +21,8 @@ public class LicenseServerProperties {
   private String timeZone = "America/Detroit";
 
   /**
-   * External directory served at {@code /temp/**} and {@code /webstart/**}: the legacy
-   * {@code MP3Jukeboxx.jar} auto-update jar, {@code kiosk.zip}, third-party jars, JNLP files.
-   * Blank disables those paths.
+   * External directory whose {@code temp} subfolder is served at {@code /temp/**}: the legacy
+   * {@code MP3Jukeboxx.jar} auto-update jar and {@code kiosk.zip}. Blank disables that path.
    */
   private String downloadsDir = "";
 

@@ -123,8 +123,8 @@ braintree:
 
 # Outbound email (account verification, Add Funds receipts, Financial Ledger split summaries); SMTP settings are under spring.mail
 email:
-  from-address: ${MAIL_FROM_ADDRESS:${receipt.from-address:tmyers1@yahoo.com}}   # sender for every email; still honors a legacy receipt.from-address
-  financial-ledger-recipients: tmyers1@yahoo.com   # comma-separated list that receives the Financial Ledger split summary; blank = none
+  from-address: ${MAIL_FROM_ADDRESS:${receipt.from-address:support@jukeanator.com}}   # sender for every email; still honors a legacy receipt.from-address
+  financial-ledger-recipients: support@jukeanator.com   # comma-separated list that receives the Financial Ledger split summary; blank = none
   verification-required: true   # Create Account must verify its email address before it can sign in
   verification-base-url: ~   # public URL of the web UI used in verification links (e.g. https://jukeanator.com); blank = the URL the request arrived on
   verification-token-ttl: 24h   # how long a verification link stays valid
@@ -160,11 +160,11 @@ license:   # legacy license key (JukeANator.CTL) and subscription (ExtendCode.CT
 
 license-server:   # master mode only: www.jukeanator.com license server and public website
   time-zone: America/Detroit   # zone for subscription quarter math
-  downloads-dir: ~   # serves /temp/** and /webstart/** (legacy MP3Jukeboxx.jar auto-update, kiosk.zip, JNLP files)
+  downloads-dir: ~   # its temp subfolder is served at /temp/** (legacy MP3Jukeboxx.jar auto-update, kiosk.zip)
   legacy-jar-path: ~   # frozen legacy MP3Jukeboxx.jar for the build date/size checks; blank = <downloads-dir>/temp/MP3Jukeboxx.jar
   latest-engine-version: ~   # reported to jukeanator-engine clients by command=getengineversion
   engine-download-url: ~
-  feedback-recipients: tmyers1@yahoo.com   # contact form recipients (comma-separated)
+  feedback-recipients: support@jukeanator.com   # contact form recipients (comma-separated)
 
 user-interface:
   always-on-top: false
@@ -193,3 +193,10 @@ user-interface:
   # MOUSE POINTER
   hide-mouse-pointer: false # JFC/Swing kiosk only: if true, hides the mouse pointer inside the kiosk window (for touch screens)
   touch-indicator: false # JFC/Swing kiosk only: if true, shows a small translucent circle where the screen is touched (for legacy serial touch screens with no Windows touch support)
+
+# Network safety: accept connections from this PC only, so nothing on the location's network
+# (often open Wi-Fi) can reach the application. Remove these two lines only if phones on the
+# location's own network must open this kiosk's Web/Mobile UI directly (http://<kiosk address>:8080/app/).
+# See "Network Security" in WindowsConfig.md or LinuxConfig.md.
+server:
+  address: 127.0.0.1

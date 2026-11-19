@@ -14,6 +14,7 @@ import com.djt.jukeanator_engine.domain.location.dto.CommandEnvelope;
 import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.exception.LocationOfflineException;
 import com.djt.jukeanator_engine.domain.location.exception.LocationServiceException;
+import com.djt.jukeanator_engine.domain.location.security.LocationAccessPolicy;
 import com.djt.jukeanator_engine.domain.songqueue.exception.SongNotEligibleException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,16 +39,19 @@ public class SlaveCommandGateway {
   private final ObjectMapper objectMapper;
   private final ConnectedSlaveRegistry connectedSlaveRegistry;
   private final long commandTimeoutMs;
+  private final LocationAccessPolicy locationAccessPolicy;
 
   private final ConcurrentHashMap<String, CompletableFuture<CommandReplyDto>> pendingReplies =
       new ConcurrentHashMap<>();
 
   public SlaveCommandGateway(SimpMessagingTemplate messagingTemplate, ObjectMapper objectMapper,
-      ConnectedSlaveRegistry connectedSlaveRegistry, long commandTimeoutMs) {
+      ConnectedSlaveRegistry connectedSlaveRegistry, long commandTimeoutMs,
+      LocationAccessPolicy locationAccessPolicy) {
     this.messagingTemplate = messagingTemplate;
     this.objectMapper = objectMapper;
     this.connectedSlaveRegistry = connectedSlaveRegistry;
     this.commandTimeoutMs = commandTimeoutMs;
+    this.locationAccessPolicy = locationAccessPolicy;
   }
 
   /** Sends a command and awaits the reply, converting its payload to {@code replyType}. */
@@ -90,6 +94,12 @@ public class SlaveCommandGateway {
 
   private CommandReplyDto sendCommandAndAwaitReply(Integer locationId, String commandType,
       Object payload) {
+
+    // A private location answers as if it did not exist for every account not allowed to use it
+    // (see LocationAccessPolicy).
+    if (!locationAccessPolicy.isAccessibleToCurrentUser(locationId)) {
+      throw new ResourceNotFoundException("Location not found: " + locationId);
+    }
 
     // Fail fast rather than waiting out a full timeout for a location that is obviously not
     // connected right now.

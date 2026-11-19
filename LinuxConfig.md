@@ -11,6 +11,7 @@ The sections below are in the order they are normally done:
 5. eGalax touchscreen (only if this touchscreen is used, for example in a converted TouchTunes Maestro)
 6. Kiosk Mode Settings
 7. Auto-Start JukeANator at Power-On
+8. Network Security (before connecting to a location's Wi-Fi)
 
 ## Prerequisite: Java 25
 
@@ -188,6 +189,12 @@ sudo apt install inputattach
 
 ```
 sudo inputattach --elotouch /dev/ttyUSB0
+```
+
+To force re-attach (if needed):
+
+```
+sudo modprobe -r elo
 ```
 
 Leave it running and, in a second terminal, confirm that the touchscreen was registered:
@@ -612,3 +619,94 @@ Use the real path to `go.sh` on the `Exec=` line. `go.sh` must be executable (`c
 ### Verify
 
 Switch the PC off at the wall or cabinet switch, then switch it on again. Without touching anything, it must boot, sign in, and show JukeANator full screen.
+
+## Network Security
+
+At a location the jukebox is usually on the bar's Wi-Fi, often an open guest network shared with anyone nearby. The jukebox never needs to accept a connection from that network: it only makes outgoing connections, to the master (`app.master-instance-url`) and the license server (`license.server-url`), the same way a web browser does. Patrons use the Web/Mobile UI on the master, not on the jukebox. The steps below make the PC accept nothing from the network. Do them before the jukebox is connected to a location's Wi-Fi.
+
+### Step 1: Turn on the firewall
+
+Linux Mint includes the `ufw` firewall but leaves it off. Turn it on so it blocks every incoming connection and allows outgoing ones:
+
+```
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw enable
+```
+
+It stays on after a restart. Check it with `sudo ufw status verbose`, which must show `Status: active` and `deny (incoming)`. The same settings are in the **Firewall Configuration** app (**Menu**, then **Firewall Configuration**).
+
+### Step 2: Accept connections from this PC only
+
+By default the application listens on every network connection (port 8080). Add these lines to the end of the external `application.yml` (in `--app.config-dir`), then restart the application:
+
+```
+server:
+  address: 127.0.0.1
+```
+
+The jukebox screen talks to the application inside the same program, so nothing else needs port 8080. The templates [docs/application-slave-mode.yml](docs/application-slave-mode.yml) and [docs/application-standalone-mode.yml](docs/application-standalone-mode.yml) already contain these lines. Leave them out only for a standalone jukebox whose Web/Mobile UI must be opened from phones on the location's own network.
+
+### Step 3: Check that MySQL is local-only (only if MySQL is installed)
+
+On Linux Mint, MySQL accepts connections from this PC only by default. Check it:
+
+```
+sudo ss -tlnp | grep -E ':3306|:33060'
+```
+
+Both lines must show `127.0.0.1` as the local address. If either shows `0.0.0.0` or `*`, open `/etc/mysql/mysql.conf.d/mysqld.cnf` with `sudo xed`, set these two lines under `[mysqld]`, and restart MySQL with `sudo systemctl restart mysql`:
+
+```
+bind-address = 127.0.0.1
+mysqlx-bind-address = 127.0.0.1
+```
+
+### Step 4: No remote access services
+
+A standard Linux Mint install runs no SSH server or file sharing. Check what accepts connections:
+
+```
+sudo ss -tlnp
+```
+
+Apart from `127.0.0.1` or `[::1]` entries, only `127.0.0.53` (the system's name lookup) is expected. If `sshd` appears and nobody needs to sign in to the jukebox remotely, remove it with `sudo apt remove openssh-server`; if `smbd` appears, remove file sharing with `sudo apt remove samba`. The firewall (Step 1) blocks them in any case.
+
+### Step 5: Use HTTPS to reach the master
+
+On an open network, others nearby can read unencrypted traffic, including the jukebox's location API key. Once the master has its HTTPS certificate, set the master address in the external `application.yml` to its `https://` form:
+
+```
+app:
+  master-instance-url: https://www.jukeanator.com
+```
+
+Never use an `http://` master address on a location's network. `license.server-url` is already `https://www.jukeanator.com` by default.
+
+### Step 6: Keep the Wi-Fi connection up
+
+- Connect the jukebox to a network without a sign-in ("accept the terms") page. The jukebox cannot click through one, and many networks show it again every few days. A staff network, a network just for the jukebox, or a small 4G/5G router dedicated to the jukebox is more dependable than an open guest network.
+- In **Network Connections** (**Menu**, then **Advanced Network Configuration**), open the Wi-Fi connection and, on the **General** tab, tick **Connect automatically with priority**.
+- Turn off Wi-Fi power saving, which can drop an idle connection. Create the file with `sudo xed /etc/NetworkManager/conf.d/wifi-powersave-off.conf`, put these two lines in it, save, and restart networking with `sudo systemctl restart NetworkManager`:
+
+```
+[connection]
+wifi.powersave = 2
+```
+
+The application reconnects to the master on its own after the connection drops.
+
+### Step 7: Keep up with security updates
+
+On a public network, install security updates regularly with **Update Manager** (**Menu**, then **Update Manager**), at least every month or two during a maintenance visit.
+
+### Verify
+
+With the application running:
+
+```
+sudo ss -tlnp | grep -E ':8080|:3306|:33060'
+sudo ufw status verbose
+```
+
+Every listening line must show `127.0.0.1` (or `[::1]`) as the local address, never `0.0.0.0`, `*` or `[::]`, and the firewall must show `Status: active`.

@@ -83,7 +83,7 @@ public class SecurityConfig {
             // Legacy MP3Jukeboxx installs call /FrontController anonymously over plain HTTP and
             // download auto-updates from /temp/** -- never require auth or HTTPS on these.
             .requestMatchers("/FrontController", "/servlet/FrontController", "/temp/**",
-                "/webstart/**", "/*.jsp")
+                "/*.jsp")
             .permitAll()
             // Static marketing pages and assets at the site root, the web UI under /app/, the
             // license admin page shell (its API below is admin-only), and well-known files.

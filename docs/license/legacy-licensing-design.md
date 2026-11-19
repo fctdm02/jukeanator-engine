@@ -185,7 +185,8 @@ Code: `LegacyFrontController`, `LegacyResponses`, `LicenseServerClient`.
   issue the key free -> else require and consume one available license -> key for the customer's
   tier.
 - **Heartbeat:** an unknown email auto-creates a customer (passcode = SHA-1 of the email, zero
-  licenses); an unknown serial is registered (subscription tiers get next year's quarter).
+  licenses); an unknown serial is registered (legacy gave subscription tiers next year's quarter;
+  the new server registers it unpaid, see "Free subscription key through a heartbeat" below).
 - **Subscription check:** runs the heartbeat side effects first, then answers.
 - The key type comes from the **customer's** license type, not the request.
 
@@ -213,6 +214,14 @@ Each bug is listed as bug (where): handling.
 - `index.jsp` read the `home` parameter instead of `command`, so every page rendered home (site):
   Fixed: page commands redirect to the matching static page
 - Heartbeat auto-creates customers (server): Preserved (flagged `auto_created`) for transparency
+- Free subscription key through a heartbeat (server): a heartbeat for an unknown serial with
+  license type R or A registered it with next year's quarter, and the auto-created customer's
+  passcode is the SHA-1 of the email, so a heartbeat followed by a provision with that passcode
+  returned a Commercial-Subscription key without consuming a license (the machine counted as
+  already paid for the period). The same gap let any real customer license extra machines for
+  free by sending a heartbeat first. Fixed: a serial first seen by a heartbeat is registered
+  unpaid; paid time comes only from provisioning (one license) or the admin page. Machines
+  already registered this way in the legacy data keep their quarter
 - A few `CUSTOMER.EMAIL` rows hold more than one address (free-text admin entry, e.g.
   newline-separated) (data): Import takes the first address as canonical (it's the unique
   provisioning key); any further address is appended to `notes`

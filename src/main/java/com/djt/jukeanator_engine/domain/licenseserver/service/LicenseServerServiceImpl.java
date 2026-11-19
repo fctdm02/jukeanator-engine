@@ -175,8 +175,16 @@ public class LicenseServerServiceImpl implements LicenseServerService {
 
   /**
    * Legacy HeartbeatServerCommand side effects: auto-create an unknown customer (passcode = SHA-1
-   * of the email, zero licenses), register an unknown serial (subscription tiers get next year's
-   * quarter), refresh location/build, and now also the heartbeat columns.
+   * of the email, zero licenses), register an unknown serial, refresh location/build, and now also
+   * the heartbeat columns.
+   *
+   * <p>
+   * Deliberate departure from legacy: the legacy server gave a newly registered subscription
+   * serial (license type R or A) next year's quarter here. Combined with the auto-created
+   * customer's predictable passcode, that let anyone obtain a paid subscription key for free (a
+   * heartbeat, then a provision that counted the machine as already paid for the period). A serial
+   * first seen by a heartbeat is now always registered unpaid; paid time comes only from
+   * {@link #provision}, which consumes a license, or from the license administration page.
    */
   private void recordHeartbeat(LegacyClientRequest request) {
 
@@ -214,11 +222,7 @@ public class LicenseServerServiceImpl implements LicenseServerService {
       LicenseMachineEntity m = new LicenseMachineEntity();
       m.setCustomerId(customer.getPersistentIdentity());
       m.setSerialNumber(serial);
-      boolean subscription = "R".equals(request.licenseType())
-          || "A".equals(request.licenseType());
-      m.setLastPaidQuarter(subscription
-          ? currentQuarter().plus(4).toString()
-          : "");
+      m.setLastPaidQuarter(""); // never paid until provisioned (see method comment)
       m.setFirstSeenAt(clock.instant());
       return m;
     });

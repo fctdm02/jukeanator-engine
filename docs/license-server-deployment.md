@@ -10,8 +10,8 @@ In production a jukeanator-engine **master** instance replaces the legacy JSP si
   every location. The root URL `/` is the marketing home page, not the jukebox UI.
 - `/FrontController`, `/servlet/FrontController`: legacy license protocol used by MP3Jukeboxx
   installs **and** jukeanator-engine standalone/slave instances
-- `/temp/**`, `/webstart/**`: legacy auto-update downloads, served from
-  `license-server.downloads-dir`
+- `/temp/**`: legacy auto-update downloads, served from `license-server.downloads-dir`. The
+  legacy site's Java Web Start downloads (`/webstart/**`, `webstart.html`) are not carried over
 - `/admin/licenses.html` + `/api/admin/licenses/**`: license administration (ADMIN role)
 - `/api/**`, `/ws`, `/ws-slave`: existing engine APIs (unchanged)
 
@@ -35,8 +35,8 @@ them.
   web UI).
 - The WAR deployed as **`ROOT`** (context path `/`). Legacy clients call `/FrontController` at the
   root.
-- **Plain HTTP must keep working** for `/FrontController`, `/servlet/FrontController`, `/temp/**`
-  and `/webstart/**`. Legacy clients cannot follow a redirect to HTTPS. Do not enable a site-wide
+- **Plain HTTP must keep working** for `/FrontController`, `/servlet/FrontController` and
+  `/temp/**`. Legacy clients cannot follow a redirect to HTTPS. Do not enable a site-wide
   "force HTTPS" rule; if the host's panel only offers a global switch, exempt these paths.
 - A writable folder outside the webapp for `license-server.downloads-dir`.
 - Enough memory for the JVM (512 MB heap is plenty for master mode, which runs headless).
@@ -63,7 +63,7 @@ license-server:
   legacy-jar-path: ~        # defaults to <downloads-dir>/temp/MP3Jukeboxx.jar
   latest-engine-version: ~  # e.g. 1.0.0 -- reported to engine clients
   engine-download-url: ~
-  feedback-recipients: tmyers1@yahoo.com
+  feedback-recipients: support@jukeanator.com
 
 email:
   verification-base-url: https://www.jukeanator.com
@@ -82,8 +82,6 @@ downloads/
     jackson-*.jar, jna-3.5.2.jar, platform-3.5.2.jar, vlcj-2.4.1.jar
     messages_*.properties
     discid.exe
-  webstart/
-    jukeanator.jnlp, 64bit/jukeanator-64bit.jnlp and their jars
 ```
 
 **Keep `MP3Jukeboxx.jar` frozen.** Legacy clients compare the date of this file

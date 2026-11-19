@@ -23,7 +23,7 @@ import com.djt.jukeanator_engine.domain.licenseserver.service.LicenseServerServi
 
 /**
  * Wires the license server (master mode only): repository, service, and the {@code /temp/**}
- * and {@code /webstart/**} download paths that legacy clients use for auto-update.
+ * download path that legacy clients use for auto-update.
  */
 @Configuration
 @ConditionalOnProperty(name = "app.mode", havingValue = "master")
@@ -50,24 +50,22 @@ public class LicenseServerConfig implements WebMvcConfigurer {
   }
 
   /**
-   * Serves {@code <downloads-dir>/temp/**} and {@code <downloads-dir>/webstart/**}. These hold the
-   * legacy auto-update jar, {@code kiosk.zip}, third-party jars and JNLP files, which are too large
-   * (and too release-specific) to ship inside the WAR.
+   * Serves {@code <downloads-dir>/temp/**}: the legacy auto-update jar and {@code kiosk.zip},
+   * which are too large (and too release-specific) to ship inside the WAR. The legacy site's Java
+   * Web Start downloads ({@code /webstart/**}) are intentionally not carried over.
    */
   @Override
   public void addResourceHandlers(ResourceHandlerRegistry registry) {
     String dir = properties.getDownloadsDir();
     if (dir == null || dir.isBlank()) {
-      log.warn("license-server.downloads-dir is not set: /temp/** and /webstart/** are disabled,"
+      log.warn("license-server.downloads-dir is not set: /temp/** is disabled,"
           + " so legacy MP3Jukeboxx auto-update downloads will fail");
       return;
     }
     Path root = Path.of(dir);
-    log.info("Serving /temp/** and /webstart/** from {} (exists={})", root.toAbsolutePath(),
+    log.info("Serving /temp/** from {} (exists={})", root.toAbsolutePath(),
         Files.isDirectory(root));
     registry.addResourceHandler("/temp/**").addResourceLocations(dirUri(root.resolve("temp")));
-    registry.addResourceHandler("/webstart/**")
-        .addResourceLocations(dirUri(root.resolve("webstart")));
   }
 
   // Path.toUri() only appends the trailing slash Spring needs when the directory already exists.

@@ -36,6 +36,10 @@
   };
 
   async function loadPricingConfig() {
+    if (state.locationId == null) {
+      state.pricingConfig = null; // no location chosen yet (master): nothing to price
+      return;
+    }
     try {
       state.pricingConfig = await api(`/api/users/pricing-config?locationId=${state.locationId}`);
     } catch {
@@ -468,7 +472,7 @@
         <header class="top-bar">
           <div class="account-panel">
             <div class="account-left">
-              <button class="location-btn${state.locations.length > 1 ? ' location-btn--pickable' : ''}" id="locationBtn">
+              <button class="location-btn${locationPickable() ? ' location-btn--pickable' : ''}" id="locationBtn">
                 ${locationButtonInnerHtml()}
               </button>
               <span class="credits-value" id="creditsValue">${creditsWidgetText(0)}</span>
@@ -509,7 +513,7 @@
     });
 
     document.getElementById('locationBtn').addEventListener('click', () => {
-      if (state.locations.length > 1) showLocationPickerSheet();
+      if (locationPickable()) showLocationPickerSheet();
     });
 
     document.getElementById('accountBtn').addEventListener('click', () => {
@@ -521,7 +525,13 @@
       }
     });
 
-    document.getElementById('searchInput').addEventListener('focus', () => {
+    document.getElementById('searchInput').addEventListener('focus', (e) => {
+      if (state.locationId == null && state.locations.length) {
+        // Searching needs a location's library: choose one first.
+        e.target.blur();
+        showLocationPickerSheet();
+        return;
+      }
       navigateSub('search-entry');
     });
 
@@ -531,7 +541,9 @@
     ]);
 
     const homeContent = document.getElementById('homeContent');
-    if (tab === 'music') {
+    if (tab === 'music' && state.locationId == null && state.locations.length) {
+      renderChooseLocationPrompt(homeContent);
+    } else if (tab === 'music') {
       loadHomePage(homeContent);
     } else if (tab === 'addfunds') {
       loadAddFunds(homeContent);
@@ -1060,8 +1072,9 @@
     document.getElementById('termsBtn').addEventListener('click', () => navigateSub('terms'));
     document.getElementById('privacyBtn').addEventListener('click', () => navigateSub('privacy'));
     document.getElementById('simulateLocationBtn')?.addEventListener('click', showSimulateLocationDialog);
-    document.getElementById('logoutBtn').addEventListener('click', () => {
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
       clearAuth();
+      await refreshLocations();
       renderMain('music');
     });
   }
@@ -1291,6 +1304,7 @@
           }),
         });
         setAuth(auth);
+        await refreshLocations();
         afterLogin();
       } catch (err) {
         if (err.status === 403) {
@@ -1418,6 +1432,7 @@
           return;
         }
         setAuth(auth);
+        await refreshLocations();
         afterLogin();
       } catch (err) {
         // The server's own validation and duplicate-email messages are written for the patron.
@@ -3061,7 +3076,7 @@
   function locationButtonInnerHtml() {
     const loc = state.currentLocation;
     const name = loc ? loc.name : 'Select Location';
-    const arrow = state.locations.length > 1 ? '<span class="location-arrow">&#8964;</span>' : '';
+    const arrow = locationPickable() ? '<span class="location-arrow">&#8964;</span>' : '';
     return `
       <img class="location-logo" src="${locationLogoSrc(loc)}" alt=""
         onerror="this.src='/images/JukeANatorLogo.png'">
@@ -3075,6 +3090,67 @@
     subscribeToLocation();
     await Promise.all([loadPricingConfig(), loadGeoFenceStatus()]);
     renderMain(state.currentMainTab);
+  }
+
+  /**
+   * Reloads the master's location picker list after signing in or out: a private location is
+   * listed only for the accounts allowed to use it (location.private-locations on master). If the
+   * current location is no longer listed, falls back to defaultLocation() (possibly none). Does
+   * not render; the caller renders next. No-op on standalone/slave, where /api/locations does not
+   * exist.
+   */
+  async function refreshLocations() {
+    let locations;
+    try {
+      locations = await api('/api/locations') || [];
+    } catch {
+      return;
+    }
+    state.locations = locations;
+    const current = state.currentLocation;
+    const stillListed = current && locations.some(l => l.locationId === current.locationId);
+    if (!stillListed) {
+      const next = defaultLocation(locations);
+      state.currentLocation = next;
+      state.locationId = next ? next.locationId : null;
+      subscribeToLocation(); // drops the old location's topics; subscribes to next, if any
+      await Promise.all([loadPricingConfig(), loadGeoFenceStatus()]);
+    }
+  }
+
+  /**
+   * The master location picked without asking the patron: only when there is exactly one public
+   * location and it is online. Private locations (listed only for the accounts allowed to use them)
+   * are never picked and do not count. Otherwise none, and the patron chooses from the picker.
+   */
+  function defaultLocation(locations) {
+    const publicLocations = locations.filter(l => !l.privateLocation);
+    return publicLocations.length === 1 && publicLocations[0].online ? publicLocations[0] : null;
+  }
+
+  /** The picker opens when there is a choice to make, or when no location is selected yet. */
+  function locationPickable() {
+    return state.locations.length > 1 || (!state.currentLocation && state.locations.length > 0);
+  }
+
+  /** Home screen on master before a location is chosen: a prompt to open the picker. */
+  function renderChooseLocationPrompt(container) {
+    if (!container) return;
+    const anyOnline = state.locations.some(l => l.online);
+    container.innerHTML = `
+      <section class="home-section">
+        <div class="home-section-header">
+          <span class="home-section-title">Choose a location</span>
+        </div>
+        <div class="home-section-body">
+          <p>${anyOnline
+            ? 'Pick the jukebox you are at to browse its music and queue songs.'
+            : 'No jukebox is online right now. You can still pick a location to browse its music.'}</p>
+          <button class="form-btn save" id="chooseLocationBtn">Select Location</button>
+        </div>
+      </section>`;
+    document.getElementById('chooseLocationBtn')
+      .addEventListener('click', () => showLocationPickerSheet());
   }
 
   function showLocationPickerSheet() {
@@ -3705,9 +3781,12 @@
     } catch {
       state.locations = [];
     }
-    if (!state.currentLocation && state.locations.length) {
-      state.currentLocation = state.locations[0];
-      state.locationId = state.currentLocation.locationId;
+    if (!state.currentLocation) {
+      const initial = defaultLocation(state.locations);
+      if (initial) {
+        state.currentLocation = initial;
+        state.locationId = initial.locationId;
+      }
     }
     await Promise.all([loadPricingConfig(), loadGeoFenceStatus()]);
     renderMain('music');

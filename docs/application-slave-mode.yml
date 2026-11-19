@@ -123,8 +123,8 @@ braintree:
 
 # Outbound email (Financial Ledger split summaries sent from this kiosk); SMTP settings are under spring.mail
 email:
-  from-address: ${MAIL_FROM_ADDRESS:${receipt.from-address:tmyers1@yahoo.com}}   # sender for every email; still honors a legacy receipt.from-address
-  financial-ledger-recipients: tmyers1@yahoo.com   # comma-separated list that receives the Financial Ledger split summary sent from this kiosk; blank = none
+  from-address: ${MAIL_FROM_ADDRESS:${receipt.from-address:support@jukeanator.com}}   # sender for every email; still honors a legacy receipt.from-address
+  financial-ledger-recipients: support@jukeanator.com   # comma-separated list that receives the Financial Ledger split summary sent from this kiosk; blank = none
 
 financial-ledger:
   jukebox-split-percentage: 50   # % of each period's total earnings due to the location owner; the operator gets the rest
@@ -155,11 +155,11 @@ license:   # legacy license key (JukeANator.CTL) and subscription (ExtendCode.CT
 
 license-server:   # master mode only: www.jukeanator.com license server and public website
   time-zone: America/Detroit   # zone for subscription quarter math
-  downloads-dir: ~   # serves /temp/** and /webstart/** (legacy MP3Jukeboxx.jar auto-update, kiosk.zip, JNLP files)
+  downloads-dir: ~   # its temp subfolder is served at /temp/** (legacy MP3Jukeboxx.jar auto-update, kiosk.zip)
   legacy-jar-path: ~   # frozen legacy MP3Jukeboxx.jar for the build date/size checks; blank = <downloads-dir>/temp/MP3Jukeboxx.jar
   latest-engine-version: ~   # reported to jukeanator-engine clients by command=getengineversion
   engine-download-url: ~
-  feedback-recipients: tmyers1@yahoo.com   # contact form recipients (comma-separated)
+  feedback-recipients: support@jukeanator.com   # contact form recipients (comma-separated)
 
 user-interface:
   always-on-top: false
@@ -188,3 +188,11 @@ user-interface:
   # MOUSE POINTER
   hide-mouse-pointer: false # JFC/Swing kiosk only: if true, hides the mouse pointer inside the kiosk window (for touch screens)
   touch-indicator: false # JFC/Swing kiosk only: if true, shows a small translucent circle where the screen is touched (for legacy serial touch screens with no Windows touch support)
+
+# Network safety: accept connections from this PC only. A slave only makes outgoing connections
+# (to master-instance-url and the license server); its own screen talks to the application inside
+# the same process, and patrons use the Web/Mobile UI on master. So nothing on the location's
+# network (often open Wi-Fi) needs to reach it. See "Network Security" in WindowsConfig.md or
+# LinuxConfig.md.
+server:
+  address: 127.0.0.1

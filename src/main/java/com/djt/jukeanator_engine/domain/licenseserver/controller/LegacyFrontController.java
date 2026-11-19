@@ -54,8 +54,7 @@ public class LegacyFrontController {
   /** Legacy website page commands, now static pages ({@code command=order} → /order.html). */
   private static final Set<String> PAGE_COMMANDS = Set.of("features", "faq", "order", "contact",
       "licensing", "screenshots", "photos", "conversionkits", "comparison_matrix", "howto",
-      "performing_upgrade", "privacy_policy", "return_policy", "terms_and_conditions",
-      "webstart");
+      "performing_upgrade", "privacy_policy", "return_policy", "terms_and_conditions");
 
   private final LicenseServerService licenseServerService;
   private final LicenseServerProperties properties;

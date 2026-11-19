@@ -20,6 +20,7 @@ import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
+import com.djt.jukeanator_engine.domain.location.security.LocationAccessPolicy;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.domain.user.service.UserService;
@@ -41,13 +42,17 @@ public class LocationController {
 
   private final LocationService locationService;
   private final UserService userService;
+  private final LocationAccessPolicy locationAccessPolicy;
 
-  public LocationController(LocationService locationService, UserService userService) {
+  public LocationController(LocationService locationService, UserService userService,
+      LocationAccessPolicy locationAccessPolicy) {
 
     requireNonNull(locationService, "locationService cannot be null");
     requireNonNull(userService, "userService cannot be null");
+    requireNonNull(locationAccessPolicy, "locationAccessPolicy cannot be null");
     this.locationService = locationService;
     this.userService = userService;
+    this.locationAccessPolicy = locationAccessPolicy;
   }
 
   @PostMapping
@@ -57,10 +62,17 @@ public class LocationController {
     return ResponseEntity.ok(locationService.registerLocation(request));
   }
 
+  /**
+   * The location picker list, without the private locations this caller may not use. The private
+   * locations this caller may use are flagged, so the web UI never picks one by default.
+   */
   @GetMapping
   public ResponseEntity<List<LocationSummaryDto>> listLocations() {
 
-    return ResponseEntity.ok(locationService.listLocations());
+    return ResponseEntity.ok(locationService.listLocations().stream()
+        .filter(l -> locationAccessPolicy.isAccessibleToCurrentUser(l.locationId()))
+        .map(l -> l.withPrivateLocation(locationAccessPolicy.isPrivate(l.locationId())))
+        .toList());
   }
 
   /**
