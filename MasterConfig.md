@@ -903,12 +903,18 @@ MySQL (3306, 33060), the application (8080), OpenDKIM (8891) and PostSRSd (10001
 **Automated (recommended).** From the project folder on the PC, run:
 
 ```
+mvnw clean deploy -Pprod
+```
+
+This runs the tests, builds the WAR and deploys it (add `-DskipTests` to skip the tests); a failing test stops it before anything is deployed. The `prod` profile in `pom.xml` skips Maven's own install and deploy steps and instead runs `deploy\deploy-prod.ps1 -SkipBuild` in the deploy phase. The script can also be run on its own, which builds the WAR without the tests first:
+
+```
 powershell -ExecutionPolicy Bypass -File deploy\deploy-prod.ps1
 ```
 
-It needs only the SSH key access from Step 1; no passwords or secrets are involved, and nothing secret is kept in git. The script:
+Either way it needs only the SSH key access from Step 1; no passwords or secrets are involved, and nothing secret is kept in git. The script:
 
-- builds the WAR (`mvnw -DskipTests package`; run the tests separately beforehand);
+- builds the WAR (`mvnw -DskipTests package`), unless run with `-SkipBuild` as Maven does;
 - uploads it to the server as `jukeanator-engine.war.new`, together with `deploy/jukeanator-deploy.sh`, and runs that script on the server;
 - on the server: checks the upload against the SHA-256 computed on the PC, runs the database backup (Step 12), keeps the current WAR as `jukeanator-engine.war.previous`, switches to the new one, restarts the service and waits up to four minutes for the application to answer;
 - if the new version does not answer in time, puts the previous WAR back, restarts it, prints the last log lines and reports the deploy as failed.
@@ -916,7 +922,7 @@ It needs only the SSH key access from Step 1; no passwords or secrets are involv
 Options:
 
 - `-SkipBuild` deploys the WAR already in `target\` without building.
-- `-SshHost <name>`, or the `JUKEANATOR_DEPLOY_HOST` environment variable, deploys to another server's entry in `%USERPROFILE%\.ssh\config` (default `jukeanator-prod`). This is how to deploy to a rebuilt or second server.
+- `-SshHost <name>` (script only), or the `JUKEANATOR_DEPLOY_HOST` environment variable (script and Maven), deploys to another server's entry in `%USERPROFILE%\.ssh\config` (default `jukeanator-prod`). This is how to deploy to a rebuilt or second server.
 
 The automatic rollback only restores the WAR. If the new version already changed the database schema before failing, also restore the backup the script took (the newest file in `/var/backups/jukeanator`, see "Restore" in Step 12).
 

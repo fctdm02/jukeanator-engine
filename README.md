@@ -30,6 +30,29 @@ In PowerShell, use `.\mvnw.cmd` instead of `mvnw.cmd`.
 
 This creates `target/jukeanator-engine-0.0.1-SNAPSHOT.war`. `-DskipTests` skips the tests, some of which need a local MySQL server (see "Live Integration Tests"). To deploy the WAR on a jukebox PC, see [WindowsConfig.md](WindowsConfig.md) or [LinuxConfig.md](LinuxConfig.md).
 
+# Deploying to the Production Server
+
+The `prod` Maven profile builds the WAR, runs the tests, and deploys it to the production master instance in one step (Windows, from the project directory):
+
+```
+mvnw clean deploy -Pprod
+```
+
+Add `-DskipTests` to deploy without running the tests. In PowerShell, use `.\mvnw.cmd`. In Eclipse, create a Maven Run Configuration with goals `clean deploy` and profile `prod`.
+
+What it does:
+
+- `clean`, `test` and `package` run as usual. A failing test stops the build before anything is deployed.
+- The standard `install` and `deploy` steps (copying the WAR to the local Maven repository and publishing it to a Maven repository server) are skipped; this project has no repository server.
+- In the `deploy` phase, Maven runs [deploy/deploy-prod.ps1](deploy/deploy-prod.ps1) `-SkipBuild`. It uploads the WAR over SSH and runs [deploy/jukeanator-deploy.sh](deploy/jukeanator-deploy.sh) on the server, which checks the upload, backs up the database, switches to the new WAR, restarts the application, and puts the previous WAR back if the new one does not start within four minutes. Any failure fails the Maven build.
+
+Requirements:
+
+- SSH key access to the server under the name `jukeanator-prod` in `%USERPROFILE%\.ssh\config` (see "Production Server (Linux VPS)", Step 1, in [MasterConfig.md](MasterConfig.md)). No passwords or secrets are used, and none are stored in git.
+- Windows PowerShell and the Windows OpenSSH client (`ssh`, `scp`), both included in Windows 10 and 11.
+
+To deploy to another server, set the `JUKEANATOR_DEPLOY_HOST` environment variable to that server's name in the SSH config. Plain `mvnw deploy` without `-Pprod` never contacts the server. The same deploy can be run without Maven with `powershell -ExecutionPolicy Bypass -File deploy\deploy-prod.ps1`. Details, the manual steps and rolling back are under "Updating the application" in [MasterConfig.md](MasterConfig.md).
+
 # Running the Application
 
 The application needs a Java 25 runtime and a media player (VLC, or Winamp on Windows). Installing both is described in [WindowsConfig.md](WindowsConfig.md) and [LinuxConfig.md](LinuxConfig.md). The environment variables it reads (`DISCOGS_CONSUMER_KEY`, `DISCOGS_CONSUMER_SECRET`, `JWT_SECRET`, and the database variables when MySQL is used) are described there and in [MasterConfig.md](MasterConfig.md).

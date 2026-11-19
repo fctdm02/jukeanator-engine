@@ -284,6 +284,54 @@
 				</plugins>
 			</build>
 		</profile>
+
+		<!-- Builds, tests and deploys the WAR to the production master:
+		     mvnw clean deploy -Pprod
+		     (add -DskipTests to skip the tests). Instead of publishing to a Maven repository, the
+		     deploy phase runs deploy/deploy-prod.ps1 -SkipBuild, which uploads target/*.war over SSH
+		     (key access, no secrets), backs up the database, switches versions and rolls back if
+		     the new version does not start. Windows only (PowerShell). The server is the
+		     jukeanator-prod entry in ~/.ssh/config, or the JUKEANATOR_DEPLOY_HOST environment
+		     variable. Without -Pprod, mvn deploy never touches the server. See "Updating the
+		     application" in MasterConfig.md. -->
+		<profile>
+			<id>prod</id>
+			<properties>
+				<!-- No Maven repository: skip the standard install and deploy steps. -->
+				<maven.install.skip>true</maven.install.skip>
+				<maven.deploy.skip>true</maven.deploy.skip>
+			</properties>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>exec-maven-plugin</artifactId>
+						<version>3.7.0</version>
+						<executions>
+							<execution>
+								<id>deploy-prod</id>
+								<phase>deploy</phase>
+								<goals>
+									<goal>exec</goal>
+								</goals>
+								<configuration>
+									<executable>powershell</executable>
+									<workingDirectory>${project.basedir}</workingDirectory>
+									<arguments>
+										<argument>-NoProfile</argument>
+										<argument>-ExecutionPolicy</argument>
+										<argument>Bypass</argument>
+										<argument>-File</argument>
+										<argument>${project.basedir}/deploy/deploy-prod.ps1</argument>
+										<argument>-SkipBuild</argument>
+									</arguments>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
 	</profiles>
 
 </project>

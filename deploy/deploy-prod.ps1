@@ -4,6 +4,9 @@
 #   powershell -ExecutionPolicy Bypass -File deploy\deploy-prod.ps1
 #   powershell -ExecutionPolicy Bypass -File deploy\deploy-prod.ps1 -SkipBuild
 #
+# Usually run through Maven instead: mvnw clean deploy -Pprod (the prod profile in pom.xml runs
+# this script with -SkipBuild in the deploy phase, after the tests and the build).
+#
 # -SshHost (or the JUKEANATOR_DEPLOY_HOST environment variable) names the server's entry in
 # %USERPROFILE%\.ssh\config; the default is jukeanator-prod. -SkipBuild deploys the WAR already in
 # target\. The server-side steps (checksum, database backup, switch, restart, automatic rollback)
