@@ -11,9 +11,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.springframework.http.MediaType;
 import com.djt.jukeanator_engine.AbstractControllerTest;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotAlbumDto;
@@ -25,6 +27,7 @@ import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationSummaryDto;
 import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
+import com.djt.jukeanator_engine.domain.location.security.LocationAccessPolicy;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageDto;
 import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageType;
@@ -46,6 +49,14 @@ class LocationControllerTest extends AbstractControllerTest {
 
   @Mock
   private UserService userService;
+
+  private static final Integer PRIVATE_LOCATION_ID = 8;
+
+  // A real policy: location 8 is private. There is no signed-in caller in these tests, which the
+  // policy treats as background work (allowed), so the private location is listed and flagged.
+  @Spy
+  private LocationAccessPolicy locationAccessPolicy =
+      new LocationAccessPolicy(Map.of(PRIVATE_LOCATION_ID, List.of("owner@example.com")));
 
   @InjectMocks
   private LocationController locationController;
@@ -83,7 +94,22 @@ class LocationControllerTest extends AbstractControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].locationId", is(LOCATION_ID)))
         .andExpect(jsonPath("$[0].name", is("Bar Downtown")))
-        .andExpect(jsonPath("$[0].online", is(true)));
+        .andExpect(jsonPath("$[0].online", is(true)))
+        .andExpect(jsonPath("$[0].privateLocation", is(false)));
+  }
+
+  @Test
+  void listLocations_flagsPrivateLocations() throws Exception {
+    when(locationService.listLocations()).thenReturn(List.of(
+        new LocationSummaryDto(LOCATION_ID, "Bar Downtown", "logo.png", 40.0, -73.0, true),
+        new LocationSummaryDto(PRIVATE_LOCATION_ID, "Test Bar", "logo.png", 40.0, -73.0, true)));
+
+    mockMvc.perform(get("/api/locations"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].locationId", is(LOCATION_ID)))
+        .andExpect(jsonPath("$[0].privateLocation", is(false)))
+        .andExpect(jsonPath("$[1].locationId", is(PRIVATE_LOCATION_ID)))
+        .andExpect(jsonPath("$[1].privateLocation", is(true)));
   }
 
   @Test
