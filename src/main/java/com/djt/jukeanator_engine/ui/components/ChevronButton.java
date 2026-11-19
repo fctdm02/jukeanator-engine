@@ -1,7 +1,6 @@
 package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BasicStroke;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -97,7 +96,7 @@ final class ChevronButton {
     btn.setBorderPainted(false);
     btn.setFocusPainted(false);
     btn.setPreferredSize(size);
-    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    btn.setCursor(KioskCursors.hand());
 
     btn.addMouseListener(new MouseAdapter() {
       @Override

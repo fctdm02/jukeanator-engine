@@ -213,3 +213,5 @@ user-interface:
   # MOUSE POINTER
   hide-mouse-pointer: false # JFC/Swing kiosk only: if true, hides the mouse pointer inside the kiosk window (for touch screens)
   touch-indicator: false # JFC/Swing kiosk only: if true, shows a small translucent circle where the screen is touched (for legacy serial touch screens with no Windows touch support)
+  touch-indicator-diameter: 60 # JFC/Swing kiosk only: diameter of the touch indicator circle, in pixels
+  touch-indicator-center-opacity: 35 # JFC/Swing kiosk only: opacity at the center of the touch indicator circle, as a percentage (0-100); fades to transparent at the edge

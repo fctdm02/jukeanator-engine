@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -270,7 +269,7 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
     }
 
     JPanel artPanel = buildCoverArtPanel(coverIcon);
-    artPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    artPanel.setCursor(KioskCursors.hand());
     artPanel.addMouseListener(new java.awt.event.MouseAdapter() {
       @Override
       public void mouseReleased(java.awt.event.MouseEvent e) {
@@ -409,7 +408,7 @@ public class LegacyAlbumGridPanel extends JPanel implements AlbumGridView {
     row.setOpaque(false);
     row.setBorder(new EmptyBorder(1, 4, 1, 4));
     row.setMaximumSize(new Dimension(Integer.MAX_VALUE, profile.trackRowH()));
-    row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    row.setCursor(KioskCursors.hand());
 
     // ── Indicator (WEST), directly to the left of the track text: a red play icon when this
     // song is the one currently playing, otherwise the usual popularity bars. ─────────────────

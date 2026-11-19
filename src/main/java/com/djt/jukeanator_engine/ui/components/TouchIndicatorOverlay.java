@@ -16,7 +16,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
 /**
- * Draws a small translucent circle where the screen is touched, similar to the touch feedback
+ * Draws a translucent glowing circle where the screen is touched, similar to the touch feedback
  * Windows shows for USB touch screens. Enabled by {@code user-interface.touch-indicator}, for
  * legacy serial touch screens whose driver only emulates a mouse, so Windows shows no feedback.
  *
@@ -32,34 +32,43 @@ public final class TouchIndicatorOverlay extends JComponent {
 
   private static final long serialVersionUID = 1L;
 
-  private static final int DIAMETER = 48;
   private static final int PAD = 1; // anti-aliasing margin when repainting
-  private static final float CENTER_OPACITY = 0.25f;
-  // Radial gradient stops (center to edge) and relative strength at each: stays bright near the
-  // center, then tapers smoothly to fully transparent at the edge.
-  private static final float[] GLOW_FRACTIONS = {0f, 0.3f, 0.6f, 0.85f, 1f};
-  private static final float[] GLOW_STRENGTHS = {1f, 0.85f, 0.45f, 0.12f, 0f};
+  // Radial gradient stops (center to edge) and relative strength at each: stays bright across most
+  // of the circle, then tapers smoothly to fully transparent at the edge.
+  private static final float[] GLOW_FRACTIONS = {0f, 0.35f, 0.65f, 0.88f, 1f};
+  private static final float[] GLOW_STRENGTHS = {1f, 0.9f, 0.6f, 0.2f, 0f};
   private static final long FADE_NANOS = 300_000_000L;
   private static final int FRAME_MILLIS = 16;
 
   private final JFrame frame;
   private final Timer fadeTimer;
+  private final int diameter; // pixels
+  private final float centerOpacity; // 0..1
 
   private Point center; // overlay coordinates; null when nothing to draw
   private boolean pressed;
   private float alpha;
   private long fadeStartNanos;
 
-  private TouchIndicatorOverlay(JFrame frame) {
+  private TouchIndicatorOverlay(JFrame frame, int diameter, int centerOpacityPercent) {
     this.frame = frame;
+    this.diameter = Math.max(2, diameter);
+    this.centerOpacity = Math.min(100, Math.max(0, centerOpacityPercent)) / 100f;
     setOpaque(false);
     this.fadeTimer = new Timer(FRAME_MILLIS, e -> stepFade());
     this.fadeTimer.setCoalesce(true);
   }
 
-  /** Installs the overlay as {@code frame}'s glass pane and starts listening for touches. */
-  public static TouchIndicatorOverlay install(JFrame frame) {
-    TouchIndicatorOverlay overlay = new TouchIndicatorOverlay(frame);
+  /**
+   * Installs the overlay as {@code frame}'s glass pane and starts listening for touches.
+   *
+   * @param diameter circle diameter in pixels ({@code user-interface.touch-indicator-diameter})
+   * @param centerOpacityPercent opacity at the circle's center, 0-100
+   *        ({@code user-interface.touch-indicator-center-opacity})
+   */
+  public static TouchIndicatorOverlay install(JFrame frame, int diameter,
+      int centerOpacityPercent) {
+    TouchIndicatorOverlay overlay = new TouchIndicatorOverlay(frame, diameter, centerOpacityPercent);
     frame.setGlassPane(overlay);
     overlay.setVisible(true);
     Toolkit.getDefaultToolkit().addAWTEventListener(event -> {
@@ -126,7 +135,7 @@ public final class TouchIndicatorOverlay extends JComponent {
 
   private void repaintCircle() {
     if (center != null) {
-      int r = DIAMETER / 2 + PAD;
+      int r = diameter / 2 + PAD;
       repaint(center.x - r, center.y - r, 2 * r, 2 * r);
     }
   }
@@ -139,19 +148,19 @@ public final class TouchIndicatorOverlay extends JComponent {
     Graphics2D g2 = (Graphics2D) g.create();
     try {
       g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-      int x = center.x - DIAMETER / 2;
-      int y = center.y - DIAMETER / 2;
+      int x = center.x - diameter / 2;
+      int y = center.y - diameter / 2;
 
       // Soft glow: whitest at the touch point, fading smoothly to fully transparent at the edge,
       // with no border. The fade-out alpha scales every stop.
       Color[] colors = new Color[GLOW_FRACTIONS.length];
       for (int i = 0; i < colors.length; i++) {
-        int a = Math.round(255 * CENTER_OPACITY * GLOW_STRENGTHS[i] * alpha);
+        int a = Math.round(255 * centerOpacity * GLOW_STRENGTHS[i] * alpha);
         colors[i] = new Color(255, 255, 255, a);
       }
-      g2.setPaint(new RadialGradientPaint(center.x, center.y, DIAMETER / 2f, GLOW_FRACTIONS,
+      g2.setPaint(new RadialGradientPaint(center.x, center.y, diameter / 2f, GLOW_FRACTIONS,
           colors));
-      g2.fillOval(x, y, DIAMETER, DIAMETER);
+      g2.fillOval(x, y, diameter, diameter);
     } finally {
       g2.dispose();
     }

@@ -1,6 +1,5 @@
 package com.djt.jukeanator_engine.ui.components;
 
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -336,7 +335,7 @@ public class KeyboardPanel extends JPanel {
     btn.setOpaque(false);
     btn.setForeground(ColorTheme.get().textPrimary);
     btn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, LayoutTheme.get().fontSizeKeyLabel));
-    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    btn.setCursor(KioskCursors.hand());
     return btn;
   }
 }

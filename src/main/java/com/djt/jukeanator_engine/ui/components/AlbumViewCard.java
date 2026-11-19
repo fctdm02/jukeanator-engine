@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -512,7 +511,7 @@ public class AlbumViewCard extends JPanel {
     row.setMaximumSize(rowSize);
 
     if (listener != null) {
-      row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+      row.setCursor(KioskCursors.hand());
     }
 
     // ── Popularity bars (WEST) ────────────────────────────────────────────

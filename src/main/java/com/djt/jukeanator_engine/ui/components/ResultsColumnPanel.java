@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -261,7 +260,7 @@ public final class ResultsColumnPanel {
     // Previously: new Dimension(Integer.MAX_VALUE, 72) — hard-coded 72px max height.
     // Now: lt.resultRowMaxH so a scaled theme can increase row height proportionally.
     row.setMaximumSize(new Dimension(Integer.MAX_VALUE, lt.resultRowMaxH));
-    row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    row.setCursor(KioskCursors.hand());
 
     // Previously: new Dimension(36, 56) — hard-coded.
     // Now: lt.resultNumLabelW × lt.resultThumbSize.

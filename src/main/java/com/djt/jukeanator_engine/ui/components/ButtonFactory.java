@@ -1,7 +1,6 @@
 package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GradientPaint;
@@ -65,7 +64,7 @@ public final class ButtonFactory {
     button.setFocusPainted(false);
     button.setOpaque(false);
     button.setPreferredSize(new Dimension(LayoutTheme.get().navBtnW, LayoutTheme.get().navBtnH));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    button.setCursor(KioskCursors.hand());
 
     return button;
   }
@@ -129,7 +128,7 @@ public final class ButtonFactory {
     button.setFocusPainted(false);
     button.setOpaque(false);
     button.setBorder(new EmptyBorder(6, 18, 6, 18));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    button.setCursor(KioskCursors.hand());
 
     return button;
   }

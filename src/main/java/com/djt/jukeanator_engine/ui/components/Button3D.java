@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
@@ -61,7 +60,7 @@ final class Button3D {
     button.setFocusPainted(false);
     button.setOpaque(false);
     button.setPreferredSize(preferredSize);
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    button.setCursor(KioskCursors.hand());
     button.addMouseListener(new MouseAdapter() {
       @Override
       public void mouseEntered(MouseEvent e) {

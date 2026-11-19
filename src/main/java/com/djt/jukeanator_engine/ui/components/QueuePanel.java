@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -599,7 +598,7 @@ public class QueuePanel extends JPanel {
     row.setMinimumSize(new Dimension(0, rowHeight));
     row.setMaximumSize(rowSize);
     if (selectable) {
-      row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+      row.setCursor(KioskCursors.hand());
     }
 
     boolean selected = selectable && index == selectedIndex;

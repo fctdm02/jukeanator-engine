@@ -3,7 +3,6 @@ package com.djt.jukeanator_engine.ui.components;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
@@ -3141,7 +3140,7 @@ public class AdminPanel extends JPanel {
     btn.setPreferredSize(BTN_SIZE);
     btn.setMaximumSize(BTN_SIZE);
     btn.setMinimumSize(BTN_SIZE);
-    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    btn.setCursor(KioskCursors.hand());
     btn.addActionListener(action);
     return btn;
   }

@@ -1,7 +1,6 @@
 package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
@@ -141,7 +140,7 @@ public class AlbumDetailCard extends JPanel {
     button.setOpaque(false);
     button.setPreferredSize(
         new Dimension(LayoutTheme.get().detailBackBtnW, LayoutTheme.get().detailBackBtnH));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    button.setCursor(KioskCursors.hand());
     button.addActionListener(e -> action.run());
 
     return button;

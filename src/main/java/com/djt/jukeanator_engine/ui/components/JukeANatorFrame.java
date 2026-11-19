@@ -5,6 +5,7 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -16,14 +17,13 @@ import java.awt.GraphicsEnvironment;
 import java.awt.GridBagLayout;
 import java.awt.Image;
 import java.awt.LinearGradientPaint;
-import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.Window;
+import java.awt.event.ContainerEvent;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Point2D;
-import java.awt.image.BufferedImage;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -327,24 +327,50 @@ public class JukeANatorFrame extends JFrame {
 
   /**
    * Hides the mouse pointer inside the kiosk window ({@code user-interface.hide-mouse-pointer}).
-   * The blank cursor is set on the content pane, but any component with its own cursor (HAND_CURSOR
-   * on buttons, rows and tiles; TEXT_CURSOR on text fields) would still show it, so a global
-   * listener also gives every component the blank cursor when the pointer enters it. This covers
-   * components created later as well.
+   *
+   * <p>
+   * Windows picks the cursor natively from the component under the pointer before Java dispatches
+   * any mouse event, so reacting to MOUSE_ENTERED alone is too late: a touch that jumps the pointer
+   * onto a button showed its hand cursor. Instead the pointer is hidden at the source:
+   * <ul>
+   * <li>{@link KioskCursors} returns the blank cursor for every hand/text cursor our components
+   * assign;</li>
+   * <li>every component added to any container (including Swing's own text fields, whose UI
+   * delegates install a text cursor) gets the blank cursor as it is added;</li>
+   * <li>as a safety net, any mouse event on a component that still has a visible cursor resets it to
+   * blank.</li>
+   * </ul>
    */
   private void applyHiddenMousePointer() {
-    Cursor blank = Toolkit.getDefaultToolkit().createCustomCursor(
-        new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB), new Point(0, 0), "blank");
-    getContentPane().setCursor(blank);
+    KioskCursors.setHidden(true);
+    Cursor blank = KioskCursors.blank();
     setCursor(blank);
+    getRootPane().setCursor(blank);
+    getLayeredPane().setCursor(blank);
+    getContentPane().setCursor(blank);
+    getGlassPane().setCursor(blank);
 
     Toolkit.getDefaultToolkit().addAWTEventListener(event -> {
-      if (event.getID() == MouseEvent.MOUSE_ENTERED
-          && event.getSource() instanceof Component component
+      if (event instanceof ContainerEvent ce && ce.getID() == ContainerEvent.COMPONENT_ADDED) {
+        blankCursorTree(ce.getChild(), blank);
+      } else if (event instanceof MouseEvent && event.getSource() instanceof Component component
           && component.getCursor() != blank) {
         component.setCursor(blank);
       }
-    }, AWTEvent.MOUSE_EVENT_MASK);
+    }, AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK
+        | AWTEvent.CONTAINER_EVENT_MASK);
+  }
+
+  /** Gives {@code component} and all of its descendants the blank cursor. */
+  private static void blankCursorTree(Component component, Cursor blank) {
+    if (component.getCursor() != blank) {
+      component.setCursor(blank);
+    }
+    if (component instanceof Container container) {
+      for (Component child : container.getComponents()) {
+        blankCursorTree(child, blank);
+      }
+    }
   }
 
   // INITIALIZE
@@ -390,7 +416,9 @@ public class JukeANatorFrame extends JFrame {
       applyHiddenMousePointer();
     }
     if (touchIndicator) {
-      TouchIndicatorOverlay.install(this);
+      TouchIndicatorOverlay.install(this,
+          jukeANatorUserInterfaceProperties.getTouchIndicatorDiameter(),
+          jukeANatorUserInterfaceProperties.getTouchIndicatorCenterOpacity());
     }
 
     // ── Compute the Home grid profile for the actual screen dimensions ────────
@@ -1404,7 +1432,7 @@ public class JukeANatorFrame extends JFrame {
     creditsPanel.add(creditsTextPanel, BorderLayout.CENTER);
 
     // Clicking the credits panel opens the admin login card.
-    creditsPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    creditsPanel.setCursor(KioskCursors.hand());
     creditsPanel.addMouseListener(new java.awt.event.MouseAdapter() {
       @Override
       public void mouseReleased(java.awt.event.MouseEvent e) {
@@ -1565,7 +1593,7 @@ public class JukeANatorFrame extends JFrame {
 
     // Clicking anywhere on the Now Playing panel opens the album detail card
     // for the currently-playing song, showing the full track listing.
-    panel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    panel.setCursor(KioskCursors.hand());
     panel.addMouseListener(new java.awt.event.MouseAdapter() {
       @Override
       public void mouseReleased(java.awt.event.MouseEvent e) {

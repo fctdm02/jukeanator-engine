@@ -1,7 +1,6 @@
 package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -332,7 +331,7 @@ public class AlbumGridPanel extends JPanel implements AlbumGridView {
     };
     tile.setName(UiComponentNames.ALBUM_TILE);
     tile.setOpaque(false);
-    tile.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    tile.setCursor(KioskCursors.hand());
     tile.setBorder(new EmptyBorder(1, 1, 1, 1)); // breathing room inside border
 
     // ── Cover art ─────────────────────────────────────────────────────────

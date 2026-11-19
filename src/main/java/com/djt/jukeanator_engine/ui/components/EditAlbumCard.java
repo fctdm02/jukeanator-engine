@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -984,7 +983,7 @@ public class EditAlbumCard extends JPanel {
     btn.setBorderPainted(false);
     btn.setFocusPainted(false);
     btn.setOpaque(false);
-    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    btn.setCursor(KioskCursors.hand());
     btn.addActionListener(action);
     return btn;
   }

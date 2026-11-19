@@ -3,7 +3,6 @@ package com.djt.jukeanator_engine.ui.components;
 import java.awt.AWTEvent;
 import java.awt.BasicStroke;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -111,8 +110,7 @@ public class PeekPasswordField extends JPasswordField {
 
       @Override
       public void mouseMoved(MouseEvent e) {
-        setCursor(Cursor.getPredefinedCursor(
-            isOverIcon(e.getX()) ? Cursor.HAND_CURSOR : Cursor.TEXT_CURSOR));
+        setCursor(isOverIcon(e.getX()) ? KioskCursors.hand() : KioskCursors.text());
       }
     };
     addMouseListener(peekMouse);

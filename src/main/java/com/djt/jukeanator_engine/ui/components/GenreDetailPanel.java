@@ -1,7 +1,6 @@
 package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
@@ -233,7 +232,7 @@ public class GenreDetailPanel extends JPanel {
     // Previously: new Dimension(170, 42) — hard-coded.
     // Now sourced from LayoutTheme so a scaled theme can adjust button proportions.
     btn.setPreferredSize(new Dimension(LayoutTheme.get().sortBtnW, LayoutTheme.get().sortBtnH));
-    btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    btn.setCursor(KioskCursors.hand());
 
     btn.addActionListener(e -> applySortMode(mode));
 

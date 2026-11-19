@@ -2,7 +2,6 @@ package com.djt.jukeanator_engine.ui.components;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -325,7 +324,7 @@ public class LoginToAdminPanelCard extends JPanel {
     field.setPreferredSize(new Dimension(100, LayoutTheme.get().loginFieldH));
 
     // Tap the field to switch keyboard focus to it
-    field.setCursor(Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR));
+    field.setCursor(KioskCursors.text());
     field.addMouseListener(new java.awt.event.MouseAdapter() {
       @Override
       public void mouseReleased(java.awt.event.MouseEvent e) {
@@ -480,7 +479,7 @@ public class LoginToAdminPanelCard extends JPanel {
     button.setOpaque(false);
     button.setPreferredSize(
         new Dimension(LayoutTheme.get().loginActionBtnW, LayoutTheme.get().loginActionBtnH));
-    button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    button.setCursor(KioskCursors.hand());
     button.addActionListener(e -> action.run());
     return button;
   }

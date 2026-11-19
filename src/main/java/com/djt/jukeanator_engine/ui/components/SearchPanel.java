@@ -3,7 +3,6 @@ package com.djt.jukeanator_engine.ui.components;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -376,7 +375,7 @@ public class SearchPanel extends JPanel implements TabNavigator {
       btn.setBackground(ACCENT_BLUE);
       btn.setFocusPainted(false);
       btn.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
-      btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+      btn.setCursor(KioskCursors.hand());
       btn.addActionListener(e -> executeSearch());
 
       JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));

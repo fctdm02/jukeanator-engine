@@ -76,6 +76,11 @@ public class JukeANatorUserInterfaceProperties {
   // touch feedback Windows shows for USB touch screens. Meant for legacy serial touch screens
   // whose driver only emulates a mouse.
   private boolean touchIndicator = false;
+  // Diameter of the touch indicator circle, in pixels.
+  private int touchIndicatorDiameter = 60;
+  // Opacity at the center of the touch indicator circle, as a percentage (0-100). The glow fades
+  // from this value to fully transparent at the edge.
+  private int touchIndicatorCenterOpacity = 35;
 
 
   
@@ -245,5 +250,21 @@ public class JukeANatorUserInterfaceProperties {
 
   public void setTouchIndicator(boolean touchIndicator) {
     this.touchIndicator = touchIndicator;
+  }
+
+  public int getTouchIndicatorDiameter() {
+    return touchIndicatorDiameter;
+  }
+
+  public void setTouchIndicatorDiameter(int touchIndicatorDiameter) {
+    this.touchIndicatorDiameter = touchIndicatorDiameter;
+  }
+
+  public int getTouchIndicatorCenterOpacity() {
+    return touchIndicatorCenterOpacity;
+  }
+
+  public void setTouchIndicatorCenterOpacity(int touchIndicatorCenterOpacity) {
+    this.touchIndicatorCenterOpacity = touchIndicatorCenterOpacity;
   }
 }

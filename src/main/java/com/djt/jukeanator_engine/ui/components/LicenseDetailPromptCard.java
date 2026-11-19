@@ -262,7 +262,7 @@ public class LicenseDetailPromptCard extends JPanel {
     button.setOpaque(false);
     button.setPreferredSize(new Dimension(LayoutTheme.get().loginActionBtnW,
         LayoutTheme.get().loginActionBtnH));
-    button.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+    button.setCursor(KioskCursors.hand());
     button.addActionListener(e -> action.run());
     return button;
   }

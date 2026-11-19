@@ -1,6 +1,5 @@
 package com.djt.jukeanator_engine.ui.components;
 
-import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.GradientPaint;
 import java.awt.Graphics;
@@ -38,7 +37,7 @@ public class ToggleSwitch extends JButton {
     setBorderPainted(false);
     setFocusPainted(false);
     setOpaque(false);
-    setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    setCursor(KioskCursors.hand());
 
     addActionListener(e -> {
       on = !on;
