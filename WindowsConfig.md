@@ -8,8 +8,9 @@ The sections below are in the order they are normally done:
 2. Prerequisite: media player
 3. Install JukeANator
 4. ELO ET2002L touchscreen (only if this touchscreen is used)
-5. Kiosk Mode Settings
-6. Auto-Start JukeANator at Power-On
+5. eGalax touchscreen (only if this touchscreen is used, for example in a converted TouchTunes Maestro)
+6. Kiosk Mode Settings
+7. Auto-Start JukeANator at Power-On
 
 ## Prerequisite: Java 25
 
@@ -159,13 +160,55 @@ Connect the monitor's video cable as well, and make the touchscreen the primary 
 
 ### Serial
 
-These steps apply both to a serial cable plugged into the PC's own COM port and to one plugged into a USB-to-serial adapter.
+Current PCs have no serial (RS-232) port, so the touchscreen's serial cable is plugged into an RS-232 to USB adapter, and the adapter into a USB port on the PC.
 
-1. Find the COM port: open **Device Manager** and expand **Ports (COM & LPT)**. An onboard port is usually COM1. A USB-to-serial adapter appears as a new entry (often COM3 or higher) when it is plugged in; if it shows under **Other devices** with a warning icon instead, install the driver for the adapter's chip (FTDI, Prolific, Silicon Labs or WCH CH340) from the adapter maker's site.
+1. Find the COM port: plug in the adapter, open **Device Manager** and expand **Ports (COM & LPT)**. The adapter appears as a new entry (often COM3 or higher). If it shows under **Other devices** with a warning icon instead, install the driver for the adapter's chip (FTDI, Prolific, Silicon Labs or WCH CH340) from the adapter maker's site.
 2. Download the Elo **Windows serial touch driver** from Elo's support site, https://elosupport.elotouch.com/ (search for "Windows touch driver"), choosing the build for your Windows version.
 3. Run the installer, choose **Serial** as the interface, and pick the COM port found in step 1. The controller runs at 9600 baud by default.
 4. Reboot when prompted.
 5. Run the **Elo Config** utility the driver installs, and use its **Align** (calibration) function: tap each target as it appears.
+
+## eGalax touchscreen
+
+Many unbranded touchscreens, including the one in a converted TouchTunes Maestro, use a touch controller made by EETI (eGalax). The controller board sits behind the screen and connects to the PC with a serial (RS-232, 9-pin) cable. Windows cannot detect a serial touchscreen by itself, so the eGalaxTouch driver is required.
+
+Current PCs have no serial (RS-232) port, so the touchscreen's serial cable is plugged into an RS-232 to USB adapter, and the adapter into a USB port on the PC.
+
+Connect the monitor's video cable as well, and make the touchscreen the primary display if the PC has more than one.
+
+### Step 1: Connect the adapter
+
+1. Plug the touchscreen's serial cable into the adapter, and the adapter into a USB port.
+2. Find the COM port: open **Device Manager** and expand **Ports (COM & LPT)**. The adapter appears as a new entry (often COM3 or higher). If it shows under **Other devices** with a warning icon instead, install the driver for the adapter's chip (FTDI, Prolific, Silicon Labs or WCH CH340) from the adapter maker's site.
+
+Keep the adapter in the same USB port from now on. Windows can give it a different COM number in another port, and the touchscreen then stops responding until the driver is pointed at the new port.
+
+### Step 2: Install the eGalaxTouch driver
+
+The driver is the eGalaxTouch package for single-touch devices, version 5.13 (folder `eGalaxTouch_5.13.0.14220-Release-150820-ForSingleTouchDevice`). A copy is kept in `C:\kiosk`; newer versions are available from the Downloads page of EETI's site, https://www.eeti.com/.
+
+1. Run `setup.exe` from the driver folder as an administrator (right-click it, then **Run as administrator**).
+2. Accept the licence. When the installer asks which interface drivers to install, select the **RS232** interface. Leave the other options at their defaults.
+3. Accept the default install folder (`C:\Program Files\eGalaxTouch`) and finish the installer.
+4. Reboot when prompted.
+
+### Step 3: Find the controller
+
+1. Open the **eGalaxTouch** utility (from the Start menu, or the desktop shortcut the installer creates).
+2. On the **General** tab, the controller should be listed as a serial (RS232) touchscreen controller on the adapter's COM port. Tapping the screen should move the pointer, possibly to the wrong place until it is calibrated.
+3. If no controller is listed, click **Add** (or **Search**) on the **General** tab and choose the adapter's COM port. The controller runs at 9600 baud by default.
+
+If the controller is still not found, check in Device Manager that the adapter is present on the expected COM port, and that no other program (such as a modem or terminal program) has the port open.
+
+### Step 4: Calibrate
+
+1. In the **eGalaxTouch** utility, open the **Tools** tab and click **4 Points Calibration**.
+2. Tap and hold each target until it moves to the next corner, without touching anywhere else on the screen.
+3. If touches are still off near the edges, run **Linearization** (9 or 25 points) on the same tab after the 4-point calibration.
+
+Use only the eGalaxTouch calibration. Do not also calibrate with Windows' own **Tablet PC Settings**, as the two adjustments add together and the result is wrong.
+
+On a PC with two monitors, use the **Display** tab of the utility to tie the touchscreen to the jukebox display before calibrating.
 
 ## Kiosk Mode Settings
 

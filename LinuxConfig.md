@@ -8,8 +8,9 @@ The sections below are in the order they are normally done:
 2. Prerequisite: media player
 3. Install JukeANator
 4. ELO ET2002L touchscreen (only if this touchscreen is used)
-5. Kiosk Mode Settings
-6. Auto-Start JukeANator at Power-On
+5. eGalax touchscreen (only if this touchscreen is used, for example in a converted TouchTunes Maestro)
+6. Kiosk Mode Settings
+7. Auto-Start JukeANator at Power-On
 
 ## Prerequisite: Java 25
 
@@ -160,17 +161,17 @@ lsusb | grep -i 04e7
 
 Then skip to Step 2.
 
-**Serial:** Linux Mint already includes a kernel driver for Elo serial controllers (the `elo` module), so nothing has to be downloaded. The kernel does not attach it to the serial port by itself, however: the `inputattach` utility does that, and a systemd service runs it at every boot. These steps apply both to a serial cable plugged into the PC's own COM port and to one plugged into a USB-to-serial adapter.
+**Serial:** Linux Mint already includes a kernel driver for Elo serial controllers (the `elo` module), so nothing has to be downloaded. The kernel does not attach it to the serial port by itself, however: the `inputattach` utility does that, and a systemd service runs it at every boot. Current PCs have no serial (RS-232) port, so the serial cable is plugged into an RS-232 to USB adapter, and the adapter into a USB port on the PC.
 
-*Find the serial port.* Plug in the RS-232 cable and list the serial ports the kernel found:
+*Find the serial port.* Plug in the adapter and list the serial ports the kernel found:
 
 ```
 sudo dmesg | grep -i tty
 ```
 
-An onboard COM1 port is usually `/dev/ttyS0`; a USB-to-serial adapter shows up as `/dev/ttyUSB0`. The commands below use `/dev/ttyS0`; substitute the actual port where needed.
+The adapter shows up as `/dev/ttyUSB0` (or `/dev/ttyUSB1` and so on if more than one adapter is connected). The commands below use `/dev/ttyUSB0`; substitute the actual port where needed.
 
-*USB-to-serial adapter only.* Two Mint services can interfere with an adapter. `brltty` (Braille display support) claims adapters with a CH340/CH341 chip, so the port appears in `dmesg` and then disconnects at once; ModemManager may send modem commands to any new serial port. If no Braille display or cellular modem is used, remove `brltty`, disable ModemManager, and then unplug and reconnect the adapter:
+*Prepare the adapter.* Two Mint services can interfere with an adapter. `brltty` (Braille display support) claims adapters with a CH340/CH341 chip, so the port appears in `dmesg` and then disconnects at once; ModemManager may send modem commands to any new serial port. If no Braille display or cellular modem is used, remove `brltty`, disable ModemManager, and then unplug and reconnect the adapter:
 
 ```
 sudo apt remove brltty
@@ -186,7 +187,7 @@ sudo apt install inputattach
 *Test the connection.* Run `inputattach` in the foreground. It loads the `elo` kernel module and talks to the controller in Elo's 10-byte SmartSet protocol (used by IntelliTouch controllers) at 9600 baud:
 
 ```
-sudo inputattach --elotouch /dev/ttyS0
+sudo inputattach --elotouch /dev/ttyUSB0
 ```
 
 Leave it running and, in a second terminal, confirm that the touchscreen was registered:
@@ -200,13 +201,19 @@ A line such as `input: Elo Serial TouchScreen` should appear. Tapping the screen
 If nothing registers, the controller uses a different Elo protocol. Stop the command with `Ctrl+C` and try each of these in turn:
 
 ```
+# (Standard 10-byte Elo SmartSet — most common)
+sudo inputattach --elotouch  /dev/ttyUSB0
+
+# (4-byte Elo protocol)
+sudo inputattach --elo4002 /dev/ttyUSB0
+
+# (6-byte Elo protocol)
+sudo inputattach --elo271-140 /dev/ttyUSB0
+
 sudo inputattach --elo261-281 /dev/ttyUSB0
-sudo inputattach --elo271-140 /dev/ttyS0
-sudo inputattach --elo4002 /dev/ttyS0
-sudo inputattach --elo261-281 /dev/ttyS0
 ```
 
-These are Elo's 4-byte, 6-byte and 3-byte protocols, named after the controller models that use them. Their short forms are `-elo4b`, `-elo6b` and `-elo3b` (and `-elo` for `--elotouch`), with a single dash. To see the exact option names supported by the installed version, run `inputattach --help | grep -i elo`. If the controller has been set to a speed other than 9600 baud, add `--baud 19200` (or that speed) before the protocol option, for example `sudo inputattach --baud 19200 --elotouch /dev/ttyS0`. Stop the test with `Ctrl+C` once a working option is found.
+These are Elo's 4-byte, 6-byte and 3-byte protocols, named after the controller models that use them. Their short forms are `-elo4b`, `-elo6b` and `-elo3b` (and `-elo` for `--elotouch`), with a single dash. To see the exact option names supported by the installed version, run `inputattach --help | grep -i elo`. If the controller has been set to a speed other than 9600 baud, add `--baud 19200` (or that speed) before the protocol option, for example `sudo inputattach --baud 19200 --elotouch /dev/ttyUSB0`. Stop the test with `Ctrl+C` once a working option is found.
 
 *Attach it automatically at every boot.* Create a systemd service:
 
@@ -217,12 +224,12 @@ sudo nano /etc/systemd/system/elo-touch.service
 ```
 [Unit]
 Description=Elo serial touchscreen
-After=dev-ttyS0.device
-Requires=dev-ttyS0.device
+After=dev-ttyUSB0.device
+Requires=dev-ttyUSB0.device
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/inputattach --elotouch /dev/ttyS0
+ExecStart=/usr/bin/inputattach --elotouch /dev/ttyUSB0
 Restart=on-failure
 RestartSec=5
 
@@ -230,7 +237,7 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-In the `ExecStart` line, use the port and options (protocol, and `--baud` if needed) that worked in the test. If the port is not `/dev/ttyS0`, change the `dev-ttyS0.device` lines to match (for example `dev-ttyUSB0.device` for `/dev/ttyUSB0`). Then load, enable and start the service:
+In the `ExecStart` line, use the port and options (protocol, and `--baud` if needed) that worked in the test. If the port is not `/dev/ttyUSB0`, change the `dev-ttyUSB0.device` lines to match (for example `dev-ttyUSB1.device` for `/dev/ttyUSB1`). Then load, enable and start the service:
 
 ```
 sudo systemctl daemon-reload
@@ -299,6 +306,161 @@ Then map the touch device to it, using the device name from Step 2:
 
 ```
 xinput map-to-output "Elo TouchSystems ..." HDMI-1
+```
+
+This lasts until logout. To apply it at every login, add the same command in **Menu**, then **Startup Applications** (click **+**, then **Custom command**, and set a delay of a few seconds).
+
+## eGalax touchscreen
+
+Many unbranded touchscreens, including the one in a converted TouchTunes Maestro, use a touch controller made by EETI (eGalax). The Windows driver for it is named "eGalaxTouch". Linux Mint does not need that driver: the kernel already includes drivers for eGalax controllers, so nothing has to be downloaded. The eGalax controller board sits behind the screen and connects to the PC with a serial (RS-232, 9-pin) cable. The kernel's `egalax_ts_serial` module drives it, and the `inputattach` utility attaches that module to the serial port. The kernel does not do this by itself, so a systemd service runs `inputattach` at every boot. Current PCs have no serial (RS-232) port, so the serial cable is plugged into an RS-232 to USB adapter, and the adapter into a USB port on the PC.
+
+Calibration made with the eGalax utility on Windows is stored by that utility, not in the controller, so it does not carry over. The screen must be calibrated again on Linux (Step 4).
+
+These steps assume the default Cinnamon desktop on X11. Install the tools used below once:
+
+```
+sudo apt update
+sudo apt install xinput xinput-calibrator xserver-xorg-input-evdev evtest inputattach
+```
+
+### Step 1: Connect the touch controller
+
+First confirm that the Mint kernel includes the eGalax serial driver. This command must print the module's details, not an error:
+
+```
+modinfo egalax_ts_serial
+```
+
+*Find the serial port.* Plug in the RS-232 cable and list the serial ports the kernel found:
+
+```
+sudo dmesg | grep -i tty
+```
+
+The adapter shows up as `/dev/ttyUSB0` (or `/dev/ttyUSB1` and so on if more than one adapter is connected). The commands below use `/dev/ttyUSB0`; substitute the actual port where needed. Remove `brltty` and disable ModemManager as described under "ELO ET2002L touchscreen", Step 1 (*Prepare the adapter*), so that they do not take over the adapter.
+
+*Optional: check that the controller sends data.* Set the port to 9600 baud and print the raw bytes it receives, then touch the screen. Lines of hexadecimal data should appear with each touch. Stop it with `Ctrl+C`:
+
+```
+sudo stty -F /dev/ttyUSB0 9600 raw
+sudo cat /dev/ttyUSB0 | xxd
+```
+
+If nothing appears, the port is wrong, the cable is not connected, or the controller is set to a different speed (see "If the serial touchscreen does not respond" below).
+
+*Test the connection.* Run `inputattach` in the foreground. It loads the `egalax_ts_serial` kernel module and talks to the controller at 9600 baud:
+
+```
+sudo inputattach --eetiegalax /dev/ttyUSB0
+```
+
+Leave it running and, in a second terminal, confirm that the touchscreen was registered:
+
+```
+sudo dmesg | tail
+```
+
+A line such as `input: EETI eGalaxTouch Serial TouchScreen` should appear. Tapping the screen should now move the pointer (possibly to the wrong place until it is calibrated). For a closer look, run `sudo evtest`, choose the eGalax device, and touch the screen: coordinate events should be printed. Stop the test with `Ctrl+C`. The short form of the option is `-eeti`, with a single dash.
+
+*Attach it automatically at every boot.* Create a systemd service:
+
+```
+sudo nano /etc/systemd/system/egalax-touch.service
+```
+
+```
+[Unit]
+Description=eGalax serial touchscreen
+After=dev-ttyUSB0.device
+Requires=dev-ttyUSB0.device
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/inputattach --eetiegalax /dev/ttyUSB0
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+If the port is not `/dev/ttyUSB0`, change it in the `ExecStart` line and in the `dev-ttyUSB0.device` lines (for example `dev-ttyUSB1.device` for `/dev/ttyUSB1`). Then load, enable and start the service:
+
+```
+sudo systemctl daemon-reload
+sudo systemctl enable --now egalax-touch.service
+```
+
+Check that it is running with `systemctl status egalax-touch.service`.
+
+*If the serial touchscreen does not respond.* Check the following:
+
+- The port is correct and no other program holds it. `sudo fuser /dev/ttyUSB0` prints nothing when the port is free.
+- The adapter stays connected. If `sudo dmesg | grep -i ttyUSB` shows it connecting and then disconnecting at once, `brltty` is still installed.
+- The controller runs at 9600 baud, its factory default. If it was set to another speed, add `--baud 19200` (or that speed) before the protocol option, for example `sudo inputattach --baud 19200 --eetiegalax /dev/ttyUSB0`, or set it back to 9600 with the eGalax utility on a Windows PC.
+- The installed `inputattach` supports eGalax: `inputattach --help | grep -i eeti` must print a line.
+
+### Step 2: Check the device name
+
+```
+xinput list
+```
+
+Note the name of the eGalax entry (normally `EETI eGalaxTouch Serial TouchScreen`). If the screen does not respond at all, `sudo evtest` lists the input devices and shows whether touches arrive.
+
+### Step 3: Use the evdev driver for the touchscreen
+
+Mint's default input driver ignores the calibration that `xinput_calibrator` produces, so assign the touchscreen to the `evdev` driver instead. Create the configuration file, then log out and back in (or reboot):
+
+```
+sudo mkdir -p /etc/X11/xorg.conf.d
+sudo nano /etc/X11/xorg.conf.d/99-egalax-touch.conf
+```
+
+```
+Section "InputClass"
+    Identifier "eGalax touchscreen"
+    MatchProduct "eGalax"
+    MatchDevicePath "/dev/input/event*"
+    Driver "evdev"
+EndSection
+```
+
+`MatchProduct` matches any device whose name contains the given text. If the name noted in Step 2 does not contain `eGalax`, use part of that name instead.
+
+### Step 4: Calibrate
+
+```
+xinput_calibrator
+```
+
+Tap each of the four targets as it appears. When it finishes, the tool prints a `Section "InputClass" ... EndSection` block. Add the `Option "Calibration" ...` line it prints (and `Option "SwapAxes" ...` if it prints one) to the block in `/etc/X11/xorg.conf.d/99-egalax-touch.conf` (open it with `sudo nano`), so it reads, for example, as shown below. Then log out and back in (or reboot); the calibration then applies at every login. If the X or Y direction is reversed, add `Option "InvertX" "on"` or `Option "InvertY" "on"`, or rerun `xinput_calibrator`.
+
+```
+Section "InputClass"
+    Identifier "eGalax touchscreen"
+    MatchProduct "eGalax"
+    MatchDevicePath "/dev/input/event*"
+    Driver "evdev"
+    Option "Calibration" "102 1945 102 1945"
+    Option "SwapAxes" "0"
+EndSection
+```
+
+The driver reports positions from 0 to 2047 on each axis, so the calibration values fall in that range (the example values above are typical).
+
+### Step 5: Two monitors (only if the PC has more than one display)
+
+Touches are spread over all displays until the touchscreen is tied to its own output. Find the output name (for example `HDMI-1`):
+
+```
+xrandr --listmonitors
+```
+
+Then map the touch device to it, using the device name from Step 2:
+
+```
+xinput map-to-output "EETI eGalaxTouch Serial TouchScreen" HDMI-1
 ```
 
 This lasts until logout. To apply it at every login, add the same command in **Menu**, then **Startup Applications** (click **+**, then **Custom command**, and set a delay of a few seconds).
