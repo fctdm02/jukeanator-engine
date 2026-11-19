@@ -274,7 +274,7 @@ public class RegistrationCard extends JPanel {
   private JPanel machineIdRow(String machineId) {
     JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
     row.setOpaque(false);
-    JLabel label = new JLabel("Machine ID: " + (machineId == null ? "(unknown)" : machineId));
+    JLabel label = new JLabel("Serial Number: " + (machineId == null ? "(unknown)" : machineId));
     label.setForeground(ColorTheme.get().textPrimary);
     label.setFont(new Font(Font.MONOSPACED, Font.BOLD, LayoutTheme.get().fontSizeLoginCaption));
     row.add(label);
@@ -282,7 +282,7 @@ public class RegistrationCard extends JPanel {
       JButton copy = actionButton("Copy", () -> {
         Toolkit.getDefaultToolkit().getSystemClipboard()
             .setContents(new StringSelection(machineId), null);
-        showMessage("Machine ID copied to the clipboard.", true);
+        showMessage("Serial number copied to the clipboard.", true);
       });
       copy.setPreferredSize(new Dimension(LayoutTheme.get().loginActionBtnW / 2,
           LayoutTheme.get().loginActionBtnH * 2 / 3));

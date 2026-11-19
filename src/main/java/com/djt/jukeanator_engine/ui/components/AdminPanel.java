@@ -48,6 +48,7 @@ import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import com.djt.jukeanator_engine.domain.license.legacy.SubscriptionQuarter;
 import com.djt.jukeanator_engine.domain.license.model.LicenseStatus;
 import com.djt.jukeanator_engine.domain.license.service.LicenseService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.AlbumDto;
@@ -392,7 +393,8 @@ public class AdminPanel extends JPanel {
 
   private static String htmlWrap(String message) {
     String escaped = message == null ? ""
-        : message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        : message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace("\n", "<br>");
     return "<html><body style='width: 260px; text-align:center;'>" + escaped + "</body></html>";
   }
 
@@ -1701,17 +1703,18 @@ public class AdminPanel extends JPanel {
         status = licenseService.getStatus();
       }
       LicenseStatus s = status;
+      String customerEmail = licenseService.getCustomerEmail();
+      String locationName = licenseService.getLocationName();
       SwingUtilities.invokeLater(() -> {
         StringBuilder text = new StringBuilder();
-        text.append("License: ").append(s.describe()).append(". ");
+        text.append("Build Date: ").append(BuildInfo.buildDate()).append("\n\n");
+        text.append("License: ").append(s.describe()).append('\n');
+        text.append("Serial Number: ").append(orNotSet(s.machineId())).append('\n');
+        text.append("Customer Email: ").append(orNotSet(customerEmail)).append('\n');
+        text.append("Location Name: ").append(orNotSet(locationName)).append('\n');
+        text.append("Expires: ").append(describeExpiration(s)).append("\n\n");
         text.append("Commercial operation (bill acceptor and card reader): ")
             .append(s.commercialEnabled() ? "enabled" : "disabled").append(". ");
-        text.append("Machine ID: ").append(s.machineId() == null ? "unknown" : s.machineId())
-            .append(". ");
-        if (s.subscriptionQuarter() != null) {
-          text.append("Subscription paid through ").append(s.subscriptionQuarter())
-              .append(" (").append(s.subscriptionHoursRemaining()).append(" hours left). ");
-        }
         if (s.lastServerCheckAt() != null) {
           text.append("Last confirmed by the license server: ")
               .append(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")
@@ -1735,6 +1738,29 @@ public class AdminPanel extends JPanel {
             });
       });
     });
+  }
+
+  private static String orNotSet(String value) {
+    return value == null || value.isBlank() ? "(not set)" : value;
+  }
+
+  /**
+   * The expiration as quarter and year with the remaining runtime hours, e.g.
+   * {@code "Q1 2027 (1234 hours remaining)"}.
+   */
+  private static String describeExpiration(LicenseStatus s) {
+    String quarter;
+    if (s.subscriptionQuarter() == null) {
+      quarter = s.isTrial() ? "(no license)"
+          : s.licensedTier().isSubscription() ? "(not set)" : "Never";
+    } else if (SubscriptionQuarter.isValid(s.subscriptionQuarter())) {
+      SubscriptionQuarter q = SubscriptionQuarter.parse(s.subscriptionQuarter());
+      quarter = "Q" + q.getQuarter() + " " + q.getYear();
+    } else {
+      quarter = s.subscriptionQuarter();
+    }
+    Integer hours = s.subscriptionHoursRemaining();
+    return quarter + " (" + (hours == null ? 0 : hours) + " hours remaining)";
   }
 
   // ─────────────────────────────────────────────────────────────────────────
