@@ -1,5 +1,7 @@
 package com.djt.jukeanator_engine.ui.event;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import com.djt.jukeanator_engine.domain.songlibrary.event.AlbumMetadataChangedEvent;
@@ -23,6 +25,7 @@ public class JukeANatorEventListener {
   private SongQueueService songQueueService;
   private SongPlayerService songPlayerService;
   private JukeANatorFrame frame;
+  private final AtomicInteger scanReloadCount = new AtomicInteger();
 
   public void setFrame(JukeANatorFrame frame) {
     this.frame = frame;
@@ -113,8 +116,20 @@ public class JukeANatorEventListener {
   public void handleScanFileSystemForSongsEvent(ScanFileSystemForSongsEvent event) {
 
     if (frame == null) return;
-    
+
+    // Counted before fetching, so a startup data load that began earlier can tell its data is stale
+    scanReloadCount.incrementAndGet();
     initializeUi();
+  }
+
+  /**
+   * How many times a library scan has reloaded the UI. The startup data load in
+   * {@code JukeANatorUserInterfaceApplication} runs concurrently with a first-time scan; it reads
+   * this before fetching and skips pushing its (possibly pre-scan, empty) data if a scan reload
+   * happened in the meantime, so it cannot overwrite the scanned library on the EDT.
+   */
+  public int getScanReloadCount() {
+    return scanReloadCount.get();
   }
   
   private void initializeUi() {

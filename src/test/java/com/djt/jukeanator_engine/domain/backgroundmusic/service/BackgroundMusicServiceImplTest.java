@@ -213,9 +213,11 @@ class BackgroundMusicServiceImplTest {
 
     String leastPlayed = "C:\\Music\\Least.mp3";
     String mostPlayed = "C:\\Music\\Most.mp3";
+    // Build the song mocks before stubbing root.getSongs(): stubbing another mock inside an
+    // unfinished when(...).thenReturn(...) triggers Mockito's UnfinishedStubbingException.
+    List<SongFileEntity> songs = List.of(librarySong(leastPlayed, 1), librarySong(mostPlayed, 50));
     RootFolderEntity root = mock(RootFolderEntity.class);
-    when(root.getSongs())
-        .thenReturn(List.of(librarySong(leastPlayed, 1), librarySong(mostPlayed, 50)));
+    when(root.getSongs()).thenReturn(songs);
     when(songLibraryService.getSongLibraryRoot(PREVIOUS_LOCATION_ID)).thenReturn(root);
 
     BackgroundMusicServiceImpl service = newService();

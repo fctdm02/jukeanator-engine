@@ -169,6 +169,12 @@ public class JukeANatorUserInterfaceApplication {
 
   private void loadInitialData() {
 
+    // A first-time scan runs concurrently with this load. If it completes after the fetch below
+    // starts, its ScanFileSystemForSongsEvent reload has already pushed the scanned library, and
+    // this (pre-scan, empty) data must not be pushed after it -- frame.setAlbums() hops to the EDT
+    // again, so it could otherwise land last and leave Home showing "No albums found."
+    int scanReloadsBeforeFetch = jukeANatorEventListener.getScanReloadCount();
+
     Integer          locationId  = songLibraryService.getOwnLocationId();
     List<AlbumDto>   albums      = songLibraryService.getAlbums(locationId);
     int              artistCount = songLibraryService.getArtists(locationId).size();
@@ -177,10 +183,15 @@ public class JukeANatorUserInterfaceApplication {
     var              queue       = songQueueService.getQueuedSongs(locationId);
 
     SwingUtilities.invokeLater(() -> {
-      frame.setAlbums(albums, artistCount);
-      frame.setGenres(genres);
-      frame.setNowPlaying(playing);
-      frame.setQueue(queue);
+      if (jukeANatorEventListener.getScanReloadCount() == scanReloadsBeforeFetch) {
+        frame.setAlbums(albums, artistCount);
+        frame.setGenres(genres);
+        frame.setNowPlaying(playing);
+        frame.setQueue(queue);
+      } else {
+        log.info("JukeANator UI: a library scan reloaded the UI during the initial data load; "
+            + "keeping the scanned data");
+      }
 
       // HOT HERE replaces the startup HOME tab only when there are enough song statistics.
       frame.selectDefaultTab();
