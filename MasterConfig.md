@@ -900,7 +900,27 @@ MySQL (3306, 33060), the application (8080), OpenDKIM (8891) and PostSRSd (10001
 
 ### Updating the application
 
-Build the WAR on the PC (`mvnw -DskipTests package`) and copy it to the server under a temporary name:
+**Automated (recommended).** From the project folder on the PC, run:
+
+```
+powershell -ExecutionPolicy Bypass -File deploy\deploy-prod.ps1
+```
+
+It needs only the SSH key access from Step 1; no passwords or secrets are involved, and nothing secret is kept in git. The script:
+
+- builds the WAR (`mvnw -DskipTests package`; run the tests separately beforehand);
+- uploads it to the server as `jukeanator-engine.war.new`, together with `deploy/jukeanator-deploy.sh`, and runs that script on the server;
+- on the server: checks the upload against the SHA-256 computed on the PC, runs the database backup (Step 12), keeps the current WAR as `jukeanator-engine.war.previous`, switches to the new one, restarts the service and waits up to four minutes for the application to answer;
+- if the new version does not answer in time, puts the previous WAR back, restarts it, prints the last log lines and reports the deploy as failed.
+
+Options:
+
+- `-SkipBuild` deploys the WAR already in `target\` without building.
+- `-SshHost <name>`, or the `JUKEANATOR_DEPLOY_HOST` environment variable, deploys to another server's entry in `%USERPROFILE%\.ssh\config` (default `jukeanator-prod`). This is how to deploy to a rebuilt or second server.
+
+The automatic rollback only restores the WAR. If the new version already changed the database schema before failing, also restore the backup the script took (the newest file in `/var/backups/jukeanator`, see "Restore" in Step 12).
+
+**By hand.** Build the WAR on the PC (`mvnw -DskipTests package`) and copy it to the server under a temporary name:
 
 ```
 scp target/jukeanator-engine-0.0.1-SNAPSHOT.war jukeanator-prod:/opt/jukeanator/jukeanator-engine.war.new
