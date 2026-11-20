@@ -21,8 +21,11 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
+import java.util.List;
+import java.util.function.Supplier;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songqueue.dto.AddSongToQueueRequest;
+import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService;
 import com.djt.jukeanator_engine.ui.model.CreditManager;
 import com.djt.jukeanator_engine.ui.security.SwingSecurityUtil;
@@ -42,6 +45,14 @@ public class AddSongToQueueCard extends JPanel {
   private final SongDto song;
   private final int priorityCostMultiplier;
   private final SongQueueService songQueueService;
+
+  /**
+   * The frame's latest queue snapshot (kept current by {@code SongQueueChangedEvent}). Button state
+   * and priority pricing are derived from it rather than from {@link SongQueueService}, whose
+   * getters wait on the song-queue monitor -- held across a DB write while a song is being added --
+   * and would stall the EDT. The service still enforces the real ordering when the song is added.
+   */
+  private final Supplier<List<SongQueueEntryDto>> queueSnapshot;
 
   private final CreditManager creditManager;
   private final Runnable onDismiss;
@@ -77,12 +88,14 @@ public class AddSongToQueueCard extends JPanel {
   // CONSTRUCTOR
   // ─────────────────────────────────────────────────────────────────────────
   public AddSongToQueueCard(SongDto song, ImageLoader imageLoader, int priorityCostMultiplier,
-      SongQueueService songQueueService, CreditManager creditManager, Runnable onDismiss) {
+      SongQueueService songQueueService, Supplier<List<SongQueueEntryDto>> queueSnapshot,
+      CreditManager creditManager, Runnable onDismiss) {
 
     this.imageLoader = imageLoader;
     this.song = song;
     this.priorityCostMultiplier = priorityCostMultiplier;
     this.songQueueService = songQueueService;
+    this.queueSnapshot = queueSnapshot;
     this.creditManager = creditManager;
     this.onDismiss = onDismiss;
 
@@ -404,7 +417,9 @@ public class AddSongToQueueCard extends JPanel {
   }
 
   private void dismiss() {
-    timeoutTimer.stop();
+    // Stop listening as soon as the card closes: the Play tap's own deductCredits() would otherwise
+    // re-run updateButtonStates() for this now-hidden card.
+    teardown();
     if (onDismiss != null) {
       SwingUtilities.invokeLater(onDismiss);
     }
@@ -420,7 +435,7 @@ public class AddSongToQueueCard extends JPanel {
     if (sessionLevel != null) {
       return sessionLevel;
     }
-    return songQueueService.getHighestPriority(songQueueService.getOwnLocationId());
+    return SongQueueService.nextPriorityLevel(queueSnapshot.get());
   }
 
   /**
@@ -439,8 +454,7 @@ public class AddSongToQueueCard extends JPanel {
    * credit session; earlier jukebox users' and web users' songs count as someone else's.
    */
   private boolean isPriorityPlayAllowed() {
-    return SongQueueService.isPriorityPlayAllowed(
-        songQueueService.getQueuedSongs(songQueueService.getOwnLocationId()),
+    return SongQueueService.isPriorityPlayAllowed(queueSnapshot.get(),
         entry -> SongQueueService.LOCAL_USERNAME.equals(entry.username())
             && creditManager.isSongQueuedThisSession(entry.song().albumId(),
                 entry.song().songId()));
@@ -550,6 +564,7 @@ public class AddSongToQueueCard extends JPanel {
     timeoutTimer.stop();
     if (creditListener != null) {
       creditManager.removeListener(creditListener);
+      creditListener = null;
     }
   }
 }

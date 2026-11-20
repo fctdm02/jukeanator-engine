@@ -44,6 +44,9 @@ app:
 logging:
   level:
     com.djt.jukeanator_engine: INFO
+    # Slave only: when master closes /ws-slave and resets the socket, Tomcat logs a WARN stack
+    # trace for its failed close-frame echo. SlaveConnectionManager already logs and reconnects.
+    org.apache.tomcat.websocket.WsRemoteEndpointImplClient: ERROR
 
 spring:
   application:

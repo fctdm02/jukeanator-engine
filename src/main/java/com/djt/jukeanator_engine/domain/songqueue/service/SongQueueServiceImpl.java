@@ -122,6 +122,12 @@ public class SongQueueServiceImpl
   /** How many dequeued songs {@link #songPlayHistoryLog} keeps. */
   private static final int SONG_PLAY_HISTORY_MAX = 100;
 
+  // ── Empty-queue refill retry (see dequeueNextSong()) ─────────────────────
+  /** Minimum time between attempts to refill an empty queue with background music. */
+  private static final Duration EMPTY_QUEUE_REFILL_RETRY_INTERVAL = Duration.ofMinutes(1);
+  /** When dequeueNextSong() last tried to refill an empty queue; guarded by {@code this}. */
+  private Instant lastEmptyQueueRefillAttempt;
+
   /**
    * Every song dequeued for playback, newest first (the currently playing song is at the head).
    * In memory only. Separate from {@link #songPlayHistory}, which Rule B trims to a few entries.
@@ -267,8 +273,23 @@ public class SongQueueServiceImpl
 
     if (songs.isEmpty()) {
 
-      eventPublisher.publishEvent(new SongQueueEmptyEvent());
-      return null;
+      // The queue is normally topped up right after each dequeue, but if that top-up found nothing
+      // it could queue (e.g. every background-music song was ineligible at the time), nothing else
+      // would ever refill it and background music would stay silent. The player polls this method
+      // every few seconds while idle, so retry the top-up here -- throttled, since a failed attempt
+      // runs the eligibility rules against the whole background-music playlist.
+      Instant now = Instant.now();
+      if (lastEmptyQueueRefillAttempt == null || !now
+          .isBefore(lastEmptyQueueRefillAttempt.plus(EMPTY_QUEUE_REFILL_RETRY_INTERVAL))) {
+        lastEmptyQueueRefillAttempt = now;
+        autoPopulateQueue();
+        songs = songQueueRoot.getSongs();
+      }
+
+      if (songs.isEmpty()) {
+        eventPublisher.publishEvent(new SongQueueEmptyEvent());
+        return null;
+      }
     }
 
     SongQueueEntryEntity nextSong = songs.getFirst();
@@ -354,13 +375,17 @@ public class SongQueueServiceImpl
       attempts++;
 
       // ── Draw one core background-music song ──────────────────────────────
+      // The eligibility rules are applied inside the draw, so the background-music service can
+      // skip songs that cannot be queued right now and, if none left in its current cycle can be,
+      // start a new cycle instead of returning the same ineligible song again and again.
       SongFileEntity coreSong;
       try {
-        coreSong = backgroundMusicService.getNextSong();
+        coreSong = backgroundMusicService.getNextSong(this::isBackgroundSongEligibleForQueue);
       } catch (BackgroundMusicServiceException bmse) {
-        // No eligible background-music candidate could be resolved against the song library
-        // (e.g. the library is empty/stale). Stop trying rather than let this fail queue
-        // seeding — and, during initializeInternal(), application startup itself.
+        // No background-music song can be resolved against the song library (e.g. the library is
+        // empty/stale), or none can be queued right now even in a new cycle. Stop trying rather
+        // than let this fail queue seeding -- and, during initializeInternal(), application
+        // startup itself. dequeueNextSong() retries periodically while the queue stays empty.
         log.warn("autoPopulateQueue: could not get next background music song, stopping: {}",
             bmse.getMessage());
         break;
@@ -369,17 +394,8 @@ public class SongQueueServiceImpl
       Integer coreAlbumId = coreSong.getAlbum().getId();
       Integer coreSongId = coreSong.getId();
 
-      String coreIneligibility =
-          isSongEligibleForQueue(songLibraryService.getOwnLocationId(), coreAlbumId, coreSongId, 0);
-      if (coreIneligibility == null) {
-        addSongToQueue("BG_MUSIC", coreAlbumId, coreSongId, 0);
-        backgroundMusicService.markSongQueued(coreSong);
-      } else {
-        log.debug("autoPopulateQueue: core BG song {} not eligible: {}", coreSong,
-            coreIneligibility);
-        // Do not count an ineligible core song against the smart-additions for this slot.
-        continue;
-      }
+      addSongToQueue("BG_MUSIC", coreAlbumId, coreSongId, 0);
+      backgroundMusicService.markSongQueued(coreSong);
 
       // ── Interleave smart-addition songs if the window is active ──────────
       if (!smartActive) {
@@ -423,6 +439,21 @@ public class SongQueueServiceImpl
     }
   }
 
+  /**
+   * Applies {@link #isSongEligibleForQueue} to a candidate core background-music song, at normal
+   * priority. Called back from {@link BackgroundMusicService#getNextSong(java.util.function.Predicate)}
+   * while {@link #autoPopulateQueue()} holds {@code this} monitor.
+   */
+  private boolean isBackgroundSongEligibleForQueue(SongFileEntity song) {
+
+    String ineligibility = isSongEligibleForQueue(songLibraryService.getOwnLocationId(),
+        song.getAlbum().getId(), song.getId(), 0);
+    if (ineligibility != null) {
+      log.debug("autoPopulateQueue: core BG song {} not eligible: {}", song, ineligibility);
+    }
+    return ineligibility == null;
+  }
+
   @Override
   public Integer getHighestPriority(Integer locationId) {
     if (!isOwnLocation(locationId)) {
@@ -431,10 +462,8 @@ public class SongQueueServiceImpl
     }
     synchronized (this) {
       List<SongQueueEntryEntity> songs = songQueueRoot.getSongs();
-      if (songs.isEmpty()) {
-        return Integer.valueOf(2);
-      }
-      return Integer.valueOf(songs.getFirst().getPriority().intValue() + 1);
+      return Integer.valueOf(SongQueueService
+          .nextPriorityLevel(songs.isEmpty() ? null : songs.getFirst().getPriority()));
     }
   }
 
@@ -458,6 +487,17 @@ public class SongQueueServiceImpl
       return requireGateway(locationId).sendCommand(locationId, "isSongEligibleForQueue",
           new EligibilityCheckPayload(albumId, songId, priority), String.class);
     }
+
+    // The rules read the queue, the play history and the currently playing song, all of which are
+    // mutated under this monitor (e.g. dequeueNextSong() on the song-queue thread); iterating them
+    // without it risks a ConcurrentModificationException.
+    synchronized (this) {
+      return checkEligibility(albumId, songId, priority);
+    }
+  }
+
+  /** Body of {@link #isSongEligibleForQueue} for this location; caller must hold {@code this}. */
+  private String checkEligibility(Integer albumId, Integer songId, Integer priority) {
 
     try {
 
@@ -928,6 +968,50 @@ public class SongQueueServiceImpl
     } catch (EntityDoesNotExistException e) {
       throw new ResourceNotFoundException("Could not add move song up in queue, albumId: " + albumId
           + ", songId: " + songId + ", error: " + e.getMessage(), e);
+    }
+  }
+
+  @Override
+  public Integer moveSongToTopOfQueue(Integer locationId,
+      ChangeSongQueueRequest changeSongQueueRequest) {
+    if (!isOwnLocation(locationId)) {
+      return requireGateway(locationId).sendCommand(locationId, "moveSongToTopOfQueue",
+          changeSongQueueRequest, Integer.class);
+    }
+    int albumId = changeSongQueueRequest.albumId();
+    int songId = changeSongQueueRequest.songId();
+
+    try {
+      AlbumFolderEntity album = songLibraryRoot.getAlbumById(albumId);
+      if (album == null) {
+        throw new ResourceNotFoundException("Could not move song to top of queue, albumId: "
+            + albumId + ", songId: " + songId + ", error: album does not exist!");
+      }
+      SongFileEntity song = album.getChildSong(songId);
+      if (song == null) {
+        throw new ResourceNotFoundException("Could not move song to top of queue, albumId: "
+            + albumId + ", songId: " + songId + ", error: song does not exist!");
+      }
+      int preferredIndex = changeSongQueueRequest.queuePosition() != null
+          ? changeSongQueueRequest.queuePosition()
+          : -1;
+
+      Integer numSongsInQueue;
+      List<SongQueueEntryDto> queuedSongs = null;
+      synchronized (this) {
+        numSongsInQueue = songQueueRoot.moveSongToTopOfQueue(song, preferredIndex);
+        if (numSongsInQueue.intValue() > 0) {
+          songQueueRepository.storeAggregateRoot(songQueueRoot);
+          queuedSongs = SongQueueMapper.toDto(songQueueRoot.getSongs());
+        }
+      }
+      if (queuedSongs != null) {
+        eventPublisher.publishEvent(new SongQueueChangedEvent(queuedSongs));
+      }
+      return numSongsInQueue;
+    } catch (EntityDoesNotExistException e) {
+      throw new ResourceNotFoundException("Could not move song to top of queue, albumId: "
+          + albumId + ", songId: " + songId + ", error: " + e.getMessage(), e);
     }
   }
 

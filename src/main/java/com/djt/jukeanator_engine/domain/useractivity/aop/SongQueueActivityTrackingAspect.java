@@ -61,6 +61,10 @@ public class SongQueueActivityTrackingAspect {
   private void moveSongDownInQueue() {}
 
   @Pointcut("execution(* com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService."
+      + "moveSongToTopOfQueue(..))")
+  private void moveSongToTopOfQueue() {}
+
+  @Pointcut("execution(* com.djt.jukeanator_engine.domain.songqueue.service.SongQueueService."
       + "removeSongDownFromQueue(..))")
   private void removeSongDownFromQueue() {}
 
@@ -80,6 +84,12 @@ public class SongQueueActivityTrackingAspect {
 
   @AfterReturning("moveSongUpInQueue()")
   public void trackMoveSongUpInQueue(JoinPoint jp) {
+    trackChange(jp, UserActivityType.QUEUE_SONG_MOVED_UP);
+  }
+
+  // Recorded as a move up: it is the one-step equivalent of moving the song up to the top.
+  @AfterReturning("moveSongToTopOfQueue()")
+  public void trackMoveSongToTopOfQueue(JoinPoint jp) {
     trackChange(jp, UserActivityType.QUEUE_SONG_MOVED_UP);
   }
 

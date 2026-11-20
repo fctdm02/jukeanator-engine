@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.config;
 
+import java.net.URI;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -12,6 +13,10 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
+import org.springframework.web.socket.WebSocketHandler;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.location.security.StompLocationApiKeyChannelInterceptor;
 
@@ -20,6 +25,17 @@ import com.djt.jukeanator_engine.domain.location.security.StompLocationApiKeyCha
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
   private static final long HEARTBEAT_INTERVAL_MILLIS = 10_000;
+
+  /**
+   * Largest single message a slave may send over {@code /ws-slave}. A slave sends its entire song
+   * queue there on every change (and in reply to {@code getQueuedSongs}), roughly 500 bytes per
+   * song, so a queue loaded from a playlist easily exceeds both default limits: Tomcat's 8 KB
+   * WebSocket text buffer (an oversized message closes the connection with 1009 TOO_BIG) and
+   * Spring's 64 KB STOMP message size limit. The master then dropped the slave's connection on
+   * every queue change, and the slave reconnected a few seconds later. 1 MB covers a queue of
+   * about 2,000 songs.
+   */
+  static final int SLAVE_MAX_MESSAGE_SIZE_BYTES = 1024 * 1024;
 
   private final JwtUtil jwtUtil;
 
@@ -70,6 +86,35 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     // by StompLocationApiKeyChannelInterceptor rather than JWT.
     if (locationApiKeyChannelInterceptor.isPresent()) {
       registry.addEndpoint("/ws-slave").setAllowedOriginPatterns("*");
+    }
+  }
+
+  @Override
+  public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+    // STOMP-level limit (applies to every endpoint; it only caps buffering, nothing is
+    // preallocated).
+    registration.setMessageSizeLimit(SLAVE_MAX_MESSAGE_SIZE_BYTES);
+    registration.addDecoratorFactory(SlaveSessionTextBufferDecorator::new);
+  }
+
+  /**
+   * Raises Tomcat's per-session WebSocket text buffer for {@code /ws-slave} sessions only. Tomcat
+   * allocates that buffer up front for every session, so it is left at its default for the
+   * browser-facing {@code /ws} endpoint, whose clients only send small frames.
+   */
+  private static final class SlaveSessionTextBufferDecorator extends WebSocketHandlerDecorator {
+
+    SlaveSessionTextBufferDecorator(WebSocketHandler delegate) {
+      super(delegate);
+    }
+
+    @Override
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+      URI uri = session.getUri();
+      if (uri != null && uri.getPath() != null && uri.getPath().endsWith("/ws-slave")) {
+        session.setTextMessageSizeLimit(SLAVE_MAX_MESSAGE_SIZE_BYTES);
+      }
+      super.afterConnectionEstablished(session);
     }
   }
 

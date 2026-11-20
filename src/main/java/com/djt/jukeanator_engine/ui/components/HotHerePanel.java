@@ -166,6 +166,20 @@ public class HotHerePanel extends JPanel implements TabNavigator {
       popularity = new SearchResultDto(List.of(), List.of(), List.of());
     }
 
+    // The fetch stays on the calling thread (JukeANatorEventListener calls this from whichever
+    // thread published the event -- e.g. the background thread that added a song); the rebuild
+    // touches Swing components and must run on the EDT.
+    final SearchResultDto results = popularity;
+    if (SwingUtilities.isEventDispatchThread()) {
+      applyMusicByPopularityResults(results);
+    } else {
+      SwingUtilities.invokeLater(() -> applyMusicByPopularityResults(results));
+    }
+  }
+
+  /** EDT half of {@link #refreshMusicByPopularityResults()}. */
+  private void applyMusicByPopularityResults(SearchResultDto popularity) {
+
     popularityArtistBuffer.seedFirstPage(safeList(popularity.artists()));
     popularityAlbumBuffer.seedFirstPage(safeList(popularity.albums()));
     popularitySongBuffer.seedFirstPage(safeList(popularity.songs()));

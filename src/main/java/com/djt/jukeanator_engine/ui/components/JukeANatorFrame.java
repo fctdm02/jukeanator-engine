@@ -195,6 +195,9 @@ public class JukeANatorFrame extends JFrame {
   private boolean idleResetDone = false;
 
   private AddSongToQueueCard addSongToQueueCard;
+
+  /** Bumped (on the EDT) by each showAddSongToQueueCard tap; stale eligibility results are dropped. */
+  private int addSongCardRequest;
   private EditAlbumCard editAlbumCard;
   private LoginToAdminPanelCard loginToAdminPanelCard;
   private AlbumDetailCard nowPlayingAlbumCard;
@@ -1944,8 +1947,40 @@ public class JukeANatorFrame extends JFrame {
    * {@link SongQueueService#isSongEligibleForQueue}. If the song is currently ineligible the card
    * is still shown, but it opens on its built-in "Song Constraint" panel rather than the normal
    * play-selection panel.
+   *
+   * <p>
+   * The eligibility check runs off the EDT: it waits on the song-queue monitor, which is held
+   * across a DB write whenever a song is being added or dequeued. The card is then built and shown
+   * back on the EDT. A tap superseded by a newer one before its check returns is dropped.
    */
   public void showAddSongToQueueCard(SongDto song) {
+
+    final int request = ++addSongCardRequest;
+    final Integer locationId = songQueueService.getOwnLocationId();
+
+    // ── Eligibility check (normal play = priority 1) ──────────────────────
+    // getHighestPriority() returns the next available priority; normal plays
+    // always use priority 1, so we pass 1 here as a representative value.
+    SwingSecurityUtil.runAsync(() -> {
+      String reason;
+      try {
+        reason = songQueueService.isSongEligibleForQueue(locationId, song.albumId(),
+            song.songId(), 1);
+      } catch (Exception e) {
+        log.error("Unable to check queue eligibility for {}", song.songName(), e);
+        reason = "its eligibility could not be checked";
+      }
+      final String ineligibleReason = reason;
+      SwingUtilities.invokeLater(() -> {
+        if (request == addSongCardRequest) {
+          displayAddSongToQueueCard(song, ineligibleReason);
+        }
+      });
+    });
+  }
+
+  /** EDT half of {@link #showAddSongToQueueCard}: builds and shows the card. */
+  private void displayAddSongToQueueCard(SongDto song, String reason) {
 
     if (addSongToQueueCard != null) {
       addSongToQueueCard.teardown();
@@ -1960,14 +1995,8 @@ public class JukeANatorFrame extends JFrame {
       requestFocusInWindow();
     };
 
-    // ── Eligibility check (normal play = priority 1) ──────────────────────
-    // getHighestPriority() returns the next available priority; normal plays
-    // always use priority 1, so we pass 1 here as a representative value.
-    String reason = songQueueService.isSongEligibleForQueue(songQueueService.getOwnLocationId(),
-        song.albumId(), song.songId(), 1);
-
     addSongToQueueCard = new AddSongToQueueCard(song, imageLoader, priorityCostMultiplier,
-        songQueueService, creditManager, onDismiss);
+        songQueueService, () -> currentQueue, creditManager, onDismiss);
 
     addSongToQueueCard.setOpaque(false);
 

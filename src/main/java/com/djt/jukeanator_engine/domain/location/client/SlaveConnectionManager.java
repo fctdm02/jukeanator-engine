@@ -153,6 +153,10 @@ public class SlaveConnectionManager {
     // separately via the app's own ObjectMapper in dispatch()/convert() below, regardless of
     // which Jackson generation produced the intermediate LinkedHashMap.
     this.stompClient.setMessageConverter(new JacksonJsonMessageConverter());
+    // STOMP-level counterpart of the WebSocket text buffer raised in SerializedSendWebSocketClient
+    // (Spring's default is 64 KB).
+    this.stompClient
+        .setInboundMessageSizeLimit(SerializedSendWebSocketClient.MAX_INBOUND_MESSAGE_SIZE_BYTES);
 
     // Required by WebSocketStompClient whenever STOMP heartbeats are enabled (see
     // connectHeaders.setHeartbeat below) — it schedules the heartbeat send/expect timers.
@@ -377,7 +381,10 @@ public class SlaveConnectionManager {
 
     @Override
     public void handleTransportError(StompSession session, Throwable exception) {
-      log.debug("Transport error on master connection, will reconnect", exception);
+      // INFO without a stack trace: a drop is routine (maintainConnection reconnects within one
+      // check interval), but repeated drops must be visible in the normal log.
+      log.info("Lost connection to master ({}), will reconnect", exception.getMessage());
+      log.debug("Transport error on master connection", exception);
       currentSession.compareAndSet(session, null);
     }
 
@@ -611,6 +618,9 @@ public class SlaveConnectionManager {
         return songQueueService.randomizeQueue(ownLocationId);
       case "moveSongUpInQueue":
         return songQueueService.moveSongUpInQueue(ownLocationId,
+            convert(payload, ChangeSongQueueRequest.class));
+      case "moveSongToTopOfQueue":
+        return songQueueService.moveSongToTopOfQueue(ownLocationId,
             convert(payload, ChangeSongQueueRequest.class));
       case "moveSongDownInQueue":
         return songQueueService.moveSongDownInQueue(ownLocationId,

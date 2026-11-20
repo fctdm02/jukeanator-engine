@@ -2382,17 +2382,27 @@ public class AdminPanel extends JPanel {
           ColorTheme.get().accentOrange);
       return;
     }
-    try {
-      int idx = queueList.getSelectedIndex();
-      for (int i = 0; i < idx; i++) {
-        songQueueService.moveSongUpInQueue(songQueueService.getOwnLocationId(),
-            new ChangeSongQueueRequest(selected.song().albumId(),
-                selected.song().songId()));
+    final int idx = queueList.getSelectedIndex();
+
+    // Off the EDT: moving the song persists the whole queue and notifies every listener (UI, web
+    // clients, master), and stopping the current song waits on the player.
+    SwingSecurityUtil.runAsync(() -> {
+      try {
+        if (idx > 0) {
+          // One move straight to the top -- not one move-up per position, which persisted and
+          // broadcast the entire queue once per step and could freeze the UI for many seconds.
+          songQueueService.moveSongToTopOfQueue(songQueueService.getOwnLocationId(),
+              new ChangeSongQueueRequest(selected.song().albumId(), selected.song().songId(),
+                  idx));
+        }
+        songPlayerService.playNextTrack(songLibraryService.getOwnLocationId());
+      } catch (Exception ex) {
+        ex.printStackTrace();
+        SwingUtilities.invokeLater(() -> showOverlayMessage("Play Failed",
+            "Could not play the selected song: " + ex.getMessage(),
+            ColorTheme.get().accentRed));
       }
-      songPlayerService.playNextTrack(songLibraryService.getOwnLocationId());
-    } catch (Exception ex) {
-      ex.printStackTrace();
-    }
+    });
   }
 
   private void doMoveUp() {
@@ -2697,7 +2707,9 @@ public class AdminPanel extends JPanel {
 
   public void setQueue(List<SongQueueEntryDto> queue) {
 
-    refreshQueueList(songQueueService.getQueuedSongs(songQueueService.getOwnLocationId()));
+    // Use the snapshot carried by SongQueueChangedEvent; re-fetching here would wait on the
+    // song-queue monitor from the EDT.
+    refreshQueueList(queue);
   }
 
   private void refreshQueueList(List<SongQueueEntryDto> queue) {

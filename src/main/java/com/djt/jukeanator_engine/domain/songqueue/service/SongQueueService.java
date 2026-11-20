@@ -44,6 +44,23 @@ public interface SongQueueService {
   }
 
   /**
+   * The next available priority level -- one above the song at the head of the queue, or 2 when the
+   * queue is empty. Shared by {@link #getHighestPriority} and the jukebox UI, which computes it from
+   * its own queue snapshot so it never has to wait on the song queue from the Swing EDT.
+   *
+   * @param headPriority priority of the first queued song, or {@code null} when the queue is empty
+   */
+  static int nextPriorityLevel(Integer headPriority) {
+    return headPriority == null ? 2 : headPriority.intValue() + 1;
+  }
+
+  /** {@link #nextPriorityLevel(Integer)} for a queue snapshot (head of the list is first to play). */
+  static int nextPriorityLevel(List<SongQueueEntryDto> queuedSongs) {
+    return nextPriorityLevel(
+        queuedSongs == null || queuedSongs.isEmpty() ? null : queuedSongs.getFirst().priority());
+  }
+
+  /**
    * NOTE: System method, not to be invoked on behalf of a user
    * 
    * @return
@@ -146,6 +163,19 @@ public interface SongQueueService {
    * @return
    */
   Integer moveSongUpInQueue(Integer locationId, ChangeSongQueueRequest changeSongQueueRequest);
+
+  /**
+   * Moves a queued song straight to the top of the queue in a single operation (one persist and
+   * one {@code SongQueueChangedEvent}), e.g. for the Admin screen's Play button. Moving it one step
+   * at a time with {@link #moveSongUpInQueue} would persist and broadcast the whole queue once per
+   * step, which takes many seconds for a song far down a long queue.
+   *
+   * @param changeSongQueueRequest the song to move; {@code queuePosition}, if given, picks the
+   *        right entry when the same song is queued more than once
+   * @return the number of songs in the queue if the song was moved, or {@code -1} if it was
+   *         already at the top
+   */
+  Integer moveSongToTopOfQueue(Integer locationId, ChangeSongQueueRequest changeSongQueueRequest);
 
   /**
    *

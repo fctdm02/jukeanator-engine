@@ -435,7 +435,7 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
         .filter(r -> !containsLabelText(r, homeSong.songName())).findFirst()
         .orElseThrow(() -> new AssertionError("no unqueued song in the search results")));
     clickComponent(songRow);
-    assertTrue(isAddSongCardShowing(), "a song row should open the Add Song card");
+    await(() -> isAddSongCardShowing(),"a song row should open the Add Song card");
     click(frame(), UiComponentNames.ADD_SONG_CANCEL_BUTTON);
     assertFalse(isAddSongCardShowing(), "Cancel should close the Add Song card");
     assertEquals(queueBefore, storedSongNames(), "Cancel must not queue anything");
@@ -466,7 +466,7 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     // That song is already queued, so the card opens on the constraint view
     int creditsBefore = credits();
     clickComponent(resultRow(hotHere, "SONGS", homeSong.songName()));
-    assertTrue(isAddSongCardShowing(), "the Add Song card should open");
+    await(() -> isAddSongCardShowing(),"the Add Song card should open");
     JLabel reason = onEdt(() -> requireShowing(frame(), UiComponentNames.ADD_SONG_CONSTRAINT_LABEL,
         JLabel.class));
     assertTrue(onEdt(reason::getText).contains("already in the queue"),
@@ -1255,6 +1255,7 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     }
   }
 
+  /** The card opens asynchronously (eligibility is checked off the EDT), so callers await it. */
   private static boolean isAddSongCardShowing() throws Exception {
     return onEdt(() -> SwingTestSupport.find(frame(), UiComponentNames.FRAME_ADD_SONG_GLASS_PANE,
         JPanel.class).orElseThrow().isVisible());
@@ -1262,7 +1263,7 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
 
   /** Presses Play or Priority Play on the open Add Song card and waits for it to close. */
   private static void playFromAddSongCard(String buttonName) throws Exception {
-    assertTrue(isAddSongCardShowing(), "the Add Song card should open");
+    await(() -> isAddSongCardShowing(),"the Add Song card should open");
     JButton play = onEdt(() -> requireShowing(frame(), buttonName, JButton.class));
     assertTrue(onEdt(play::isEnabled), buttonName + " should be enabled with enough credits");
     click(play);

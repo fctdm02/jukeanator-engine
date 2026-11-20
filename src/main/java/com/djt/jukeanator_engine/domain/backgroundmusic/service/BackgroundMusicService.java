@@ -1,5 +1,7 @@
 package com.djt.jukeanator_engine.domain.backgroundmusic.service;
 
+import java.util.function.Predicate;
+
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.event.ScanFileSystemForSongsEvent;
@@ -31,7 +33,26 @@ public interface BackgroundMusicService {
    * @return the next core background-music song, drawn from the played/not-played rotation over
    *         {@code BackgroundMusic.TXT}
    */
-  SongFileEntity getNextSong();
+  default SongFileEntity getNextSong() {
+    return getNextSong(song -> true);
+  }
+
+  /**
+   * Same as {@link #getNextSong()}, but only returns a song for which {@code isQueueable} is
+   * {@code true} (e.g. the song queue's eligibility rules: not explicit outside the allowed hours,
+   * not played too recently, and so on). Songs that fail it are skipped for this call but stay in
+   * the not-played pool, so they are still played this cycle if they become queueable later.
+   *
+   * <p>
+   * If none of the songs left in the current cycle can be queued, the cycle is completed early and
+   * a new one started, so background music keeps playing rather than stalling on them.
+   *
+   * @param isQueueable tests whether a candidate can be queued right now
+   * @return the next core background-music song that can be queued
+   * @throws com.djt.jukeanator_engine.domain.backgroundmusic.exception.BackgroundMusicServiceException
+   *         if no song in the playlist can be queued right now, even in a new cycle
+   */
+  SongFileEntity getNextSong(Predicate<SongFileEntity> isQueueable);
 
   /**
    * @return {@code true} when smart additions are enabled and the current wall-clock hour falls

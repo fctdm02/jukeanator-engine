@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -361,19 +362,56 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * application startup via {@code SongQueueServiceImpl}'s cold-start queue seeding. A skipped
    * candidate is also dropped from the not-played pool for the rest of the current cycle, so a
    * cycle whose only remaining songs are unresolvable still resets.
+   *
+   * <p>
+   * Candidates that fail {@code isQueueable} are skipped for the rest of this call but -- unlike
+   * unresolvable songs -- stay in the not-played pool, since they may become queueable later in the
+   * cycle (e.g. explicit songs once the evening window opens). If every song left in the current
+   * cycle fails it, the cycle is completed early and a new one started, so that songs which
+   * <em>can</em> be queued are drawn instead; otherwise the unqueueable leftovers would be the only
+   * candidates on every draw and background music would stop entirely. The early reset is skipped
+   * when the current cycle has made no progress yet (nothing played or queued since it began),
+   * since a new cycle would contain exactly the same songs.
+   *
+   * <p>
+   * Each pass through the loop either returns a song, throws, or permanently excludes one more
+   * song for this call, and the cycle is reset early at most once, so the call always terminates.
    */
   @Override
-  public SongFileEntity getNextSong() {
+  public SongFileEntity getNextSong(Predicate<SongFileEntity> isQueueable) {
 
-    Set<Integer> triedIds = new HashSet<>();
+    Set<Integer> excludedIds = new HashSet<>();
+    int rejectedCount = 0;
+    boolean cycleCompletedEarly = false;
     BackgroundMusicServiceException lastNotFoundFailure = null;
 
-    int maxAttempts = Math.max(1, allSongs.size());
+    // Safety bound only: every song can be excluded at most once per cycle, and there are at most
+    // two cycles (the current one and one started during this call).
+    int maxAttempts = 2 * Math.max(1, allSongs.size()) + 1;
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
 
       Integer chosenId;
       try {
-        chosenId = pickNextEligibleBackgroundId(triedIds);
+        chosenId = pickNextEligibleBackgroundId(excludedIds);
+
+        if (chosenId == null && rejectedCount > 0 && !cycleCompletedEarly
+            && currentCycleHasProgress()) {
+          // Unresolvable songs are removed from the not-played pool as they are skipped, so if
+          // the pool is non-empty but nothing is left to pick, every song remaining in this cycle
+          // was rejected as not queueable -- complete the cycle now instead of stalling on them.
+          log.info(
+              "getNextSong: none of the {} song(s) left in the current background music cycle "
+                  + "can be queued right now, starting a new cycle",
+              notPlayedIds.size());
+          cycleCompletedEarly = true;
+          startNewCycle();
+          // Rejected songs are back in the pool, but there is no point re-testing them right away.
+          chosenId = pickNextEligibleBackgroundId(excludedIds);
+        }
+
+        if (chosenId == null) {
+          throw new BackgroundMusicServiceException("No background music songs available");
+        }
       } catch (Exception e) {
         if (lastNotFoundFailure != null) {
           throw lastNotFoundFailure;
@@ -384,30 +422,54 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
 
       BackgroundMusicSongEntity chosen = songsById.get(chosenId);
 
+      SongFileEntity resolved;
       try {
         RootFolderEntity libraryRoot = this.songLibraryService
             .getSongLibraryRoot(this.songLibraryService.getOwnLocationId());
-        return resolveBackgroundSong(libraryRoot, chosen);
+        resolved = resolveBackgroundSong(libraryRoot, chosen);
       } catch (EntityDoesNotExistException ednee) {
         log.warn(
             "getNextSong: background music song id {} not found in song library, path: {}, "
                 + "skipping and trying another candidate",
             chosenId, chosen.getSongFilePath());
-        triedIds.add(chosenId);
+        excludedIds.add(chosenId);
         // Count it as used for this cycle (its timeLastPlayed stays null, so it is back in the pool
         // after the next reset or restart) -- otherwise, once only unresolvable songs remain, the
         // not-played pool never empties and the cycle never resets.
         notPlayedIds.remove(chosenId);
         lastNotFoundFailure = new BackgroundMusicServiceException(
             "Cannot get next background music song, error: " + ednee.getMessage(), ednee);
+        continue;
       } catch (Exception e) {
         throw new BackgroundMusicServiceException(
             "Cannot get next background music song, error: " + e.getMessage(), e);
       }
+
+      if (isQueueable.test(resolved)) {
+        return resolved;
+      }
+
+      // Not queueable right now: skip it for the rest of this call, but leave it in the
+      // not-played pool so it is still played this cycle if it becomes queueable later.
+      excludedIds.add(chosenId);
+      rejectedCount++;
     }
 
     throw lastNotFoundFailure != null ? lastNotFoundFailure
         : new BackgroundMusicServiceException("No background music songs available");
+  }
+
+  /**
+   * @return {@code true} if at least one song in the current playlist has been played or queued
+   *         since the current cycle began -- i.e. starting a new cycle now would actually return
+   *         songs to the pool. Songs still sitting in the queue are not counted, since they keep
+   *         their stamp across a reset (see {@link #startNewBackgroundCycle()}).
+   */
+  private boolean currentCycleHasProgress() {
+
+    return allSongs.stream()
+        .filter(song -> currentPlaylistPaths.contains(normalizedPath(song)))
+        .anyMatch(song -> song.getTimeLastPlayed() != null && !isCurrentlyQueued(song));
   }
 
   /**
@@ -427,18 +489,16 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
    * until enough picks have been made to release them, falling back to them only when nothing
    * else remains.
    *
-   * @param excludedIds ids to leave out of consideration, e.g. candidates already tried and
-   *        rejected earlier in the same {@link #getNextSong()} call because their path could not
-   *        be found in the song library
+   * @param excludedIds ids to leave out of consideration, e.g. candidates already tried earlier in
+   *        the same {@link #getNextSong(Predicate)} call because their path could not be found in
+   *        the song library, or because they could not be queued
+   * @return the chosen id, or {@code null} if every song in the (non-empty) not-played pool is in
+   *         {@code excludedIds}
    */
   private Integer pickNextEligibleBackgroundId(Set<Integer> excludedIds) {
 
     if (notPlayedIds.isEmpty()) {
-      startNewBackgroundCycle();
-
-      if (enableSmartBackgroundMusicAdditions) {
-        refreshSmartAdditionPool();
-      }
+      startNewCycle();
     }
 
     if (notPlayedIds.isEmpty()) {
@@ -449,7 +509,7 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
         .collect(Collectors.toList());
 
     if (notExcluded.isEmpty()) {
-      throw new BackgroundMusicServiceException("No background music songs available");
+      return null;
     }
 
     List<Integer> eligible = notExcluded.stream()
@@ -468,6 +528,19 @@ public class BackgroundMusicServiceImpl implements BackgroundMusicService {
     }
 
     return chosenId;
+  }
+
+  /**
+   * Starts a new core background-music cycle and, since song popularity may have shifted over a
+   * full cycle, refreshes the smart-additions pool along with it.
+   */
+  private void startNewCycle() {
+
+    startNewBackgroundCycle();
+
+    if (enableSmartBackgroundMusicAdditions) {
+      refreshSmartAdditionPool();
+    }
   }
 
   /**

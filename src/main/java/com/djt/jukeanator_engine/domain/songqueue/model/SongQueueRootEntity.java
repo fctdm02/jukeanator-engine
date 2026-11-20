@@ -183,7 +183,34 @@ public class SongQueueRootEntity extends AbstractPersistentEntity {
   }
 
   /**
-   * 
+   * Moves a song straight to the top of the song queue in one step, keeping the relative order of
+   * every other entry (equivalent to repeated {@link #moveSongUpInQueue(SongFileEntity, int)} calls,
+   * without persisting and broadcasting the queue once per step).
+   *
+   * @param song The song to move
+   * @param preferredIndex the song's expected queue index, used to pick the right entry when the
+   *        same song is queued more than once; {@code -1} to use its first occurrence
+   * @return The number of queueEntries in the song queue if the song was moved. Otherwise, if the
+   *         song is already at the top of the queue or is not queued, then -1 is returned
+   */
+  public Integer moveSongToTopOfQueue(SongFileEntity song, int preferredIndex) {
+
+    if (queueEntries == null) {
+      queueEntries = new ArrayList<>();
+    }
+    int index = resolveIndex(song, preferredIndex);
+    if (index > 0) {
+
+      SongQueueEntryEntity current = this.queueEntries.remove(index);
+      this.queueEntries.add(0, current);
+
+      return Integer.valueOf(this.queueEntries.size());
+    }
+    return -1;
+  }
+
+  /**
+   *
    * @param song
    * @return
    */

@@ -4,6 +4,8 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import jakarta.websocket.ContainerProvider;
+import jakarta.websocket.WebSocketContainer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketExtension;
@@ -32,6 +34,24 @@ public class SerializedSendWebSocketClient extends StandardWebSocketClient {
 
   /** How much may queue up behind a slow send before the connection is treated as stuck. */
   static final int BUFFER_SIZE_LIMIT_BYTES = 1024 * 1024;
+
+  /**
+   * Largest single message accepted from master. Tomcat's default WebSocket text buffer is only
+   * 8 KB, and an oversized message closes the connection (1009 TOO_BIG); a command carrying a
+   * long song list could exceed that. Matches master's limit for messages from slaves (see
+   * {@code WebSocketConfig.SLAVE_MAX_MESSAGE_SIZE_BYTES}).
+   */
+  static final int MAX_INBOUND_MESSAGE_SIZE_BYTES = 1024 * 1024;
+
+  public SerializedSendWebSocketClient() {
+    super(createContainer());
+  }
+
+  private static WebSocketContainer createContainer() {
+    WebSocketContainer container = ContainerProvider.getWebSocketContainer();
+    container.setDefaultMaxTextMessageBufferSize(MAX_INBOUND_MESSAGE_SIZE_BYTES);
+    return container;
+  }
 
   @Override
   protected CompletableFuture<WebSocketSession> executeInternal(WebSocketHandler webSocketHandler,

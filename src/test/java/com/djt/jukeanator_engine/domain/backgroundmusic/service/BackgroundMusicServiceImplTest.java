@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -716,6 +717,72 @@ class BackgroundMusicServiceImplTest {
     stubLibrary(List.of(), paths);
 
     assertThrows(BackgroundMusicServiceException.class, service::getNextSong);
+  }
+
+  @Test
+  void regularCycle_skipsUnqueueableSong_andStartsNewCycle_whenOnlyItRemains() throws Exception {
+
+    List<String> paths = cyclePaths("Regular", 4);
+    BackgroundMusicServiceImpl service = newRegularCycleService(paths);
+    stubLibrary(paths, List.of());
+
+    // e.g. a song on an album flagged explicit, during the day
+    String blocked = paths.get(0);
+    Predicate<SongFileEntity> notBlocked = song -> !blocked.equals(song.getNaturalIdentity());
+
+    // While other songs remain in the cycle, the unqueueable one is skipped in their favor.
+    Set<String> picked = new HashSet<>();
+    for (int i = 0; i < paths.size() - 1; i++) {
+      SongFileEntity song = service.getNextSong(notBlocked);
+      assertNotEquals(blocked, song.getNaturalIdentity(), "an unqueueable song is never returned");
+      assertTrue(picked.add(song.getNaturalIdentity()));
+      service.markSongQueued(song);
+    }
+    Set<String> expected = new HashSet<>(paths);
+    expected.remove(blocked);
+    assertEquals(expected, picked);
+    verify(backgroundMusicRepository, never()).resetAllPlayedTimestamps(anyList());
+
+    // Only the unqueueable song is left in the cycle. Previously it was drawn on every attempt and
+    // the cycle never reset, so background music stopped entirely; now a new cycle starts.
+    SongFileEntity next = service.getNextSong(notBlocked);
+
+    assertNotEquals(blocked, next.getNaturalIdentity());
+    verify(backgroundMusicRepository, times(1)).resetAllPlayedTimestamps(anyList());
+
+    // The skipped song is part of the new cycle, so it is played once it can be queued again.
+    service.markSongQueued(next);
+    Set<String> rest = new HashSet<>();
+    for (int i = 0; i < paths.size() - 1; i++) {
+      SongFileEntity song = service.getNextSong();
+      rest.add(song.getNaturalIdentity());
+      service.markSongQueued(song);
+    }
+    assertTrue(rest.contains(blocked));
+  }
+
+  @Test
+  void regularCycle_fails_withoutResetting_whenNoSongCanBeQueuedInAFreshCycle() throws Exception {
+
+    List<String> paths = cyclePaths("Regular", 3);
+    BackgroundMusicServiceImpl service = newRegularCycleService(paths);
+    stubLibrary(paths, List.of());
+
+    // Nothing has been played this cycle, so a new cycle would hold exactly the same songs.
+    assertThrows(BackgroundMusicServiceException.class, () -> service.getNextSong(song -> false));
+    verify(backgroundMusicRepository, never()).resetAllPlayedTimestamps(anyList());
+  }
+
+  @Test
+  void regularCycle_fails_afterOneReset_whenNoSongCanBeQueued() throws Exception {
+
+    List<String> paths = cyclePaths("Regular", 3);
+    BackgroundMusicServiceImpl service = newRegularCycleService(paths);
+    stubLibrary(paths, List.of());
+    service.markSongQueued(service.getNextSong());
+
+    assertThrows(BackgroundMusicServiceException.class, () -> service.getNextSong(song -> false));
+    verify(backgroundMusicRepository, times(1)).resetAllPlayedTimestamps(anyList());
   }
 
   @Test
