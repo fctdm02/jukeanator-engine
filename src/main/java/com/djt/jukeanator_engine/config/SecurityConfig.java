@@ -67,7 +67,7 @@ public class SecurityConfig {
             // CONNECT frame (StompJwtChannelInterceptor / StompLocationApiKeyChannelInterceptor).
             // The Web/Mobile UI lives under /app/ (see StaticSiteConfig); "/" is the public
             // marketing home page on master and a redirect to /app/ elsewhere.
-            .requestMatchers("/", "/index.html", "/app", "/app/**", "/images/**",
+            .requestMatchers("/", "/index.html", "/app", "/app/**", "/get-app", "/images/**",
                 "/favicon.ico", "/favicon-16x16.png", "/favicon-32x32.png",
                 "/apple-touch-icon.png", "/android-chrome-192x192.png",
                 "/android-chrome-512x512.png", "/ws/**", "/ws-slave/**")

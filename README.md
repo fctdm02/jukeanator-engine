@@ -38,7 +38,13 @@ The `prod` Maven profile builds the WAR, runs the tests, and deploys it to the p
 mvnw clean deploy -Pprod
 ```
 
-Add `-DskipTests` to deploy without running the tests. In PowerShell, use `.\mvnw.cmd`. In Eclipse, create a Maven Run Configuration with goals `clean deploy` and profile `prod`.
+To deploy without the tests (for example, a change to the static web pages only), add the `skip-tests` profile:
+
+```
+mvnw clean deploy -Pprod,skip-tests
+```
+
+In PowerShell, use `.\mvnw.cmd`. In Eclipse, create a Maven Run Configuration with goals `clean deploy` and profile `prod` (or `prod,skip-tests` to skip the tests).
 
 What it does:
 

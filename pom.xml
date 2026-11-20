@@ -340,6 +340,18 @@
 				</plugins>
 			</build>
 		</profile>
+
+		<!-- Skips compiling and running the tests. Combine it with prod for a quick deploy of a
+		     change the tests do not cover (e.g. the static web pages):
+		     mvnw clean deploy -Pprod,skip-tests
+		     In Eclipse: a Maven Run Configuration with goals "clean deploy" and profiles
+		     "prod,skip-tests". -->
+		<profile>
+			<id>skip-tests</id>
+			<properties>
+				<maven.test.skip>true</maven.test.skip>
+			</properties>
+		</profile>
 	</profiles>
 
 </project>
