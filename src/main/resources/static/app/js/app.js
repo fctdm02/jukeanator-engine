@@ -379,18 +379,228 @@
 
   // ── Navigation ──────────────────────────────────────────────────────────
   function navigateSub(screen, params = {}) {
+    currentAuthView = null;
     state.navStack.push({ screen, params });
+    recordHistory();
     renderSubScreen(screen, params);
   }
 
   function goBack() {
+    // When the browser's current history entry is this very screen, step the browser back: the
+    // popstate handler then shows the previous screen, so the on-screen back arrow and the
+    // browser/phone Back button walk the same path and Forward still works afterwards.
+    const entry = history.state;
+    if (entry && entry.jk && !entry.auth && entry.idx > 0 && state.navStack.length > 0
+        && sameView(entry, historySnapshot())) {
+      history.back();
+      return;
+    }
     state.navStack.pop(); // current screen
     const prev = state.navStack[state.navStack.length - 1];
-    if (!prev) {
-      renderMain(state.currentMainTab);
-    } else {
-      renderSubScreen(prev.screen, prev.params);
+    withHistory('replace', () => {
+      if (!prev) {
+        renderMain(state.currentMainTab);
+      } else {
+        renderSubScreen(prev.screen, prev.params);
+        recordHistory();
+      }
+    });
+  }
+
+  // ── Browser history (Back / Forward buttons) ────────────────────────────
+  // Every screen the patron moves to gets its own browser history entry, holding a snapshot of
+  // where they are: the main tab, the sub-screen stack (navStack) and, on the sign-in screens,
+  // which one. The browser's Back/Forward buttons (and Android's system Back) then fire
+  // popstate, which shows the screen in that snapshot instead of leaving the app. history.state
+  // also survives a page reload, so a reload reopens the same screen where that is safe.
+  // The address bar itself never changes.
+
+  // Screens that hold an in-progress edit; history never reopens them from a snapshot (only
+  // when they are still live in navStack), so Forward or a reload lands on their parent.
+  const NON_RESTORABLE_SCREENS = new Set(['playlist-edit-order', 'playlist-multi-select']);
+  // Screens that need a signed-in patron; dropped from a restored stack after signing out.
+  const SIGNED_IN_SCREENS = new Set([
+    'my-account', 'manage-account', 'user-profile', 'change-password', 'delete-account',
+    'transaction-history', 'my-playlists-all', 'playlist-detail', 'playlist-edit-order',
+    'playlist-multi-select',
+  ]);
+
+  let currentAuthView = null;   // { kind: 'login' | 'register' | 'check-email', email } or null
+  let historyIdx = 0;           // this app's position in the browser history (0 = first entry)
+  let historyOverride = null;   // 'replace' or 'skip' while a render must not push an entry
+  let suppressedPops = 0;       // popstate events caused by our own history.go(), to ignore
+
+  function historySnapshot() {
+    return {
+      jk: 1,
+      idx: historyIdx,
+      tab: state.currentMainTab,
+      stack: state.navStack.map(e => ({ screen: e.screen, params: e.params })),
+      auth: currentAuthView ? { ...currentAuthView } : null,
+    };
+  }
+
+  /** Same screen, ignoring parameters: a re-render of it replaces its entry instead of adding one. */
+  function sameView(a, b) {
+    return a.tab === b.tab
+      && (a.auth ? a.auth.kind : null) === (b.auth ? b.auth.kind : null)
+      && a.stack.length === b.stack.length
+      && a.stack.every((e, i) => e.screen === b.stack[i].screen);
+  }
+
+  /** Runs a render whose own recordHistory() call must replace the current entry, or add none. */
+  function withHistory(mode, render) {
+    const previous = historyOverride;
+    historyOverride = mode;
+    try {
+      render();
+    } finally {
+      historyOverride = previous;
     }
+  }
+
+  /** Records the screen just shown: a new history entry, or a replacement of the current one. */
+  function recordHistory() {
+    if (historyOverride === 'skip') return;
+    const current = history.state;
+    const snapshot = historySnapshot();
+    let replace = !current || !current.jk || historyOverride === 'replace' || sameView(current, snapshot);
+    // Signing in, cancelling sign-in, or moving on to "Check Your Email" takes the sign-in
+    // screen's place, so Back never returns to a sign-in form that no longer applies.
+    if (!replace && current.auth && (!snapshot.auth || snapshot.auth.kind !== 'register')) {
+      replace = true;
+    }
+    snapshot.idx = replace ? (current && current.jk ? current.idx : 0) : historyIdx + 1;
+    writeHistory(snapshot, replace);
+    historyIdx = snapshot.idx;
+  }
+
+  function writeHistory(snapshot, replace) {
+    try {
+      if (replace) history.replaceState(snapshot, '');
+      else history.pushState(snapshot, '');
+    } catch {
+      // A screen parameter the browser cannot store (DataCloneError): keep the screen names
+      // only. Such an entry is still reachable while it is live in navStack.
+      snapshot.stack = snapshot.stack.map(e => ({ screen: e.screen, params: null, lost: true }));
+      if (replace) history.replaceState(snapshot, '');
+      else history.pushState(snapshot, '');
+    }
+  }
+
+  /** Closes the topmost dialog, menu or bottom sheet, if one is open. True when one was. */
+  function closeTopOverlay() {
+    const dialogs = document.querySelectorAll('.app-dialog-backdrop');
+    if (dialogs.length) {
+      // openAppDialog dismisses on a click whose target is the backdrop itself.
+      dialogs[dialogs.length - 1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      return true;
+    }
+    if (document.getElementById('playlistEditMenu')) {
+      // The playlist Edit menu closes on any click outside it.
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      document.getElementById('playlistEditMenu')?.remove();
+      return true;
+    }
+    const sheets = document.querySelectorAll('.song-popup-overlay.song-popup-visible');
+    if (!sheets.length) return false;
+    const sheet = sheets[sheets.length - 1];
+    switch (sheet.id) {
+      case 'songPopupOverlay':      dismissSongPopup();            break;
+      case 'locationPickerOverlay': dismissLocationPickerSheet();  break;
+      case 'selectPlaylistOverlay': dismissSelectPlaylistSheet();  break;
+      case 'paymentMethodOverlay':
+        // Never pull the sheet out from under a payment that is being processed.
+        if (!document.getElementById('payNowBtn')?.disabled) dismissPaymentMethodSheet();
+        break;
+      default: sheet.remove();
+    }
+    return true;
+  }
+
+  /**
+   * Shows the screen in a history snapshot. direction is -1 (Back), +1 (Forward) or 0 (reload).
+   * Screens still live in navStack keep their current parameters (which may have been updated,
+   * e.g. a renamed playlist); the rest come from the snapshot.
+   */
+  function showHistoryEntry(entry, direction) {
+    if (entry.auth) {
+      if (state.token) {
+        // Already signed in: a sign-in screen no longer applies, so step past it.
+        if (direction < 0) history.back();
+        else if (direction > 0) history.forward();
+        else withHistory('replace', () => renderMain(entry.tab === 'addfunds' ? 'addfunds' : 'music'));
+        return;
+      }
+      withHistory('skip', () => {
+        if (entry.auth.kind === 'register') renderRegister();
+        else if (entry.auth.kind === 'check-email' && entry.auth.email) renderCheckYourEmail(entry.auth.email);
+        else renderLogin();
+      });
+      return;
+    }
+
+    const tab = entry.tab === 'addfunds' && !state.token ? 'music' : (entry.tab || 'music');
+    const live = tab === state.currentMainTab ? state.navStack : [];
+    const stack = [];
+    let livePrefix = true;
+    for (let i = 0; i < entry.stack.length; i++) {
+      const e = entry.stack[i];
+      if (livePrefix && i < live.length && live[i].screen === e.screen) {
+        stack.push(live[i]);
+        continue;
+      }
+      livePrefix = false;
+      if (e.lost || NON_RESTORABLE_SCREENS.has(e.screen)
+          || (!state.token && SIGNED_IN_SCREENS.has(e.screen))) {
+        break;
+      }
+      stack.push({ screen: e.screen, params: e.params || {} });
+    }
+    const trimmed = tab !== entry.tab || stack.length !== entry.stack.length;
+
+    currentAuthView = null;
+    withHistory(trimmed ? 'replace' : 'skip', () => {
+      if (stack.length === 0) {
+        renderMain(tab);
+      } else {
+        state.currentMainTab = tab;
+        state.navStack = stack;
+        recordHistory();
+        renderSubScreen(stack[stack.length - 1].screen, stack[stack.length - 1].params);
+      }
+    });
+  }
+
+  window.addEventListener('popstate', (e) => {
+    const entry = e.state;
+    if (suppressedPops > 0) {
+      suppressedPops--;
+      if (entry && entry.jk) historyIdx = entry.idx;
+      return;
+    }
+    const targetIdx = entry && entry.jk ? entry.idx : 0;
+    const delta = targetIdx - historyIdx;
+    if (closeTopOverlay()) {
+      // Back (or Forward) only closed the open dialog or sheet: return to the entry we were on.
+      if (delta !== 0) {
+        suppressedPops++;
+        history.go(-delta);
+      }
+      return;
+    }
+    if (!entry || !entry.jk) return; // not an entry this app made
+    historyIdx = entry.idx;
+    showHistoryEntry(entry, Math.sign(delta));
+  });
+
+  /** On page load: reopens the screen this history entry was on before a reload. */
+  function restoreHistoryOnLoad() {
+    const entry = history.state;
+    if (!entry || !entry.jk) return false;
+    historyIdx = entry.idx;
+    showHistoryEntry(entry, 0);
+    return true;
   }
 
   // ── Sub-screen shell ────────────────────────────────────────────────────
@@ -466,6 +676,8 @@
     activeContentPanelScrollHandler = null;
     state.currentMainTab = tab;
     state.navStack = [];
+    currentAuthView = null;
+    recordHistory();
 
     contentPanel.innerHTML = `
       <div class="app-frame">
@@ -1259,6 +1471,8 @@
    */
   function renderLogin(errorMessage, options = {}) {
     const { notice, resendEmail } = options;
+    currentAuthView = { kind: 'login' };
+    recordHistory();
     contentPanel.innerHTML = `
       <div class="centered-view">
         <div class="auth-box">
@@ -1333,6 +1547,8 @@
 
   /** Shown after Create Account when the new account must verify its email before signing in. */
   function renderCheckYourEmail(emailAddress, notice) {
+    currentAuthView = { kind: 'check-email', email: emailAddress };
+    recordHistory();
     contentPanel.innerHTML = `
       <div class="centered-view">
         <div class="auth-box">
@@ -1353,7 +1569,7 @@
       renderCheckYourEmail(emailAddress, sent ? 'A new link is on its way.'
         : 'Could not send the email. Please try again.');
     });
-    document.getElementById('verifySignInBtn').addEventListener('click', () => renderLogin());
+    document.getElementById('verifySignInBtn').addEventListener('click', () => backToSignIn('check-email'));
   }
 
   /**
@@ -1367,7 +1583,8 @@
     if (!outcome) return false;
     params.delete('verify');
     const query = params.toString();
-    history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : '')
+    // Keep this entry's screen snapshot (see recordHistory); only the address changes.
+    history.replaceState(history.state, '', window.location.pathname + (query ? `?${query}` : '')
       + window.location.hash);
 
     if (outcome === 'success') {
@@ -1380,7 +1597,23 @@
     return true;
   }
 
+  /**
+   * "Cancel" on Create Account and "Back to Sign In" on Check Your Email: steps the browser back
+   * to the sign-in screen they came from (so its history entry is reused, not duplicated), or
+   * shows the sign-in screen directly when there is no such entry.
+   */
+  function backToSignIn(fromKind) {
+    const entry = history.state;
+    if (entry && entry.jk && entry.idx > 0 && entry.auth && entry.auth.kind === fromKind) {
+      history.back();
+    } else {
+      renderLogin();
+    }
+  }
+
   function renderRegister(errorMessage) {
+    currentAuthView = { kind: 'register' };
+    recordHistory();
     contentPanel.innerHTML = `
       <div class="centered-view">
         <div class="auth-box">
@@ -1403,7 +1636,7 @@
     wirePasswordPeeks(contentPanel);
     wirePasswordValidity(document.getElementById('registerPassword'),
       document.getElementById('registerConfirmPassword'));
-    document.getElementById('registerCancelBtn').addEventListener('click', () => renderLogin());
+    document.getElementById('registerCancelBtn').addEventListener('click', () => backToSignIn('register'));
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const errEl = document.getElementById('registerError');
@@ -2741,6 +2974,7 @@
       const renamed = { ...playlist, name: newName };
       const current = state.navStack[state.navStack.length - 1];
       if (current && current.screen === 'playlist-detail') current.params = { ...current.params, playlist: renamed };
+      withHistory('replace', recordHistory); // so Forward and a reload show the new name
       renderPlaylistDetail({ ...params, playlist: renamed });
     }
 
@@ -3789,7 +4023,10 @@
       }
     }
     await Promise.all([loadPricingConfig(), loadGeoFenceStatus()]);
-    renderMain('music');
+    // A verification link always opens the sign-in screen; otherwise a reload reopens the
+    // screen this history entry was on (see showHistoryEntry), or the Music tab on a first visit.
+    const verifying = new URLSearchParams(window.location.search).has('verify');
+    if (verifying || !restoreHistoryOnLoad()) renderMain('music');
     handleVerificationRedirect();
     connectWebSocket();
   })();
