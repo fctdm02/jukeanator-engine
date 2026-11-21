@@ -42,6 +42,7 @@ import com.djt.jukeanator_engine.domain.license.legacy.LegacyResponses;
 import com.djt.jukeanator_engine.domain.license.legacy.LicenseTier;
 import com.djt.jukeanator_engine.domain.license.legacy.RevocationLists;
 import com.djt.jukeanator_engine.domain.license.legacy.SubscriptionQuarter;
+import com.djt.jukeanator_engine.domain.license.model.LicenseAgreement;
 import com.djt.jukeanator_engine.domain.license.model.LicenseStatus;
 
 /**
@@ -539,6 +540,40 @@ public class LicenseServiceImpl implements LicenseService {
       refreshCustomerName();
     }
     return status;
+  }
+
+  @Override
+  public boolean isAgreementAccepted() {
+    return LicenseAgreement.VERSION.equals(trimToNull(properties.getAgreementAcceptedVersion()));
+  }
+
+  @Override
+  public boolean isCommercialAgreementAccepted() {
+    return LicenseAgreement.VERSION.equals(
+        trimToNull(properties.getCommercialAgreementAcceptedVersion()));
+  }
+
+  @Override
+  public synchronized void acceptAgreement(boolean includingCommercialSection) {
+    String version = LicenseAgreement.VERSION;
+    String at = Instant.now(clock).toString();
+    Map<String, String> updates = new LinkedHashMap<>();
+    updates.put("agreement-accepted-version", version);
+    updates.put("agreement-accepted-at", at);
+    if (includingCommercialSection) {
+      updates.put("commercial-agreement-accepted-version", version);
+      updates.put("commercial-agreement-accepted-at", at);
+    }
+    persist(updates, p -> {
+      p.setAgreementAcceptedVersion(version);
+      p.setAgreementAcceptedAt(at);
+      if (includingCommercialSection) {
+        p.setCommercialAgreementAcceptedVersion(version);
+        p.setCommercialAgreementAcceptedAt(at);
+      }
+    });
+    log.info("License agreement {} accepted{}", version,
+        includingCommercialSection ? " (including the Commercial Use section)" : "");
   }
 
   @Override

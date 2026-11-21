@@ -36,6 +36,25 @@ public class LicenseProperties {
 
   private String autoProvisionPasscode;
 
+  /**
+   * Version of the license agreement the operator accepted at first start (blank = not yet
+   * accepted). Written by the jukebox UI; see {@code LicenseAgreement.VERSION}.
+   */
+  private String agreementAcceptedVersion;
+
+  /** When {@link #agreementAcceptedVersion} was accepted (ISO-8601). */
+  private String agreementAcceptedAt;
+
+  /**
+   * Version of the license agreement whose Commercial Use section (public performance licensing
+   * is the operator's responsibility) the operator accepted. Payment inputs stay disabled until
+   * it matches the current version.
+   */
+  private String commercialAgreementAcceptedVersion;
+
+  /** When {@link #commercialAgreementAcceptedVersion} was accepted (ISO-8601). */
+  private String commercialAgreementAcceptedAt;
+
   /** How often to report in to the license server. */
   private Duration heartbeatInterval = Duration.ofHours(6);
 
@@ -100,6 +119,38 @@ public class LicenseProperties {
 
   public void setAutoProvisionPasscode(String autoProvisionPasscode) {
     this.autoProvisionPasscode = autoProvisionPasscode;
+  }
+
+  public String getAgreementAcceptedVersion() {
+    return agreementAcceptedVersion;
+  }
+
+  public void setAgreementAcceptedVersion(String agreementAcceptedVersion) {
+    this.agreementAcceptedVersion = agreementAcceptedVersion;
+  }
+
+  public String getAgreementAcceptedAt() {
+    return agreementAcceptedAt;
+  }
+
+  public void setAgreementAcceptedAt(String agreementAcceptedAt) {
+    this.agreementAcceptedAt = agreementAcceptedAt;
+  }
+
+  public String getCommercialAgreementAcceptedVersion() {
+    return commercialAgreementAcceptedVersion;
+  }
+
+  public void setCommercialAgreementAcceptedVersion(String commercialAgreementAcceptedVersion) {
+    this.commercialAgreementAcceptedVersion = commercialAgreementAcceptedVersion;
+  }
+
+  public String getCommercialAgreementAcceptedAt() {
+    return commercialAgreementAcceptedAt;
+  }
+
+  public void setCommercialAgreementAcceptedAt(String commercialAgreementAcceptedAt) {
+    this.commercialAgreementAcceptedAt = commercialAgreementAcceptedAt;
   }
 
   public Duration getHeartbeatInterval() {

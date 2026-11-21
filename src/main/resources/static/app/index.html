@@ -7,8 +7,10 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-<link rel="manifest" href="/app/site.webmanifest">
-<link rel="stylesheet" href="/app/css/style.css">
+<!-- The UI's own files are referenced relative to this page (always served at /app/; /app
+     redirects there) so the same files also work when bundled into the native mobile app. -->
+<link rel="manifest" href="site.webmanifest">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div id="app-shell">
@@ -32,6 +34,8 @@
   <!-- PayPal's JS SDK is loaded dynamically in app.js, not here -- it must carry a
        data-client-token attribute set from our own per-session Braintree client token. -->
 
-  <script src="/app/js/app.js"></script>
+  <!-- config.js sets the server base URL (empty here; the native app build overrides it). -->
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

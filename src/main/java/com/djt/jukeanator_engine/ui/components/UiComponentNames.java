@@ -121,6 +121,12 @@ public final class UiComponentNames {
   public static final String LICENSE_DETAIL_SKIP_BUTTON = "LicenseDetailPromptCard.skipButton";
   public static final String LICENSE_DETAIL_MESSAGE_LABEL = "LicenseDetailPromptCard.messageLabel";
 
+  // ── LicenseAgreementCard ────────────────────────────────────────────────────
+  public static final String LICENSE_AGREEMENT_TEXT = "LicenseAgreementCard.text";
+  public static final String LICENSE_AGREEMENT_ACCEPT_BUTTON = "LicenseAgreementCard.acceptButton";
+  public static final String LICENSE_AGREEMENT_DECLINE_BUTTON = "LicenseAgreementCard.declineButton";
+  public static final String LICENSE_AGREEMENT_MESSAGE_LABEL = "LicenseAgreementCard.messageLabel";
+
   // ── AdminPanel: lists ───────────────────────────────────────────────────────
   public static final String ADMIN_ALBUM_LIST = "AdminPanel.albumList";
   public static final String ADMIN_QUEUE_LIST = "AdminPanel.queueList";

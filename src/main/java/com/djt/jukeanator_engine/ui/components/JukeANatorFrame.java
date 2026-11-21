@@ -134,12 +134,14 @@ public class JukeANatorFrame extends JFrame {
   public static final String CARD_NOW_PLAYING_ALBUM = "NOW_PLAYING_ALBUM";
   public static final String CARD_REGISTRATION = "REGISTRATION";
   public static final String CARD_LICENSE_DETAIL = "LICENSE_DETAIL";
+  public static final String CARD_LICENSE_AGREEMENT = "LICENSE_AGREEMENT";
 
   // ── LICENSING ──────────────────────────────────────────────────────────────
   // Null when no license service exists (e.g. GUI tests): payment inputs then stay enabled.
   private LicenseService licenseService;
   private RegistrationCard registrationCard;
   private LicenseDetailPromptCard licenseDetailCard;
+  private LicenseAgreementCard licenseAgreementCard;
   private long lastUnlicensedPaymentLogMillis;
 
   private final CardLayout overlayCardLayout = new CardLayout();
@@ -2107,14 +2109,24 @@ public class JukeANatorFrame extends JFrame {
    * arriving otherwise is ignored (logged at most once a minute), as in the legacy application.
    */
   private boolean paymentsLicensed(String source) {
-    if (licenseService == null || licenseService.isCommercialEnabled()) {
+    if (licenseService == null) {
+      return true;
+    }
+    boolean commercial = licenseService.isCommercialEnabled();
+    boolean acknowledged = licenseService.isCommercialAgreementAccepted();
+    if (commercial && acknowledged) {
       return true;
     }
     long now = System.currentTimeMillis();
     if (now - lastUnlicensedPaymentLogMillis > 60_000L) {
       lastUnlicensedPaymentLogMillis = now;
-      log.warn("Ignoring {} pulse: no commercial license is active ({})", source,
-          licenseService.getStatus().describe());
+      if (!commercial) {
+        log.warn("Ignoring {} pulse: no commercial license is active ({})", source,
+            licenseService.getStatus().describe());
+      } else {
+        log.warn("Ignoring {} pulse: the Commercial Use section of the license agreement has not"
+            + " been accepted", source);
+      }
     }
     return false;
   }
@@ -2125,7 +2137,55 @@ public class JukeANatorFrame extends JFrame {
    */
   private boolean registrationCardShowing() {
     return (registrationCard != null && registrationCard.isShowing())
-        || (licenseDetailCard != null && licenseDetailCard.isShowing());
+        || (licenseDetailCard != null && licenseDetailCard.isShowing())
+        || (licenseAgreementCard != null && licenseAgreementCard.isShowing());
+  }
+
+  /**
+   * Shows the license agreement when it still needs accepting, then runs {@code then} (on the
+   * EDT). The whole agreement is shown when the current version was never accepted; only the
+   * Commercial Use acknowledgement when it was, but a commercial tier is now licensed and that
+   * section was not. Declining the whole agreement exits; declining the commercial section
+   * continues with payment inputs disabled. Without a license service (GUI tests, master) it just
+   * runs {@code then}.
+   */
+  public void showLicenseAgreementIfNeeded(Runnable then) {
+    if (licenseService == null) {
+      then.run();
+      return;
+    }
+    LicenseAgreementCard.Mode mode = null;
+    if (!licenseService.isAgreementAccepted()) {
+      mode = LicenseAgreementCard.Mode.GENERAL;
+    } else if (licenseService.getStatus().licensedTier().isCommercial()
+        && !licenseService.isCommercialAgreementAccepted()) {
+      mode = LicenseAgreementCard.Mode.COMMERCIAL;
+    }
+    if (mode == null) {
+      then.run();
+      return;
+    }
+    LicenseAgreementCard.Mode shown = mode;
+    licenseAgreementCard = new LicenseAgreementCard(licenseService, shown,
+        /* onAccepted */ () -> {
+          hideOverlay();
+          then.run();
+        },
+        /* onDeclined */ () -> {
+          if (shown == LicenseAgreementCard.Mode.GENERAL) {
+            log.info("License agreement declined: exiting");
+            System.exit(0);
+          }
+          hideOverlay();
+          then.run();
+        });
+    replaceOverlayCard(CARD_LICENSE_AGREEMENT, licenseAgreementCard);
+    overlayCardLayout.show(overlayRoot, CARD_LICENSE_AGREEMENT);
+    syncOverlayLayerBounds();
+    overlayRoot.revalidate();
+    overlayRoot.repaint();
+    requestFocusInWindow();
+    log.info("License agreement shown ({} mode)", shown);
   }
 
   /**
@@ -2197,8 +2257,9 @@ public class JukeANatorFrame extends JFrame {
             registrationCard.dismiss();
           }
           hideOverlay();
-          // Now ask for any customer / location name the license server could not supply.
-          showMissingLicenseDetails();
+          // A newly installed commercial license needs the Commercial Use acknowledgement; then
+          // ask for any customer / location name the license server could not supply.
+          showLicenseAgreementIfNeeded(this::showMissingLicenseDetails);
         }));
     replaceOverlayCard(CARD_REGISTRATION, registrationCard);
     overlayCardLayout.show(overlayRoot, CARD_REGISTRATION);

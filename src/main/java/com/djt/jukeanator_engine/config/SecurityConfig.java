@@ -1,17 +1,23 @@
 package com.djt.jukeanator_engine.config;
 
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import com.djt.jukeanator_engine.domain.common.security.JwtAuthenticationFilter;
 import com.djt.jukeanator_engine.domain.location.security.LocationApiKeyAuthenticationFilter;
 
@@ -36,6 +42,8 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http.csrf(csrf -> csrf.disable())
+        // CORS preflights are answered by corsConfigurationSource() before authorization runs.
+        .cors(Customizer.withDefaults())
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(ex -> ex
             // No/invalid/expired JWT on a protected endpoint → 401, not the default 403, so the
@@ -88,7 +96,7 @@ public class SecurityConfig {
             // Static marketing pages and assets at the site root, the web UI under /app/, the
             // license admin page shell (its API below is admin-only), and well-known files.
             .requestMatchers("/*.html", "/*.htm", "/*.pdf", "/*.xml", "/*.txt", "/*.jpg",
-                "/*.png", "/*.ico", "/*.gif", "/assets/**", "/patent_Application_files/**",
+                "/*.png", "/*.ico", "/*.gif", "/assets/**",
                 "/admin/**", "/.well-known/**")
             .permitAll()
             .requestMatchers("/api/admin/licenses/**").hasRole("ADMIN")
@@ -188,5 +196,27 @@ public class SecurityConfig {
         filter -> http.addFilterAfter(filter, JwtAuthenticationFilter.class));
 
     return http.build();
+  }
+
+  /**
+   * Cross-origin access to the REST API for the native mobile app. The Capacitor wrapper loads a
+   * bundled copy of the Web/Mobile UI from the device itself -- origin capacitor://localhost on
+   * iOS, https://localhost on Android -- so its calls to /api/** are cross-origin. Auth is a
+   * bearer JWT in the Authorization header (never a cookie), so credentials are not allowed.
+   * The /ws SockJS endpoint does its own CORS handling (see WebSocketConfig) and is not
+   * registered here. Override the origin list with app.cors.allowed-origins.
+   */
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource(
+      @Value("${app.cors.allowed-origins:capacitor://localhost,https://localhost}") List<String> allowedOrigins) {
+    CorsConfiguration config = new CorsConfiguration();
+    config.setAllowedOrigins(allowedOrigins);
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+    config.setAllowedHeaders(List.of("*"));
+    config.setAllowCredentials(false);
+    config.setMaxAge(3600L);
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/api/**", config);
+    return source;
   }
 }

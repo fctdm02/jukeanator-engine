@@ -20,18 +20,19 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 
-import com.djt.jukeanator_engine.domain.email.service.EmailService;
 import com.djt.jukeanator_engine.domain.license.legacy.LegacyResponses;
 import com.djt.jukeanator_engine.domain.license.legacy.LicenseTier;
 import com.djt.jukeanator_engine.domain.licenseserver.config.LicenseServerProperties;
 import com.djt.jukeanator_engine.domain.licenseserver.dto.LegacyClientRequest;
 import com.djt.jukeanator_engine.domain.licenseserver.dto.ProvisionOutcome;
+import com.djt.jukeanator_engine.domain.licenseserver.event.ContactFeedbackSubmittedEvent;
 import com.djt.jukeanator_engine.domain.licenseserver.service.LicenseServerService;
 
 /**
@@ -56,15 +57,18 @@ public class LegacyFrontController {
       "licensing", "screenshots", "photos", "conversionkits", "comparison_matrix", "howto",
       "performing_upgrade", "privacy_policy", "return_policy", "terms_and_conditions");
 
+  /** Contact form fields left out of the feedback email (the command and the buttons). */
+  private static final Set<String> FEEDBACK_IGNORED_PARAMS = Set.of("command", "Submit", "Reset");
+
   private final LicenseServerService licenseServerService;
   private final LicenseServerProperties properties;
-  private final EmailService emailService;
+  private final ApplicationEventPublisher eventPublisher;
 
   public LegacyFrontController(LicenseServerService licenseServerService,
-      LicenseServerProperties properties, EmailService emailService) {
+      LicenseServerProperties properties, ApplicationEventPublisher eventPublisher) {
     this.licenseServerService = licenseServerService;
     this.properties = properties;
-    this.emailService = emailService;
+    this.eventPublisher = eventPublisher;
   }
 
   @RequestMapping(path = {"/FrontController", "/servlet/FrontController"},
@@ -141,15 +145,25 @@ public class LegacyFrontController {
     Enumeration<String> names = request.getParameterNames();
     while (names.hasMoreElements()) {
       String name = names.nextElement();
-      if ("command".equals(name)) {
+      if (FEEDBACK_IGNORED_PARAMS.contains(name)) {
         continue;
       }
       for (String value : request.getParameterValues(name)) {
-        comments.append(name).append(": ").append(value).append('\n');
+        if (value != null && !value.isBlank()) {
+          comments.append(name).append(": ").append(value.trim()).append('\n');
+        }
       }
     }
-    emailService.sendContactFeedbackEmail(properties.getFeedbackRecipients(),
-        request.getParameter("customerEmail"), comments.toString());
+    // An empty submission (every field blank) is not worth an email.
+    if (comments.isEmpty()) {
+      log.info("Ignoring empty contact form submission from {}", request.getRemoteAddr());
+    } else {
+      // Sent asynchronously as the system principal (ContactFeedbackEmailListener): this request
+      // is anonymous, and ServiceSecurityAspect rejects unauthenticated EmailService calls.
+      eventPublisher.publishEvent(new ContactFeedbackSubmittedEvent(
+          properties.getFeedbackRecipients(), request.getParameter("customerEmail"),
+          comments.toString()));
+    }
     response.sendRedirect("/contact-thanks.html");
   }
 

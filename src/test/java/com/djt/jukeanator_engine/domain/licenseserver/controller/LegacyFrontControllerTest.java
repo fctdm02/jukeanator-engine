@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -11,27 +12,54 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-import com.djt.jukeanator_engine.domain.email.service.EmailService;
 import com.djt.jukeanator_engine.domain.license.legacy.LegacyResponses;
 import com.djt.jukeanator_engine.domain.licenseserver.config.LicenseServerProperties;
 import com.djt.jukeanator_engine.domain.licenseserver.dto.LegacyClientRequest;
 import com.djt.jukeanator_engine.domain.licenseserver.dto.LicenseAdminDtos;
 import com.djt.jukeanator_engine.domain.licenseserver.dto.ProvisionOutcome;
+import com.djt.jukeanator_engine.domain.licenseserver.event.ContactFeedbackSubmittedEvent;
 import com.djt.jukeanator_engine.domain.licenseserver.service.LicenseServerService;
 
 /** Byte-level checks of the legacy wire format legacy MP3Jukeboxx clients compare against. */
 class LegacyFrontControllerTest {
 
   private RecordingService service;
+  private List<Object> publishedEvents;
   private LegacyFrontController controller;
 
   @BeforeEach
   void setUp() {
     service = new RecordingService();
+    publishedEvents = new ArrayList<>();
     LicenseServerProperties properties = new LicenseServerProperties();
     properties.setLatestEngineVersion("1.2.0");
     properties.setEngineDownloadUrl("https://www.jukeanator.com/temp/engine.zip");
-    controller = new LegacyFrontController(service, properties, new NoEmail());
+    properties.setFeedbackRecipients(List.of("support@jukeanator.com"));
+    controller = new LegacyFrontController(service, properties, publishedEvents::add);
+  }
+
+  @Test
+  void feedback_publishesEventWithFilledFieldsOnly_andRedirectsToThanks() throws Exception {
+    MockHttpServletResponse response = call("feedback", "customerName", "Pat",
+        "customerEmail", "pat@example.com", "customerPhone", "", "comments", "Hello",
+        "Submit", "Send");
+
+    assertEquals("/contact-thanks.html", response.getRedirectedUrl());
+    assertEquals(1, publishedEvents.size());
+    ContactFeedbackSubmittedEvent event = (ContactFeedbackSubmittedEvent) publishedEvents.get(0);
+    assertEquals(List.of("support@jukeanator.com"), event.recipients());
+    assertEquals("pat@example.com", event.visitorEmail());
+    assertEquals("customerName: Pat\ncustomerEmail: pat@example.com\ncomments: Hello\n",
+        event.comments());
+  }
+
+  @Test
+  void feedback_emptySubmission_sendsNothing_butStillRedirects() throws Exception {
+    MockHttpServletResponse response = call("feedback", "customerName", " ", "comments", "",
+        "Submit", "Send");
+
+    assertEquals("/contact-thanks.html", response.getRedirectedUrl());
+    assertEquals(0, publishedEvents.size());
   }
 
   @Test
@@ -182,22 +210,4 @@ class LegacyFrontControllerTest {
     }
   }
 
-  private static final class NoEmail implements EmailService {
-    @Override
-    public void sendPurchaseReceiptEmail(String toAddress, String firstName, int credits,
-        int bonusCredits, java.math.BigDecimal amountUsd, String paymentSource,
-        String transactionId, java.time.Instant timestamp, int newBalance) {}
-
-    @Override
-    public void sendAccountVerificationEmail(String toAddress, String firstName,
-        String verificationUrl, java.time.Instant expiresAt) {}
-
-    @Override
-    public void sendFinancialLedgerSplitSummaryEmail(
-        com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto period) {}
-
-    @Override
-    public void sendContactFeedbackEmail(List<String> toAddresses, String visitorEmail,
-        String comments) {}
-  }
 }

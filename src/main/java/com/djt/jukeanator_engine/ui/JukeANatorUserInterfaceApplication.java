@@ -156,6 +156,12 @@ public class JukeANatorUserInterfaceApplication {
     if (licenseService == null) {
       return;
     }
+    // The license agreement comes first (first start, a new agreement version, or a commercial
+    // license whose Commercial Use section was not yet acknowledged).
+    frame.showLicenseAgreementIfNeeded(this::showRegistrationOrMissingDetails);
+  }
+
+  private void showRegistrationOrMissingDetails() {
     LicenseStatus status = licenseService.getStatus();
     if (status.registrationNeeded()
         || (status.licensedTier().isSubscription() && status.message() != null)) {

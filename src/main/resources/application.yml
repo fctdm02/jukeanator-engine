@@ -192,7 +192,7 @@ license-server:   # master mode only: www.jukeanator.com license server and publ
 # blank until that app is published; those phones go to web-app-url instead.
 mobile-app:
   ios-store-url: ~       # Apple App Store listing, e.g. https://apps.apple.com/us/app/jukeanator/id1234567890
-  android-store-url: ~   # Google Play listing, e.g. https://play.google.com/store/apps/details?id=com.djt.jukeanator
+  android-store-url: ~   # Google Play listing, e.g. https://play.google.com/store/apps/details?id=com.jukeanator.app
   web-app-url: /app/     # everyone else: desktop browsers, other phones, and unpublished apps
 
 user-interface:

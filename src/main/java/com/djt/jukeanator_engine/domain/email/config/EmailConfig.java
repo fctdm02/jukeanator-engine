@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.mail.javamail.JavaMailSender;
 import com.djt.jukeanator_engine.domain.email.listener.AccountVerificationEmailListener;
+import com.djt.jukeanator_engine.domain.email.listener.ContactFeedbackEmailListener;
 import com.djt.jukeanator_engine.domain.email.listener.FinancialLedgerSplitEmailListener;
 import com.djt.jukeanator_engine.domain.email.listener.PurchaseReceiptEmailListener;
 import com.djt.jukeanator_engine.domain.email.service.EmailService;
@@ -32,6 +33,11 @@ public class EmailConfig {
   public AccountVerificationEmailListener accountVerificationEmailListener(
       EmailService emailService) {
     return new AccountVerificationEmailListener(emailService);
+  }
+
+  @Bean
+  public ContactFeedbackEmailListener contactFeedbackEmailListener(EmailService emailService) {
+    return new ContactFeedbackEmailListener(emailService);
   }
 
   @Bean

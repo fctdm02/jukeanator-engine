@@ -1,4 +1,12 @@
 (() => {
+  // ── Server base URL ─────────────────────────────────────────────────────
+  // Empty when the UI is served by the JukeANator server itself (paths stay same-origin, e.g.
+  // "/api/..."). When the UI is bundled into a native mobile wrapper (Capacitor), js/config.js
+  // sets apiBaseUrl to the master's absolute URL, and every REST call, the websocket, and every
+  // server-hosted image (cover art, location logos, /images/...) is prefixed with it.
+  const API_BASE = ((window.JUKEANATOR_CONFIG && window.JUKEANATOR_CONFIG.apiBaseUrl) || '')
+    .replace(/\/+$/, '');
+
   // ── State ───────────────────────────────────────────────────────────────
   const state = {
     token: localStorage.getItem('jwt'),
@@ -180,7 +188,7 @@
   }
 
   async function api(path, options = {}) {
-    const res = await fetch(locationScopedPath(path), {
+    const res = await fetch(API_BASE + locationScopedPath(path), {
       ...options,
       headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(options.headers || {}) },
     });
@@ -690,7 +698,7 @@
               <span class="credits-value" id="creditsValue">${creditsWidgetText(0)}</span>
             </div>
             <button class="account-logo-btn" id="accountBtn">
-              <img src="/images/AccountLogo.png" alt="Account">
+              <img src="${API_BASE}/images/AccountLogo.png" alt="Account">
             </button>
           </div>
           <div class="now-playing-bar" id="nowPlayingWidget"></div>
@@ -866,7 +874,7 @@
 
   function songThumbHtml(s) {
     const art = s.albumId != null
-      ? `<img src="/api/locations/${state.locationId}/song-library/albums/${s.albumId}/coverArt" alt=""
+      ? `<img src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${s.albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'rp-thumb-placeholder\\'>&#127925;</div>'">`
       : `<div class="rp-thumb-placeholder">&#127925;</div>`;
     return `<div class="rp-thumb-card">
@@ -878,7 +886,7 @@
 
   function artistThumbHtml(a) {
     const art = (a.albums && a.albums.length && a.albums[0].albumId != null)
-      ? `<img src="/api/locations/${state.locationId}/song-library/albums/${a.albums[0].albumId}/coverArt" alt=""
+      ? `<img src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${a.albums[0].albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'rp-thumb-placeholder\\'>&#127911;</div>'">`
       : `<div class="rp-thumb-placeholder">&#127911;</div>`;
     return `<div class="rp-thumb-card">
@@ -890,7 +898,7 @@
 
   function albumThumbHtml(a) {
     const art = a.albumId != null
-      ? `<img src="/api/locations/${state.locationId}/song-library/albums/${a.albumId}/coverArt" alt=""
+      ? `<img src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${a.albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'rp-thumb-placeholder\\'>&#128191;</div>'">`
       : `<div class="rp-thumb-placeholder">&#128191;</div>`;
     return `<div class="rp-thumb-card">
@@ -1026,7 +1034,7 @@
 
   function songListRowHtml(s) {
     const art = s.albumId != null
-      ? `<img class="result-thumb" src="/api/locations/${state.locationId}/song-library/albums/${s.albumId}/coverArt" alt=""
+      ? `<img class="result-thumb" src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${s.albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#127925;</div>'">`
       : `<div class="result-thumb-placeholder">&#127925;</div>`;
     return `<div class="result-row">
@@ -1040,7 +1048,7 @@
 
   function artistListRowHtml(a) {
     const art = (a.albums && a.albums.length && a.albums[0].albumId != null)
-      ? `<img class="result-thumb" src="/api/locations/${state.locationId}/song-library/albums/${a.albums[0].albumId}/coverArt" alt=""
+      ? `<img class="result-thumb" src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${a.albums[0].albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#127911;</div>'">`
       : `<div class="result-thumb-placeholder">&#127911;</div>`;
     return `<div class="result-row">
@@ -1054,7 +1062,7 @@
 
   function albumListRowHtml(a) {
     const art = a.albumId != null
-      ? `<img class="result-thumb" src="/api/locations/${state.locationId}/song-library/albums/${a.albumId}/coverArt" alt=""
+      ? `<img class="result-thumb" src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${a.albumId}/coverArt" alt=""
               onerror="this.outerHTML='<div class=\\'result-thumb-placeholder\\'>&#128191;</div>'">`
       : `<div class="result-thumb-placeholder">&#128191;</div>`;
     return `<div class="result-row">
@@ -1119,7 +1127,7 @@
     } else {
       const crawlText = `${escHtml(song.artistName || '')}${song.albumName ? ' &middot; ' + escHtml(song.albumName) : ''}`;
       widget.innerHTML = `
-        <img class="now-playing-album-link" src="/api/locations/${state.locationId}/song-library/albums/${song.albumId}/coverArt" alt="${escHtml(song.albumName || '')}"
+        <img class="now-playing-album-link" src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${song.albumId}/coverArt" alt="${escHtml(song.albumName || '')}"
              onerror="this.remove()">
         <div class="now-playing-text">
           <div class="now-playing-title-row">
@@ -1476,7 +1484,7 @@
     contentPanel.innerHTML = `
       <div class="centered-view">
         <div class="auth-box">
-          <div class="auth-logo"><img src="/images/JukeANatorLogo.png" alt="JukeANator"></div>
+          <div class="auth-logo"><img src="${API_BASE}/images/JukeANatorLogo.png" alt="JukeANator"></div>
           <h1>Login</h1>
           <form id="loginForm">
             ${notice ? `<div class="notice-msg" id="loginNotice">${escHtml(notice)}</div>` : ''}
@@ -1552,7 +1560,7 @@
     contentPanel.innerHTML = `
       <div class="centered-view">
         <div class="auth-box">
-          <div class="auth-logo"><img src="/images/JukeANatorLogo.png" alt="JukeANator"></div>
+          <div class="auth-logo"><img src="${API_BASE}/images/JukeANatorLogo.png" alt="JukeANator"></div>
           <h1>Check Your Email</h1>
           ${notice ? `<div class="notice-msg">${escHtml(notice)}</div>` : ''}
           <p class="verify-email-text">We sent a verification link to
@@ -1617,7 +1625,7 @@
     contentPanel.innerHTML = `
       <div class="centered-view">
         <div class="auth-box">
-          <div class="auth-logo"><img src="/images/JukeANatorLogo.png" alt="JukeANator"></div>
+          <div class="auth-logo"><img src="${API_BASE}/images/JukeANatorLogo.png" alt="JukeANator"></div>
           <h1>Create Account</h1>
           <form id="registerForm" autocomplete="off">
             <div class="error-msg" id="registerError" ${errorMessage ? '' : 'hidden'}>${escHtml(errorMessage || '')}</div>
@@ -1909,7 +1917,7 @@
 
   function coverArtHtml(albumId, fallbackEmoji) {
     if (albumId != null) {
-      return `<img class="result-thumb" src="/api/locations/${state.locationId}/song-library/albums/${albumId}/coverArt"
+      return `<img class="result-thumb" src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${albumId}/coverArt"
                alt="" onerror="this.outerHTML=\`<div class='result-thumb-placeholder'>${fallbackEmoji}</div>\`">`;
     }
     return `<div class="result-thumb-placeholder">${fallbackEmoji}</div>`;
@@ -1917,7 +1925,7 @@
 
   function artistResultRow(a) {
     const thumb = a.artistId != null
-      ? `<img class="result-thumb" src="/api/locations/${state.locationId}/song-library/artists/${a.artistId}/coverArt"
+      ? `<img class="result-thumb" src="${API_BASE}/api/locations/${state.locationId}/song-library/artists/${a.artistId}/coverArt"
                alt="" onerror="this.outerHTML=\`<div class='result-thumb-placeholder'>&#127911;</div>\`">`
       : `<div class="result-thumb-placeholder">&#127911;</div>`;
     return `<div class="result-row artist-result-row" data-artist-id="${a.artistId ?? ''}">
@@ -2294,7 +2302,7 @@
     const countsText = `${songCount.toLocaleString()} ${songCount === 1 ? 'Song' : 'Songs'}`
       + ` &middot; ${playCount.toLocaleString()} ${playCount === 1 ? 'Play' : 'Plays'}`;
     const coverHtml = album.albumId != null
-      ? `<img class="album-detail-cover" src="/api/locations/${state.locationId}/song-library/albums/${album.albumId}/coverArt"
+      ? `<img class="album-detail-cover" src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${album.albumId}/coverArt"
               alt="" onerror="this.outerHTML=\`<div class='album-detail-cover album-detail-cover-placeholder'>&#128191;</div>\`">`
       : `<div class="album-detail-cover album-detail-cover-placeholder">&#128191;</div>`;
 
@@ -2382,7 +2390,7 @@
         </div>`;
       }
       const art = nowPlaying.albumId != null
-        ? `<img class="queue-now-playing-thumb" src="/api/locations/${state.locationId}/song-library/albums/${nowPlaying.albumId}/coverArt"
+        ? `<img class="queue-now-playing-thumb" src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${nowPlaying.albumId}/coverArt"
                 alt="" onerror="this.remove()">`
         : '';
       return `<div class="queue-now-playing-row now-playing-album-link">
@@ -2591,7 +2599,7 @@
     const crawlText = `${albumName} · ${artist}`;
 
     const thumbHtml = song.albumId != null
-      ? `<img class="song-popup-thumb" src="/api/locations/${state.locationId}/song-library/albums/${song.albumId}/coverArt"
+      ? `<img class="song-popup-thumb" src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${song.albumId}/coverArt"
               alt="" onerror="this.outerHTML='<div class=\\'song-popup-thumb song-popup-thumb-placeholder\\'>&#127925;</div>'">`
       : `<div class="song-popup-thumb song-popup-thumb-placeholder">&#127925;</div>`;
 
@@ -2774,13 +2782,13 @@
   function playlistCoverArtHtml(p, cssClass) {
     const cls = cssClass || 'rp-thumb-img';
     if (p.name === 'My Favorites') {
-      return `<div class="${cls}"><img src="/images/MyFavorites_Playlist.png" alt="" style="width:100%;height:100%;object-fit:contain;"></div>`;
+      return `<div class="${cls}"><img src="${API_BASE}/images/MyFavorites_Playlist.png" alt="" style="width:100%;height:100%;object-fit:contain;"></div>`;
     }
     if (p.firstSongAlbumId != null) {
-      return `<div class="${cls}"><img src="/api/locations/${state.locationId}/song-library/albums/${p.firstSongAlbumId}/coverArt" alt=""
-        onerror="this.src='/images/Generic_Playlist.png'" style="width:100%;height:100%;object-fit:cover;"></div>`;
+      return `<div class="${cls}"><img src="${API_BASE}/api/locations/${state.locationId}/song-library/albums/${p.firstSongAlbumId}/coverArt" alt=""
+        onerror="this.src='${API_BASE}/images/Generic_Playlist.png'" style="width:100%;height:100%;object-fit:cover;"></div>`;
     }
-    return `<div class="${cls}"><img src="/images/Generic_Playlist.png" alt="" style="width:100%;height:100%;object-fit:contain;"></div>`;
+    return `<div class="${cls}"><img src="${API_BASE}/images/Generic_Playlist.png" alt="" style="width:100%;height:100%;object-fit:contain;"></div>`;
   }
 
   function playlistTileHtml(p) {
@@ -3304,7 +3312,8 @@
   // ── Location header + picker sheet ─────────────────────────────────────
 
   function locationLogoSrc(location) {
-    return location && location.logoName ? `/images/${location.logoName}` : '/images/JukeANatorLogo.png';
+    return location && location.logoName
+      ? `${API_BASE}/images/${location.logoName}` : `${API_BASE}/images/JukeANatorLogo.png`;
   }
 
   function locationButtonInnerHtml() {
@@ -3313,7 +3322,7 @@
     const arrow = locationPickable() ? '<span class="location-arrow">&#8964;</span>' : '';
     return `
       <img class="location-logo" src="${locationLogoSrc(loc)}" alt=""
-        onerror="this.src='/images/JukeANatorLogo.png'">
+        onerror="this.src='${API_BASE}/images/JukeANatorLogo.png'">
       <span class="location-name">${escHtml(name)}</span>
       ${arrow}`;
   }
@@ -3394,7 +3403,7 @@
     const listHtml = state.locations.map((loc, i) => `
       <div class="select-playlist-row" data-index="${i}">
         <div class="select-playlist-thumb">
-          <img src="${locationLogoSrc(loc)}" alt="" onerror="this.src='/images/JukeANatorLogo.png'"
+          <img src="${locationLogoSrc(loc)}" alt="" onerror="this.src='${API_BASE}/images/JukeANatorLogo.png'"
             style="width:100%;height:100%;object-fit:contain;">
         </div>
         <div class="select-playlist-name">${escHtml(loc.name)}${loc.online === false
@@ -3926,7 +3935,7 @@
   function connectWebSocket() {
     if (stompClient && stompClient.connected) return;
     clearTimeout(stompReconnectTimer);
-    const client = Stomp.over(new SockJS('/ws'));
+    const client = Stomp.over(new SockJS(`${API_BASE}/ws`));
     stompClient = client;
     client.debug = () => {};
     const connectHeaders = state.token ? { token: state.token } : {};

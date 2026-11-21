@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">JukeANator</string>
+    <string name="title_activity_main">JukeANator</string>
+    <string name="package_name">com.jukeanator.app</string>
+    <string name="custom_url_scheme">com.jukeanator.app</string>
+</resources>

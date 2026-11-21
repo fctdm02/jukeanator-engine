@@ -1004,6 +1004,10 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
    */
   private void registerWithImportedLicenseFile(JukeANatorFrame frame) throws Exception {
 
+    // First start: the license agreement comes before the registration card
+    acceptLicenseAgreement(frame);
+    assertTrue(licenseService.isAgreementAccepted(), "the license agreement should be accepted");
+
     await(() -> isCardShowing(frame, UiComponentNames.REGISTRATION_IMPORT_BUTTON),
         "the registration card", SCAN_TIMEOUT_MS);
     assertTrue(licenseService.getStatus().isTrial(), "the test run should start unlicensed");
@@ -1030,6 +1034,11 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
     assertFalse(isCardShowing(frame, UiComponentNames.REGISTRATION_IMPORT_BUTTON),
         "Try should close the registration card");
 
+    // The new Commercial license needs the Commercial Use acknowledgement before payments work
+    acceptLicenseAgreement(frame);
+    assertTrue(licenseService.isCommercialAgreementAccepted(),
+        "the Commercial Use section should be accepted");
+
     // A licensed instance then asks for the customer and location names it does not have yet
     answerLicenseDetailPrompt(frame, "Customer Name", LICENSE_CUSTOMER_NAME);
     answerLicenseDetailPrompt(frame, "Location Name", LICENSE_LOCATION_NAME);
@@ -1037,6 +1046,16 @@ class JukeANatorUserInterfaceApplicationFunctionalTest extends AbstractServiceIn
         "the license detail prompts to close");
     assertEquals(LICENSE_CUSTOMER_NAME, licenseService.getCustomerName());
     assertEquals(LICENSE_LOCATION_NAME, licenseService.getLocationName());
+  }
+
+  /** Waits for the license agreement card, clicks I Accept and waits for it to close. */
+  private static void acceptLicenseAgreement(JukeANatorFrame frame) throws Exception {
+    await(() -> isCardShowing(frame, UiComponentNames.LICENSE_AGREEMENT_ACCEPT_BUTTON),
+        "the license agreement", SCAN_TIMEOUT_MS);
+    click(frame, UiComponentNames.LICENSE_AGREEMENT_ACCEPT_BUTTON);
+    // Saving runs in the background, then closes the card
+    await(() -> !isCardShowing(frame, UiComponentNames.LICENSE_AGREEMENT_ACCEPT_BUTTON),
+        "the license agreement to close");
   }
 
   /** Waits for the license detail prompt titled {@code title}, types {@code value} and saves. */

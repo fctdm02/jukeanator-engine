@@ -11,6 +11,7 @@ This file is for developers: building the application with Maven, running it fro
 - [WindowsConfig.md](WindowsConfig.md): Windows prerequisites (Java, media player), launch script, touchscreen, kiosk settings and auto-start.
 - [LinuxConfig.md](LinuxConfig.md): the same for Linux Mint.
 - [MasterConfig.md](MasterConfig.md): the MySQL database and master mode setup.
+- [docs/MobileApp.md](docs/MobileApp.md): how the iOS/Android app wraps the Web/Mobile UI (see also "Mobile App Packaging/Deployment" below).
 
 # Building the Application
 
@@ -189,3 +190,169 @@ The following guides illustrate how to use some features concretely:
 ## Maven Parent overrides
 
 Due to Maven's design, elements are inherited from the parent POM to the project POM. While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent. To prevent this, the project POM contains empty overrides for these elements. If you switch to a different parent and want the inheritance, remove those overrides.
+
+# Mobile App Packaging/Deployment
+
+The JukeANator iPhone and Android apps are the same Web/Mobile UI that the server serves at `/app/` (`src/main/resources/static/app`), packaged as native apps with [Capacitor](https://capacitorjs.com/). There is one UI codebase; the `mobile` folder holds only the wrapper project. How the wrapper works is described in [docs/MobileApp.md](docs/MobileApp.md).
+
+The app is built with the server URL `https://www.jukeanator.com` and the app ID `com.jukeanator.app`. The app ID is used as both the iOS bundle ID and the Android application ID, and it can never be changed once the app is uploaded to either store.
+
+## Installation/Setup
+
+This covers the Windows PC used to build the Android app. The iPhone app can only be built on a Mac (see step 7 of "End-to-End Steps" below).
+
+### Step 1: Install Node.js
+
+Node.js runs JavaScript-based tools on the PC, much like a JDK runs Java tools. Capacitor's command-line tool needs it, and its package manager `npm` plays the role Maven plays for Java. In PowerShell:
+
+```
+winget install OpenJS.NodeJS.LTS
+```
+
+Close that PowerShell window and open a new one so it picks up the new PATH, then check the install. It should print v22 or later:
+
+```
+node --version
+```
+
+Alternatively, download the "LTS" Windows installer from nodejs.org and accept every default.
+
+If PowerShell reports "npm.ps1 cannot be loaded because running scripts is disabled on this system", Windows' default execution policy is blocking the `npm.ps1` and `npx.ps1` wrapper scripts. Either type `npm.cmd` and `npx.cmd` instead of `npm` and `npx` (no settings change), or allow locally installed scripts for your Windows account once with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` and open a new PowerShell window.
+
+### Step 2: Install Android Studio
+
+Android Studio is the IDE for Android apps (comparable to Eclipse). It also installs the Android SDK, the build tools and the phone emulator. In PowerShell:
+
+```
+winget install Google.AndroidStudio
+```
+
+Then complete its one-time setup:
+
+1. Start Android Studio from the Start menu.
+2. If it asks to import settings, choose "Do not import settings".
+3. In the Setup Wizard, choose the "Standard" install type. Accept the license agreements (there are several: select each one in the list on the left and click Accept).
+4. Click Finish and wait while it downloads the Android SDK (several GB).
+5. When the welcome screen appears, setup is done. Do not create a project; Capacitor generates one in the next step.
+
+Android Studio installs to `C:\Program Files\Android\Android Studio`, which is where Capacitor expects it, so no environment variables are needed.
+
+If the Setup Wizard was skipped or cancelled, the SDK is never downloaded, and opening a project shows a "Select SDKs" dialog asking for the path to the Android SDK. Click Cancel, then open the SDK Manager (Tools, SDK Manager; or "More Actions", SDK Manager on the welcome screen). Next to "Android SDK Location", click Edit, keep the suggested location `%LOCALAPPDATA%\Android\Sdk` (that is, `C:\Users\<you>\AppData\Local\Android\Sdk`), click Next, accept the licenses, and click Finish to download it. Then run "Sync Project with Gradle Files" (the elephant icon at the top right).
+
+### Step 3: Create the Android project
+
+Run these once, in PowerShell, from the `mobile` folder. The two `npm install` commands download the current Capacitor release and record its version in `mobile/package.json`; `npx cap add android` generates the native project in `mobile/android`, which should be committed to git.
+
+```
+cd C:\dev-wks\projects\jukeanator-engine\mobile
+npm install @capacitor/core @capacitor/android @capacitor/ios
+npm install -D @capacitor/cli
+npm run sync-web
+npx cap add android
+```
+
+### Step 4: Open the project in Android Studio
+
+From the `mobile` folder:
+
+```
+npm run android
+```
+
+This copies the current web UI into the app (`npm run sync-web`), updates the native project (`cap sync`), and opens it in Android Studio. The first time, Android Studio runs a "Gradle sync" (Gradle is its build tool, similar to Maven) that takes several minutes; progress shows in the bottom status bar.
+
+The first sync fails with "Incompatible Gradle JVM version" if Gradle runs on Java 25: the Gradle version in Capacitor's Android project (8.14.3) cannot run on Java 25, and current Android Studio releases bundle a JDK 25 (its `jbr` folder), as does this PC's own JDK. Gradle needs a JDK 21, which Android Studio can download once:
+
+1. Open File, Settings, Build, Execution, Deployment, Build Tools, Gradle.
+2. Open the "Gradle JDK" dropdown and choose "Download JDK...".
+3. Set Version to 21 and Vendor to "Eclipse Temurin" (or "JetBrains Runtime"), keep the suggested location, and click Download.
+4. When the download finishes, make sure the new JDK 21 is selected as "Gradle JDK", click OK, then click "Sync Project with Gradle Files" (the elephant icon at the top right).
+
+This affects only the Android build; `JAVA_HOME` and the JDK used by Maven for the server stay unchanged.
+
+### Step 5: Run the app
+
+Before testing, the server the app talks to must have the CORS change in `SecurityConfig` deployed (see "Deploying to the Production Server" above). Without it the app opens but shows no music. The Android app cannot use a plain-http server such as `http://localhost:8080`, because its page runs from `https://localhost` and the WebView blocks the request as mixed content.
+
+On a real Android phone (recommended; this PC has 8 GB of RAM, and Android Studio plus the emulator use most of it):
+
+1. On the phone, open Settings, About phone, and tap "Build number" seven times to enable Developer options.
+2. Open Settings, System, Developer options, and turn on "USB debugging".
+3. Connect the phone by USB and tap "Allow" on the phone's prompt.
+4. In Android Studio, select the phone in the device list at the top and click the green Run button.
+
+On the emulator:
+
+1. In Android Studio, open the Device Manager (phone icon on the right edge) and click "+", then "Create Virtual Device".
+2. Pick a Pixel phone, choose the recommended system image (it downloads), and click Finish.
+3. Select it in the device list and click the green Run button.
+
+### Day-to-day workflow
+
+After any change to the web UI under `src/main/resources/static/app`, run `npm run android` from the `mobile` folder again and click Run in Android Studio. Never edit files in `mobile/www`; that folder is regenerated on every sync. To build against a server other than production, set `JUKEANATOR_API_BASE_URL` for that run, for example in PowerShell:
+
+```
+$env:JUKEANATOR_API_BASE_URL = 'https://test.example.com'; npm run sync
+```
+
+## End-to-End Steps
+
+The complete path from the current state to both apps being available in the stores. Steps marked "done" are already in the code base.
+
+### 1. Prepare the web UI and server (done)
+
+- The web UI reads the server URL from `src/main/resources/static/app/js/config.js` and uses it for all REST calls, the websocket and server-hosted images. It is empty for the browser.
+- `SecurityConfig` allows cross-origin API calls from the app origins `capacitor://localhost` (iOS) and `https://localhost` (Android); override with the property `app.cors.allowed-origins`.
+- The Capacitor project files are in `mobile` (`package.json`, `capacitor.config.json`, `scripts/sync-web.mjs`).
+
+### 2. Deploy the server change to production
+
+- Deploy with `mvnw clean deploy -Pprod` (see "Deploying to the Production Server"). The apps talk to `https://www.jukeanator.com`, so nothing works in them until production has the CORS change.
+
+### 3. Build and test the Android app
+
+- Follow "Installation/Setup" above.
+- Test every screen against production: browsing, search, sign up, sign in, queueing songs, playlists, live queue updates, and the location picker.
+
+### 4. Make the app work well on a phone
+
+- App icon and splash screen: create one 1024x1024 source image and generate every size with the `@capacitor/assets` tool.
+- Payments: test Add Funds inside the app. Card entry (Braintree Hosted Fields) should work as-is; PayPal, Venmo and Google Pay may need native Capacitor plugins, because they switch to other apps or open pop-up windows. Production Braintree keys must be set on the server first.
+- Native features, which make the app more useful and help pass Apple's review (Apple rejects apps that are only a website in a wrapper): the Capacitor Geolocation plugin for the geo-fence, a barcode scanner for jukebox QR codes, and push notifications (for example "your song is up next").
+- Optional: open email verification links in the app instead of the phone's browser (Android App Links and iOS Universal Links).
+
+### 5. Decide how purchased credits are presented
+
+- Apple and Google exempt payments for physical services from in-app purchase (Apple guideline 3.1.3(e)), which is why Braintree can be used instead, avoiding the 15 to 30 percent store commission.
+- Credits are currently one balance per user, usable at any location. A reviewer may consider that virtual currency, which would require Apple and Google in-app purchase. Options: keep the global balance and explain that credits only buy song plays on physical jukeboxes at a venue, or tie purchases to the current location in the app.
+- Before building the store submission, describe the model to Apple (App Review contact or a pre-submission question) and get an answer in writing.
+
+### 6. Create the store accounts
+
+- Google Play Console: 25 USD one-time, at play.google.com/console. A personal account must run a closed test with at least 12 testers for 14 days before the app can be published; an organization account does not, but needs a D-U-N-S number.
+- Apple Developer Program: 99 USD per year, at developer.apple.com. Enrolling as an organization requires a D-U-N-S number (free, can take a week or more to issue); start this early.
+- Both stores require a privacy policy URL (`https://www.jukeanator.com/privacy_policy.html` exists) and an in-app way to delete the account (already in the Profile screen).
+
+### 7. Build the iPhone app on a Mac
+
+- Requirements: a Mac running a recent macOS with Xcode from the Mac App Store. Apple requires uploads to be built with a current Xcode, and each Xcode release needs a minimum macOS version, so check the Mac's macOS version (Apple menu, About This Mac) against the Xcode requirements on developer.apple.com. An older Mac that cannot run a current macOS cannot be used for uploads; a cloud build service (for example Codemagic or Ionic Appflow) is the alternative.
+- On the Mac: install Node.js (LTS installer from nodejs.org), copy or clone this repository, then from the `mobile` folder run `npm install`, `npx cap add ios` and `npm run ios`. Commit the generated `mobile/ios` folder.
+- In Xcode, sign in with the Apple Developer account (Xcode, Settings, Accounts), select the team under Signing and Capabilities, and run the app on an iPhone connected by USB or on the simulator.
+
+### 8. Prepare the store listings
+
+- App name, short and full description, category (Music or Entertainment), screenshots for the required phone sizes, the app icon, the privacy policy URL, and a support URL.
+- Store privacy questionnaires: Google's Data safety form and Apple's App Privacy section. Data collected includes email address, purchase history and, when the geo-fence is used, location.
+- Content rating questionnaires in both consoles.
+- Apple review notes: explain that purchases pay for song plays on a physical jukebox at a venue, processed by Braintree, and attach a short video showing a song bought in the app playing on the jukebox. Provide a demo account the reviewer can sign in with.
+
+### 9. Build signed release versions and upload
+
+- Android: in Android Studio, Build, Generate Signed App Bundle, Android App Bundle. Create the upload keystore when prompted and store it and its passwords somewhere safe outside git; losing it blocks future updates. Upload the `.aab` file to a closed testing track in the Play Console, then promote it to production after testing.
+- iPhone: in Xcode, Product, Archive, then Distribute App to App Store Connect. Test with TestFlight, then submit for review in App Store Connect.
+- For every later release, increase the version (Android `versionCode` and `versionName` in `mobile/android/app/build.gradle`; iOS version and build number in Xcode).
+
+### 10. After approval
+
+- Set `mobile-app.ios-store-url` and `mobile-app.android-store-url` in the production `application.yml` (`/var/lib/jukeanator/config/application.yml`) and restart the application. The `/get-app` QR codes on the home page and marquees then send iPhones and Android phones to the right store, and everyone else to `/app/`.
+- Web UI changes reach app users only after a new app version is built and published (step 9), because the UI is bundled into the app. Server-only changes take effect immediately.

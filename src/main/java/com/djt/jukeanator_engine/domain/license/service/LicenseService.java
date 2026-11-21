@@ -75,6 +75,28 @@ public interface LicenseService {
   LicenseStatus updateRegistrationDetails(String customerEmail, String customerName,
       String locationName);
 
+  /**
+   * True when the operator has accepted the current version of the license agreement
+   * ({@code license.agreement-accepted-version}).
+   */
+  @PublicServiceMethod
+  boolean isAgreementAccepted();
+
+  /**
+   * True when the operator has accepted the Commercial Use section of the current license
+   * agreement ({@code license.commercial-agreement-accepted-version}): the operator, not DJT, is
+   * responsible for public performance licenses. The jukebox UI keeps payment inputs disabled
+   * until this is true.
+   */
+  @PublicServiceMethod
+  boolean isCommercialAgreementAccepted();
+
+  /**
+   * Records acceptance of the current license agreement in the external config, together with
+   * its Commercial Use section when {@code includingCommercialSection} is true.
+   */
+  void acceptAgreement(boolean includingCommercialSection);
+
   /** Provisions with {@code license.auto-provision-*} when no license is installed. */
   void autoProvisionIfConfigured();
 

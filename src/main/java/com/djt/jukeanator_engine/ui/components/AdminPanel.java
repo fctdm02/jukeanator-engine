@@ -1713,6 +1713,14 @@ public class AdminPanel extends JPanel {
         text.append("Customer Email: ").append(orNotSet(customerEmail)).append('\n');
         text.append("Location Name: ").append(orNotSet(locationName)).append('\n');
         text.append("Expires: ").append(describeExpiration(s)).append("\n\n");
+        text.append("License Agreement: ")
+            .append(licenseService.isAgreementAccepted() ? "accepted" : "not accepted");
+        if (s.licensedTier().isCommercial()) {
+          text.append("; Commercial Use section: ")
+              .append(licenseService.isCommercialAgreementAccepted() ? "accepted"
+                  : "not accepted (payments stay disabled until it is accepted at the next start)");
+        }
+        text.append(".\n\n");
         text.append("Commercial operation (bill acceptor and card reader): ")
             .append(s.commercialEnabled() ? "enabled" : "disabled").append(". ");
         if (s.lastServerCheckAt() != null) {
