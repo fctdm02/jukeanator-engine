@@ -471,6 +471,42 @@ input.pw-valid:focus {
   padding: 2rem;
 }
 
+/* ── Legal screens (Terms and Conditions, Privacy Policy) ───────────────── */
+
+.legal-content {
+  padding: 1rem 1.1rem 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.legal-content h5 {
+  margin: 1.2rem 0 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.legal-content p,
+.legal-content ul {
+  margin: 0 0 0.75rem;
+}
+
+.legal-content ul {
+  padding-left: 1.2rem;
+}
+
+.legal-content li {
+  margin-bottom: 0.4rem;
+}
+
+.legal-content i {
+  color: var(--muted);
+}
+
+.legal-content a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 /* ── Home sections ──────────────────────────────────────────────────────── */
 
 .home-sections {

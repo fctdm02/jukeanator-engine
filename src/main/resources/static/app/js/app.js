@@ -645,8 +645,8 @@
       case 'transaction-history': renderStub('Transaction History'); break;
       case 'help':              renderStub('Help');              break;
       case 'settings':          renderStub('Settings');          break;
-      case 'terms':             renderStub('Terms and Conditions'); break;
-      case 'privacy':           renderStub('Privacy Policy');    break;
+      case 'terms':             renderLegal('Terms and Conditions', TERMS_HTML); break;
+      case 'privacy':           renderLegal('Privacy Policy', PRIVACY_HTML);     break;
       case 'recent-plays-all':       renderRecentPlaysAll();          break;
       case 'artists-hot-here-all':   renderArtistsHotHereAll();       break;
       case 'albums-hot-here-all':    renderAlbumsHotHereAll();        break;
@@ -1461,6 +1461,98 @@
         btn.disabled = false; btn.textContent = 'Delete Account';
       }
     });
+  }
+
+  // ── Sub-screens: Terms and Conditions / Privacy Policy ──────────────────
+  // The wording matches the website's /terms_and_conditions.html and /privacy_policy.html (only
+  // the sections that apply to the Web/Mobile app); keep the two in step when either changes.
+  // Links to the other legal screen carry data-nav and are wired by renderLegal().
+
+  const TERMS_HTML = `
+    <p><i>Effective November 20, 2026</i></p>
+    <p>These Terms and Conditions apply to the JukeANator Web/Mobile app provided by Digital Jukebox Technologies, LLC
+    (&quot;DJT&quot;, &quot;we&quot;).</p>
+
+    <h5>Web/Mobile App Accounts</h5>
+    <p>You must provide accurate information when you create an account and verify your email address before signing in. You are
+    responsible for keeping your password confidential and for all activity under your account.</p>
+
+    <h5>Credits</h5>
+    <p>Credits purchased in the Web/Mobile app are used to queue songs on JukeANator jukeboxes that accept requests from the app. Credits
+    have no cash value, cannot be transferred to another account and are non-refundable, except as required by law or where a charge was
+    made in error. The jukebox owner sets the songs available, the credit cost of each play and whether requests are accepted, and a
+    request may be declined (for example, when the queue is full or you are not at the location). If you believe you were charged in error,
+    email support (at) jukeanator.com.</p>
+
+    <h5>Acceptable Use</h5>
+    <p>You may not misuse the website, the Web/Mobile app or the jukeboxes, including by attempting to bypass location checks or credit
+    charges, interfering with their operation, or accessing another person's account.</p>
+
+    <h5>Payments</h5>
+    <p>Credit card, PayPal, Venmo, Google Pay and Apple Pay payments are processed by PayPal, including Braintree (a PayPal service). See our
+    <a href="#" data-nav="privacy">Privacy Policy</a>.</p>
+
+    <h5>Copyright and Trademark Notice</h5>
+    <p>Unless otherwise specified, all materials appearing on this website and in the Web/Mobile app, including the text, design, logos,
+    graphics, icons and images, as well as the selection, assembly and arrangement thereof, are the sole property of Digital Jukebox
+    Technologies, LLC, Copyright &copy;2004-2026, ALL RIGHTS RESERVED. No materials may be copied, reproduced, modified, republished,
+    uploaded, posted, transmitted or distributed in any form or by any means without our prior written permission. All rights not expressly
+    granted herein are reserved. Album cover art and song information remain the property of their respective owners.</p>
+
+    <h5>Other Conditions</h5>
+    <p>We may change this website, the Web/Mobile app and these Terms and Conditions at any time; the effective date above shows when they
+    were last changed. These Terms and Conditions are governed by the laws of the State of Michigan, United States. Questions may be sent to
+    support (at) jukeanator.com.</p>`;
+
+  const PRIVACY_HTML = `
+    <p><i>Effective November 20, 2026</i></p>
+    <p>This Privacy Policy describes how Digital Jukebox Technologies, LLC (&quot;DJT&quot;, &quot;we&quot;) collects, uses and protects
+    personal information when you use the www.jukeanator.com website, the JukeANator Web/Mobile app and JukeANator jukeboxes.</p>
+
+    <h5>Information We Collect</h5>
+    <ul>
+      <li><b>Account information (Web/Mobile app):</b> first name, last name, email address and password. Passwords are stored only in
+      encrypted (hashed) form.</li>
+      <li><b>App activity:</b> your credit balance, credit purchases, the songs you queue, your play and search history and your
+      playlists, so the app can show them back to you.</li>
+      <li><b>Location:</b> at jukeboxes that accept song requests only from people on the premises, the app asks your device for its
+      location when you queue a song and sends it with that request so the jukebox can confirm that you are nearby. Your location is
+      checked and is not stored. If you deny location access, you will not be able to queue songs at those jukeboxes.</li>
+      <li><b>Technical information:</b> as with most websites, our servers record information such as your IP address, browser type
+      and operating system.</li>
+    </ul>
+
+    <h5>How We Use Information</h5>
+    <p>We use this information to create and operate your account, to verify your email address, to add purchased credits to your
+    account and play the songs you request, to respond to customer service requests, and to keep our services secure. We do not sell or
+    rent your personal information.</p>
+
+    <h5>Payments</h5>
+    <p>Payments are processed by PayPal, including Braintree (a PayPal service) for credit and debit card, PayPal, Venmo, Google Pay and
+    Apple Pay payments in the Web/Mobile app. You provide your payment details directly to the payment processor; DJT does not receive or
+    store your full card number. The payment processor's privacy policy applies to the information you provide to it.</p>
+
+    <h5>Cookies and Local Storage</h5>
+    <p>The Web/Mobile app stores your sign-in token, email address and recent searches on your device so that you stay signed in. We do
+    not use advertising or tracking cookies.</p>
+
+    <h5>Access, Correction and Deletion</h5>
+    <p>You can view and update your account information in the Web/Mobile app under <b>Manage Account</b>, and you can delete your account
+    there with <b>Delete Account</b>. For any other request, or for questions about this policy, email support (at) jukeanator.com. See
+    also the <a href="#" data-nav="terms">Terms and Conditions</a>.</p>
+
+    <h5>Changes to This Policy</h5>
+    <p>We may update this policy from time to time. The effective date above shows when it was last changed.</p>`;
+
+  function renderLegal(title, bodyHtml) {
+    contentPanel.innerHTML = subScreenShell(title, `<div class="legal-content">${bodyHtml}</div>`);
+    contentPanel.querySelectorAll('.legal-content a[data-nav]').forEach((link) => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateSub(link.dataset.nav);
+      });
+    });
+    wireBackBtn();
   }
 
   // ── Sub-screen: Generic stub ────────────────────────────────────────────
