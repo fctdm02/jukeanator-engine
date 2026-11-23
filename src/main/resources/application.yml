@@ -146,7 +146,7 @@ braintree:
 
 # Outbound email (account verification, Add Funds receipts, Financial Ledger split summaries); SMTP settings are under spring.mail
 email:
-  from-address: ${MAIL_FROM_ADDRESS:${receipt.from-address:support@jukeanator.com}}   # sender for every email; still honors a legacy receipt.from-address
+  from-address: "${MAIL_FROM_ADDRESS:${receipt.from-address:JukeANator <support@jukeanator.com>}}"   # sender for every email ("Name <address>" or a bare address); still honors a legacy receipt.from-address
   financial-ledger-recipients: support@jukeanator.com   # comma-separated list that receives the Financial Ledger split summary; blank = none
   verification-required: true   # Create Account must verify its email address before it can sign in
   verification-base-url: ~   # public URL of the web UI used in verification links (e.g. https://jukeanator.com); blank = the URL the request arrived on

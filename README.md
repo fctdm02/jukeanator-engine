@@ -316,7 +316,7 @@ The complete path from the current state to both apps being available in the sto
 
 ### 4. Make the app work well on a phone
 
-- App icon and splash screen: create one 1024x1024 source image and generate every size with the `@capacitor/assets` tool.
+- App icon and splash screen (done for Android): the icon is the "J" from the JukeANator wordmark and the splash screen is the whole wordmark, both on black. See "App icon and splash screen" in [docs/MobileApp.md](docs/MobileApp.md); on the Mac, run `npm run assets -- --ios` after `npx cap add ios`.
 - Payments: test Add Funds inside the app. Card entry (Braintree Hosted Fields) should work as-is; PayPal, Venmo and Google Pay may need native Capacitor plugins, because they switch to other apps or open pop-up windows. Production Braintree keys must be set on the server first.
 - Native features, which make the app more useful and help pass Apple's review (Apple rejects apps that are only a website in a wrapper): the Capacitor Geolocation plugin for the geo-fence, a barcode scanner for jukebox QR codes, and push notifications (for example "your song is up next").
 - Optional: open email verification links in the app instead of the phone's browser (Android App Links and iOS Universal Links).

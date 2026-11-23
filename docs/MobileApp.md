@@ -63,9 +63,19 @@ $env:JUKEANATOR_API_BASE_URL = 'https://test.example.com'; npm run sync
 - The app identifier is `com.jukeanator.app` (`appId` in `mobile/capacitor.config.json`), used as both the iOS bundle ID and the Android application ID. It becomes permanent once an app is uploaded to either store, so never change it.
 - Email verification links open `https://www.jukeanator.com/app/?verify=...` in the phone's browser, not in the app. After verifying, the user signs in inside the app as usual. Opening those links directly in the app (App Links / Universal Links) is a later enhancement.
 
+## App icon and splash screen
+
+The icon is the "J" from the JukeANator wordmark and the splash screen is the whole wordmark, both on black (the Web/Mobile UI's background). Both come from `src/main/resources/static/images/JukeANatorLogo.png`. The website's `android-chrome-*.png` and `apple-touch-icon.png` were not usable: their grey checkerboard background is painted into the image, not real transparency.
+
+- `mobile/scripts/make-icon-sources.ps1` builds the source images in `mobile/assets`: `icon-only.png` (full icon), `icon-foreground.png` and `icon-background.png` (Android adaptive icon layers), `splash.png` and `splash-dark.png`. It isolates the J by masking out the neighboring letters, with pixel coordinates specific to that logo file.
+- `npm run assets -- --android` (or `-- --ios` on the Mac) runs `@capacitor/assets`, which generates every icon and splash size into the native projects.
+- Android 12 and later do not show `splash.png`; they show the app icon on the color `windowSplashScreenBackground` (set to black in `mobile/android/app/src/main/res/values/styles.xml`).
+
+To change the artwork, replace the files in `mobile/assets` (or edit and re-run the script), then run the `npm run assets` command again and rebuild the app. The command overwrites `mobile/android/app/src/main/AndroidManifest.xml` formatting; that change is harmless.
+
 ## Still to do
 
-- App icons and splash screens (the `@capacitor/assets` tool generates every size from one source image).
+- iOS icons and splash screens: on the Mac, `npm run assets -- --ios` after `npx cap add ios`.
 - Native plugins: Geolocation (geo-fence), a barcode scanner for jukebox QR codes, and push notifications.
 - Verify each Add Funds payment method inside the app's WebView: card entry (Hosted Fields) first; PayPal, Venmo and Google Pay may need native plugins.
 - Store accounts: Apple Developer Program and Google Play Console.
