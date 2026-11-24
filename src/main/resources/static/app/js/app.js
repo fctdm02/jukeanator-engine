@@ -4045,6 +4045,9 @@
 
         client.subscribe('/user/queue/recent-plays', (frame) => {
           const song = JSON.parse(frame.body);
+          // One entry per song: a replayed song moves to the front instead of appearing twice.
+          state.recentPlays = state.recentPlays.filter(
+              s => !(s.albumId === song.albumId && s.songId === song.songId));
           state.recentPlays.unshift(song);
           if (state.recentPlays.length > 10) state.recentPlays.length = 10;
           const body = document.getElementById('recentPlaysBody');

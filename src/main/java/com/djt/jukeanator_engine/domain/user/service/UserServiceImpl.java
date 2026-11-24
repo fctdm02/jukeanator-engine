@@ -8,9 +8,11 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -397,12 +399,18 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     List<SongIdentifier> history = user.getSongPlayHistory();
     List<SongDto> recentPlays = new ArrayList<>();
+    // Newest first, one entry per song: a repeat play only counts at its most recent position.
+    Set<String> seen = new HashSet<>();
     for (int i = history.size() - 1; i >= 0 && recentPlays.size() < MAX_RECENT_PLAYS; i--) {
       SongIdentifier id = history.get(i);
+      Integer songLocationId = locationIdOf(id);
+      if (!seen.add(songLocationId + ":" + id.getAlbumId() + ":" + id.getSongId())) {
+        continue;
+      }
       try {
         // A master-served user's history can span multiple locations.
         SongDto song =
-            songLibraryService.getSongById(locationIdOf(id), id.getAlbumId(), id.getSongId());
+            songLibraryService.getSongById(songLocationId, id.getAlbumId(), id.getSongId());
         if (song != null)
           recentPlays.add(song);
       } catch (Exception e) {
