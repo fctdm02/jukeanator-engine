@@ -8,7 +8,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TimeZone;
@@ -32,7 +31,6 @@ import com.djt.jukeanator_engine.domain.license.legacy.LicenseTier;
 import com.djt.jukeanator_engine.domain.licenseserver.config.LicenseServerProperties;
 import com.djt.jukeanator_engine.domain.licenseserver.dto.LegacyClientRequest;
 import com.djt.jukeanator_engine.domain.licenseserver.dto.ProvisionOutcome;
-import com.djt.jukeanator_engine.domain.licenseserver.event.ContactFeedbackSubmittedEvent;
 import com.djt.jukeanator_engine.domain.licenseserver.service.LicenseServerService;
 
 /**
@@ -56,9 +54,6 @@ public class LegacyFrontController {
   private static final Set<String> PAGE_COMMANDS = Set.of("features", "faq", "order", "contact",
       "licensing", "screenshots", "photos", "conversionkits", "comparison_matrix", "howto",
       "performing_upgrade", "privacy_policy", "return_policy", "terms_and_conditions");
-
-  /** Contact form fields left out of the feedback email (the command and the buttons). */
-  private static final Set<String> FEEDBACK_IGNORED_PARAMS = Set.of("command", "Submit", "Reset");
 
   private final LicenseServerService licenseServerService;
   private final LicenseServerProperties properties;
@@ -111,7 +106,7 @@ public class LegacyFrontController {
   public void legacyJsp(@PathVariable String page, HttpServletResponse response) {
     String p = page.toLowerCase(Locale.ROOT);
     String target = PAGE_COMMANDS.contains(p) ? "/" + p + ".html"
-        : "feedback".equals(p) ? "/contact-thanks.html" : "/";
+        : "feedback".equals(p) ? "/contact.html" : "/";
     response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
     response.setHeader("Location", target);
   }
@@ -138,33 +133,15 @@ public class LegacyFrontController {
     }
   }
 
+  /**
+   * The contact form was removed (bot spam relayed through support@ hurt the server's mail
+   * reputation, which receipts depend on). Bots still post here directly, so every submission is
+   * discarded without sending email.
+   */
   private void feedback(HttpServletRequest request, HttpServletResponse response)
       throws IOException {
-
-    StringBuilder comments = new StringBuilder();
-    Enumeration<String> names = request.getParameterNames();
-    while (names.hasMoreElements()) {
-      String name = names.nextElement();
-      if (FEEDBACK_IGNORED_PARAMS.contains(name)) {
-        continue;
-      }
-      for (String value : request.getParameterValues(name)) {
-        if (value != null && !value.isBlank()) {
-          comments.append(name).append(": ").append(value.trim()).append('\n');
-        }
-      }
-    }
-    // An empty submission (every field blank) is not worth an email.
-    if (comments.isEmpty()) {
-      log.info("Ignoring empty contact form submission from {}", request.getRemoteAddr());
-    } else {
-      // Sent asynchronously as the system principal (ContactFeedbackEmailListener): this request
-      // is anonymous, and ServiceSecurityAspect rejects unauthenticated EmailService calls.
-      eventPublisher.publishEvent(new ContactFeedbackSubmittedEvent(
-          properties.getFeedbackRecipients(), request.getParameter("customerEmail"),
-          comments.toString()));
-    }
-    response.sendRedirect("/contact-thanks.html");
+    log.debug("Discarding contact form submission from {}", request.getRemoteAddr());
+    response.sendRedirect("/contact.html");
   }
 
   /**

@@ -17,7 +17,6 @@ import com.djt.jukeanator_engine.domain.licenseserver.config.LicenseServerProper
 import com.djt.jukeanator_engine.domain.licenseserver.dto.LegacyClientRequest;
 import com.djt.jukeanator_engine.domain.licenseserver.dto.LicenseAdminDtos;
 import com.djt.jukeanator_engine.domain.licenseserver.dto.ProvisionOutcome;
-import com.djt.jukeanator_engine.domain.licenseserver.event.ContactFeedbackSubmittedEvent;
 import com.djt.jukeanator_engine.domain.licenseserver.service.LicenseServerService;
 
 /** Byte-level checks of the legacy wire format legacy MP3Jukeboxx clients compare against. */
@@ -39,26 +38,12 @@ class LegacyFrontControllerTest {
   }
 
   @Test
-  void feedback_publishesEventWithFilledFieldsOnly_andRedirectsToThanks() throws Exception {
+  void feedback_isDiscardedWithoutEmail_andRedirectsToContactPage() throws Exception {
     MockHttpServletResponse response = call("feedback", "customerName", "Pat",
         "customerEmail", "pat@example.com", "customerPhone", "", "comments", "Hello",
         "Submit", "Send");
 
-    assertEquals("/contact-thanks.html", response.getRedirectedUrl());
-    assertEquals(1, publishedEvents.size());
-    ContactFeedbackSubmittedEvent event = (ContactFeedbackSubmittedEvent) publishedEvents.get(0);
-    assertEquals(List.of("support@jukeanator.com"), event.recipients());
-    assertEquals("pat@example.com", event.visitorEmail());
-    assertEquals("customerName: Pat\ncustomerEmail: pat@example.com\ncomments: Hello\n",
-        event.comments());
-  }
-
-  @Test
-  void feedback_emptySubmission_sendsNothing_butStillRedirects() throws Exception {
-    MockHttpServletResponse response = call("feedback", "customerName", " ", "comments", "",
-        "Submit", "Send");
-
-    assertEquals("/contact-thanks.html", response.getRedirectedUrl());
+    assertEquals("/contact.html", response.getRedirectedUrl());
     assertEquals(0, publishedEvents.size());
   }
 
