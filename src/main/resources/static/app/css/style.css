@@ -2057,10 +2057,244 @@ input {
 
 /* ── Select Payment Method sheet ──────────────────────────────────────────── */
 
+/* A white sheet (like the payment sheets patrons know from other apps), so card details are easy
+   to read; the rest of the app stays dark. */
 .payment-method-sheet {
-  max-height: 80vh;
+  max-height: 88vh;
   overflow-y: auto;
   padding-bottom: 1rem;
+  background: #ffffff;
+  color: #1a1d22;
+  color-scheme: light;
+}
+
+.pm-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem 0.5rem;
+}
+
+.pm-header-btn {
+  background: none;
+  border: none;
+  color: #1a1d22;
+  font-size: 1.35rem;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pm-header-btn:hover {
+  background: #eef1f5;
+}
+
+.pm-header-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pm-summary {
+  padding: 0 1.25rem 0.5rem 4.25rem;
+  font-size: 0.85rem;
+  color: #5f6771;
+}
+
+.pm-status {
+  padding: 1.5rem 1.25rem;
+  text-align: center;
+  color: #5f6771;
+}
+
+.pm-section-label {
+  padding: 1rem 1.25rem 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a919b;
+}
+
+.pm-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.8rem 1.25rem;
+  background: none;
+  border: none;
+  color: #1a1d22;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pm-row:hover {
+  background: #f4f6f9;
+}
+
+.pm-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 32px;
+  border: 1px solid #d5dae1;
+  border-radius: 6px;
+  color: #1a1d22;
+  flex-shrink: 0;
+}
+
+.pm-row-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.pm-brand-chip {
+  background: #1a3a6e;
+  border-color: #1a3a6e;
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  overflow: hidden;
+}
+
+.pm-row-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.pm-row-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.pm-row-sub {
+  font-size: 0.82rem;
+  color: #6b7380;
+}
+
+.pm-row-chevron {
+  font-size: 1.6rem;
+  color: #9aa1ab;
+}
+
+.pm-stored-row {
+  display: flex;
+  align-items: center;
+}
+
+.pm-stored-remove {
+  background: none;
+  border: none;
+  color: #9aa1ab;
+  font-size: 1rem;
+  width: 44px;
+  height: 44px;
+  margin-right: 0.6rem;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pm-stored-remove:hover {
+  background: #fdecea;
+  color: #c62828;
+}
+
+/* ── Cards: the full card form ── */
+
+.pm-card-form {
+  padding: 0.25rem 1.25rem 0.5rem;
+}
+
+.pm-field-label {
+  display: block;
+  margin: 0.8rem 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #3c434d;
+}
+
+.pm-card-brands {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.pm-card-brand {
+  padding: 0.2rem 0.45rem;
+  border: 1px solid #d5dae1;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #1a3a6e;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.pm-card-brand.active {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 1px #1a73e8;
+}
+
+.pm-card-brand.dimmed {
+  opacity: 0.3;
+}
+
+.card-field-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.pm-save-card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1rem 0 0.25rem;
+  font-size: 0.92rem;
+  color: #3c434d;
+  cursor: pointer;
+}
+
+.pm-save-card input {
+  width: 18px;
+  height: 18px;
+  accent-color: #1a73e8;
+}
+
+.pm-card-error {
+  margin-top: 0.75rem;
+  color: #c62828;
+  font-size: 0.88rem;
+}
+
+.pm-pay-btn {
+  display: block;
+  width: 100%;
+  margin-top: 1.1rem;
+  padding: 0.95rem;
+  border: none;
+  border-radius: 10px;
+  background: #1a73e8;
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pm-pay-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .payment-sheet-title {
@@ -2072,26 +2306,44 @@ input {
 }
 
 .payment-method-row {
-  padding: 0.85rem 1.25rem;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 0.6rem 1.25rem;
 }
 
 .payment-method-row-label {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: var(--muted);
-  margin-bottom: 0.5rem;
+  color: #3c434d;
+  margin-bottom: 0.4rem;
 }
 
 .pmr-mount { min-height: 1px; }
 
 .card-field {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
+  background: #ffffff;
+  border: 1px solid #c9ced6;
   border-radius: 8px;
-  height: 42px;
+  height: 46px;
   padding: 0 0.75rem;
-  margin-bottom: 0.5rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Hosted Fields puts these classes on the container. */
+.card-field.braintree-hosted-fields-focused {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 1px #1a73e8;
+}
+
+.card-field.braintree-hosted-fields-invalid {
+  border-color: #c62828;
+  box-shadow: 0 0 0 1px #c62828;
+}
+
+/* Braintree's card fields are iframes whose documents use the default (light) color scheme. On
+   the app's dark-scheme page, Chrome and Android's WebView paint a differing-scheme iframe on an
+   opaque white backdrop; the sheet is light (color-scheme: light) and this keeps each iframe's
+   scheme matching, so it stays transparent on the white field. */
+.card-field iframe {
+  color-scheme: normal;
 }
 
 .card-field-row {
@@ -2105,9 +2357,9 @@ input {
 
 .payment-method-row-btn {
   width: 100%;
-  background: rgba(74,184,216,0.18);
-  border: 1px solid #4ab8d8;
-  color: #4ab8d8;
+  background: #f4f6f9;
+  border: 1px solid #c9ced6;
+  color: #1a1d22;
   font-weight: 700;
   font-size: 0.95rem;
   padding: 0.7rem;
@@ -2116,7 +2368,7 @@ input {
 }
 
 .payment-method-row-btn:hover {
-  background: rgba(74,184,216,0.3);
+  background: #e8ecf1;
 }
 
 /* ── Transaction Successful screen ──────────────────────────────────────── */

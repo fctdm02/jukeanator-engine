@@ -143,6 +143,7 @@ braintree:
   merchant-id: ${BRAINTREE_MERCHANT_ID:}
   public-key: ${BRAINTREE_PUBLIC_KEY:}
   private-key: ${BRAINTREE_PRIVATE_KEY:}
+  customer-id-prefix: ${BRAINTREE_CUSTOMER_ID_PREFIX:jukeanator-}   # + user id = Braintree customer id (stored cards); unique per server sharing a Braintree account
 
 # Outbound email (account verification, Add Funds receipts, Financial Ledger split summaries); SMTP settings are under spring.mail
 email:

@@ -1,5 +1,10 @@
 package com.djt.jukeanator_engine.domain.common.controller;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -209,11 +214,16 @@ public class GlobalExceptionHandler {
     // A committed response (e.g. a SockJS xhr_streaming connection that dropped mid-stream) has
     // already sent its status and headers, and may already be using getOutputStream(), so
     // getWriter() would throw IllegalStateException. Nothing more can reach the client; skip the body.
+    // The reset must not drop the CORS headers Spring Security's CorsFilter already added: without
+    // them the native mobile app (a cross-origin caller) cannot read the error at all and only sees
+    // "Failed to fetch" -- e.g. for a declined payment, a wrong password or too few credits.
     private void write(HttpStatus status, Exception ex, HttpServletResponse response) throws IOException {
         if (response.isCommitted()) {
             return;
         }
+        Map<String, List<String>> corsHeaders = corsHeadersOf(response);
         response.reset();
+        corsHeaders.forEach((name, values) -> values.forEach(value -> response.addHeader(name, value)));
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         ApiError error = new ApiError(
@@ -222,5 +232,18 @@ public class GlobalExceptionHandler {
                 status.value()
         );
         objectMapper.writeValue(response.getWriter(), error);
+    }
+
+    /** The response's CORS headers (Access-Control-* and Vary), in order, to restore after a reset. */
+    private static Map<String, List<String>> corsHeadersOf(HttpServletResponse response) {
+        Map<String, List<String>> headers = new LinkedHashMap<>();
+        for (String name : response.getHeaderNames()) {
+            String lower = name.toLowerCase(Locale.ROOT);
+            if ((lower.startsWith("access-control-") || lower.equals("vary"))
+                    && !headers.containsKey(name)) {
+                headers.put(name, new ArrayList<>(response.getHeaders(name)));
+            }
+        }
+        return headers;
     }
 }

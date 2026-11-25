@@ -825,6 +825,53 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     assertEquals("fake-client-token", userServiceImpl.generatePaymentClientToken());
   }
 
+  // ── stored cards ────────────────────────────────────────────────────────────
+
+  @Test
+  void generatePaymentClientToken_forAPatron_isScopedToTheirPaymentCustomer() {
+
+    when(paymentGateway.generateClientToken("1")).thenReturn("patron-token");
+
+    assertEquals("patron-token", userServiceImpl.generatePaymentClientToken(REGISTERED_EMAIL));
+  }
+
+  @Test
+  void addFunds_withSaveCard_chargesForThePatronAndStoresTheCard() {
+
+    when(paymentGateway.charge(any(BigDecimal.class), anyString(), anyString(),
+        org.mockito.ArgumentMatchers.anyBoolean()))
+        .thenReturn(PaymentChargeResult.success("txn-9", "Visa •••• 1111"));
+
+    userServiceImpl.addFunds(REGISTERED_EMAIL,
+        new AddFundsRequest(LOC, "pkg-7", "fake-nonce", Boolean.TRUE));
+
+    verify(paymentGateway).charge(new BigDecimal("7.00"), "fake-nonce", "1", true);
+    verify(paymentGateway, never()).charge(any(BigDecimal.class), anyString());
+    assertEquals(20, credits());
+  }
+
+  @Test
+  void addFunds_withoutSaveCard_doesNotStoreTheCard() {
+
+    when(paymentGateway.charge(any(BigDecimal.class), anyString()))
+        .thenReturn(PaymentChargeResult.success("txn-9", "Visa •••• 1111"));
+
+    userServiceImpl.addFunds(REGISTERED_EMAIL,
+        new AddFundsRequest(LOC, "pkg-7", "fake-nonce", null));
+
+    verify(paymentGateway).charge(new BigDecimal("7.00"), "fake-nonce");
+    verify(paymentGateway, never()).charge(any(BigDecimal.class), anyString(), anyString(),
+        org.mockito.ArgumentMatchers.anyBoolean());
+  }
+
+  @Test
+  void deleteAccount_deletesThePatronsStoredCards() {
+
+    userServiceImpl.deleteAccount(REGISTERED_EMAIL);
+
+    verify(paymentGateway).deleteCustomer("1");
+  }
+
   @Test
   void updateProfile_updatesFirstAndLastNameAndPersists() {
 

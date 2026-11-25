@@ -16,6 +16,12 @@ public class BraintreeProperties {
   private String merchantId;
   private String publicKey;
   private String privateKey;
+  /**
+   * Put in front of a patron's user id to make their Braintree customer id (stored cards). Give
+   * each server sharing one Braintree account its own prefix, e.g. a developer's master and
+   * production on the same sandbox account.
+   */
+  private String customerIdPrefix = "jukeanator-";
 
   public String getEnvironment() {
     return environment;
@@ -47,5 +53,13 @@ public class BraintreeProperties {
 
   public void setPrivateKey(String privateKey) {
     this.privateKey = privateKey;
+  }
+
+  public String getCustomerIdPrefix() {
+    return customerIdPrefix;
+  }
+
+  public void setCustomerIdPrefix(String customerIdPrefix) {
+    this.customerIdPrefix = customerIdPrefix;
   }
 }

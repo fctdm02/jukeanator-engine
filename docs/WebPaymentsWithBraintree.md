@@ -437,6 +437,29 @@ then repeat with a sandbox decline to confirm no credits are granted and no emai
    ledger (`MOBILE_WEB`) and mirrored to its slave. `UserProfileDto.numCredits` became a list of
    per-location `balances`. See [per-location-accounts.md](per-location-accounts.md).
 
+5. **Payment Methods sheet with stored cards and a full card form (later change).** Modelled on
+   the payment sheet patrons know from other jukebox apps:
+   - The button under the packages reads "Select Payment Method" and opens a white "Payment
+     Methods" sheet. It lists the patron's **stored** cards first, then **Others**: Cards, PayPal,
+     Venmo, Google Pay and Apple Pay, each shown only where the device supports it.
+   - **Stored cards.** Each patron has a Braintree customer whose id is
+     `braintree.customer-id-prefix` (default `jukeanator-`) plus their user id, so no database
+     change is needed. `GET /api/users/payment/client-token` now generates the token for that
+     customer, creating it on first use (`PaymentGateway.generateClientToken(customerKey)`).
+     The sheet lists the cards with braintree-web's `vault-manager` component
+     (`fetchPaymentMethods`); tapping one asks for confirmation and pays with that card's
+     nonce; the remove button calls `deletePaymentMethod`. Closing an account deletes the
+     customer and its cards (`PaymentGateway.deleteCustomer`).
+   - **Cards** opens a full card form: card number with the brands (Visa, Mastercard, Amex,
+     Discover) lighting up as the number is typed, expiry date, security code, name on card,
+     postal code, a "Save this card for my next purchase" box (ticked by default) and a blue
+     "Pay $x" button. The postal code lets Braintree run address checks, which reduce fraud
+     and chargebacks. `AddFundsRequest.saveCard` asks the server to store the card on a
+     successful charge (`storeInVaultOnSuccess`); a client without the field never stores one.
+   - Give each server that shares one Braintree account its own prefix
+     (`BRAINTREE_CUSTOMER_ID_PREFIX`), for example `dev-` on a developer's master, so they
+     never see each other's stored cards.
+
 ### Follow-ups and open items
 
 - **Refund/dispute webhook handler** (task chip created, not started): signature-verified

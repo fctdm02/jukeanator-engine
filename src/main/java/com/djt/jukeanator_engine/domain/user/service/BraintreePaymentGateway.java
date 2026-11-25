@@ -5,9 +5,14 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.braintreegateway.BraintreeGateway;
+import com.braintreegateway.ClientTokenRequest;
+import com.braintreegateway.Customer;
+import com.braintreegateway.CustomerRequest;
 import com.braintreegateway.Result;
 import com.braintreegateway.Transaction;
 import com.braintreegateway.TransactionRequest;
+import com.braintreegateway.exceptions.NotFoundException;
+import com.djt.jukeanator_engine.domain.user.exception.PaymentException;
 
 /**
  * The real, Braintree-backed {@link PaymentGateway}. Only ever constructed on a master instance
@@ -20,10 +25,26 @@ public class BraintreePaymentGateway implements PaymentGateway {
 
   private static final Logger log = LoggerFactory.getLogger(BraintreePaymentGateway.class);
 
+  /** Default {@code braintree.customer-id-prefix}. */
+  public static final String DEFAULT_CUSTOMER_ID_PREFIX = "jukeanator-";
+
   private final BraintreeGateway braintreeGateway;
+  private final String customerIdPrefix;
 
   public BraintreePaymentGateway(BraintreeGateway braintreeGateway) {
+    this(braintreeGateway, DEFAULT_CUSTOMER_ID_PREFIX);
+  }
+
+  /**
+   * {@code customerIdPrefix} goes in front of each patron's user id to make their Braintree
+   * customer id, so two servers sharing one Braintree account (e.g. a developer's master and
+   * production, both on the sandbox) never share customers.
+   */
+  public BraintreePaymentGateway(BraintreeGateway braintreeGateway, String customerIdPrefix) {
     this.braintreeGateway = Objects.requireNonNull(braintreeGateway);
+    this.customerIdPrefix = customerIdPrefix == null || customerIdPrefix.isBlank()
+        ? DEFAULT_CUSTOMER_ID_PREFIX
+        : customerIdPrefix.trim();
   }
 
   @Override
@@ -31,13 +52,80 @@ public class BraintreePaymentGateway implements PaymentGateway {
     return braintreeGateway.clientToken().generate();
   }
 
+  /** Creates the customer on first use, so the token can list and remove their stored cards. */
+  @Override
+  public String generateClientToken(String customerKey) {
+    String customerId = customerIdFor(customerKey);
+    ensureCustomer(customerId);
+    return braintreeGateway.clientToken().generate(new ClientTokenRequest().customerId(customerId));
+  }
+
   @Override
   public PaymentChargeResult charge(BigDecimal amount, String paymentMethodNonce) {
-
-    TransactionRequest txRequest = new TransactionRequest()
+    return sale(new TransactionRequest()
         .amount(amount)
         .paymentMethodNonce(paymentMethodNonce)
-        .options().submitForSettlement(true).done();
+        .options().submitForSettlement(true).done());
+  }
+
+  @Override
+  public PaymentChargeResult charge(BigDecimal amount, String paymentMethodNonce,
+      String customerKey, boolean storeCard) {
+
+    String customerId = customerIdFor(customerKey);
+    if (storeCard) {
+      try {
+        ensureCustomer(customerId);
+      } catch (RuntimeException e) {
+        return PaymentChargeResult.failure("Payment processing failed: " + e.getMessage());
+      }
+    }
+    return sale(new TransactionRequest()
+        .amount(amount)
+        .paymentMethodNonce(paymentMethodNonce)
+        .customerId(customerId)
+        .options().submitForSettlement(true).storeInVaultOnSuccess(storeCard).done());
+  }
+
+  @Override
+  public void deleteCustomer(String customerKey) {
+
+    String customerId = customerIdFor(customerKey);
+    try {
+      Result<Customer> result = braintreeGateway.customer().delete(customerId);
+      if (!result.isSuccess()) {
+        log.warn("Braintree refused to delete customer {}: {}", customerId, result.getMessage());
+      }
+    } catch (NotFoundException e) {
+      // Never stored a card -- nothing to delete.
+    } catch (RuntimeException e) {
+      log.warn("Could not delete Braintree customer {}", customerId, e);
+    }
+  }
+
+  String customerIdFor(String customerKey) {
+    if (customerKey == null || customerKey.isBlank()) {
+      throw new IllegalArgumentException("customerKey cannot be blank");
+    }
+    return customerIdPrefix + customerKey.trim();
+  }
+
+  private void ensureCustomer(String customerId) {
+
+    try {
+      braintreeGateway.customer().find(customerId);
+      return;
+    } catch (NotFoundException e) {
+      // First stored-card visit: create it below.
+    }
+    Result<Customer> result =
+        braintreeGateway.customer().create(new CustomerRequest().id(customerId));
+    if (!result.isSuccess()) {
+      throw new PaymentException("Could not set up stored cards: " + result.getMessage());
+    }
+  }
+
+  private PaymentChargeResult sale(TransactionRequest txRequest) {
 
     Result<Transaction> result;
     try {

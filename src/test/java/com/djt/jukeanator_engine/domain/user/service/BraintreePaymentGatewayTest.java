@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
@@ -15,7 +16,13 @@ import com.braintreegateway.AndroidPayDetails;
 import com.braintreegateway.ApplePayDetails;
 import com.braintreegateway.BraintreeGateway;
 import com.braintreegateway.ClientTokenGateway;
+import com.braintreegateway.ClientTokenRequest;
 import com.braintreegateway.CreditCard;
+import com.braintreegateway.Customer;
+import com.braintreegateway.CustomerGateway;
+import com.braintreegateway.CustomerRequest;
+import com.braintreegateway.exceptions.NotFoundException;
+import org.mockito.ArgumentCaptor;
 import com.braintreegateway.PayPalDetails;
 import com.braintreegateway.Result;
 import com.braintreegateway.Transaction;
@@ -147,6 +154,110 @@ class BraintreePaymentGatewayTest {
     when(transactionGateway.voidTransaction("txn-1")).thenThrow(new RuntimeException("network error"));
 
     assertFalse(paymentGateway.voidCharge("txn-1"));
+  }
+
+  // ── stored cards ──────────────────────────────────────────────────────────
+
+  private CustomerGateway customerGateway(boolean customerExists) {
+    CustomerGateway customers = mock(CustomerGateway.class);
+    when(braintreeGateway.customer()).thenReturn(customers);
+    if (customerExists) {
+      when(customers.find("jukeanator-42")).thenReturn(mock(Customer.class));
+    } else {
+      when(customers.find("jukeanator-42")).thenThrow(new NotFoundException());
+    }
+    Result<Customer> created = mock(Result.class);
+    when(created.isSuccess()).thenReturn(true);
+    when(customers.create(any(CustomerRequest.class))).thenReturn(created);
+    return customers;
+  }
+
+  @Test
+  void generateClientTokenForACustomer_createsTheCustomerOnFirstUse_andScopesTheToken() {
+    CustomerGateway customers = customerGateway(false);
+    ClientTokenGateway clientTokenGateway = mock(ClientTokenGateway.class);
+    when(braintreeGateway.clientToken()).thenReturn(clientTokenGateway);
+    when(clientTokenGateway.generate(any(ClientTokenRequest.class))).thenReturn("customer-token");
+
+    assertEquals("customer-token", paymentGateway.generateClientToken("42"));
+
+    ArgumentCaptor<CustomerRequest> created = ArgumentCaptor.forClass(CustomerRequest.class);
+    verify(customers).create(created.capture());
+    assertTrue(created.getValue().toXML().contains("jukeanator-42"));
+    ArgumentCaptor<ClientTokenRequest> token = ArgumentCaptor.forClass(ClientTokenRequest.class);
+    verify(clientTokenGateway).generate(token.capture());
+    assertTrue(token.getValue().toXML().contains("jukeanator-42"));
+  }
+
+  @Test
+  void generateClientTokenForAnExistingCustomer_doesNotCreateItAgain() {
+    CustomerGateway customers = customerGateway(true);
+    ClientTokenGateway clientTokenGateway = mock(ClientTokenGateway.class);
+    when(braintreeGateway.clientToken()).thenReturn(clientTokenGateway);
+    when(clientTokenGateway.generate(any(ClientTokenRequest.class))).thenReturn("customer-token");
+
+    paymentGateway.generateClientToken("42");
+
+    verify(customers, never()).create(any(CustomerRequest.class));
+  }
+
+  @Test
+  void theCustomerIdPrefixIsConfigurable() {
+    assertEquals("dev-7", new BraintreePaymentGateway(braintreeGateway, "dev-").customerIdFor("7"));
+    assertEquals("jukeanator-7", new BraintreePaymentGateway(braintreeGateway, " ").customerIdFor("7"));
+  }
+
+  @Test
+  void chargeStoringTheCard_chargesForTheCustomer_andStoresTheCardOnSuccess() {
+    customerGateway(true);
+    stubSuccessfulSale();
+
+    PaymentChargeResult result =
+        paymentGateway.charge(new BigDecimal("7.00"), "fake-nonce", "42", true);
+
+    assertTrue(result.success());
+    ArgumentCaptor<TransactionRequest> sale = ArgumentCaptor.forClass(TransactionRequest.class);
+    verify(transactionGateway).sale(sale.capture());
+    String xml = sale.getValue().toXML();
+    assertTrue(xml.contains("jukeanator-42"), xml);
+    assertTrue(xml.matches("(?s).*<storeInVaultOnSuccess[^>]*>true</storeInVaultOnSuccess>.*"), xml);
+  }
+
+  @Test
+  void chargeStoringTheCard_failsCleanlyWhenTheCustomerCannotBeSetUp() {
+    CustomerGateway customers = mock(CustomerGateway.class);
+    when(braintreeGateway.customer()).thenReturn(customers);
+    when(customers.find("jukeanator-42")).thenThrow(new RuntimeException("network error"));
+
+    PaymentChargeResult result =
+        paymentGateway.charge(new BigDecimal("7.00"), "fake-nonce", "42", true);
+
+    assertFalse(result.success());
+    verify(transactionGateway, never()).sale(any(TransactionRequest.class));
+  }
+
+  @Test
+  void deleteCustomer_deletesIt_andIgnoresACustomerThatNeverExisted() {
+    CustomerGateway customers = mock(CustomerGateway.class);
+    when(braintreeGateway.customer()).thenReturn(customers);
+    Result<Customer> deleted = mock(Result.class);
+    when(deleted.isSuccess()).thenReturn(true);
+    when(customers.delete("jukeanator-42")).thenReturn(deleted);
+    when(customers.delete("jukeanator-43")).thenThrow(new NotFoundException());
+
+    paymentGateway.deleteCustomer("42");
+    paymentGateway.deleteCustomer("43"); // must not throw
+
+    verify(customers).delete("jukeanator-42");
+  }
+
+  private void stubSuccessfulSale() {
+    Transaction tx = mock(Transaction.class);
+    when(tx.getId()).thenReturn("txn-1");
+    Result<Transaction> success = mock(Result.class);
+    when(success.isSuccess()).thenReturn(true);
+    when(success.getTarget()).thenReturn(tx);
+    when(transactionGateway.sale(any(TransactionRequest.class))).thenReturn(success);
   }
 
   private PaymentChargeResult chargeWithTransactionStub(Consumer<Transaction> stub) {

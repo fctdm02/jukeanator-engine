@@ -156,6 +156,12 @@ public interface UserService {
   String generatePaymentClientToken();
 
   /**
+   * A client token for {@code emailAddress}'s own payment-method sheet, which can also list, pay
+   * with and remove the cards that patron stored.
+   */
+  String generatePaymentClientToken(String emailAddress);
+
+  /**
    * 
    * @param emailAddress
    * @param request

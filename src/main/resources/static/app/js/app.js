@@ -1245,7 +1245,7 @@
           ${packages.map(packageCardHtml).join('')}
         </div>
 
-        <button class="add-funds-action-btn" id="addFundsBtn">Add Funds</button>
+        <button class="add-funds-action-btn" id="addFundsBtn">Select Payment Method</button>
       </div>`;
 
     container.querySelectorAll('.package-card').forEach((card) => {
@@ -1593,7 +1593,9 @@
     <h5>Payments</h5>
     <p>Payments are processed by PayPal, including Braintree (a PayPal service) for credit and debit card, PayPal, Venmo, Google Pay and
     Apple Pay payments in the Web/Mobile app. You provide your payment details directly to the payment processor; DJT does not receive or
-    store your full card number. The payment processor's privacy policy applies to the information you provide to it.</p>
+    store your full card number. The payment processor's privacy policy applies to the information you provide to it.
+    If you choose to save a card for your next purchase, Braintree stores it for you: the app shows only its type, last four digits
+    and expiry date, you can remove it at any time from the Payment Methods screen, and closing your account deletes your saved cards.</p>
 
     <h5>Cookies and Local Storage</h5>
     <p>The Web/Mobile app stores your sign-in token, email address and recent searches on your device so that you stay signed in. We do
@@ -3966,84 +3968,327 @@
       </div>`;
   }
 
+  // Card brands shown under the card number; the one being typed lights up (Hosted Fields'
+  // cardTypeChange). Plain text marks, not the networks' logos.
+  const CARD_BRANDS = [
+    { type: 'visa', label: 'VISA' },
+    { type: 'master-card', label: 'Mastercard' },
+    { type: 'american-express', label: 'AMEX' },
+    { type: 'discover', label: 'Discover' },
+  ];
+
+  const CARD_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" '
+    + 'stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="2.5" y="5" '
+    + 'width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19" stroke-width="2.6"/>'
+    + '<path d="M6 15h4" stroke-linecap="round"/></svg>';
+
+  /** Short display name of a stored card's brand, e.g. "Visa", from Braintree's card type. */
+  function storedCardBrand(details) {
+    const type = (details && details.cardType) || 'Card';
+    return type === 'MasterCard' ? 'Mastercard' : type === 'American Express' ? 'Amex' : type;
+  }
+
+  function storedMethodLabel(method) {
+    const d = method.details || {};
+    if (method.type === 'CreditCard') return `${storedCardBrand(d)} •••• ${escHtml(d.lastFour || '')}`;
+    if (method.type === 'PayPalAccount') return `PayPal ${escHtml(d.email || '')}`.trim();
+    if (method.type === 'VenmoAccount') return `Venmo ${escHtml(d.username || '')}`.trim();
+    return escHtml(method.type || 'Payment method');
+  }
+
+  function storedMethodExpiry(method) {
+    const d = method.details || {};
+    if (method.type !== 'CreditCard' || !d.expirationMonth || !d.expirationYear) return '';
+    return `${d.expirationMonth}/${String(d.expirationYear).slice(-2)}`;
+  }
+
+  /**
+   * The Payment Methods sheet: the patron's stored cards first (pay with one tap and a
+   * confirmation, or remove one), then the other ways to pay -- Cards (the full card form, which
+   * can store the card), PayPal, Venmo, Google Pay and Apple Pay where this device supports them.
+   */
   async function showPaymentMethodSheet(pkg, onSuccess) {
     const existing = document.getElementById('paymentMethodOverlay');
     if (existing) existing.remove();
     _hostedFieldsInstance = null;
 
+    const price = `$${Number(pkg.priceUsd).toFixed(2)}`;
+    const credits = Number(pkg.credits) + Number(pkg.bonusCredits || 0);
+    const locationName = state.currentLocation?.name || 'this location';
+
     const overlay = document.createElement('div');
     overlay.id = 'paymentMethodOverlay';
     overlay.className = 'song-popup-overlay';
     overlay.innerHTML = `
-      <div class="song-popup payment-method-sheet" id="paymentMethodSheet">
-        <div class="song-popup-handle"></div>
-        <div class="payment-sheet-title">Select Payment Method</div>
-        <div id="paymentMethodStatus" class="stub-placeholder">Loading payment options…</div>
-        <div id="paymentMethodList" hidden>
-          ${paymentMethodRowHtml('pmCard', 'Credit or Debit Card')}
-          ${paymentMethodRowHtml('pmPayPal', 'PayPal')}
-          ${paymentMethodRowHtml('pmVenmo', 'Venmo')}
-          ${paymentMethodRowHtml('pmGooglePay', 'Google Pay')}
-          ${paymentMethodRowHtml('pmApplePay', 'Apple Pay')}
+      <div class="song-popup payment-method-sheet" id="paymentMethodSheet" role="dialog" aria-label="Payment methods">
+        <div id="pmListView">
+          <div class="pm-header">
+            <button type="button" class="pm-header-btn" id="pmCloseBtn" aria-label="Close">&#10005;</button>
+            <div class="pm-header-title">Payment Methods</div>
+          </div>
+          <div class="pm-summary">${price} for ${credits} credits at ${escHtml(locationName)}</div>
+          <div id="paymentMethodStatus" class="pm-status">Loading payment options…</div>
+          <div id="pmStoredSection" hidden>
+            <div class="pm-section-label">Stored</div>
+            <div id="pmStoredList"></div>
+          </div>
+          <div id="paymentMethodList" hidden>
+            <div class="pm-section-label">Others</div>
+            <button type="button" class="pm-row" id="pmCardRow">
+              <span class="pm-row-icon">${CARD_ICON_SVG}</span>
+              <span class="pm-row-text"><span class="pm-row-title">Cards</span>
+                <span class="pm-row-sub">Credit or debit card</span></span>
+              <span class="pm-row-chevron" aria-hidden="true">&#8250;</span>
+            </button>
+            ${paymentMethodRowHtml('pmPayPal', 'PayPal')}
+            ${paymentMethodRowHtml('pmVenmo', 'Venmo')}
+            ${paymentMethodRowHtml('pmGooglePay', 'Google Pay')}
+            ${paymentMethodRowHtml('pmApplePay', 'Apple Pay')}
+          </div>
         </div>
-        <button class="add-funds-action-btn" id="payNowBtn" hidden>Pay $${Number(pkg.priceUsd).toFixed(2)}</button>
+
+        <div id="pmCardView" hidden>
+          <div class="pm-header">
+            <button type="button" class="pm-header-btn" id="pmCardBackBtn" aria-label="Back">&#8592;</button>
+            <div class="pm-header-title">Cards</div>
+          </div>
+          <div class="pm-card-form">
+            <label class="pm-field-label" for="cardNumber">Card number</label>
+            <div class="card-field" id="cardNumber"></div>
+            <div class="pm-card-brands" id="pmCardBrands">
+              ${CARD_BRANDS.map((b) => `<span class="pm-card-brand" data-type="${b.type}">${b.label}</span>`).join('')}
+            </div>
+            <div class="card-field-row">
+              <div class="card-field-col">
+                <label class="pm-field-label" for="cardExpiry">Expiry date</label>
+                <div class="card-field" id="cardExpiry"></div>
+              </div>
+              <div class="card-field-col">
+                <label class="pm-field-label" for="cardCvv">Security code</label>
+                <div class="card-field" id="cardCvv"></div>
+              </div>
+            </div>
+            <label class="pm-field-label" for="cardName">Name on card</label>
+            <div class="card-field" id="cardName"></div>
+            <label class="pm-field-label" for="cardPostalCode">Postal code</label>
+            <div class="card-field" id="cardPostalCode"></div>
+            <label class="pm-save-card">
+              <input type="checkbox" id="pmSaveCard" checked>
+              <span>Save this card for my next purchase</span>
+            </label>
+            <div class="pm-card-error" id="pmCardError" hidden></div>
+            <button type="button" class="pm-pay-btn" id="payNowBtn" disabled>Pay ${price}</button>
+          </div>
+        </div>
       </div>`;
 
     document.getElementById('app-shell').appendChild(overlay);
     requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('song-popup-visible')));
     overlay.addEventListener('click', (e) => { if (e.target === overlay) dismissPaymentMethodSheet(); });
-    overlay.querySelector('.song-popup-handle').addEventListener('click', dismissPaymentMethodSheet);
+    document.getElementById('pmCloseBtn').addEventListener('click', dismissPaymentMethodSheet);
 
-    async function submitPayment(nonce) {
+    let paying = false;
+    async function submitPayment(nonce, saveCard = false) {
+      if (paying) return;
+      paying = true;
       const payBtn = document.getElementById('payNowBtn');
       if (payBtn) { payBtn.disabled = true; payBtn.textContent = 'Processing…'; }
       try {
         const response = await api('/api/users/add-funds', {
           method: 'POST',
           // The credits are bought for, and usable only at, the selected location.
-          body: JSON.stringify({ locationId: state.locationId, packageId: pkg.id, paymentMethodNonce: nonce }),
+          body: JSON.stringify({
+            locationId: state.locationId, packageId: pkg.id, paymentMethodNonce: nonce, saveCard,
+          }),
         });
         dismissPaymentMethodSheet();
         onSuccess(response);
       } catch (err) {
-        if (payBtn) { payBtn.disabled = false; payBtn.textContent = `Pay $${Number(pkg.priceUsd).toFixed(2)}`; }
+        if (payBtn) { payBtn.disabled = false; payBtn.textContent = `Pay ${price}`; }
         showAppAlert({ title: 'Payment Failed', message: 'Payment failed: ' + (err.message || err) });
+      } finally {
+        paying = false;
       }
     }
 
+    function showView(view) {
+      document.getElementById('pmListView').hidden = view !== 'list';
+      document.getElementById('pmCardView').hidden = view !== 'card';
+      document.getElementById('paymentMethodSheet').scrollTop = 0;
+    }
+
+    let client;
     try {
       const { clientToken } = await api('/api/users/payment/client-token');
-      const client = await braintree.client.create({ authorization: clientToken });
-
+      client = await braintree.client.create({ authorization: clientToken });
       document.getElementById('paymentMethodStatus').hidden = true;
       document.getElementById('paymentMethodList').hidden = false;
 
+      document.getElementById('pmCardRow').addEventListener('click', async () => {
+        showView('card');
+        if (!_hostedFieldsInstance) await initCardForm(client, submitPayment);
+      });
+      document.getElementById('pmCardBackBtn').addEventListener('click', () => showView('list'));
+
       await Promise.all([
-        initCardField(client),
+        initStoredCards(client, pkg, price, credits, locationName, submitPayment),
         initPayPal(client, clientToken, pkg, submitPayment),
         initVenmo(client, submitPayment),
         initGooglePay(client, pkg, submitPayment),
         initApplePay(client, pkg, submitPayment),
       ]);
-
-      const payBtn = document.getElementById('payNowBtn');
-      if (_hostedFieldsInstance) {
-        payBtn.hidden = false;
-        payBtn.addEventListener('click', async () => {
-          payBtn.disabled = true;
-          payBtn.textContent = 'Processing…';
-          try {
-            const { nonce } = await _hostedFieldsInstance.tokenize();
-            await submitPayment(nonce);
-          } catch (err) {
-            payBtn.disabled = false;
-            payBtn.textContent = `Pay $${Number(pkg.priceUsd).toFixed(2)}`;
-          }
-        });
-      }
     } catch (err) {
-      document.getElementById('paymentMethodStatus').textContent = 'Could not load payment options.';
+      const status = document.getElementById('paymentMethodStatus');
+      if (status) status.textContent = 'Could not load payment options.';
     }
+  }
+
+  /** Lists the patron's stored cards; tapping one pays with it after a confirmation. */
+  async function initStoredCards(client, pkg, price, credits, locationName, submitPayment) {
+    if (!braintree.vaultManager) return;
+    let vaultManager;
+    try {
+      vaultManager = await braintree.vaultManager.create({ client });
+    } catch {
+      return; // no stored cards for this token
+    }
+
+    async function render() {
+      const section = document.getElementById('pmStoredSection');
+      const list = document.getElementById('pmStoredList');
+      if (!section || !list) return;
+      let methods = [];
+      try {
+        methods = await vaultManager.fetchPaymentMethods({ defaultFirst: true });
+      } catch {
+        methods = [];
+      }
+      section.hidden = methods.length === 0;
+      list.innerHTML = methods.map((m, i) => `
+        <div class="pm-stored-row">
+          <button type="button" class="pm-row pm-stored-pay" data-index="${i}">
+            <span class="pm-row-icon pm-brand-chip">${escHtml(m.type === 'CreditCard'
+              ? storedCardBrand(m.details) : (m.type || '').replace('Account', ''))}</span>
+            <span class="pm-row-text"><span class="pm-row-title">${storedMethodLabel(m)}</span>
+              ${storedMethodExpiry(m) ? `<span class="pm-row-sub">Expires ${storedMethodExpiry(m)}</span>` : ''}</span>
+          </button>
+          <button type="button" class="pm-stored-remove" data-index="${i}"
+                  aria-label="Remove ${storedMethodLabel(m)}" title="Remove">&#10005;</button>
+        </div>`).join('');
+
+      list.querySelectorAll('.pm-stored-pay').forEach((btn) => btn.addEventListener('click', async () => {
+        const method = methods[Number(btn.dataset.index)];
+        const ok = await showAppConfirm({
+          title: 'Confirm Purchase',
+          message: `Pay ${price} with ${storedMethodLabel(method)} for ${credits} credits at ${locationName}?`,
+          confirmLabel: `Pay ${price}`,
+        });
+        if (ok) submitPayment(method.nonce, false);
+      }));
+      list.querySelectorAll('.pm-stored-remove').forEach((btn) => btn.addEventListener('click', async () => {
+        const method = methods[Number(btn.dataset.index)];
+        const ok = await showAppConfirm({
+          title: 'Remove Card',
+          message: `Remove ${storedMethodLabel(method)} from your stored payment methods?`,
+          confirmLabel: 'Remove',
+        });
+        if (!ok) return;
+        try {
+          await vaultManager.deletePaymentMethod(method.nonce);
+        } catch {
+          showAppAlert({ title: 'Remove Card', message: 'The card could not be removed. Please try again.' });
+        }
+        render();
+      }));
+    }
+
+    await render();
+  }
+
+  /** The full card form: number (with the brand lit up), expiry, security code, name, postal code. */
+  async function initCardForm(client, submitPayment) {
+    const payBtn = document.getElementById('payNowBtn');
+    const errorBox = document.getElementById('pmCardError');
+    const showError = (message) => { errorBox.textContent = message; errorBox.hidden = !message; };
+    try {
+      _hostedFieldsInstance = await braintree.hostedFields.create({
+        client,
+        styles: {
+          // 16px keeps iOS from zooming the page when a field is focused.
+          input: { color: '#1a1d22', 'font-size': '16px', 'font-family': 'system-ui, sans-serif' },
+          '::placeholder': { color: '#9aa1ab' },
+          '.invalid': { color: '#c62828' },
+        },
+        fields: {
+          number: { selector: '#cardNumber', placeholder: '1234 1234 1234 1234' },
+          expirationDate: { selector: '#cardExpiry', placeholder: 'MM / YY' },
+          cvv: { selector: '#cardCvv', placeholder: 'CVC' },
+          cardholderName: { selector: '#cardName', placeholder: 'Full name' },
+          postalCode: { selector: '#cardPostalCode', placeholder: 'ZIP / Postal code' },
+        },
+      });
+    } catch (err) {
+      showError('Card entry could not be loaded. Please try again.');
+      return;
+    }
+    payBtn.disabled = false;
+
+    _hostedFieldsInstance.on('cardTypeChange', (event) => {
+      const type = event.cards && event.cards.length === 1 ? event.cards[0].type : null;
+      document.querySelectorAll('#pmCardBrands .pm-card-brand').forEach((chip) => {
+        chip.classList.toggle('active', chip.dataset.type === type);
+        chip.classList.toggle('dimmed', !!type && chip.dataset.type !== type);
+      });
+    });
+    _hostedFieldsInstance.on('validityChange', () => showError(''));
+
+    payBtn.addEventListener('click', async () => {
+      showError('');
+      payBtn.disabled = true;
+      try {
+        const { nonce } = await _hostedFieldsInstance.tokenize();
+        await submitPayment(nonce, document.getElementById('pmSaveCard').checked);
+      } catch (err) {
+        payBtn.disabled = false;
+        showError(cardTokenizeErrorMessage(err));
+      }
+    });
+  }
+
+  const CARD_FIELD_NAMES = {
+    number: 'card number',
+    expirationDate: 'expiry date',
+    cvv: 'security code',
+    cardholderName: 'name on card',
+    postalCode: 'postal code',
+  };
+
+  /**
+   * What to tell the patron when Braintree refuses to tokenize the card: which fields are wrong, or
+   * Braintree's own reason (a network problem, or the card refused by the gateway's checks).
+   */
+  function cardTokenizeErrorMessage(err) {
+    const code = err && err.code;
+    if (code === 'HOSTED_FIELDS_FIELDS_EMPTY') return 'Please enter your card details.';
+    if (code === 'HOSTED_FIELDS_FIELDS_INVALID') {
+      const keys = (err.details && err.details.invalidFieldKeys) || [];
+      const names = keys.map((k) => CARD_FIELD_NAMES[k] || k);
+      return names.length
+        ? `Please check the ${names.join(', ')}.`
+        : 'Please check the card details highlighted in red.';
+    }
+    if (code === 'HOSTED_FIELDS_TOKENIZATION_NETWORK_ERROR') {
+      return 'The card could not be checked because of a network problem. Please try again.';
+    }
+    if (code === 'HOSTED_FIELDS_TOKENIZATION_CVV_VERIFICATION_FAILED') {
+      return 'The security code did not match the card. Please check it.';
+    }
+    // Anything else: show Braintree's own reason, so it can be acted on.
+    const original = err && err.details && err.details.originalError;
+    const reason = (original && (original.message
+        || (original.details && original.details.originalError && original.details.originalError.message)))
+      || (err && err.message) || 'unknown error';
+    return `The card could not be used: ${reason}${code ? ` (${code})` : ''}`;
   }
 
   function dismissPaymentMethodSheet() {
@@ -4055,30 +4300,6 @@
     }
     overlay.classList.remove('song-popup-visible');
     setTimeout(() => overlay.remove(), 300);
-  }
-
-  async function initCardField(client) {
-    const row = document.getElementById('pmCard');
-    row.hidden = false;
-    row.querySelector('.pmr-mount').innerHTML = `
-      <div class="card-field" id="cardNumber"></div>
-      <div class="card-field-row">
-        <div class="card-field" id="cardExpiry"></div>
-        <div class="card-field" id="cardCvv"></div>
-      </div>`;
-    try {
-      _hostedFieldsInstance = await braintree.hostedFields.create({
-        client,
-        styles: { input: { color: '#e8e8ee', 'font-size': '15px' } },
-        fields: {
-          number: { selector: '#cardNumber', placeholder: 'Card number' },
-          expirationDate: { selector: '#cardExpiry', placeholder: 'MM/YY' },
-          cvv: { selector: '#cardCvv', placeholder: 'CVV' },
-        },
-      });
-    } catch (err) {
-      row.hidden = true;
-    }
   }
 
   async function initPayPal(client, clientToken, pkg, submitPayment) {

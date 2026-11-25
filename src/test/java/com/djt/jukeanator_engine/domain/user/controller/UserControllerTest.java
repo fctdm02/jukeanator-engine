@@ -438,7 +438,8 @@ class UserControllerTest extends AbstractControllerTest {
 
   @Test
   void getPaymentClientToken_delegatesToService() throws Exception {
-    when(userService.generatePaymentClientToken()).thenReturn("fake-client-token");
+    // For the signed-in patron, so the sheet can show their stored cards.
+    when(userService.generatePaymentClientToken(any())).thenReturn("fake-client-token");
 
     mockMvc.perform(get("/api/users/payment/client-token"))
         .andExpect(status().isOk())

@@ -415,8 +415,10 @@ public class AppConfig {
 
   @Bean
   @ConditionalOnProperty(name = "app.mode", havingValue = "master")
-  public PaymentGateway braintreePaymentGateway(BraintreeGateway braintreeGateway) {
-    return new BraintreePaymentGateway(braintreeGateway);
+  public PaymentGateway braintreePaymentGateway(BraintreeGateway braintreeGateway,
+      BraintreeProperties braintreeProperties) {
+    return new BraintreePaymentGateway(braintreeGateway,
+        braintreeProperties.getCustomerIdPrefix());
   }
 
   @Bean

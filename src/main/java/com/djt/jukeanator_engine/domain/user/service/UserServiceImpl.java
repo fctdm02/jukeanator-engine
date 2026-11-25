@@ -470,7 +470,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public synchronized void deleteAccount(String emailAddress) {
 
-    requireUser(emailAddress);
+    UserEntity user = requireUser(emailAddress);
+    String paymentCustomerKey = paymentCustomerKeyOf(user);
 
     // Closed, never removed: the account's Add Funds transactions and song-credit usages are the
     // record that Braintree's charges and every location's mobile revenue are reconciled against.
@@ -479,6 +480,20 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     userRoot.closeUser(emailAddress, closedEmailAddress,
         passwordEncoder.encode(UUID.randomUUID().toString()));
     this.userRepository.storeAggregateRoot(this.userRoot);
+
+    // The patron's stored cards go with the account (the gateway never throws).
+    if (paymentCustomerKey != null) {
+      paymentGateway.deleteCustomer(paymentCustomerKey);
+    }
+  }
+
+  /**
+   * The patron's key at the payment processor (their user id; the gateway adds its prefix), or
+   * null for a user not stored yet.
+   */
+  private static String paymentCustomerKeyOf(UserEntity user) {
+    Integer id = user.getPersistentIdentity();
+    return id == null ? null : id.toString();
   }
 
   /**
@@ -510,8 +525,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new PaymentException("Missing payment method");
     }
 
-    PaymentChargeResult chargeResult =
-        paymentGateway.charge(pkg.priceUsd(), request.paymentMethodNonce());
+    String paymentCustomerKey = paymentCustomerKeyOf(user);
+    PaymentChargeResult chargeResult = request.storeCard() && paymentCustomerKey != null
+        ? paymentGateway.charge(pkg.priceUsd(), request.paymentMethodNonce(), paymentCustomerKey,
+            true)
+        : paymentGateway.charge(pkg.priceUsd(), request.paymentMethodNonce());
     if (!chargeResult.success()) {
       throw new PaymentException(chargeResult.failureMessage());
     }
@@ -567,6 +585,14 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public String generatePaymentClientToken() {
     return paymentGateway.generateClientToken();
+  }
+
+  @Override
+  public synchronized String generatePaymentClientToken(String emailAddress) {
+    String paymentCustomerKey = paymentCustomerKeyOf(requireUser(emailAddress));
+    return paymentCustomerKey == null
+        ? paymentGateway.generateClientToken()
+        : paymentGateway.generateClientToken(paymentCustomerKey);
   }
 
   @Override

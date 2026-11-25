@@ -198,8 +198,11 @@ public class UserController {
 
   /** A payment gateway client token for the web UI's payment-method sheet to initialize its SDK with. */
   @GetMapping("/payment/client-token")
-  public ResponseEntity<Map<String, String>> getPaymentClientToken() {
-    return ResponseEntity.ok(Map.of("clientToken", userService.generatePaymentClientToken()));
+  public ResponseEntity<Map<String, String>> getPaymentClientToken(
+      @AuthenticationPrincipal String emailAddress) {
+    // For this patron, so the sheet can list, pay with and remove their stored cards.
+    return ResponseEntity.ok(
+        Map.of("clientToken", userService.generatePaymentClientToken(emailAddress)));
   }
 
   @org.springframework.web.bind.annotation.PutMapping("/me")
