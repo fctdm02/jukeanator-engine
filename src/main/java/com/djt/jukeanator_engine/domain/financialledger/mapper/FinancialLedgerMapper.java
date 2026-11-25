@@ -5,6 +5,7 @@ import java.util.List;
 import com.djt.jukeanator_engine.domain.financialledger.dto.FinancialLedgerRootDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalMobileTransactionDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocationMobileCreditUsageDto;
@@ -13,6 +14,7 @@ import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRoo
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalMobileTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocationMobileCreditUsageEntity;
 
 public final class FinancialLedgerMapper {
@@ -172,6 +174,36 @@ public final class FinancialLedgerMapper {
         dto.sourceTransactionId());
     entity.markSyncedToMaster(dto.syncedToMasterAt());
     return entity;
+  }
+
+  public static LocalMobileTransactionDto toDto(LocalMobileTransactionEntity entity) {
+
+    return new LocalMobileTransactionDto(
+        entity.getPersistentIdentity(),
+        entity.getAmount(),
+        entity.getTimestamp(),
+        entity.getLocationId(),
+        entity.getSourceTransactionId(),
+        entity.getUserEmail(),
+        entity.getPaymentReference(),
+        entity.getPackageCode(),
+        entity.getCreditsAwarded(),
+        entity.getBonusCredits());
+  }
+
+  public static LocalMobileTransactionEntity toEntity(LocalMobileTransactionDto dto) {
+
+    return new LocalMobileTransactionEntity(
+        dto.persistentIdentity(),
+        dto.amount(),
+        dto.timestamp(),
+        dto.locationId(),
+        dto.sourceTransactionId(),
+        dto.userEmail(),
+        dto.paymentReference(),
+        dto.packageCode(),
+        dto.creditsAwarded(),
+        dto.bonusCredits());
   }
 
   public static LocationMobileCreditUsageEntity toEntity(LocationMobileCreditUsageDto dto) {

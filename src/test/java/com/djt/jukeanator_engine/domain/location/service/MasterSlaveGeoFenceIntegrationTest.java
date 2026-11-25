@@ -129,7 +129,7 @@ class MasterSlaveGeoFenceIntegrationTest extends AbstractServiceIntegrationTest 
     // outcome could be observed. Unique per run, against a persistent database.
     String patronEmail = "geo-fence-patron+" + System.nanoTime() + "@example.com";
     userService.register(new RegisterRequest("Geo", "Patron", patronEmail, "password123"));
-    userService.addFunds(patronEmail, new AddFundsRequest("pkg-7", "fake-nonce"));
+    userService.addFunds(patronEmail, new AddFundsRequest(locationId, "pkg-7", "fake-nonce"));
     String patronToken = jwtUtil.generateToken(patronEmail, UserRole.ROLE_USER.name());
 
     // ── Web UI patron: no position, outside the fence, inside the fence ─────────

@@ -2,16 +2,21 @@ package com.djt.jukeanator_engine.domain.financialledger.repository;
 
 import static java.util.Objects.requireNonNull;
 import java.io.File;
+import java.util.List;
 import java.util.stream.Stream;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.repository.AbstractRepositoryFileSystemImpl;
 import com.djt.jukeanator_engine.domain.financialledger.dto.FinancialLedgerRootDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalMobileTransactionDto;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.djt.jukeanator_engine.domain.financialledger.exception.FinancialLedgerException;
 import com.djt.jukeanator_engine.domain.financialledger.mapper.FinancialLedgerMapper;
 import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRootEntity;
 
 public final class FinancialLedgerRepositoryFileSystemImpl extends AbstractRepositoryFileSystemImpl
     implements FinancialLedgerRepository {
+
+  static final String MOBILE_TRANSACTIONS_FILENAME = "JukeANator_MobileTransactions.json";
 
   private String filePath;
 
@@ -42,6 +47,10 @@ public final class FinancialLedgerRepositoryFileSystemImpl extends AbstractRepos
     }
 
     FinancialLedgerRootEntity root = FinancialLedgerMapper.toEntity(dto);
+    for (LocalMobileTransactionDto mobileDto : readJsonList(mobileTransactionsFilePath(),
+        new TypeReference<List<LocalMobileTransactionDto>>() {})) {
+      root.addLocalMobileTransaction(FinancialLedgerMapper.toEntity(mobileDto));
+    }
     seedIdentityCounter(root);
     return root;
   }
@@ -50,6 +59,15 @@ public final class FinancialLedgerRepositoryFileSystemImpl extends AbstractRepos
   public void storeAggregateRoot(FinancialLedgerRootEntity root) {
 
     writeJson(filePath, FinancialLedgerMapper.toDto(root));
+    writeJsonList(mobileTransactionsFilePath(), root.getLocalMobileTransactions().stream()
+        .map(FinancialLedgerMapper::toDto)
+        .toList());
+  }
+
+  // Web/Mobile purchases live in their own file beside the ledger file, so adding them never
+  // changes (and never invalidates) the format of an existing ledger file.
+  private String mobileTransactionsFilePath() {
+    return new File(filePath).getParent() + File.separator + MOBILE_TRANSACTIONS_FILENAME;
   }
 
   @Override
@@ -77,6 +95,7 @@ public final class FinancialLedgerRepositoryFileSystemImpl extends AbstractRepos
             root.getSplitPeriods().stream().map(p -> p.getPersistentIdentity()),
             root.getLocalCashTransactions().stream().map(t -> t.getPersistentIdentity()),
             root.getLocalCreditCardTransactions().stream().map(t -> t.getPersistentIdentity()),
+            root.getLocalMobileTransactions().stream().map(t -> t.getPersistentIdentity()),
             root.getMobileCreditUsages().stream().map(u -> u.getPersistentIdentity()))
         .flatMap(s -> s));
   }

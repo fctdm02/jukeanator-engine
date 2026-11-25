@@ -40,6 +40,7 @@ import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 class UserRepositoryJpaPlaylistDeletionTest {
 
   private static final String PLAYLIST = "Road Trip";
+  private static final Integer LOCATION_ID = Integer.valueOf(7);
 
   @Autowired
   private DataSource dataSource;
@@ -62,7 +63,7 @@ class UserRepositoryJpaPlaylistDeletionTest {
     UserRepositoryJpaImpl setupRepository = newRepository();
     UserRootEntity setupRoot = setupRepository.loadAggregateRoot("users");
     UserEntity setupUser = newUser(setupRoot, email);
-    setupUser.createPlaylist(PLAYLIST);
+    setupUser.getOrCreateLocationAccount(LOCATION_ID).createPlaylist(PLAYLIST);
     setupRepository.storeAggregateRoot(setupRoot);
     assertEquals(1, countPlaylists(email, PLAYLIST));
 
@@ -82,7 +83,7 @@ class UserRepositoryJpaPlaylistDeletionTest {
     UserRootEntity root = repository.loadAggregateRoot("users");
     UserEntity user = newUser(root, email);
     repository.storeAggregateRoot(root);
-    user.createPlaylist(PLAYLIST);
+    user.getOrCreateLocationAccount(LOCATION_ID).createPlaylist(PLAYLIST);
     repository.storeAggregateRoot(root);
     assertEquals(1, countPlaylists(email, PLAYLIST));
 
@@ -92,7 +93,7 @@ class UserRepositoryJpaPlaylistDeletionTest {
   private void assertDeletingThePlaylistNeverBreaksLaterStores(UserRepositoryJpaImpl repository,
       UserRootEntity root, UserEntity user, String email) throws Exception {
 
-    user.deletePlaylist(PLAYLIST);
+    user.getLocationAccountNullIfNotExists(LOCATION_ID).deletePlaylist(PLAYLIST);
     repository.storeAggregateRoot(root);
     assertEquals(0, countPlaylists(email, PLAYLIST), "the deleted playlist's row must be gone");
 
@@ -108,7 +109,7 @@ class UserRepositoryJpaPlaylistDeletionTest {
     assertDoesNotThrow(() -> repository.storeAggregateRoot(root));
     assertEquals("New", firstNameOf(otherEmail));
 
-    // The user's remaining playlist (My Favorites) is untouched throughout.
+    // The user's remaining playlist (My Favorites at that location) is untouched throughout.
     assertEquals(1, countPlaylists(email, "My Favorites"));
   }
 
@@ -120,7 +121,7 @@ class UserRepositoryJpaPlaylistDeletionTest {
 
   private static UserEntity newUser(UserRootEntity root, String email) {
     UserEntity user = new UserEntity(root.nextUserPersistentIdentity(), "New", "User", email,
-        "hash", Integer.valueOf(0), UserRole.ROLE_USER);
+        "hash", UserRole.ROLE_USER);
     root.addUser(user);
     return user;
   }
@@ -128,8 +129,10 @@ class UserRepositoryJpaPlaylistDeletionTest {
   private int countPlaylists(String email, String playlistName) throws SQLException {
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(
-            "select count(*) from user_playlist p join user_account u "
-                + "on u.persistent_identity = p.user_id where u.email_address = ? and p.name = ?")) {
+            "select count(*) from user_playlist p "
+                + "join user_location_account a on a.persistent_identity = p.user_location_account_id "
+                + "join user_account u on u.persistent_identity = a.user_id "
+                + "where u.email_address = ? and p.name = ?")) {
       statement.setString(1, email);
       statement.setString(2, playlistName);
       try (ResultSet rs = statement.executeQuery()) {

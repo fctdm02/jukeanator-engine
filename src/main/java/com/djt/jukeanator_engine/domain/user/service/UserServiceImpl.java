@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -31,7 +32,10 @@ import com.djt.jukeanator_engine.domain.common.service.command.model.CommandResp
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryRequest;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponse;
 import com.djt.jukeanator_engine.domain.common.service.query.model.QueryResponseItem;
+import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
+import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
+import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
@@ -43,6 +47,7 @@ import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
+import com.djt.jukeanator_engine.domain.user.dto.LocationBalanceDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
 import com.djt.jukeanator_engine.domain.user.dto.PricingConfigDto;
@@ -67,6 +72,7 @@ import com.djt.jukeanator_engine.domain.user.exception.UserServiceException;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserLocationAccountEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageType;
@@ -81,8 +87,6 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   private static final int MAX_RECENT_PLAYS = 10;
 
-  static final Integer STARTING_CREDITS = Integer.valueOf(0);
-
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
@@ -95,8 +99,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   private final EmailVerificationPolicy emailVerificationPolicy;
   private final SecureRandom secureRandom = new SecureRandom();
 
-  // The Add Funds packages on sale -- add-funds.packages, set via setCreditPackages() at startup.
-  private volatile List<CreditPackageDto> creditPackages = CreditPackageCatalog.DEFAULT_PACKAGES;
+  // See setFinancialLedgerServiceSupplier() / setLocationService().
+  private volatile Supplier<FinancialLedgerService> financialLedgerServiceSupplier = () -> null;
+  private volatile LocationService locationService;
 
   private UserRootEntity userRoot;
 
@@ -325,11 +330,11 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
     Integer persistentIdentity = this.userRoot.nextUserPersistentIdentity();
 
-    // A new account starts with no credits: every credit a web user spends must have been bought
-    // through Add Funds, since each one spent is paid out to the location as mobile revenue.
-    // The UserEntity constructor gives every new account its My Favorites playlist.
+    // A new account has no location accounts, so no credits anywhere: each location account (with
+    // its own My Favorites playlist) is created the first time the patron uses that location, and
+    // every credit spent there must have been bought there through Add Funds.
     return new UserEntity(persistentIdentity, firstName, lastName, emailAddress,
-        passwordEncoder.encode(password), STARTING_CREDITS, role);
+        passwordEncoder.encode(password), role);
   }
 
   @Override
@@ -360,16 +365,23 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public synchronized UserProfileDto getProfile(String emailAddress) {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);;
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
+    UserEntity user = requireUser(emailAddress);
 
-    // No dollar balance: web credits are bought at package prices and spent at each location's
-    // web-cost-multiplier, so no single dollar rate is right. The Web/Mobile UI shows credits
-    // instead -- see docs/pricing.md.
+    // Credits are per location: one balance for every location the patron has used. No dollar
+    // balance -- web credits are bought at package prices and spent at each location's
+    // web-cost-multiplier, so no single dollar rate is right (see docs/pricing.md).
+    List<LocationBalanceDto> balances = new ArrayList<>();
+    for (UserLocationAccountEntity account : user.getLocationAccounts()) {
+      balances.add(new LocationBalanceDto(account.getLocationId(),
+          locationNameOf(account.getLocationId()), account.getNumCredits()));
+    }
     return new UserProfileDto(user.getPersistentIdentity(), user.getFirstName(), user.getLastName(),
-        user.getEmailAddress(), user.getNumCredits(), user.getSongPlayHistory());
+        user.getEmailAddress(), balances);
+  }
+
+  @Override
+  public synchronized int getNumCredits(String emailAddress, Integer locationId) {
+    return requireUser(emailAddress).getNumCredits(resolveLocationId(locationId));
   }
 
   private static final int MAX_HOT_HERE = 10;
@@ -386,31 +398,32 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public synchronized UserHomePageDto getHomePage(String emailAddress, Integer locationId) {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    UserEntity user = requireUser(emailAddress);
+    Integer resolvedLocationId = resolveLocationIdOrNull(locationId);
+    if (resolvedLocationId == null) {
+      // Master with no location selected yet: nothing location-specific to show.
+      return new UserHomePageDto(List.of(), List.of(), List.of(), List.of(), List.of(),
+          user.getSearchHistory(), 0);
     }
-    ensureMyFavorites(user);
+    UserLocationAccountEntity account = accountFor(user, resolvedLocationId);
 
     List<String> playlistNames = new ArrayList<>();
-    for (PlaylistEntity playlist : user.getPlaylists()) {
+    for (PlaylistEntity playlist : account.getPlaylists()) {
       playlistNames.add(playlist.getName());
     }
 
-    List<SongIdentifier> history = user.getSongPlayHistory();
+    // Newest first, one entry per song; every entry is from this location's library.
+    List<SongIdentifier> history = account.getSongPlayHistory();
     List<SongDto> recentPlays = new ArrayList<>();
-    // Newest first, one entry per song: a repeat play only counts at its most recent position.
     Set<String> seen = new HashSet<>();
     for (int i = history.size() - 1; i >= 0 && recentPlays.size() < MAX_RECENT_PLAYS; i--) {
       SongIdentifier id = history.get(i);
-      Integer songLocationId = locationIdOf(id);
-      if (!seen.add(songLocationId + ":" + id.getAlbumId() + ":" + id.getSongId())) {
+      if (!seen.add(id.getAlbumId() + ":" + id.getSongId())) {
         continue;
       }
       try {
-        // A master-served user's history can span multiple locations.
         SongDto song =
-            songLibraryService.getSongById(songLocationId, id.getAlbumId(), id.getSongId());
+            songLibraryService.getSongById(resolvedLocationId, id.getAlbumId(), id.getSongId());
         if (song != null)
           recentPlays.add(song);
       } catch (Exception e) {
@@ -418,29 +431,16 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       }
     }
 
-    HomePageDto publicHomePageDto = getPublicHomePage(locationId);
-    
-    UserHomePageDto userHomePageDto =
-        new UserHomePageDto(recentPlays, playlistNames, publicHomePageDto.artistsHotHere(),
-            publicHomePageDto.albumsHotHere(), publicHomePageDto.songsHotHere(),
-            user.getSearchHistory());
+    HomePageDto publicHomePageDto = getPublicHomePage(resolvedLocationId);
 
-    return userHomePageDto;
+    return new UserHomePageDto(recentPlays, playlistNames, publicHomePageDto.artistsHotHere(),
+        publicHomePageDto.albumsHotHere(), publicHomePageDto.songsHotHere(),
+        user.getSearchHistory(), account.getNumCredits());
   }
 
   @Override
-  public List<CreditPackageDto> getCreditPackages() {
-    return creditPackages;
-  }
-
-  /**
-   * Replaces the Add Funds packages on sale ({@code add-funds.packages}); defaults to
-   * {@link CreditPackageCatalog#DEFAULT_PACKAGES}.
-   *
-   * @throws IllegalStateException if the list fails {@link CreditPackageCatalog#validate}
-   */
-  public void setCreditPackages(List<CreditPackageDto> creditPackages) {
-    this.creditPackages = CreditPackageCatalog.validate(creditPackages);
+  public List<CreditPackageDto> getCreditPackages(Integer locationId) {
+    return pricingService.resolveCreditPackages(resolveLocationId(locationId));
   }
 
   @Override
@@ -455,10 +455,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public synchronized void changePassword(String emailAddress, ChangePasswordRequest request) {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
+    UserEntity user = requireUser(emailAddress);
 
     if (request.currentPassword() == null
         || !passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
@@ -473,10 +470,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public synchronized void deleteAccount(String emailAddress) {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
+    requireUser(emailAddress);
 
     // Closed, never removed: the account's Add Funds transactions and song-credit usages are the
     // record that Braintree's charges and every location's mobile revenue are reconciled against.
@@ -487,15 +481,27 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     this.userRepository.storeAggregateRoot(this.userRoot);
   }
 
+  /**
+   * Buys a credit package for one location: the credits land on the patron's account at
+   * {@code request.locationId()} and are usable only there, and the whole purchase is recorded
+   * once in that location's financial ledger -- like a swipe on its own card reader.
+   */
   @Override
   public synchronized AddFundsResponseDto addFunds(String emailAddress, AddFundsRequest request) {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
+    UserEntity user = requireUser(emailAddress);
+
+    // The location the credits are for -- this instance's own when omitted (standalone/slave).
+    Integer locationId = resolveLocationIdOrNull(request.locationId());
+    if (locationId == null) {
+      throw new PaymentException("Please select a location before adding funds.");
+    }
+    if (locationService != null && appIsMaster()
+        && locationService.getLocationByIdNullIfNotExists(locationId) == null) {
+      throw new PaymentException("Unknown location: " + locationId);
     }
 
-    CreditPackageDto pkg = getCreditPackages().stream()
+    CreditPackageDto pkg = getCreditPackages(locationId).stream()
         .filter(p -> p.id().equals(request.packageId()))
         .findFirst()
         .orElseThrow(() -> new PaymentException("Unknown package: " + request.packageId()));
@@ -504,38 +510,58 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       throw new PaymentException("Missing payment method");
     }
 
-    PaymentChargeResult chargeResult = paymentGateway.charge(pkg.priceUsd(), request.paymentMethodNonce());
+    PaymentChargeResult chargeResult =
+        paymentGateway.charge(pkg.priceUsd(), request.paymentMethodNonce());
     if (!chargeResult.success()) {
       throw new PaymentException(chargeResult.failureMessage());
     }
 
     Instant now = Instant.now();
 
-    int previousBalance = user.getNumCredits() != null ? user.getNumCredits() : 0;
+    boolean newAccount = user.getLocationAccountNullIfNotExists(locationId) == null;
+    UserLocationAccountEntity account = user.getOrCreateLocationAccount(locationId);
+    int previousBalance = account.getNumCredits();
     UserAddFundsTransactionEntity transaction =
-        recordAddFundsTransaction(user, pkg, chargeResult, now);
+        recordAddFundsTransaction(account, pkg, chargeResult, now);
     try {
       this.userRepository.storeAggregateRoot(this.userRoot);
+      // Last, so a failure here only has the in-memory credit and the charge to undo.
+      requireFinancialLedgerService().recordMobilePurchase(locationId, pkg.priceUsd(),
+          emailAddress, chargeResult.transactionId(), pkg.id(), pkg.credits(),
+          pkg.bonusCredits());
     } catch (RuntimeException e) {
-      // The card was charged but the credits could not be stored -- undo both, so the customer
-      // is never billed for credits they did not receive.
-      user.setNumCredits(previousBalance);
-      user.removeUnstoredUserAddFundsTransaction(transaction);
+      // The card was charged but the purchase could not be fully recorded -- undo it all, so the
+      // customer is never billed for credits they did not receive, and the location's ledger
+      // never shows revenue for a cancelled charge.
+      account.setNumCredits(previousBalance);
+      account.removeUnstoredAddFundsTransaction(transaction);
+      if (newAccount) {
+        user.getLocationAccounts().remove(account);
+      }
+      try {
+        this.userRepository.storeAggregateRoot(this.userRoot);
+      } catch (RuntimeException storeFailure) {
+        log.error("Could not store the rolled-back Add Funds for " + emailAddress, storeFailure);
+      }
       boolean voided = paymentGateway.voidCharge(chargeResult.transactionId());
-      log.error("Add Funds for " + emailAddress + " could not be stored; payment transaction "
-          + chargeResult.transactionId() + (voided ? " was voided" : " could NOT be voided"), e);
+      log.error("Add Funds for " + emailAddress + " at location " + locationId
+          + " could not be recorded; payment transaction " + chargeResult.transactionId()
+          + (voided ? " was voided" : " could NOT be voided"), e);
       throw new PaymentException(voided
           ? "Your purchase could not be completed and your payment was cancelled. Please try again."
           : "Your purchase could not be completed. Please contact support to be refunded.", e);
     }
 
-    eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, user.getNumCredits()));
+    String locationName = locationNameOf(locationId);
+    eventPublisher.publishEvent(
+        new UserCreditsChangedEvent(emailAddress, locationId, account.getNumCredits()));
     eventPublisher.publishEvent(new PurchaseCompletedEvent(emailAddress, user.getFirstName(),
         pkg.credits(), pkg.bonusCredits(), pkg.priceUsd(), chargeResult.paymentSource(),
-        chargeResult.transactionId(), now, user.getNumCredits()));
+        chargeResult.transactionId(), now, account.getNumCredits(), locationId, locationName));
 
-    return new AddFundsResponseDto(user.getNumCredits(), pkg.credits(), pkg.bonusCredits(),
-        chargeResult.paymentSource(), chargeResult.transactionId(), now);
+    return new AddFundsResponseDto(account.getNumCredits(), pkg.credits(), pkg.bonusCredits(),
+        chargeResult.paymentSource(), chargeResult.transactionId(), now, locationId,
+        locationName);
   }
 
   @Override
@@ -546,10 +572,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   @Override
   public synchronized UserProfileDto updateProfile(String emailAddress, UpdateProfileRequest request) {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
+    UserEntity user = requireUser(emailAddress);
 
     // Validate both before changing either, so a refused update changes nothing.
     String firstName = request.firstName() != null
@@ -567,70 +590,40 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
 
   @Override
   public synchronized List<String> getSearchHistory(String emailAddress) {
-
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    return user.getSearchHistory();
+    return requireUser(emailAddress).getSearchHistory();
   }
 
   @Override
   public synchronized void addSearchHistory(String emailAddress, String query) {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    user.addToSearchHistory(query, 10);
-
+    requireUser(emailAddress).addToSearchHistory(query, 10);
     this.userRepository.storeAggregateRoot(this.userRoot);
   }
 
   @Override
   public synchronized void removeSearchHistory(String emailAddress, int index) {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    user.removeFromSearchHistory(index);
-
+    requireUser(emailAddress).removeFromSearchHistory(index);
     this.userRepository.storeAggregateRoot(this.userRoot);
   }
 
   @Override
-  public synchronized boolean createPlaylist(String emailAddress, String playlistName)
-      throws EntityAlreadyExistsException {
+  public synchronized boolean createPlaylist(String emailAddress, Integer locationId,
+      String playlistName) throws EntityAlreadyExistsException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    user.createPlaylist(playlistName);
-
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
+    account.createPlaylist(playlistName);
     this.userRepository.storeAggregateRoot(this.userRoot);
-
     return true;
   }
 
   @Override
-  public synchronized boolean addSongToPlaylist(String emailAddress, String playlistName, Integer locationId,
-      SongFileEntity song) throws EntityDoesNotExistException {
+  public synchronized boolean addSongToPlaylist(String emailAddress, String playlistName,
+      Integer locationId, SongFileEntity song) throws EntityDoesNotExistException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    boolean result = user.addSongToPlaylist(playlistName, locationId, song);
-
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
+    boolean result = account.addSongToPlaylist(playlistName, song);
     this.userRepository.storeAggregateRoot(this.userRoot);
-
     return result;
   }
 
@@ -638,48 +631,32 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public synchronized boolean removeSongFromPlaylist(String emailAddress, String playlistName,
       Integer locationId, SongFileEntity song) throws EntityDoesNotExistException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    boolean result = user.removeSongFromPlaylist(playlistName, locationId, song);
-
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
+    boolean result = account.removeSongFromPlaylist(playlistName, song);
     this.userRepository.storeAggregateRoot(this.userRoot);
-
     return result;
   }
 
   @Override
-  public synchronized boolean deletePlaylist(String emailAddress, String playlistName)
-      throws EntityDoesNotExistException {
+  public synchronized boolean deletePlaylist(String emailAddress, Integer locationId,
+      String playlistName) throws EntityDoesNotExistException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    boolean result = user.deletePlaylist(playlistName);
-
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
+    boolean result = account.deletePlaylist(playlistName);
     this.userRepository.storeAggregateRoot(this.userRoot);
-
     return result;
   }
 
   @Override
-  public synchronized boolean renamePlaylist(String emailAddress, String playlistName,
-      String newPlaylistName) throws EntityDoesNotExistException, EntityAlreadyExistsException {
+  public synchronized boolean renamePlaylist(String emailAddress, Integer locationId,
+      String playlistName, String newPlaylistName)
+      throws EntityDoesNotExistException, EntityAlreadyExistsException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    boolean result = user.renamePlaylist(playlistName, newPlaylistName);
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
+    boolean result = account.renamePlaylist(playlistName, newPlaylistName);
     if (result) {
       this.userRepository.storeAggregateRoot(this.userRoot);
     }
-
     return result;
   }
 
@@ -687,49 +664,33 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   public synchronized boolean addSongToMyFavoritesPlaylist(String emailAddress, Integer locationId,
       SongFileEntity song) throws EntityDoesNotExistException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    user.ensureMyFavoritesPlaylist();
-    boolean result =
-        user.addSongToPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, locationId, song);
-
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
+    account.ensureMyFavoritesPlaylist();
+    boolean result = account.addSongToPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, song);
     this.userRepository.storeAggregateRoot(this.userRoot);
-
     return result;
   }
 
   @Override
-  public synchronized boolean removeSongFromMyFavoritesPlaylist(String emailAddress, Integer locationId,
-      SongFileEntity song) throws EntityDoesNotExistException {
+  public synchronized boolean removeSongFromMyFavoritesPlaylist(String emailAddress,
+      Integer locationId, SongFileEntity song) throws EntityDoesNotExistException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-
-    user.ensureMyFavoritesPlaylist();
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
+    account.ensureMyFavoritesPlaylist();
     boolean result =
-        user.removeSongFromPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, locationId, song);
-
+        account.removeSongFromPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, song);
     this.userRepository.storeAggregateRoot(this.userRoot);
-
     return result;
   }
 
   @Override
-  public synchronized List<PlaylistSummaryDto> getPlaylists(String emailAddress) {
+  public synchronized List<PlaylistSummaryDto> getPlaylists(String emailAddress,
+      Integer locationId) {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-    ensureMyFavorites(user);
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
 
     List<PlaylistSummaryDto> result = new ArrayList<>();
-    for (PlaylistEntity p : user.getPlaylists()) {
+    for (PlaylistEntity p : account.getPlaylists()) {
       List<SongIdentifier> songs = p.getSongs();
       Integer firstSongAlbumId = songs.isEmpty() ? null : songs.get(0).getAlbumId();
       result.add(new PlaylistSummaryDto(p.getName(), songs.size(), firstSongAlbumId));
@@ -738,22 +699,17 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public synchronized List<SongDto> getPlaylistSongs(String emailAddress, String playlistName)
-      throws EntityDoesNotExistException {
+  public synchronized List<SongDto> getPlaylistSongs(String emailAddress, Integer locationId,
+      String playlistName) throws EntityDoesNotExistException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-    ensureMyFavorites(user);
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
 
-    PlaylistEntity playlist = user.getPlaylistByName(playlistName);
+    PlaylistEntity playlist = account.getPlaylistByName(playlistName);
     List<SongDto> result = new ArrayList<>();
     for (SongIdentifier si : playlist.getSongs()) {
       try {
-        // A master-served playlist can span multiple locations.
-        SongDto song =
-            songLibraryService.getSongById(locationIdOf(si), si.getAlbumId(), si.getSongId());
+        SongDto song = songLibraryService.getSongById(account.getLocationId(), si.getAlbumId(),
+            si.getSongId());
         if (song != null) {
           result.add(song);
         }
@@ -765,41 +721,54 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     return result;
   }
 
-  /** See {@link UserEntity#ensureMyFavoritesPlaylist()}; stores the user if it was created. */
-  private void ensureMyFavorites(UserEntity user) {
-    if (user.ensureMyFavoritesPlaylist()) {
-      this.userRepository.storeAggregateRoot(this.userRoot);
+  /**
+   * {@code locationId}, or this instance's own location when it is omitted (standalone/slave).
+   *
+   * @throws IllegalArgumentException when neither is known (master with no location selected)
+   */
+  private Integer resolveLocationId(Integer locationId) {
+
+    Integer resolved = resolveLocationIdOrNull(locationId);
+    if (resolved == null) {
+      throw new IllegalArgumentException("Please select a location first.");
     }
+    return resolved;
+  }
+
+  private Integer resolveLocationIdOrNull(Integer locationId) {
+    return locationId != null ? locationId : songLibraryService.getOwnLocationId();
   }
 
   /**
-   * The location whose song library {@code songIdentifier} came from -- this instance's own
-   * location for an entry stored before entries were tagged with one.
+   * {@code user}'s account at {@code locationId} (see {@link #resolveLocationId}), created -- and
+   * stored -- on first use, and repaired by {@link UserLocationAccountEntity#ensureMyFavoritesPlaylist}.
    */
-  private Integer locationIdOf(SongIdentifier songIdentifier) {
-    return songIdentifier.getLocationId() != null ? songIdentifier.getLocationId()
-        : songLibraryService.getOwnLocationId();
+  private UserLocationAccountEntity accountFor(UserEntity user, Integer locationId) {
+
+    Integer resolved = resolveLocationId(locationId);
+    boolean created = user.getLocationAccountNullIfNotExists(resolved) == null;
+    UserLocationAccountEntity account = user.getOrCreateLocationAccount(resolved);
+    if (account.ensureMyFavoritesPlaylist() || created) {
+      this.userRepository.storeAggregateRoot(this.userRoot);
+    }
+    return account;
   }
 
   @Override
-  public synchronized void reorderPlaylistSongs(String emailAddress, String playlistName,
-      List<SongIdentifier> songs) throws EntityDoesNotExistException {
+  public synchronized void reorderPlaylistSongs(String emailAddress, Integer locationId,
+      String playlistName, List<SongIdentifier> songs) throws EntityDoesNotExistException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
 
-    PlaylistEntity playlist = user.getPlaylistByName(playlistName);
+    PlaylistEntity playlist = account.getPlaylistByName(playlistName);
     // Match each requested song against the stored entries and keep the stored identifier, so
     // a client that omits (or mis-tags) locationId can never strip or blank out the entry's
-    // locationId -- matching on the full identifier here previously dropped every such song.
+    // locationId.
     List<SongIdentifier> current = new ArrayList<>(playlist.getSongs());
     List<SongIdentifier> reordered = new ArrayList<>();
     for (SongIdentifier si : songs) {
       for (SongIdentifier stored : current) {
-        if ((si.getLocationId() == null || si.getLocationId().equals(stored.getLocationId()))
-            && Objects.equals(si.getAlbumId(), stored.getAlbumId())
+        if (Objects.equals(si.getAlbumId(), stored.getAlbumId())
             && Objects.equals(si.getSongId(), stored.getSongId())) {
           reordered.add(stored);
           current.remove(stored);
@@ -812,37 +781,28 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   @Override
-  public synchronized List<SongIdentifier> getFavoriteSongIdentifiers(String emailAddress) {
+  public synchronized List<SongIdentifier> getFavoriteSongIdentifiers(String emailAddress,
+      Integer locationId) {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-    ensureMyFavorites(user);
-
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
     PlaylistEntity favs =
-        user.getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
+        account.getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
     return new ArrayList<>(favs.getSongs());
   }
 
   @Override
   public synchronized List<SongIdentifier> getPlaylistSongIdentifiers(String emailAddress,
-      String playlistName) throws EntityDoesNotExistException {
+      Integer locationId, String playlistName) throws EntityDoesNotExistException {
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
-    ensureMyFavorites(user);
-
-    return new ArrayList<>(user.getPlaylistByName(playlistName).getSongs());
+    UserLocationAccountEntity account = accountFor(requireUser(emailAddress), locationId);
+    return new ArrayList<>(account.getPlaylistByName(playlistName).getSongs());
   }
 
   /**
-   * Re-tags every user's in-memory play history, playlist songs and song-credit usages from the
-   * previous own location id to the confirmed one, then persists them -- under JPA the rows were
-   * already re-pointed by {@code LocationRepositoryJpaImpl.changeLocationId}, so without this the
-   * next store would write the previous id back over them.
+   * Re-tags every user's location account (and everything in it) from the previous own location
+   * id to the confirmed one, then persists them -- under JPA the rows were already re-pointed by
+   * {@code LocationRepositoryJpaImpl.changeLocationId}, so without this the next store would write
+   * the previous id back over them.
    */
   @EventListener
   @Override
@@ -853,8 +813,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   /**
-   * A song this instance added to its own queue -- tagged with the own location id, so the spend
-   * counts toward this location's mobile revenue (an untagged spend is never counted). On master,
+   * A song this instance added to its own queue -- tagged with the own location id. On master,
    * which has no queue of its own, this never fires for a web user.
    */
   @EventListener
@@ -871,10 +830,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     // exact same local event via SongQueueServiceImpl's own event publish — but the web/mobile
     // user is never registered on the slave's own user store, since credits/identity are entirely
     // master-owned once a location is in slave mode. Master charges credits explicitly via the
-    // locationId-aware overload after the command succeeds (see
-    // LocationScopedSongQueueController), so this would otherwise double-charge (or, as here,
-    // throw "user not found" and cancel the whole add). A genuine local walk-up action
-    // (LOCAL_USERNAME) is untouched — it never carries credits through this path either way.
+    // locationId-aware overload after the command succeeds (see SongQueueController), so this
+    // would otherwise double-charge (or throw "user not found" and cancel the whole add). A
+    // genuine local walk-up action (LOCAL_USERNAME) is untouched.
     if (slaveMode && !LocalPrincipal.LOCAL_USERNAME.equals(username)) {
       return;
     }
@@ -890,20 +848,25 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     if (user == null) {
       throw new UserServiceException("User not found: " + username);
     }
+    if (locationId == null) {
+      log.warn("Song queued for {} with no location; not recorded in play history", username);
+      return;
+    }
 
+    UserLocationAccountEntity account = user.getOrCreateLocationAccount(locationId);
     SongDto song = event.queueEntry().song();
-    user.addSongToSongPlayHistory(
+    account.addSongToSongPlayHistory(
         new SongIdentifier(locationId, song.albumId(), song.songId()));
 
-    // Deduct Web UI credits for non-local (web) users -- see CreditCostCalculator for the
-    // swingCost * webCostMultiplier formula.
+    // Deduct Web UI credits for non-local (web) users -- from their balance at this location
+    // only. See CreditCostCalculator for the swingCost * webCostMultiplier formula.
     UserSongCreditUsageEntity usage = null;
     if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
       int priority =
           event.queueEntry().priority() != null ? event.queueEntry().priority() : 1;
       int cost = CreditCostCalculator.webQueueAddCost(pricingService.resolvePricingConfig(locationId),
           priority, event.priorityPlay());
-      usage = deductCredits(user, username, cost, UserSongCreditUsageType.QUEUE_ADD, locationId,
+      usage = deductCredits(account, username, cost, UserSongCreditUsageType.QUEUE_ADD,
           song.albumId(), song.songId());
     }
 
@@ -914,7 +877,7 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     // Every web user's queued song -- single or from a playlist, here or forwarded to a slave --
     // passes through here, so this is the one place the live Recent Plays row is fed from.
     if (!LocalPrincipal.LOCAL_USERNAME.equals(username)) {
-      eventPublisher.publishEvent(new RecentPlayAddedEvent(username, song));
+      eventPublisher.publishEvent(new RecentPlayAddedEvent(username, locationId, song));
     }
   }
 
@@ -933,14 +896,12 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       return;
     }
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
+    UserEntity user = requireUser(emailAddress);
+    UserLocationAccountEntity account = user.getOrCreateLocationAccount(resolveLocationId(locationId));
 
-    int cost = queueActionCost(priority, locationId);
-    UserSongCreditUsageEntity usage = deductCredits(user, emailAddress, cost,
-        UserSongCreditUsageType.QUEUE_ACTION, locationId, null, null);
+    int cost = queueActionCost(priority, account.getLocationId());
+    UserSongCreditUsageEntity usage = deductCredits(account, emailAddress, cost,
+        UserSongCreditUsageType.QUEUE_ACTION, null, null);
 
     this.userRepository.storeAggregateRoot(this.userRoot);
     if (usage != null) {
@@ -956,8 +917,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       requireSlaveQueueAccess(emailAddress);
       return;
     }
-    requireAffordable(requireUser(emailAddress), CreditCostCalculator
-        .webQueueAddCost(pricingService.resolvePricingConfig(locationId), priority, priorityPlay));
+    Integer resolved = resolveLocationId(locationId);
+    requireAffordable(requireUser(emailAddress), resolved, CreditCostCalculator
+        .webQueueAddCost(pricingService.resolvePricingConfig(resolved), priority, priorityPlay));
   }
 
   @Override
@@ -968,7 +930,8 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       requireSlaveQueueAccess(emailAddress);
       return;
     }
-    requireAffordable(requireUser(emailAddress), queueActionCost(priority, locationId));
+    Integer resolved = resolveLocationId(locationId);
+    requireAffordable(requireUser(emailAddress), resolved, queueActionCost(priority, resolved));
   }
 
   /**
@@ -1002,9 +965,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
     return user;
   }
 
-  private static void requireAffordable(UserEntity user, int cost) {
+  private static void requireAffordable(UserEntity user, Integer locationId, int cost) {
 
-    int balance = user.getNumCredits() != null ? user.getNumCredits() : 0;
+    int balance = user.getNumCredits(locationId);
     if (balance < cost) {
       throw new InsufficientCreditsException(cost, balance);
     }
@@ -1021,18 +984,15 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       return Integer.MAX_VALUE;
     }
 
-    UserEntity user = userRoot.getUserByEmailAddressNullIfNotExists(emailAddress);
-    if (user == null) {
-      throw new InvalidPrincipalException("User not found: " + emailAddress);
-    }
+    UserEntity user = requireUser(emailAddress);
+    Integer resolved = resolveLocationId(locationId);
 
     int cost = CreditCostCalculator.webQueueAddCost(
-        pricingService.resolvePricingConfig(locationId), priority, priorityPlay);
+        pricingService.resolvePricingConfig(resolved), priority, priorityPlay);
     if (cost <= 0) {
       return Integer.MAX_VALUE;
     }
-    int numCredits = user.getNumCredits() != null ? user.getNumCredits() : 0;
-    return Math.max(0, numCredits) / cost;
+    return Math.max(0, user.getNumCredits(resolved)) / cost;
   }
 
   @Override
@@ -1040,8 +1000,9 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
       Instant to) {
 
     return userRoot.getUsers().stream()
-        .flatMap(u -> u.getUserSongCreditUsages().stream())
-        .filter(t -> locationId.equals(t.getLocationId()))
+        .map(u -> u.getLocationAccountNullIfNotExists(locationId))
+        .filter(Objects::nonNull)
+        .flatMap(account -> account.getSongCreditUsages().stream())
         .filter(t -> !t.getTimestamp().isBefore(from) && !t.getTimestamp().isAfter(to))
         .sorted(java.util.Comparator.comparing(UserSongCreditUsageEntity::getTimestamp))
         .map(UserServiceImpl::toDto)
@@ -1055,43 +1016,44 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   /**
-   * Deducts {@code cost} credits (floored at zero), broadcasts the new balance, and appends a
-   * ledger entry for the credits actually deducted to the user's own song-credit-usage set -- each
-   * of those credits is paid out to {@code locationId} as mobile revenue, so the entry must never
-   * claim more than the balance really lost. Returns {@code null}, recording nothing, when nothing
-   * was deducted. Callers refuse an unaffordable action up front (see {@link #requireAffordable}),
-   * so the floor only matters as a last line of defense. Callers are responsible for persisting the
-   * user root afterward, and then for passing a non-null entry to {@link
-   * #announceLocationCreditUsage}.
+   * Deducts {@code cost} credits (floored at zero) from the patron's balance at the account's
+   * location, broadcasts the new balance, and appends a spend record to the account. The spend is
+   * an audit record only -- the location's revenue was recorded in full when the credits were
+   * bought. Returns {@code null}, recording nothing, when nothing was deducted. Callers refuse an
+   * unaffordable action up front (see {@link #requireAffordable}), so the floor only matters as a
+   * last line of defense. Callers persist the user root afterward, then pass a non-null entry to
+   * {@link #announceLocationCreditUsage}.
    */
-  private UserSongCreditUsageEntity deductCredits(UserEntity user, String emailAddress, int cost,
-      UserSongCreditUsageType type, Integer locationId, Integer songAlbumId, Integer songId) {
+  private UserSongCreditUsageEntity deductCredits(UserLocationAccountEntity account,
+      String emailAddress, int cost, UserSongCreditUsageType type, Integer songAlbumId,
+      Integer songId) {
 
-    int balance = user.getNumCredits() != null ? user.getNumCredits() : 0;
+    int balance = account.getNumCredits();
     int deducted = Math.max(0, Math.min(cost, balance));
     if (deducted < cost) {
       log.warn("Charged " + emailAddress + " " + deducted + " of " + cost
-          + " credits -- the balance did not cover the full cost");
+          + " credits at location " + account.getLocationId()
+          + " -- the balance did not cover the full cost");
     }
     if (deducted == 0) {
       return null;
     }
 
     int remaining = balance - deducted;
-    user.setNumCredits(remaining);
-    eventPublisher.publishEvent(new UserCreditsChangedEvent(emailAddress, remaining));
+    account.setNumCredits(remaining);
+    eventPublisher.publishEvent(
+        new UserCreditsChangedEvent(emailAddress, account.getLocationId(), remaining));
 
-    Integer persistentIdentity = user.nextUserSongCreditUsageIdentity();
+    Integer persistentIdentity = account.nextSongCreditUsageIdentity();
     UserSongCreditUsageEntity usage = new UserSongCreditUsageEntity(persistentIdentity,
-        locationId, -deducted, type, Instant.now(), songAlbumId, songId, remaining,
+        account.getLocationId(), -deducted, type, Instant.now(), songAlbumId, songId, remaining,
         UUID.randomUUID().toString());
-    return user.addUserSongCreditUsage(usage);
+    return account.addSongCreditUsage(usage);
   }
 
   /**
-   * Announces a location-attributed spend via {@link LocationSongCreditUsageRecordedEvent} so
-   * master can mirror it to that location's slave. Called only once the spend has been stored, so
-   * a slave can never end up holding a spend master itself failed to record.
+   * Announces a spend via {@link LocationSongCreditUsageRecordedEvent} so master can mirror it to
+   * that location's slave as an audit record. Called only once the spend has been stored.
    */
   private void announceLocationCreditUsage(UserSongCreditUsageEntity usage) {
 
@@ -1102,22 +1064,56 @@ public class UserServiceImpl implements UserService, AggregateRootService<UserRo
   }
 
   /**
-   * Adds the package's credits (+ bonus) and appends an Add-Funds ledger entry to the user's own
-   * set -- never location-attributed, since Add-Funds credits can be spent at any location (see
-   * {@link UserAddFundsTransactionEntity}'s javadoc). Callers are responsible for persisting the
-   * user root afterward, and only then for broadcasting the new balance.
+   * Adds the package's credits (+ bonus) to the account's balance and appends an Add Funds record
+   * to it. Callers persist the user root afterward, and only then broadcast the new balance.
    */
-  private UserAddFundsTransactionEntity recordAddFundsTransaction(UserEntity user,
+  private UserAddFundsTransactionEntity recordAddFundsTransaction(UserLocationAccountEntity account,
       CreditPackageDto pkg, PaymentChargeResult chargeResult, Instant timestamp) {
 
-    int totalCredits = pkg.credits() + pkg.bonusCredits();
-    int newBalance = (user.getNumCredits() != null ? user.getNumCredits() : 0) + totalCredits;
-    user.setNumCredits(newBalance);
+    int newBalance = account.getNumCredits() + pkg.credits() + pkg.bonusCredits();
+    account.setNumCredits(newBalance);
 
-    Integer persistentIdentity = user.nextUserAddFundsTransactionIdentity();
-    return user.addUserAddFundsTransaction(new UserAddFundsTransactionEntity(persistentIdentity,
-        pkg.id(), pkg.credits(), pkg.bonusCredits(), pkg.priceUsd(), chargeResult.paymentSource(),
-        chargeResult.transactionId(), timestamp, newBalance));
+    Integer persistentIdentity = account.nextAddFundsTransactionIdentity();
+    return account.addAddFundsTransaction(new UserAddFundsTransactionEntity(persistentIdentity,
+        account.getLocationId(), pkg.id(), pkg.credits(), pkg.bonusCredits(), pkg.priceUsd(),
+        chargeResult.paymentSource(), chargeResult.transactionId(), timestamp, newBalance));
+  }
+
+  /**
+   * The financial ledger records each Add Funds purchase in its location's ledger. Wired after
+   * construction (see {@code AppConfig}), because the ledger service itself depends on this one.
+   */
+  public void setFinancialLedgerServiceSupplier(
+      Supplier<FinancialLedgerService> financialLedgerServiceSupplier) {
+    this.financialLedgerServiceSupplier = requireNonNull(financialLedgerServiceSupplier);
+  }
+
+  /** Used to name locations in balances and receipts, and to check an Add Funds location. */
+  public void setLocationService(LocationService locationService) {
+    this.locationService = locationService;
+  }
+
+  private FinancialLedgerService requireFinancialLedgerService() {
+
+    FinancialLedgerService service = financialLedgerServiceSupplier.get();
+    if (service == null) {
+      throw new IllegalStateException("No financial ledger is available to record the purchase");
+    }
+    return service;
+  }
+
+  private boolean appIsMaster() {
+    // Master is the only mode with no own location (see SongLibraryServiceImpl.initialize()).
+    return songLibraryService.getOwnLocationId() == null;
+  }
+
+  private String locationNameOf(Integer locationId) {
+
+    if (locationId == null || locationService == null) {
+      return null;
+    }
+    LocationEntity location = locationService.getLocationByIdNullIfNotExists(locationId);
+    return location != null ? location.getName() : null;
   }
 
   // Repository methods

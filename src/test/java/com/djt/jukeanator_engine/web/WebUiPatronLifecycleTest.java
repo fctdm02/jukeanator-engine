@@ -286,7 +286,7 @@ class WebUiPatronLifecycleTest {
     assertEquals(401, ui.post(null, "/api/users/playlists/favorites/songs", songRef(song))
         .status());
     assertEquals(401, ui.get(null, "/api/users/payment/client-token").status());
-    assertEquals(401, ui.post(null, "/api/users/add-funds", new AddFundsRequest("pkg-7", "n"))
+    assertEquals(401, ui.post(null, "/api/users/add-funds", new AddFundsRequest(locationId, "pkg-7", "n"))
         .status());
     assertTrue(queuedSongs().isEmpty(), "nothing reached the queue");
   }
@@ -317,7 +317,7 @@ class WebUiPatronLifecycleTest {
     assertEquals("Pat", profile.path("firstName").asText());
     assertEquals("Ron", profile.path("lastName").asText());
     assertEquals(email, profile.path("emailAddress").asText());
-    assertEquals(0, profile.path("numCredits").asInt());
+    assertTrue(profile.path("balances").isEmpty(), "no credits at any location yet");
 
     // ── 2. The signed-in home screen and the Playlists tab ────────────────────────────────
     JsonNode home = ui.get(token, "/api/users/home").expect(200).json();
@@ -347,27 +347,29 @@ class WebUiPatronLifecycleTest {
     assertFalse(clientToken.path("clientToken").asText("").isBlank());
 
     Response unknownPackage = ui.post(token, "/api/users/add-funds",
-        new AddFundsRequest("pkg-999", "fake-nonce"));
+        new AddFundsRequest(locationId, "pkg-999", "fake-nonce"));
     unknownPackage.expect(402);
     assertEquals("PaymentException", unknownPackage.error());
     Response noPaymentMethod = ui.post(token, "/api/users/add-funds",
-        new AddFundsRequest("pkg-14", " "));
+        new AddFundsRequest(locationId, "pkg-14", " "));
     noPaymentMethod.expect(402);
     assertEquals("PaymentException", noPaymentMethod.error());
     assertEquals(0, balance(token), "a refused purchase adds nothing");
 
     JsonNode purchase = ui.post(token, "/api/users/add-funds",
-        new AddFundsRequest("pkg-14", "fake-nonce")).expect(200).json();
+        new AddFundsRequest(locationId, "pkg-14", "fake-nonce")).expect(200).json();
     assertEquals(24, purchase.path("creditsAdded").asInt());
     assertEquals(8, purchase.path("bonusCreditsAdded").asInt());
     assertEquals(32, purchase.path("numCredits").asInt());
+    assertEquals(locationId.intValue(), purchase.path("locationId").asInt(),
+        "the credits are bought for this jukebox's location");
     assertFalse(purchase.path("transactionId").asText("").isBlank());
     assertFalse(purchase.path("paymentSource").asText("").isBlank());
 
     stomp.await(userDestination(email, "/queue/credits"),
         message -> message.path("numCredits").asInt() == 32);
     profile = ui.get(token, "/api/users/me").expect(200).json();
-    assertEquals(32, profile.path("numCredits").asInt());
+    assertEquals(32, creditsHere(profile));
 
     // ── 5. Searching, and the search history under the search box ─────────────────────────
     String artistName = songA.path("artistName").asText();
@@ -576,7 +578,7 @@ class WebUiPatronLifecycleTest {
     assertEquals(List.of(key(songA), key(songC), key(songD), key(songB)), keys(queuedSongs()));
 
     // Top up with the smallest package.
-    ui.post(token, "/api/users/add-funds", new AddFundsRequest("pkg-7", "fake-nonce"))
+    ui.post(token, "/api/users/add-funds", new AddFundsRequest(locationId, "pkg-7", "fake-nonce"))
         .expect(200);
     expectedBalance += 14; // 24
 
@@ -599,7 +601,7 @@ class WebUiPatronLifecycleTest {
         .expect(200).json();
     assertEquals("Patricia", updated.path("firstName").asText());
     assertEquals("Ron", updated.path("lastName").asText(), "an omitted field is left unchanged");
-    assertEquals(expectedBalance, updated.path("numCredits").asInt());
+    assertEquals(expectedBalance, creditsHere(updated));
 
     // A wrong current password is a 400 (never a 401, which app.js treats as signed out), and a
     // new password must meet the same rules as at registration.
@@ -934,13 +936,23 @@ class WebUiPatronLifecycleTest {
     String token = ui.post(null, "/api/users/register",
         new RegisterRequest("Pat", "Ron", email, PASSWORD)).expect(200).json()
         .path("token").asText();
-    ui.post(token, "/api/users/add-funds", new AddFundsRequest(packageId, "fake-nonce"))
+    ui.post(token, "/api/users/add-funds", new AddFundsRequest(locationId, packageId, "fake-nonce"))
         .expect(200);
     return token;
   }
 
   private int balance(String token) {
-    return ui.get(token, "/api/users/me").expect(200).json().path("numCredits").asInt();
+    return creditsHere(ui.get(token, "/api/users/me").expect(200).json());
+  }
+
+  /** The balance at this jukebox's location, from a profile's per-location balances. */
+  private int creditsHere(JsonNode profile) {
+    for (JsonNode balance : profile.path("balances")) {
+      if (balance.path("locationId").asInt() == locationId.intValue()) {
+        return balance.path("numCredits").asInt();
+      }
+    }
+    return 0;
   }
 
   private List<String> searchHistory(String token) {

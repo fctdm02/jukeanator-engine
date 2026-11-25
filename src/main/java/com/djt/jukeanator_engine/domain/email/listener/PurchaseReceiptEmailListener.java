@@ -27,6 +27,6 @@ public class PurchaseReceiptEmailListener {
     new SecurityContextPropagatingRunnable(() -> emailService.sendPurchaseReceiptEmail(
         event.emailAddress(), event.firstName(), event.credits(), event.bonusCredits(),
         event.amountUsd(), event.paymentSource(), event.transactionId(), event.timestamp(),
-        event.newBalance()), SystemPrincipal.SystemAuthenticationToken.INSTANCE).run();
+        event.newBalance(), event.locationName()), SystemPrincipal.SystemAuthenticationToken.INSTANCE).run();
   }
 }

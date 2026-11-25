@@ -19,7 +19,9 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import jakarta.persistence.EntityManagerFactory;
 import com.djt.jukeanator_engine.domain.common.security.UserRole;
+import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserLocationAccountEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageType;
@@ -75,7 +77,7 @@ class UserRepositoryJpaPlaceholderIdentityTest {
 
     String newEmail = unique("new") + "@example.com";
     root.addUser(new UserEntity(root.nextUserPersistentIdentity(), "New", "User", newEmail,
-        "hash", Integer.valueOf(6), UserRole.ROLE_USER));
+        "hash", UserRole.ROLE_USER));
     repository.storeAggregateRoot(root);
 
     assertEquals(emailHeldByCollidingId, emailOfUser(collidingId),
@@ -92,23 +94,53 @@ class UserRepositoryJpaPlaceholderIdentityTest {
 
     String email = unique("spender") + "@example.com";
     UserEntity user = new UserEntity(root.nextUserPersistentIdentity(), "Spend", "Er", email,
-        "hash", Integer.valueOf(20), UserRole.ROLE_USER);
+        "hash", UserRole.ROLE_USER);
+    UserLocationAccountEntity account = user.getOrCreateLocationAccount(Integer.valueOf(7));
+    account.setNumCredits(20);
     root.addUser(user);
     repository.storeAggregateRoot(root);
 
-    UserSongCreditUsageEntity first = user.addUserSongCreditUsage(
-        usage(user.nextUserSongCreditUsageIdentity(), "first"));
+    UserSongCreditUsageEntity first = account.addSongCreditUsage(
+        usage(account.nextSongCreditUsageIdentity(), "first"));
     repository.storeAggregateRoot(root);
 
     // persist() replaced the placeholder with a real id in place; the set must still find it.
-    assertTrue(user.getUserSongCreditUsages().contains(first));
+    assertTrue(account.getSongCreditUsages().contains(first));
 
-    UserSongCreditUsageEntity second = user.addUserSongCreditUsage(
-        usage(user.nextUserSongCreditUsageIdentity(), "second"));
+    UserSongCreditUsageEntity second = account.addSongCreditUsage(
+        usage(account.nextSongCreditUsageIdentity(), "second"));
     repository.storeAggregateRoot(root);
 
-    assertTrue(user.getUserSongCreditUsages().contains(second));
+    assertTrue(account.getSongCreditUsages().contains(second));
     assertEquals(2, countUsagesOf(email));
+  }
+
+  @Test
+  void aLocationAccountAddedToAStoredUser_isPersistedWithItsChildren() throws Exception {
+
+    UserRepositoryJpaImpl repository = newRepository();
+    UserRootEntity root = repository.loadAggregateRoot("users");
+
+    String email = unique("traveller") + "@example.com";
+    UserEntity user = new UserEntity(root.nextUserPersistentIdentity(), "Trav", "Eller", email,
+        "hash", UserRole.ROLE_USER);
+    root.addUser(user);
+    repository.storeAggregateRoot(root);
+
+    // A second location's account, with a spend, added after the user was stored.
+    UserLocationAccountEntity account = user.getOrCreateLocationAccount(Integer.valueOf(7));
+    account.addSongCreditUsage(usage(account.nextSongCreditUsageIdentity(), "abroad"));
+    repository.storeAggregateRoot(root);
+
+    UserEntity reloaded = newRepository().loadAggregateRoot("users")
+        .getUserByEmailAddressNullIfNotExists(email);
+    UserLocationAccountEntity reloadedAccount =
+        reloaded.getLocationAccountNullIfNotExists(Integer.valueOf(7));
+    assertTrue(reloadedAccount != null, "the new location account must be stored");
+    assertEquals(1, reloadedAccount.getSongCreditUsages().size());
+    assertTrue(reloadedAccount
+        .getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME) != null);
+    assertEquals(1, countUsagesOf(email));
   }
 
   // ── fixtures ────────────────────────────────────────────────────────────
@@ -126,8 +158,8 @@ class UserRepositoryJpaPlaceholderIdentityTest {
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(
             "insert into user_account (persistent_identity, first_name, last_name, "
-                + "email_address, password_hash, num_credits, role) "
-                + "values (?, 'Existing', 'User', ?, 'hash', 6, 'ROLE_USER')")) {
+                + "email_address, password_hash, role) "
+                + "values (?, 'Existing', 'User', ?, 'hash', 'ROLE_USER')")) {
       statement.setInt(1, id);
       statement.setString(2, email);
       statement.executeUpdate();
@@ -184,8 +216,10 @@ class UserRepositoryJpaPlaceholderIdentityTest {
   private int countUsagesOf(String email) throws SQLException {
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(
-            "select count(*) from user_song_credit_usage c join user_account u "
-                + "on u.persistent_identity = c.user_id where u.email_address = ?")) {
+            "select count(*) from user_song_credit_usage c "
+                + "join user_location_account a on a.persistent_identity = c.user_location_account_id "
+                + "join user_account u on u.persistent_identity = a.user_id "
+                + "where u.email_address = ?")) {
       statement.setString(1, email);
       try (ResultSet rs = statement.executeQuery()) {
         rs.next();

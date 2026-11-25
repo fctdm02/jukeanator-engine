@@ -3,6 +3,7 @@ package com.djt.jukeanator_engine.domain.location.repository;
 import static java.util.Objects.requireNonNull;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -19,9 +20,11 @@ import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
+import com.djt.jukeanator_engine.domain.location.model.LocationCreditPackageEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationStatus;
+import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 
 /**
  * JPA/Hibernate-backed implementation of {@link LocationRepository}. Server/database-type
@@ -295,13 +298,16 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
             + "where parent_location_id = :oldId", oldLocationId, newLocationId);
         rekey("update song_queue set location_id = :newId where location_id = :oldId",
             oldLocationId, newLocationId);
+        rekey("update location_credit_package set location_id = :newId "
+            + "where location_id = :oldId", oldLocationId, newLocationId);
         // The remaining tables have no foreign key to location, but their rows are still tagged
         // with this instance's own location id, so they must follow it too. Services holding
         // copies of these rows in memory re-tag them on OwnLocationIdChangedEvent, so their next
         // store doesn't write the previous id back over these updates.
         for (String table : List.of("location_transaction", "location_mobile_credit_usage",
             "user_song_play_history", "user_playlist_song", "user_song_credit_usage",
-            "user_activity", "song_background_music")) {
+            "user_add_funds_transaction", "user_location_account", "user_activity",
+            "song_background_music")) {
           rekey("update " + table + " set location_id = :newId where location_id = :oldId",
               oldLocationId, newLocationId);
         }
@@ -371,6 +377,26 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
         .executeUpdate();
   }
 
+  @Override
+  public void storeCreditPackages(Integer locationId, List<CreditPackageDto> packages) {
+
+    requireNonNull(locationId, "locationId cannot be null");
+    transactionTemplate.executeWithoutResult(status -> {
+      entityManager
+          .createQuery("delete from LocationCreditPackageEntity p where p.locationId = :locationId")
+          .setParameter("locationId", locationId)
+          .executeUpdate();
+      // Flush the delete before inserting: a re-pushed list usually reuses the same package
+      // codes, and uq_location_credit_package would otherwise reject the new rows.
+      entityManager.flush();
+      if (packages != null) {
+        for (int i = 0; i < packages.size(); i++) {
+          entityManager.persist(new LocationCreditPackageEntity(locationId, packages.get(i), i));
+        }
+      }
+    });
+  }
+
   private LocationRootEntity loadOrCreateRoot() {
 
     return transactionTemplate.execute(status -> {
@@ -378,8 +404,18 @@ public final class LocationRepositoryJpaImpl implements LocationRepository {
       List<LocationEntity> locations =
           entityManager.createQuery("from LocationEntity", LocationEntity.class).getResultList();
 
+      Map<Integer, List<CreditPackageDto>> packagesByLocation = new HashMap<>();
+      for (LocationCreditPackageEntity pkg : entityManager
+          .createQuery("from LocationCreditPackageEntity p order by p.locationId, p.displayOrder",
+              LocationCreditPackageEntity.class)
+          .getResultList()) {
+        packagesByLocation.computeIfAbsent(pkg.getLocationId(), id -> new ArrayList<>())
+            .add(pkg.toDto());
+      }
+
       LocationRootEntity root = new LocationRootEntity();
       for (LocationEntity location : locations) {
+        location.setCreditPackages(packagesByLocation.get(location.getPersistentIdentity()));
         root.addLocation(location);
         // putIfAbsent: a re-load (e.g. LocationServiceImpl picking up rows inserted by hand)
         // must not replace the last-known values of a row already held in memory -- that would

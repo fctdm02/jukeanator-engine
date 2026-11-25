@@ -1617,7 +1617,9 @@ public class AdminPanel extends JPanel {
     private static final long serialVersionUID = 1L;
 
     private static final String[] COLUMNS =
-        {"Period", "Cash", "Card", "Mobile", "Total", "Owner Due", "Operator Due"};
+        // "Mobile/Web" is the Add Funds purchases made for this location through the Web/Mobile
+        // UI, recorded in full when paid -- like "Card" -- not the credits patrons later spend.
+        {"Period", "Cash", "Card", "Mobile/Web", "Total", "Owner Due", "Operator Due"};
 
     private static final java.time.format.DateTimeFormatter DATE_FORMAT =
         java.time.format.DateTimeFormatter.ofPattern("M/d/yyyy")

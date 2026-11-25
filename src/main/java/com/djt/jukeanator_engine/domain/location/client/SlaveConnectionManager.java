@@ -28,6 +28,7 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
 import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.common.exception.ResourceNotFoundException;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalMobileTransactionDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.MasterSyncOutboxEntry;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.controller.LocationController;
@@ -36,6 +37,7 @@ import com.djt.jukeanator_engine.domain.location.dto.CommandReplyDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationEventMessage;
 import com.djt.jukeanator_engine.domain.location.dto.LocationInfoSyncDto;
 import com.djt.jukeanator_engine.domain.location.dto.LocationPricingConfigDto;
+import com.djt.jukeanator_engine.domain.user.config.AddFundsProperties;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationInfoUpdatedEvent;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
@@ -98,6 +100,7 @@ public class SlaveConnectionManager {
   private final LocationService locationService;
   private final ObjectMapper objectMapper;
   private final JukeANatorUserInterfaceProperties userInterfaceProperties;
+  private final AddFundsProperties addFundsProperties;
   private final FinancialLedgerService financialLedgerService;
   private final UserActivityService userActivityService;
 
@@ -128,9 +131,11 @@ public class SlaveConnectionManager {
       SongPlayerService songPlayerService, SongLibraryService songLibraryService,
       LocationService locationService, ObjectMapper objectMapper,
       JukeANatorUserInterfaceProperties userInterfaceProperties,
-      FinancialLedgerService financialLedgerService, UserActivityService userActivityService) {
+      FinancialLedgerService financialLedgerService, UserActivityService userActivityService,
+      AddFundsProperties addFundsProperties) {
 
     this.appProperties = appProperties;
+    this.addFundsProperties = addFundsProperties;
     this.financialLedgerService = financialLedgerService;
     this.userActivityService = userActivityService;
     this.songQueueService = songQueueService;
@@ -270,7 +275,9 @@ public class SlaveConnectionManager {
    * Pushes this slave's own {@code user-interface.*} credit-config bundle to master so master can
    * price this location's Web/Mobile UI consistently with what this slave's JFC/Swing UI charges
    * — the slave's application.yml remains the single source of truth; master just caches this on
-   * the corresponding {@code LocationEntity}. Sent on every (re)connect so config changes and
+   * the corresponding {@code LocationEntity}. Also carries this location's own Add Funds credit
+   * packages ({@code add-funds.packages}), which the Web/Mobile UI sells for this location only.
+   * Sent on every (re)connect so config changes and
    * reconnect-after-downtime both stay in sync.
    */
   private void sendPricingConfig(StompSession session) {
@@ -281,7 +288,8 @@ public class SlaveConnectionManager {
               userInterfaceProperties.getFiveDollarBonusCredits(),
               userInterfaceProperties.getTenDollarBonusCredits(),
               userInterfaceProperties.getWebCostMultiplier(),
-              userInterfaceProperties.isDisplayCurrencyForCost()));
+              userInterfaceProperties.isDisplayCurrencyForCost(),
+              addFundsProperties.toCreditPackages()));
     } catch (Exception e) {
       log.debug("Could not send pricing config to master", e);
     }
@@ -655,6 +663,10 @@ public class SlaveConnectionManager {
       case "recordMobileCreditUsage":
         financialLedgerService.receiveMobileCreditUsage(
             convert(payload, UserSongCreditUsageDto.class));
+        return null;
+      case "recordMobileTransaction":
+        financialLedgerService.receiveMobileTransaction(
+            convert(payload, LocalMobileTransactionDto.class));
         return null;
       default:
         throw new IllegalArgumentException("Unknown commandType: " + commandType);

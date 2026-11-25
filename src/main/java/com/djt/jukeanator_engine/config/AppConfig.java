@@ -29,6 +29,8 @@ import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector;
 import com.djt.jukeanator_engine.domain.common.utils.OperatingSystemDetector.OSType;
 import com.djt.jukeanator_engine.domain.email.config.EmailProperties;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
+import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
+import org.springframework.beans.factory.ObjectProvider;
 import com.djt.jukeanator_engine.domain.location.service.SlaveCommandGateway;
 import com.djt.jukeanator_engine.domain.songlibrary.config.SongLibraryProperties;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryObjectPersistor;
@@ -341,9 +343,11 @@ public class AppConfig {
 
   @Bean
   public PricingService pricingService(AppProperties appProperties,
-      JukeANatorUserInterfaceProperties userInterfaceProperties, LocationService locationService) {
+      JukeANatorUserInterfaceProperties userInterfaceProperties, LocationService locationService,
+      AddFundsProperties addFundsProperties) {
 
-    return new PricingServiceImpl(appProperties, userInterfaceProperties, locationService);
+    return new PricingServiceImpl(appProperties, userInterfaceProperties, locationService,
+        addFundsProperties);
   }
 
   @Bean
@@ -358,7 +362,8 @@ public class AppConfig {
       PricingService pricingService,
       PaymentGateway paymentGateway,
       EmailProperties emailProperties,
-      AddFundsProperties addFundsProperties) {
+      LocationService locationService,
+      ObjectProvider<FinancialLedgerService> financialLedgerServiceProvider) {
 
     UserServiceImpl userService = new UserServiceImpl(
         userRepository,
@@ -374,7 +379,9 @@ public class AppConfig {
             emailProperties.isVerificationRequired(),
             emailProperties.getVerificationBaseUrl(),
             emailProperties.getVerificationTokenTtl()));
-    userService.setCreditPackages(addFundsProperties.toCreditPackages());
+    userService.setLocationService(locationService);
+    // Resolved lazily, at purchase time: FinancialLedgerService itself depends on UserService.
+    userService.setFinancialLedgerServiceSupplier(financialLedgerServiceProvider::getIfAvailable);
     return userService;
   }
 

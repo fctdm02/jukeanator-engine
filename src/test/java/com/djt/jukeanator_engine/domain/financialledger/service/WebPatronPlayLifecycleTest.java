@@ -42,6 +42,8 @@ import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.security.UserRole;
 import com.djt.jukeanator_engine.domain.financialledger.config.FinancialLedgerProperties;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalMobileTransactionDto;
+import com.djt.jukeanator_engine.domain.financialledger.event.MobilePurchaseRecordedEvent;
 import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedgerRepository;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.GeoFenceService;
@@ -66,9 +68,11 @@ import com.djt.jukeanator_engine.domain.user.exception.InvalidCredentialsExcepti
 import com.djt.jukeanator_engine.domain.user.exception.QueueAccessDeniedException;
 import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserLocationAccountEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageType;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
+import com.djt.jukeanator_engine.domain.user.service.CreditPackageCatalog;
 import com.djt.jukeanator_engine.domain.user.service.PaymentChargeResult;
 import com.djt.jukeanator_engine.domain.user.service.PaymentGateway;
 import com.djt.jukeanator_engine.domain.user.service.PricingConfig;
@@ -84,20 +88,22 @@ import com.djt.jukeanator_engine.domain.user.service.UserServiceImpl;
  * database, no network.
  *
  * <p>The production deployment is a master (web accounts, credits, Add Funds) serving patrons at a
- * slave (the bar's jukebox and its own financial ledger). Master's spends reach the slave the way
- * {@code MobileCreditUsageSlaveNotifier} pushes them -- synchronously here -- into the slave's
- * {@link FinancialLedgerServiceImpl}, whose split periods are what the bar owner is paid from.
+ * slave (the bar's jukebox and its own financial ledger). Master's purchases and spends reach the
+ * slave the way {@code MobileTransactionSlaveNotifier} and {@code MobileCreditUsageSlaveNotifier}
+ * push them -- synchronously here -- into the slave's {@link FinancialLedgerServiceImpl}, whose
+ * split periods are what the bar owner is paid from.
  *
  * <p>The rules this locks in:
  * <ul>
- * <li>A new account holds no credits; every credit spent was bought through Add Funds.</li>
- * <li>An operation the balance does not cover is refused before it runs -- nothing is queued,
- * moved or charged -- so no play is ever free.</li>
- * <li>Every spend is recorded against the location it was made at, for exactly the credits the
- * balance lost, and mirrored only to that location.</li>
- * <li>A location's mobile revenue is the credits spent there divided by that location's own
- * {@code creditsPerDollar} -- the kiosk's bill-acceptor rate -- however much the patron paid for
- * them. This is the agreed basis for paying the bar owner.</li>
+ * <li>A new account holds no credits anywhere; every credit spent at a location was bought for
+ * that location through Add Funds, and is usable only there.</li>
+ * <li>An operation the balance at that location does not cover is refused before it runs --
+ * nothing is queued, moved or charged -- so no play is ever free.</li>
+ * <li>A location's mobile revenue is the Add Funds purchases made for it: each recorded once, in
+ * full, when paid -- like a swipe on its own card reader -- however the credits are later
+ * spent.</li>
+ * <li>Every spend is still recorded against its location as an audit trail, for exactly the
+ * credits the balance lost, and mirrored only to that location.</li>
  * <li>Closing an account keeps its financial records.</li>
  * </ul>
  */
@@ -132,8 +138,14 @@ class WebPatronPlayLifecycleTest {
   /** The bar's own (slave) ledger, which the bar owner's split is computed from. */
   private FinancialLedgerServiceImpl barLedger;
 
+  /** Master's ledger, where Web/Mobile purchases are recorded before being mirrored down. */
+  private FinancialLedgerServiceImpl masterLedger;
+
   /** Spends master pushed toward any location other than {@link #BAR}. */
   private final List<UserSongCreditUsageDto> pushedElsewhere = new CopyOnWriteArrayList<>();
+  /** Purchases master pushed toward any location other than {@link #BAR}. */
+  private final List<LocalMobileTransactionDto> purchasesPushedElsewhere =
+      new CopyOnWriteArrayList<>();
   private final List<Object> masterEvents = new CopyOnWriteArrayList<>();
   private final Map<Integer, List<SongQueueEntryDto>> slaveQueues = new ConcurrentHashMap<>();
   private final AtomicInteger nextChargeId = new AtomicInteger(1);
@@ -144,6 +156,8 @@ class WebPatronPlayLifecycleTest {
     pricingService = mock(PricingService.class);
     when(pricingService.resolvePricingConfig(any())).thenReturn(BAR_PRICING);
     when(pricingService.resolvePricingConfig(OTHER_BAR)).thenReturn(OTHER_BAR_PRICING);
+    when(pricingService.resolveCreditPackages(any()))
+        .thenReturn(CreditPackageCatalog.DEFAULT_PACKAGES);
 
     // Opened first, so the bar's open split period starts before any spend.
     barLedger = newLedger(BAR, mock(UserService.class), true);
@@ -164,6 +178,8 @@ class WebPatronPlayLifecycleTest {
     masterUserService = new UserServiceImpl(masterUserRepository, new PlainTextPasswordEncoder(),
         mock(JwtUtil.class), this::publishOnMaster, masterSongLibrary, pricingService, false,
         paymentGateway);
+    masterLedger = newMasterLedger(masterUserService);
+    masterUserService.setFinancialLedgerServiceSupplier(() -> masterLedger);
 
     // Master forwards every queue operation to the location's slave; the slaves' queues are
     // simulated here.
@@ -195,18 +211,20 @@ class WebPatronPlayLifecycleTest {
     assertEquals(0, refused.getBalance());
     verify(masterSongQueue, never()).addSongToQueue(any(), any());
 
-    // ── 2. Add Funds: $7.00 buys 12 + 2 bonus = 14 credits, at no location ────────────────
+    // ── 2. Add Funds at the bar: $7.00 buys 12 + 2 bonus = 14 credits, usable only here ───
     AddFundsResponseDto purchase =
-        masterUserService.addFunds(PATRON, new AddFundsRequest("pkg-7", "nonce-1"));
+        masterUserService.addFunds(PATRON, new AddFundsRequest(BAR, "pkg-7", "nonce-1"));
 
     verify(paymentGateway).charge(new BigDecimal("7.00"), "nonce-1");
     assertEquals(Integer.valueOf(14), purchase.numCredits());
+    assertEquals(BAR, purchase.locationId());
     assertEquals(12, purchase.creditsAdded());
     assertEquals(2, purchase.bonusCreditsAdded());
     assertEquals("txn-1", purchase.transactionId());
     assertEquals(1, eventsOfType(PurchaseCompletedEvent.class).size());
-    assertEquals(0, new BigDecimal("0.00").compareTo(openPeriod(barLedger).mobileTotal()),
-        "buying credits is not revenue for any location until they are spent there");
+    assertEquals(0, balanceAt(OTHER_BAR), "credits bought for the bar are not usable elsewhere");
+    assertMoney("7.00", openPeriod(barLedger).mobileTotal(),
+        "the whole purchase is the bar's revenue the moment it is paid, like a card swipe");
 
     // ── 3. Playing at the bar, until the balance runs out ─────────────────────────────────
     play(BAR, 1, 1, false); // normal play: 2 credits
@@ -228,15 +246,22 @@ class WebPatronPlayLifecycleTest {
 
     assertEquals(4, queuedAt(BAR).size(), "only the four paid plays reached the jukebox");
     assertTrue(queuedAt(BAR).stream().allMatch(entry -> PATRON.equals(entry.username())));
+    assertMoney("7.00", openPeriod(barLedger).mobileTotal(),
+        "spending the credits moves no money -- it was counted when paid");
 
     // ── 4. Topping up, and playing at a second bar ────────────────────────────────────────
-    masterUserService.addFunds(PATRON, new AddFundsRequest("pkg-7", "nonce-2"));
+    masterUserService.addFunds(PATRON, new AddFundsRequest(BAR, "pkg-7", "nonce-2"));
     assertEquals(14, balance());
     moveUp(BAR, 1); // 6 credits
     assertEquals(8, balance());
+
+    // The bar's credits buy nothing at the other bar: it needs its own purchase.
+    assertThrows(InsufficientCreditsException.class, () -> play(OTHER_BAR, 9, 1, false));
+    masterUserService.addFunds(PATRON, new AddFundsRequest(OTHER_BAR, "pkg-7", "nonce-3"));
     play(OTHER_BAR, 9, 1, false); // 1 credit at the other bar's pricing
-    assertEquals(7, balance());
-    verify(paymentGateway, times(2)).charge(any(BigDecimal.class), anyString());
+    assertEquals(13, balanceAt(OTHER_BAR));
+    assertEquals(8, balance(), "the bar's balance is untouched by playing elsewhere");
+    verify(paymentGateway, times(3)).charge(any(BigDecimal.class), anyString());
 
     // ── 5. Master's record accounts for every credit bought ───────────────────────────────
     List<UserSongCreditUsageDto> barSpends = spendsAt(BAR);
@@ -255,39 +280,45 @@ class WebPatronPlayLifecycleTest {
     List<UserSongCreditUsageDto> otherBarSpends = spendsAt(OTHER_BAR);
     assertEquals(List.of(-1), otherBarSpends.stream().map(UserSongCreditUsageDto::amount).toList());
 
-    UserEntity patron = storedUser(PATRON);
+    UserLocationAccountEntity atBar = storedUser(PATRON).getLocationAccountNullIfNotExists(BAR);
     List<UserAddFundsTransactionEntity> purchases =
-        new ArrayList<>(patron.getUserAddFundsTransactions());
+        new ArrayList<>(atBar.getAddFundsTransactions());
     assertEquals(2, purchases.size());
     assertTrue(purchases.stream().allMatch(
-        p -> new BigDecimal("7.00").compareTo(p.getAmountUsd()) == 0));
+        p -> new BigDecimal("7.00").compareTo(p.getAmountUsd()) == 0 && BAR.equals(p.getLocationId())));
     assertEquals(List.of("txn-1", "txn-2"), purchases.stream()
         .map(UserAddFundsTransactionEntity::getPaymentTransactionId).sorted().toList());
 
     int creditsBought = purchases.stream()
         .mapToInt(p -> p.getCreditsAwarded() + p.getBonusCredits()).sum();
-    int creditsSpent = -patron.getUserSongCreditUsages().stream().mapToInt(u -> u.getAmount()).sum();
+    int creditsSpent = -atBar.getSongCreditUsages().stream().mapToInt(u -> u.getAmount()).sum();
     assertEquals(28, creditsBought);
-    assertEquals(21, creditsSpent);
+    assertEquals(20, creditsSpent);
     assertEquals(creditsBought - creditsSpent, balance(),
-        "the balance is exactly what was bought minus what was spent");
+        "the bar's balance is exactly what was bought there minus what was spent there");
 
-    // ── 6. The bar's own ledger holds exactly the bar's spends ────────────────────────────
+    // ── 6. The bar's own ledger holds exactly the bar's purchases and spends ──────────────
+    assertEquals(List.of("txn-1", "txn-2"), purchasesMirroredToBar().stream()
+        .map(LocalMobileTransactionDto::paymentReference).toList());
+    assertEquals(List.of(OTHER_BAR), purchasesPushedElsewhere.stream()
+        .map(LocalMobileTransactionDto::locationId).toList());
     assertEquals(barSpends.stream().map(UserSongCreditUsageDto::syncId).toList(),
         mirroredToBar().stream().map(UserSongCreditUsageDto::syncId).toList());
     assertEquals(List.of(OTHER_BAR),
         pushedElsewhere.stream().map(UserSongCreditUsageDto::locationId).toList());
 
-    // 20 credits spent at the bar, at the bar's kiosk rate of 3 credits per dollar = $6.67 --
-    // even though the patron paid $7.00 per 14 credits. The bar owner is paid the kiosk-equivalent
-    // value of what was played there.
-    assertMoney("6.67", openPeriod(barLedger).mobileTotal());
+    // Two $7.00 purchases were made for the bar: its mobile revenue is $14.00, whatever was
+    // played with them. The $7.00 bought for the other bar is not the bar's.
+    assertMoney("14.00", openPeriod(barLedger).mobileTotal());
 
     // ── 7. A re-delivered push (live push + catch-up pull) is never counted twice ─────────
+    for (LocalMobileTransactionDto pushed : purchasesMirroredToBar()) {
+      barLedger.receiveMobileTransaction(pushed);
+    }
     for (UserSongCreditUsageDto spend : barSpends) {
       barLedger.receiveMobileCreditUsage(spend);
     }
-    assertMoney("6.67", openPeriod(barLedger).mobileTotal());
+    assertMoney("14.00", openPeriod(barLedger).mobileTotal());
 
     // ── 8. The patron closes their account: the financial records stay ────────────────────
     masterUserService.deleteAccount(PATRON);
@@ -296,8 +327,8 @@ class WebPatronPlayLifecycleTest {
         () -> masterUserService.login(new LoginRequest(PATRON, "secret123")));
     assertEquals(barSpends.stream().map(UserSongCreditUsageDto::syncId).toList(),
         spendsAt(BAR).stream().map(UserSongCreditUsageDto::syncId).toList(),
-        "the bar's revenue on master must survive the patron leaving");
-    assertMoney("6.67", openPeriod(barLedger).mobileTotal());
+        "the bar's spend records on master must survive the patron leaving");
+    assertMoney("14.00", openPeriod(barLedger).mobileTotal());
 
     // ── 9. The operator also takes $5 at the kiosk, then settles the split ────────────────
     barLedger.recordLocalCashCredit(5);
@@ -306,11 +337,11 @@ class WebPatronPlayLifecycleTest {
     JukeboxSplitPeriodDto settled = finalizedPeriods(barLedger).get(0);
     assertMoney("5.00", settled.cashTotal());
     assertMoney("0.00", settled.cardTotal());
-    assertMoney("6.67", settled.mobileTotal());
-    assertMoney("11.67", settled.totalEarned());
+    assertMoney("14.00", settled.mobileTotal());
+    assertMoney("19.00", settled.totalEarned());
     assertEquals(Integer.valueOf(50), settled.splitPercentageToOwner());
-    assertMoney("5.84", settled.amountDueOwner()); // 11.67 x 50%, rounded half up
-    assertMoney("5.83", settled.amountDueOperator());
+    assertMoney("9.50", settled.amountDueOwner());
+    assertMoney("9.50", settled.amountDueOperator());
 
     assertMoney("0.00", openPeriod(barLedger).mobileTotal());
   }
@@ -319,7 +350,7 @@ class WebPatronPlayLifecycleTest {
   void theSameEmailRegisteringAgainAfterClosing_startsFromNothing() throws Exception {
 
     masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "secret123"));
-    masterUserService.addFunds(PATRON, new AddFundsRequest("pkg-7", "nonce-1"));
+    masterUserService.addFunds(PATRON, new AddFundsRequest(BAR, "pkg-7", "nonce-1"));
     masterUserService.deleteAccount(PATRON);
 
     masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "new-secret123"));
@@ -339,19 +370,19 @@ class WebPatronPlayLifecycleTest {
             1, false), admin(), new MockHttpServletRequest()));
     verify(masterSongQueue, never()).addSongToQueue(any(), any());
 
-    masterUserService.addFunds(ADMIN, new AddFundsRequest("pkg-7", "nonce-1"));
+    masterUserService.addFunds(ADMIN, new AddFundsRequest(BAR, "pkg-7", "nonce-1"));
     masterController.addSongToQueue(BAR, new AddSongToQueueRequest(null, ALBUM_ID, 1, 1, false),
         admin(), new MockHttpServletRequest());
 
-    assertEquals(Integer.valueOf(12), masterUserService.getProfile(ADMIN).numCredits());
-    assertMoney("0.67", openPeriod(barLedger).mobileTotal()); // 2 credits / 3 per dollar
+    assertEquals(12, masterUserService.getNumCredits(ADMIN, BAR));
+    assertMoney("7.00", openPeriod(barLedger).mobileTotal()); // the purchase, in full
   }
 
   @Test
   void aDoubleTapWithCreditsForOnePlay_queuesExactlyOneSong() throws Exception {
 
     masterUserService.register(new RegisterRequest("Pat", "Ron", PATRON, "secret123"));
-    masterUserService.addFunds(PATRON, new AddFundsRequest("pkg-7", "nonce-1")); // 14 credits
+    masterUserService.addFunds(PATRON, new AddFundsRequest(BAR, "pkg-7", "nonce-1")); // 14 credits
 
     // The first add is still in flight at the slave when the second tap arrives.
     CountDownLatch firstAddInFlight = new CountDownLatch(1);
@@ -382,7 +413,7 @@ class WebPatronPlayLifecycleTest {
     assertEquals(1, adds.get(), "the second tap must never reach the jukebox");
     assertEquals(6, balance());
     assertEquals(List.of(-8), spendsAt(BAR).stream().map(UserSongCreditUsageDto::amount).toList());
-    assertMoney("2.67", openPeriod(barLedger).mobileTotal()); // 8 credits / 3 per dollar
+    assertMoney("7.00", openPeriod(barLedger).mobileTotal()); // the one purchase, in full
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -395,8 +426,8 @@ class WebPatronPlayLifecycleTest {
     // A slave never charges web users -- credits are master's -- so its own web page must not
     // queue a patron's song at all.
     UserRootEntity slaveUsers = new UserRootEntity();
-    slaveUsers.addUser(new UserEntity(1, "Pat", "Ron", PATRON, "x", 0, UserRole.ROLE_USER));
-    slaveUsers.addUser(new UserEntity(2, "Ada", "Min", ADMIN, "x", 0, UserRole.ROLE_ADMIN));
+    slaveUsers.addUser(new UserEntity(1, "Pat", "Ron", PATRON, "x", UserRole.ROLE_USER));
+    slaveUsers.addUser(new UserEntity(2, "Ada", "Min", ADMIN, "x", UserRole.ROLE_ADMIN));
     UserRepository slaveUserRepository = mock(UserRepository.class);
     when(slaveUserRepository.loadAggregateRoot(anyString())).thenReturn(slaveUsers);
     SongLibraryService slaveSongLibrary = ownLocation(BAR);
@@ -426,16 +457,20 @@ class WebPatronPlayLifecycleTest {
     slaveController.addSongToQueue(BAR, new AddSongToQueueRequest(null, ALBUM_ID, 1, 1, false),
         admin(), new MockHttpServletRequest());
     assertEquals(1, queuedAt(BAR).size());
-    assertTrue(slaveUsers.getUserByEmailAddressNullIfNotExists(ADMIN).getUserSongCreditUsages()
+    assertTrue(slaveUsers.getUserByEmailAddressNullIfNotExists(ADMIN).getLocationAccounts()
         .isEmpty(), "nothing is charged or recorded on a slave");
   }
 
   @Test
-  void aStandaloneJukebox_countsEachPlayOnItsOwnQueueOnce_inItsOwnMobileTotal() throws Exception {
+  void aStandaloneJukebox_chargesEachPlayOnItsOwnQueueOnce_butSpendingIsNotRevenue()
+      throws Exception {
 
-    // A patron already holding 10 credits (a standalone instance has no Add Funds of its own).
+    // A patron already holding 10 credits here (a standalone instance has no Add Funds of its
+    // own).
     UserRootEntity users = new UserRootEntity();
-    users.addUser(new UserEntity(1, "Pat", "Ron", PATRON, "x", 10, UserRole.ROLE_USER));
+    UserEntity holder = new UserEntity(1, "Pat", "Ron", PATRON, "x", UserRole.ROLE_USER);
+    holder.getOrCreateLocationAccount(BAR).setNumCredits(10);
+    users.addUser(holder);
     UserRepository userRepository = mock(UserRepository.class);
     when(userRepository.loadAggregateRoot(anyString())).thenReturn(users);
     SongLibraryService songLibrary = ownLocation(BAR);
@@ -462,11 +497,14 @@ class WebPatronPlayLifecycleTest {
           patron(), new MockHttpServletRequest());
     }
 
-    UserEntity patron = users.getUserByEmailAddressNullIfNotExists(PATRON);
-    assertEquals(4, patron.getNumCredits(), "3 plays at 2 credits each, each charged once");
-    assertTrue(patron.getUserSongCreditUsages().stream().allMatch(u -> BAR.equals(u.getLocationId())),
-        "a play on the jukebox's own queue is that location's revenue");
-    assertMoney("2.00", openPeriod(ledger).mobileTotal()); // 6 credits / 3 per dollar
+    UserLocationAccountEntity account =
+        users.getUserByEmailAddressNullIfNotExists(PATRON).getLocationAccountNullIfNotExists(BAR);
+    assertEquals(4, account.getNumCredits(), "3 plays at 2 credits each, each charged once");
+    assertEquals(3, account.getSongCreditUsages().size());
+    assertTrue(account.getSongCreditUsages().stream().allMatch(u -> BAR.equals(u.getLocationId())),
+        "a play on the jukebox's own queue is recorded against that location");
+    assertMoney("0.00", openPeriod(ledger).mobileTotal(),
+        "mobile revenue is purchases, never spends -- and nothing was bought here");
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -486,8 +524,20 @@ class WebPatronPlayLifecycleTest {
         new ChangeSongQueueRequest(ALBUM_ID, songId), patron(), new MockHttpServletRequest());
   }
 
+  /** The patron's balance at {@link #BAR}. */
   private int balance() {
-    return masterUserService.getProfile(PATRON).numCredits();
+    return balanceAt(BAR);
+  }
+
+  private int balanceAt(Integer locationId) {
+    return masterUserService.getNumCredits(PATRON, locationId);
+  }
+
+  private List<LocalMobileTransactionDto> purchasesMirroredToBar() {
+    return eventsOfType(MobilePurchaseRecordedEvent.class).stream()
+        .map(MobilePurchaseRecordedEvent::transaction)
+        .filter(transaction -> BAR.equals(transaction.locationId()))
+        .toList();
   }
 
   private List<UserSongCreditUsageDto> spendsAt(Integer locationId) {
@@ -514,11 +564,18 @@ class WebPatronPlayLifecycleTest {
   }
 
   /**
-   * Master's event bus. A location-attributed spend is pushed to that location's slave, as
-   * {@code MobileCreditUsageSlaveNotifier} does.
+   * Master's event bus. A purchase or a spend is pushed to that location's slave, as {@code
+   * MobileTransactionSlaveNotifier} and {@code MobileCreditUsageSlaveNotifier} do.
    */
   private void publishOnMaster(Object event) {
     masterEvents.add(event);
+    if (event instanceof MobilePurchaseRecordedEvent recorded) {
+      if (BAR.equals(recorded.transaction().locationId())) {
+        barLedger.receiveMobileTransaction(recorded.transaction());
+      } else {
+        purchasesPushedElsewhere.add(recorded.transaction());
+      }
+    }
     if (event instanceof LocationSongCreditUsageRecordedEvent recorded) {
       if (BAR.equals(recorded.usage().locationId())) {
         barLedger.receiveMobileCreditUsage(recorded.usage());
@@ -557,6 +614,24 @@ class WebPatronPlayLifecycleTest {
         mock(ApplicationEventPublisher.class), mock(LocationService.class), slaveMode);
   }
 
+  /** Master's ledger: no own location, so no split period -- it records purchases only. */
+  private FinancialLedgerServiceImpl newMasterLedger(UserService userService) throws Exception {
+
+    FinancialLedgerRepository repository = mock(FinancialLedgerRepository.class);
+    when(repository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger yet"));
+    AtomicInteger nextId = new AtomicInteger(1000);
+    when(repository.nextPersistentIdentity())
+        .thenAnswer(invocation -> Integer.valueOf(nextId.getAndIncrement()));
+    SongLibraryService noOwnLocation = mock(SongLibraryService.class);
+    when(noOwnLocation.getOwnLocationId()).thenReturn(null);
+    when(noOwnLocation.getOwnLocation()).thenReturn(null);
+
+    return new FinancialLedgerServiceImpl(repository, new FinancialLedgerProperties(),
+        userService, pricingService, noOwnLocation, this::publishOnMaster,
+        mock(LocationService.class), false);
+  }
+
   private static SongLibraryService ownLocation(Integer locationId) {
     SongLibraryService songLibrary = mock(SongLibraryService.class);
     when(songLibrary.getOwnLocationId()).thenReturn(locationId);
@@ -577,8 +652,12 @@ class WebPatronPlayLifecycleTest {
   }
 
   private static void assertMoney(String expected, BigDecimal actual) {
+    assertMoney(expected, actual, "");
+  }
+
+  private static void assertMoney(String expected, BigDecimal actual, String message) {
     assertEquals(0, new BigDecimal(expected).compareTo(actual),
-        "expected $" + expected + " but was $" + actual);
+        message + " -- expected $" + expected + " but was $" + actual);
   }
 
   private static Authentication patron() {

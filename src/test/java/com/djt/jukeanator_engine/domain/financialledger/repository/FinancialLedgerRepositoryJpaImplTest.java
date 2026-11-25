@@ -26,6 +26,7 @@ import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRoo
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalMobileTransactionEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 
 /**
@@ -216,6 +217,52 @@ class FinancialLedgerRepositoryJpaImplTest {
     FinancialLedgerRepositoryJpaImpl repository = newRepository();
 
     assertThrows(EntityDoesNotExistException.class, () -> repository.loadAggregateRoot(1));
+  }
+
+  @Test
+  void mobilePurchases_storeAsMobileWebRows_andReloadWithEveryField() throws Exception {
+
+    FinancialLedgerRepositoryJpaImpl repository = newRepository();
+    FinancialLedgerRootEntity root = new FinancialLedgerRootEntity();
+    Instant timestamp = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    Integer locationId = songLibraryService.getOwnLocationId();
+    root.addLocalMobileTransaction(new LocalMobileTransactionEntity(
+        repository.nextPersistentIdentity(), new BigDecimal("7.50"), timestamp, locationId, null,
+        "alice@example.com", "txn-1", "pkg-7", 12, 2));
+    root.addLocalCashTransaction(new LocalCashTransactionEntity(
+        repository.nextPersistentIdentity(), 1, timestamp, locationId));
+
+    repository.storeAggregateRoot(root);
+    // A second store merges the existing purchase rather than inserting it again.
+    repository.storeAggregateRoot(root);
+
+    try (Connection connection = dataSource.getConnection();
+        Statement statement = connection.createStatement();
+        java.sql.ResultSet rs = statement.executeQuery("select transaction_type, amount, "
+            + "payment_reference from location_transaction order by transaction_type")) {
+      assertTrue(rs.next());
+      assertEquals("CASH", rs.getString(1));
+      assertEquals(0, BigDecimal.ONE.compareTo(rs.getBigDecimal(2)));
+      assertTrue(rs.next());
+      assertEquals("MOBILE_WEB", rs.getString(1));
+      assertEquals(0, new BigDecimal("7.50").compareTo(rs.getBigDecimal(2)));
+      assertEquals("txn-1", rs.getString(3));
+      assertTrue(!rs.next(), "one row per transaction");
+    }
+
+    FinancialLedgerRootEntity reloaded = newRepository().loadAggregateRoot("FinancialLedgerRootEntity");
+    assertEquals(1, reloaded.getLocalMobileTransactions().size());
+    assertEquals(1, reloaded.getLocalCashTransactions().size(),
+        "a MOBILE_WEB row is never loaded as cash or card");
+    assertTrue(reloaded.getLocalCreditCardTransactions().isEmpty());
+    LocalMobileTransactionEntity purchase = reloaded.getLocalMobileTransactions().get(0);
+    assertEquals(0, new BigDecimal("7.50").compareTo(purchase.getAmount()));
+    assertEquals(timestamp, purchase.getTimestamp());
+    assertEquals(locationId, purchase.getLocationId());
+    assertEquals("alice@example.com", purchase.getUserEmail());
+    assertEquals("pkg-7", purchase.getPackageCode());
+    assertEquals(Integer.valueOf(12), purchase.getCreditsAwarded());
+    assertEquals(Integer.valueOf(2), purchase.getBonusCredits());
   }
 
   @Test

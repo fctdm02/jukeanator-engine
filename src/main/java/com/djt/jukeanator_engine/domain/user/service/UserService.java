@@ -106,10 +106,16 @@ public interface UserService {
   UserHomePageDto getHomePage(String emailAddress, Integer locationId);
 
   /**
-   * 
-   * @return
+   * The patron's credit balance at {@code locationId} (this instance's own location if null);
+   * 0 where they have never used that location.
    */
-  List<CreditPackageDto> getCreditPackages();
+  int getNumCredits(String emailAddress, Integer locationId);
+
+  /**
+   * The Add Funds credit packages sold for {@code locationId} (this instance's own location if
+   * null) -- see {@code PricingService.resolveCreditPackages}.
+   */
+  List<CreditPackageDto> getCreditPackages(Integer locationId);
 
   /**
    * The Web/Mobile UI's effective credit-pricing config for {@code locationId} (standalone/slave
@@ -185,7 +191,7 @@ public interface UserService {
    * @return
    * @throws EntityAlreadyExistsException
    */
-  boolean createPlaylist(String emailAddress, String playlistName)
+  boolean createPlaylist(String emailAddress, Integer locationId, String playlistName)
       throws EntityAlreadyExistsException;
 
   /**
@@ -217,7 +223,7 @@ public interface UserService {
    * @return
    * @throws EntityDoesNotExistException
    */
-  boolean deletePlaylist(String emailAddress, String playlistName)
+  boolean deletePlaylist(String emailAddress, Integer locationId, String playlistName)
       throws EntityDoesNotExistException;
 
   /**
@@ -229,8 +235,8 @@ public interface UserService {
    * @throws EntityDoesNotExistException
    * @throws EntityAlreadyExistsException if another playlist already has the new name
    */
-  boolean renamePlaylist(String emailAddress, String playlistName, String newPlaylistName)
-      throws EntityDoesNotExistException, EntityAlreadyExistsException;
+  boolean renamePlaylist(String emailAddress, Integer locationId, String playlistName,
+      String newPlaylistName) throws EntityDoesNotExistException, EntityAlreadyExistsException;
 
   /**
    * 
@@ -252,19 +258,22 @@ public interface UserService {
   boolean removeSongFromMyFavoritesPlaylist(String emailAddress, Integer locationId,
       SongFileEntity song) throws EntityDoesNotExistException;
 
-  List<PlaylistSummaryDto> getPlaylists(String emailAddress);
+  // Playlists (My Favorites included) belong to the patron's account at one location; every
+  // method below takes that locationId (this instance's own location if null).
 
-  List<SongDto> getPlaylistSongs(
-      String emailAddress, String playlistName) throws EntityDoesNotExistException;
+  List<PlaylistSummaryDto> getPlaylists(String emailAddress, Integer locationId);
 
-  void reorderPlaylistSongs(String emailAddress, String playlistName,
+  List<SongDto> getPlaylistSongs(String emailAddress, Integer locationId, String playlistName)
+      throws EntityDoesNotExistException;
+
+  void reorderPlaylistSongs(String emailAddress, Integer locationId, String playlistName,
       List<SongIdentifier> songs) throws EntityDoesNotExistException;
 
-  List<SongIdentifier> getFavoriteSongIdentifiers(String emailAddress);
+  List<SongIdentifier> getFavoriteSongIdentifiers(String emailAddress, Integer locationId);
 
-  /** The playlist's songs, in order, each tagged with the location it was added from. */
-  List<SongIdentifier> getPlaylistSongIdentifiers(String emailAddress, String playlistName)
-      throws EntityDoesNotExistException;
+  /** The playlist's songs, in order. */
+  List<SongIdentifier> getPlaylistSongIdentifiers(String emailAddress, Integer locationId,
+      String playlistName) throws EntityDoesNotExistException;
 
   /**
    * Charges a web user for a song this instance added to its own queue, tagging the ledger entry

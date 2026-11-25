@@ -18,7 +18,7 @@ public interface EmailService {
   /** The Add Funds receipt (Web/Mobile UI). */
   void sendPurchaseReceiptEmail(String toAddress, String firstName, int credits, int bonusCredits,
       BigDecimal amountUsd, String paymentSource, String transactionId, Instant timestamp,
-      int newBalance);
+      int newBalance, String locationName);
 
   /** The Create Account verification link (Web/Mobile UI). */
   void sendAccountVerificationEmail(String toAddress, String firstName, String verificationUrl,

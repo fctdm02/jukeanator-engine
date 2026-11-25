@@ -3,7 +3,6 @@ package com.djt.jukeanator_engine.domain.user.model;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -22,13 +21,15 @@ import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.djt.jukeanator_engine.domain.common.exception.EntityAlreadyExistsException;
-import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.common.security.UserRole;
-import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
-import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
+/**
+ * A patron (or admin) account. Everything a mobile/web patron owns that is only meaningful at one
+ * location -- credits, song-play history, playlists and the credit ledgers -- lives on a
+ * {@link UserLocationAccountEntity}, one per location the patron has used, never on the user
+ * directly. Only identity, credentials and search history are user-wide.
+ */
 @Entity
 @Table(name = "user_account")
 public class UserEntity extends AbstractPersistentEntity {
@@ -49,45 +50,22 @@ public class UserEntity extends AbstractPersistentEntity {
   @Column(name = "password_hash", nullable = false)
   private String passwordHash;
 
-  @Column(name = "num_credits", nullable = false)
-  private Integer numCredits = 0;
-
   // fetch = EAGER throughout this aggregate because UserServiceImpl loads the whole user root
   // once and holds it in memory indefinitely, well outside the scope of any one transaction --
   // the same "fully materialized" shape that UserRepositoryFileSystemImpl already assumes when it
   // deserializes the entire file in one shot.
-  @ElementCollection(fetch = FetchType.EAGER)
-  @CollectionTable(name = "user_song_play_history", joinColumns = @JoinColumn(name = "user_id"))
-  @OrderColumn(name = "play_order")
-  private List<SongIdentifier> songPlayHistory = new ArrayList<>();
-
   @ElementCollection(fetch = FetchType.EAGER)
   @CollectionTable(name = "user_search_history", joinColumns = @JoinColumn(name = "user_id"))
   @OrderColumn(name = "search_order")
   @Column(name = "search_query", length = 500)
   private List<String> searchHistory = new ArrayList<>();
 
+  // One account per location the patron has used. A List (not an id-hashed Set) so a placeholder
+  // id replaced in place on persist() needs no rehash.
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true,
       fetch = FetchType.EAGER)
   @OrderBy("persistentIdentity ASC")
-  private List<PlaylistEntity> playlists = new ArrayList<>();
-
-  // Same "load once, hold in memory" rationale as the other collections above -- see
-  // UserServiceImpl, which loads the whole user root once and holds it for the app's lifetime.
-  //
-  // Two genuinely separate ledgers, deliberately never conflated: userSongCreditUsages records a
-  // user spending already-owned song credits (location-attributed); userAddFundsTransactions
-  // records a user obtaining those credits with real money (never location-attributed -- see
-  // UserAddFundsTransactionEntity's javadoc).
-  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true,
-      fetch = FetchType.EAGER)
-  @OrderBy("timestamp ASC")
-  private Set<UserSongCreditUsageEntity> userSongCreditUsages = new HashSet<>();
-
-  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true,
-      fetch = FetchType.EAGER)
-  @OrderBy("timestamp ASC")
-  private Set<UserAddFundsTransactionEntity> userAddFundsTransactions = new HashSet<>();
+  private List<UserLocationAccountEntity> locationAccounts = new ArrayList<>();
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
@@ -110,21 +88,13 @@ public class UserEntity extends AbstractPersistentEntity {
   protected UserEntity() {} // for JPA
 
   public UserEntity(Integer persistentIdentity, String firstName, String lastName,
-      String emailAddress, String passwordHash, Integer numCredits, UserRole role) {
+      String emailAddress, String passwordHash, UserRole role) {
     super(persistentIdentity);
     this.firstName = firstName;
     this.lastName = lastName;
     this.emailAddress = emailAddress;
     this.passwordHash = passwordHash;
-    this.numCredits = numCredits;
     this.role = role;
-
-    try {
-      createPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
-    } catch (EntityAlreadyExistsException eaee) {
-      log.error("My favorites playlist somehow already exists for new user: {" + this.emailAddress
-          + "].");
-    }
   }
 
   public String getFirstName() {
@@ -159,41 +129,74 @@ public class UserEntity extends AbstractPersistentEntity {
     this.passwordHash = passwordHash;
   }
 
-  public Integer getNumCredits() {
-    return numCredits;
+  // --- Per-location accounts ----------------------------------------------------------------
+
+  public List<UserLocationAccountEntity> getLocationAccounts() {
+    if (locationAccounts == null) {
+      locationAccounts = new ArrayList<>();
+    }
+    return locationAccounts;
   }
 
-  public void setNumCredits(Integer numCredits) {
-    this.numCredits = numCredits;
+  /** This user's account at {@code locationId}, or null if they have never used that location. */
+  public UserLocationAccountEntity getLocationAccountNullIfNotExists(Integer locationId) {
+
+    if (locationId == null) {
+      return null;
+    }
+    for (UserLocationAccountEntity account : getLocationAccounts()) {
+      if (locationId.equals(account.getLocationId())) {
+        return account;
+      }
+    }
+    return null;
   }
 
-  public List<SongIdentifier> getSongPlayHistory() {
-    return songPlayHistory;
+  /**
+   * This user's account at {@code locationId}, created (with an empty My Favorites playlist and a
+   * zero balance) on first use. The caller must store the user if one was created.
+   */
+  public UserLocationAccountEntity getOrCreateLocationAccount(Integer locationId) {
+
+    Objects.requireNonNull(locationId, "locationId cannot be null");
+    UserLocationAccountEntity account = getLocationAccountNullIfNotExists(locationId);
+    if (account != null) {
+      return account;
+    }
+    account = new UserLocationAccountEntity(nextIdentity(getLocationAccounts(), 1), locationId);
+    account.setUser(this);
+    getLocationAccounts().add(account);
+    return account;
   }
 
-  public void setSongPlayHistory(List<SongIdentifier> songPlayHistory) {
-    this.songPlayHistory = songPlayHistory;
+  /** The balance at {@code locationId}; 0 where the user has no account there yet. */
+  public int getNumCredits(Integer locationId) {
+    UserLocationAccountEntity account = getLocationAccountNullIfNotExists(locationId);
+    return account == null ? 0 : account.getNumCredits();
   }
 
-  public boolean addSongToSongPlayHistory(SongIdentifier songIdentifier) {
-    this.songPlayHistory.remove(songIdentifier);
-    return this.songPlayHistory.add(songIdentifier);
+  /** Re-attaches an already-persisted account (rehydration only). */
+  public UserLocationAccountEntity restoreLocationAccount(UserLocationAccountEntity account) {
+    account.setUser(this);
+    getLocationAccounts().add(account);
+    return account;
   }
 
   // Package-private: only UserRootEntity.changeLocationId re-tags a user, when this instance's own
   // location id is corrected post-handshake.
   void changeLocationId(Integer oldLocationId, Integer newLocationId) {
 
-    if (this.songPlayHistory != null) {
-      this.songPlayHistory.replaceAll(s -> s.withLocationIdChanged(oldLocationId, newLocationId));
+    if (getLocationAccountNullIfNotExists(newLocationId) != null) {
+      log.warn("User [{}] already has an account at location {}; not re-tagging the account at {}",
+          emailAddress, newLocationId, oldLocationId);
+      return;
     }
-    for (PlaylistEntity playlist : this.playlists) {
-      playlist.changeLocationId(oldLocationId, newLocationId);
-    }
-    for (UserSongCreditUsageEntity usage : getUserSongCreditUsages()) {
-      usage.changeLocationId(oldLocationId, newLocationId);
+    for (UserLocationAccountEntity account : getLocationAccounts()) {
+      account.changeLocationId(oldLocationId, newLocationId);
     }
   }
+
+  // --- Search history (user-wide) -----------------------------------------------------------
 
   public List<String> getSearchHistory() {
     if (searchHistory == null)
@@ -223,198 +226,7 @@ public class UserEntity extends AbstractPersistentEntity {
     }
   }
 
-  public List<PlaylistEntity> getPlaylists() {
-
-    if (playlists == null) {
-      playlists = new ArrayList<>();
-    }
-
-    return playlists;
-  }
-
-  public PlaylistEntity getPlaylistByName(String playlistName) throws EntityDoesNotExistException {
-
-    PlaylistEntity playlist = getPlaylistByNameNullIfNotExists(playlistName);
-    if (playlist != null) {
-      return playlist;
-    }
-
-    throw new EntityDoesNotExistException(
-        "Cannot find playlist: [" + playlistName + "] for user: [" + this.emailAddress + "].");
-  }
-
-  public PlaylistEntity getPlaylistByNameNullIfNotExists(String playlistName) {
-
-    for (PlaylistEntity playlist : getPlaylists()) {
-
-      if (playlist.getName().equals(playlistName)) {
-        return playlist;
-      }
-    }
-    return null;
-  }
-
-  public PlaylistEntity createMyFavoritesPlaylist() {
-
-    // Every user should have a "My favorites" playlist
-    try {
-      return createPlaylist(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
-    } catch (EntityAlreadyExistsException eaee) {
-      log.error("My favorites playlist somehow already exists for new user: {" + this.emailAddress
-          + "].");
-    }
-
-    // This should never occur.
-    return this.getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
-  }
-
-  /**
-   * Repairs an account from before every account got My Favorites at registration, and before My
-   * Favorites was a set: creates the playlist if it is missing, and drops any duplicate songs.
-   *
-   * @return true if anything changed (the caller must then store the user)
-   */
-  public boolean ensureMyFavoritesPlaylist() {
-
-    PlaylistEntity favorites =
-        getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
-    if (favorites == null) {
-      createMyFavoritesPlaylist();
-      return true;
-    }
-    List<SongIdentifier> songs = favorites.getSongs();
-    if (songs == null || songs.size() == new HashSet<>(songs).size()) {
-      return false;
-    }
-    Set<SongIdentifier> seen = new HashSet<>();
-    songs.removeIf(song -> !seen.add(song));
-    return true;
-  }
-
-  public PlaylistEntity createPlaylist(String playlistName) throws EntityAlreadyExistsException {
-
-    PlaylistEntity check = getPlaylistByNameNullIfNotExists(playlistName);
-    if (check != null) {
-      throw new EntityAlreadyExistsException("Cannot create playlist: [" + playlistName
-          + "] for user: [" + this.emailAddress + "] because it already exists.");
-    }
-
-    if (this.playlists == null) {
-      this.playlists = new ArrayList<>();
-    }
-
-    PlaylistEntity playlist = new PlaylistEntity(nextIdentity(this.playlists, 0),
-        this.emailAddress, playlistName);
-    playlist.setUser(this);
-    this.playlists.add(playlist);
-    return playlist;
-  }
-
-  /**
-   * Re-attaches a fully-formed {@link PlaylistEntity} (persisted identity, songs, and all)
-   * without going through {@link #createPlaylist(String)}, which mints a brand new playlist.
-   * Used when rehydrating a user from persisted state, where the playlist already exists.
-   */
-  public PlaylistEntity restorePlaylist(PlaylistEntity playlist) {
-
-    playlist.setUser(this);
-    this.getPlaylists().add(playlist);
-    return playlist;
-  }
-
-  public boolean deletePlaylist(String playlistName) throws EntityDoesNotExistException {
-
-    if (PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(playlistName)) {
-      throw new IllegalArgumentException("Cannot delete the My Favorites playlist.");
-    }
-
-    PlaylistEntity playlist = getPlaylistByName(playlistName);
-    return this.playlists.remove(playlist);
-  }
-
-  public boolean renamePlaylist(String playlistName, String newPlaylistName)
-      throws EntityDoesNotExistException, EntityAlreadyExistsException {
-
-    if (PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(playlistName)
-        || PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(newPlaylistName)) {
-      throw new IllegalArgumentException("Cannot rename to or from the My Favorites playlist.");
-    }
-
-    PlaylistEntity playlist = getPlaylistByName(playlistName);
-    if (playlistName.equals(newPlaylistName)) {
-      return false;
-    }
-
-    if (getPlaylistByNameNullIfNotExists(newPlaylistName) != null) {
-      throw new EntityAlreadyExistsException("Cannot rename playlist: [" + playlistName
-          + "] to: [" + newPlaylistName + "] for user: [" + this.emailAddress
-          + "] because it already exists.");
-    }
-
-    playlist.setName(newPlaylistName);
-    return true;
-  }
-
-  public boolean addSongToPlaylist(String playlistName, Integer locationId, SongFileEntity song)
-      throws EntityDoesNotExistException {
-
-    Objects.requireNonNull(locationId, "locationId cannot be null");
-    PlaylistEntity playlist = getPlaylistByName(playlistName);
-    SongIdentifier songIdentifier = new SongIdentifier(locationId,
-        song.getAlbum().getId(), song.getId());
-
-    // My Favorites is a set -- a song is a favorite or it is not -- while any other playlist may
-    // hold a song more than once, as a music playlist can.
-    if (isMyFavorites(playlist) && playlist.getSongs().contains(songIdentifier)) {
-      return false;
-    }
-    return playlist.addSong(songIdentifier);
-  }
-
-  public boolean removeSongFromPlaylist(String playlistName, Integer locationId,
-      SongFileEntity song) throws EntityDoesNotExistException {
-
-    Objects.requireNonNull(locationId, "locationId cannot be null");
-    PlaylistEntity playlist = getPlaylistByName(playlistName);
-    SongIdentifier songIdentifier = new SongIdentifier(locationId,
-        song.getAlbum().getId(), song.getId());
-
-    // Un-favoriting removes every copy, including duplicates stored before My Favorites was a set.
-    if (isMyFavorites(playlist)) {
-      return playlist.getSongs().removeIf(songIdentifier::equals);
-    }
-    return playlist.removeSong(songIdentifier);
-  }
-
-  private static boolean isMyFavorites(PlaylistEntity playlist) {
-    return PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(playlist.getName());
-  }
-
-  public Set<UserSongCreditUsageEntity> getUserSongCreditUsages() {
-
-    if (userSongCreditUsages == null) {
-      userSongCreditUsages = new HashSet<>();
-    }
-
-    return userSongCreditUsages;
-  }
-
-  public UserSongCreditUsageEntity addUserSongCreditUsage(UserSongCreditUsageEntity usage) {
-
-    usage.setUser(this);
-    requireAdded(getUserSongCreditUsages().add(usage), usage);
-    return usage;
-  }
-
-  /** The placeholder id for this user's next new {@link UserSongCreditUsageEntity}. */
-  public Integer nextUserSongCreditUsageIdentity() {
-    return nextIdentity(getUserSongCreditUsages(), 1);
-  }
-
-  /** The placeholder id for this user's next new {@link UserAddFundsTransactionEntity}. */
-  public Integer nextUserAddFundsTransactionIdentity() {
-    return nextIdentity(getUserAddFundsTransactions(), 1);
-  }
+  // --- Placeholder identities and persistence support ---------------------------------------
 
   /**
    * One past the highest id currently held in {@code children} ({@code firstId} if there are
@@ -437,7 +249,7 @@ public class UserEntity extends AbstractPersistentEntity {
 
   // A child equal to one already held (i.e. the same persistentIdentity) would otherwise be
   // silently dropped by the HashSet -- fail loudly instead.
-  private static void requireAdded(boolean added, AbstractPersistentEntity child) {
+  static void requireAdded(boolean added, AbstractPersistentEntity child) {
     if (!added) {
       throw new IllegalStateException("Duplicate persistentIdentity " + child.getPersistentIdentity()
           + " for new " + child.getClass().getSimpleName());
@@ -451,11 +263,12 @@ public class UserEntity extends AbstractPersistentEntity {
    * than replacing it, so JPA's orphan-removal bookkeeping on the collection is unaffected.
    */
   public void rehashChildCollections() {
-    rehash(getUserSongCreditUsages());
-    rehash(getUserAddFundsTransactions());
+    for (UserLocationAccountEntity account : getLocationAccounts()) {
+      account.rehashChildCollections();
+    }
   }
 
-  private static <T> void rehash(Set<T> set) {
+  static <T> void rehash(Set<T> set) {
     List<T> members = new ArrayList<>(set);
     set.clear();
     set.addAll(members);
@@ -474,50 +287,22 @@ public class UserEntity extends AbstractPersistentEntity {
    */
   public void replaceJpaCollectionsWithPlainCopies() {
 
-    this.playlists = new ArrayList<>(getPlaylists());
-    for (PlaylistEntity playlist : this.playlists) {
-      playlist.setSongs(
-          playlist.getSongs() != null ? new ArrayList<>(playlist.getSongs()) : new ArrayList<>());
+    this.locationAccounts = new ArrayList<>(getLocationAccounts());
+    for (UserLocationAccountEntity account : this.locationAccounts) {
+      account.replaceJpaCollectionsWithPlainCopies();
     }
-    this.songPlayHistory =
-        this.songPlayHistory != null ? new ArrayList<>(this.songPlayHistory) : new ArrayList<>();
     this.searchHistory = new ArrayList<>(getSearchHistory());
-  }
-
-  public Set<UserAddFundsTransactionEntity> getUserAddFundsTransactions() {
-
-    if (userAddFundsTransactions == null) {
-      userAddFundsTransactions = new HashSet<>();
-    }
-
-    return userAddFundsTransactions;
-  }
-
-  public UserAddFundsTransactionEntity addUserAddFundsTransaction(
-      UserAddFundsTransactionEntity transaction) {
-
-    transaction.setUser(this);
-    requireAdded(getUserAddFundsTransactions().add(transaction), transaction);
-    return transaction;
-  }
-
-  /**
-   * Withdraws an Add Funds transaction that was never stored -- matched by identity, not by id,
-   * since a failed store may already have replaced its placeholder id in place (leaving it in a
-   * stale hash bucket where remove() could no longer find it).
-   */
-  public boolean removeUnstoredUserAddFundsTransaction(UserAddFundsTransactionEntity transaction) {
-    return getUserAddFundsTransactions().removeIf(t -> t == transaction);
   }
 
   /** The email-address domain given to every closed (anonymized) account. */
   public static final String CLOSED_ACCOUNT_EMAIL_DOMAIN = "@closed-account.invalid";
 
   /**
-   * Closes this account in place: everything that identifies the person, plus their search/play
-   * history and playlists, is removed, while the song-credit usages and Add Funds transactions --
-   * financial records a location's revenue and Braintree's charges are reconciled against -- are
-   * kept. {@code closedEmailAddress} must end in {@link #CLOSED_ACCOUNT_EMAIL_DOMAIN}, and
+   * Closes this account in place: everything that identifies the person, plus their search
+   * history and every location account's play history and playlists, is removed, while each
+   * location account's balance, song-credit usages and Add Funds transactions -- financial records
+   * a location's revenue and Braintree's charges are reconciled against -- are kept.
+   * {@code closedEmailAddress} must end in {@link #CLOSED_ACCOUNT_EMAIL_DOMAIN}, and
    * {@code unusablePasswordHash} must match no password, so the account can never log in again.
    */
   public void anonymize(String closedEmailAddress, String unusablePasswordHash) {
@@ -532,9 +317,10 @@ public class UserEntity extends AbstractPersistentEntity {
     this.emailAddress = closedEmailAddress;
     this.passwordHash = unusablePasswordHash;
     // Fresh collections rather than clear() -- see replaceJpaCollectionsWithPlainCopies().
-    this.songPlayHistory = new ArrayList<>();
     this.searchHistory = new ArrayList<>();
-    this.playlists = new ArrayList<>();
+    for (UserLocationAccountEntity account : getLocationAccounts()) {
+      account.anonymize();
+    }
     this.verificationTokenHash = null;
     this.verificationTokenExpiresAt = null;
   }

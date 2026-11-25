@@ -20,6 +20,7 @@ import org.springframework.web.client.RestClientResponseException;
 import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.common.security.SecurityContextPropagatingRunnable;
 import com.djt.jukeanator_engine.domain.common.security.SystemPrincipal;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalMobileTransactionDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.MasterSyncOutboxEntry;
 import com.djt.jukeanator_engine.domain.financialledger.event.JukeboxSplitFinalizedEvent;
 import com.djt.jukeanator_engine.domain.financialledger.event.LocalFinancialTransactionRecordedEvent;
@@ -113,6 +114,7 @@ public class FinancialLedgerSyncService {
     new SecurityContextPropagatingRunnable(() -> {
       try {
         pushPendingToMaster();
+        pullMobileTransactionsFromMaster();
         pullMobileCreditUsageFromMaster();
       } catch (Throwable t) {
         // Must never let a sync failure propagate anywhere that could affect the slave's own
@@ -163,6 +165,39 @@ public class FinancialLedgerSyncService {
         .body(entry.payload())
         .retrieve()
         .toBodilessEntity();
+  }
+
+  /**
+   * Catch-up for Web/Mobile Add Funds purchases (master pushes each one live -- see {@code
+   * MobileTransactionSlaveNotifier}). These are this location's mobile revenue, so they are
+   * pulled before the audit-only credit spends.
+   */
+  private void pullMobileTransactionsFromMaster() {
+
+    Integer ownLocationId = songLibraryService.getOwnLocationId();
+    Instant openPeriodStart = financialLedgerService.getOpenPeriodStartDate();
+    if (ownLocationId == null || openPeriodStart == null) {
+      return;
+    }
+
+    Instant since = catchUpSince(openPeriodStart,
+        financialLedgerService.getLatestMobileTransactionTimestamp());
+
+    List<LocalMobileTransactionDto> transactions = restClient.get()
+        .uri(uriBuilder -> uriBuilder
+            .path("/api/locations/{locationId}/financial-ledger/mobile-transactions")
+            .queryParam("since", since.toString())
+            .build(ownLocationId))
+        .header("location-id", String.valueOf(ownLocationId))
+        .header("location-api-key", appProperties.getLocationApiKey())
+        .retrieve()
+        .body(new ParameterizedTypeReference<List<LocalMobileTransactionDto>>() {});
+
+    if (transactions != null) {
+      for (LocalMobileTransactionDto transaction : transactions) {
+        financialLedgerService.receiveMobileTransaction(transaction);
+      }
+    }
   }
 
   private void pullMobileCreditUsageFromMaster() {

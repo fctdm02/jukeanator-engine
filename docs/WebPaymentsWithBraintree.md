@@ -430,6 +430,13 @@ then repeat with a sandbox decline to confirm no credits are granted and no emai
    fails; `NoOpPaymentGateway` returns `false`; `NoOpPaymentGatewayTest` gained
    `voidCharge_hasNothingToCancel`. This was added outside the conversation recorded above.
 
+4. **Credits tied to a location (later change).** Add Funds now buys credits for one location
+   and they can be used only there. `AddFundsRequest` carries `locationId`, the packages are
+   that location's own (`GET /api/users/credit-packages?locationId=`), the response and the
+   receipt name the location, and each purchase is recorded in full in the location's financial
+   ledger (`MOBILE_WEB`) and mirrored to its slave. `UserProfileDto.numCredits` became a list of
+   per-location `balances`. See [per-location-accounts.md](per-location-accounts.md).
+
 ### Follow-ups and open items
 
 - **Refund/dispute webhook handler** (task chip created, not started): signature-verified

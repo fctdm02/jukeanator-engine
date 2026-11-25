@@ -24,6 +24,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
 import com.djt.jukeanator_engine.domain.common.model.utils.ObjectMappers;
+import com.djt.jukeanator_engine.domain.location.dto.LocationPricingConfigDto;
+import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
+import java.math.BigDecimal;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotAlbumDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySnapshotDto;
 import com.djt.jukeanator_engine.domain.location.dto.LibrarySyncAckDto;
@@ -600,6 +603,63 @@ public class LocationServiceTest {
 
     verify(locationRepository, never()).storeAggregateRoot(any());
     assertEquals("Rock On Third", registeredLocation().getName());
+  }
+
+  // ── updatePricingConfig: per-location credit packages ───────────────────
+
+  private static LocationPricingConfigDto pricingWith(List<CreditPackageDto> packages) {
+    return new LocationPricingConfigDto(2, 3, 3, 10, 2, false, packages);
+  }
+
+  @Test
+  void updatePricingConfig_storesTheLocationsOwnCreditPackages() {
+
+    CreditPackageDto pkg = new CreditPackageDto("pkg-10", 20, 4, new BigDecimal("10.00"), null);
+
+    locationServiceImpl.updatePricingConfig(REGISTERED_LOCATION_ID, pricingWith(List.of(pkg)));
+
+    verify(locationRepository).storeCreditPackages(REGISTERED_LOCATION_ID, List.of(pkg));
+    assertEquals(List.of(pkg), registeredLocation().getCreditPackages());
+  }
+
+  @Test
+  void updatePricingConfig_withUnchangedPackages_doesNotRewriteThem() {
+
+    CreditPackageDto pkg = new CreditPackageDto("pkg-10", 20, 4, new BigDecimal("10.00"), null);
+    registeredLocation().setCreditPackages(List.of(pkg));
+
+    locationServiceImpl.updatePricingConfig(REGISTERED_LOCATION_ID, pricingWith(List.of(pkg)));
+
+    verify(locationRepository, never()).storeCreditPackages(any(), any());
+  }
+
+  @Test
+  void updatePricingConfig_ignoresAnInvalidPackageList_keepingTheStoredOne() {
+
+    CreditPackageDto stored = new CreditPackageDto("pkg-7", 12, 2, new BigDecimal("7.00"), null);
+    registeredLocation().setCreditPackages(List.of(stored));
+    CreditPackageDto duplicate =
+        new CreditPackageDto("pkg-10", 20, 4, new BigDecimal("10.00"), null);
+
+    locationServiceImpl.updatePricingConfig(REGISTERED_LOCATION_ID,
+        pricingWith(List.of(duplicate, duplicate)));
+
+    verify(locationRepository, never()).storeCreditPackages(any(), any());
+    assertEquals(List.of(stored), registeredLocation().getCreditPackages());
+    assertEquals(Integer.valueOf(3), registeredLocation().getCreditsPerDollar(),
+        "the rest of the pricing config is still applied");
+  }
+
+  @Test
+  void updatePricingConfig_fromASlaveThatSendsNoPackages_keepsTheStoredOnes() {
+
+    CreditPackageDto stored = new CreditPackageDto("pkg-7", 12, 2, new BigDecimal("7.00"), null);
+    registeredLocation().setCreditPackages(List.of(stored));
+
+    locationServiceImpl.updatePricingConfig(REGISTERED_LOCATION_ID, pricingWith(null));
+
+    verify(locationRepository, never()).storeCreditPackages(any(), any());
+    assertEquals(List.of(stored), registeredLocation().getCreditPackages());
   }
 
   private LocationServiceImpl newServiceWithFilesystemBackup(Path backupDataDir) {

@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.financialledger.model;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorColumn;
@@ -10,12 +11,12 @@ import jakarta.persistence.Table;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
- * Common shape shared by {@link LocalCashTransactionEntity} and {@link
- * LocalCreditTransactionEntity} -- both are simple, append-only local (bill-acceptor /
- * credit-card-reader) credit-award records tied to a physical location, differing only in which
- * hardware produced them. Both persist to one shared table ({@code location_transaction}),
- * discriminated by {@code transaction_type}, so a central DBA querying the master database can see
- * both revenue streams together and filter by location.
+ * Common shape shared by the three ways money comes in at a location: {@link
+ * LocalCashTransactionEntity} (bill acceptor), {@link LocalCreditTransactionEntity} (local
+ * credit-card reader) and {@link LocalMobileTransactionEntity} (a Web/Mobile Add Funds purchase
+ * for this location, charged through Braintree on master). All persist to one shared table
+ * ({@code location_transaction}), discriminated by {@code transaction_type}, so a central DBA
+ * querying the master database can see every revenue stream together and filter by location.
  *
  * <p>{@code sourceTransactionId} is the idempotency key for slave-to-master mirroring (see
  * {@code FinancialLedgerSyncService}/{@code FinancialLedgerSyncController}): {@code null} for
@@ -36,8 +37,10 @@ public abstract class AbstractLocationTransactionEntity extends AbstractPersiste
 
   private static final long serialVersionUID = 1L;
 
-  @Column(name = "amount_dollars", nullable = false)
-  private int amountDollars;
+  // DECIMAL so a Web/Mobile credit package need not be priced in whole dollars; cash and card rows
+  // are always whole dollars (one bill / one reader pulse each).
+  @Column(name = "amount", precision = 12, scale = 2, nullable = false)
+  private BigDecimal amount;
 
   @Column(nullable = false)
   private Instant timestamp;
@@ -53,17 +56,26 @@ public abstract class AbstractLocationTransactionEntity extends AbstractPersiste
 
   protected AbstractLocationTransactionEntity() {} // for JPA
 
-  protected AbstractLocationTransactionEntity(Integer persistentIdentity, int amountDollars,
+  protected AbstractLocationTransactionEntity(Integer persistentIdentity, BigDecimal amount,
       Instant timestamp, Integer locationId, Integer sourceTransactionId) {
     super(persistentIdentity);
-    this.amountDollars = amountDollars;
+    this.amount = amount;
     this.timestamp = timestamp;
     this.locationId = locationId;
     this.sourceTransactionId = sourceTransactionId;
   }
 
+  /** The money this transaction brought in for its location, in dollars. */
+  public BigDecimal getAmount() {
+    return amount;
+  }
+
+  /**
+   * {@link #getAmount()} in whole dollars -- exact for cash and card rows, which are always whole
+   * dollars; a Web/Mobile purchase priced in cents is truncated, so use {@link #getAmount()}.
+   */
   public int getAmountDollars() {
-    return amountDollars;
+    return amount.intValue();
   }
 
   public Instant getTimestamp() {

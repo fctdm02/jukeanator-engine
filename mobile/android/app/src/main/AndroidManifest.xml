@@ -32,4 +32,14 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Geo-fence: a geo-fenced location accepts songs only from a phone that is at the venue. The
+         web UI reads the position with navigator.geolocation when a song is queued, and Capacitor's
+         WebView asks the patron for these permissions the first time (BridgeWebChromeClient).
+         Foreground only: the position is never read in the background. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Location is optional, so Google Play still offers the app to devices without GPS. -->
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 </manifest>

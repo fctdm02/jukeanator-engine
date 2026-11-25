@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalMobileTransactionDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
 import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.controller.LocationController;
@@ -78,5 +79,15 @@ public class FinancialLedgerSyncController {
       @RequestParam Instant since) {
 
     return financialLedgerService.getMobileCreditUsageForSync(locationId, apiKey, since);
+  }
+
+  /** The slave's catch-up pull of Web/Mobile Add Funds purchases made for its location. */
+  @GetMapping("/{locationId}/financial-ledger/mobile-transactions")
+  public List<LocalMobileTransactionDto> getMobileTransactions(
+      @PathVariable Integer locationId,
+      @RequestHeader(LocationController.LOCATION_API_KEY_HEADER) String apiKey,
+      @RequestParam Instant since) {
+
+    return financialLedgerService.getMobileTransactionsForSync(locationId, apiKey, since);
   }
 }

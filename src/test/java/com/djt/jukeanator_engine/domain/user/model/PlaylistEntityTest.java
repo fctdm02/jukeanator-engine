@@ -12,7 +12,7 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
 /**
  * Covers {@link PlaylistEntity#changeLocationId}. Lives in the model package since the method is
- * package-private (only {@link UserEntity#changeLocationId} calls it).
+ * package-private (only {@link UserLocationAccountEntity#changeLocationId} calls it).
  *
  * @author tmyers
  */
@@ -23,7 +23,9 @@ class PlaylistEntityTest {
   private static final Integer OTHER_LOCATION_ID = Integer.valueOf(99);
 
   private static PlaylistEntity playlistOf(List<SongIdentifier> songs) {
-    return new PlaylistEntity(Integer.valueOf(1), "alice@example.com", "Party Mix", songs);
+    PlaylistEntity playlist = new PlaylistEntity(Integer.valueOf(1), "Party Mix");
+    playlist.setSongs(songs); // as given -- the constructor would replace a null list
+    return playlist;
   }
 
   @Test

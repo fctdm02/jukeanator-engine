@@ -37,6 +37,7 @@ import com.djt.jukeanator_engine.domain.location.dto.ProvisionedLocationDto;
 import com.djt.jukeanator_engine.domain.location.dto.RegisterLocationRequest;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalMobileTransactionDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsRequest;
 import com.djt.jukeanator_engine.domain.user.dto.AddFundsResponseDto;
@@ -61,15 +62,16 @@ import com.djt.jukeanator_engine.domain.useractivity.model.UserActivityType;
  * {@code location_id} and isolated per location, and the mirror is idempotent -- a retried push
  * (same {@code sourceTransactionId}) never duplicates a row.
  * <li>A wrong API key never reaches {@link FinancialLedgerServiceImpl} or persists anything.
- * <li>Add-Funds transactions (real money -> song credits) and song-credit-usage transactions
- * (song credits -> a queued song at a location) are genuinely separate ledgers now: the former has
- * no {@code location_id} at all (see {@code UserAddFundsTransactionEntity}'s javadoc), the latter
- * is correctly isolated per location via {@code UserService.getCreditLedgerForLocation} -- the
- * reconciliation the user asked for.
+ * <li>An Add Funds purchase (real money -> song credits) is for one location: the credits land on
+ * the patron's account there only, and the full price is recorded once in that location's
+ * financial ledger as a {@code MOBILE_WEB} row in {@code location_transaction}, like a card swipe.
+ * Song-credit spends (credits -> a queued song) stay a separate, per-location audit trail via
+ * {@code UserService.getCreditLedgerForLocation}.
  * <li>Finalized jukebox-split periods mirror from a slave into {@code location_jukebox_split},
  * tagged by {@code parent_location_id} and idempotent on {@code source_period_id}.
- * <li>A slave's catch-up pull of mobile/web spends sees only its own location's, each carrying the
- * {@code sync_id} its slave-side copy is keyed on.
+ * <li>A slave's catch-up pulls of Web/Mobile purchases and of mobile/web spends see only its own
+ * location's -- purchases keyed on master's id, spends on the {@code sync_id} its slave-side copy
+ * is keyed on.
  * <li>A slave's user-activity batch lands in {@code user_activity} under the authenticated path's
  * location, idempotent on {@code activity_id}.
  * </ol>
@@ -149,7 +151,7 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
   }
 
   @Test
-  void addFundsAndSongCreditUsage_areGenuinelySeparateLedgers_oneNeverLocationAttributedTheOtherAlwaysIs()
+  void addFunds_isForOneLocation_recordedInFullInItsLedger_andSpendsStaySeparatePerLocation()
       throws Exception {
 
     ProvisionedLocationDto locationA = locationService
@@ -160,12 +162,26 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     String email = "patron+" + System.nanoTime() + "@example.com";
     userService.register(new RegisterRequest("Pat", "Ron", email, "password123"));
 
-    // ── real money -> song credits, never location-attributed ──────────────
-    AddFundsResponseDto addFundsResult =
-        userService.addFunds(email, new AddFundsRequest("pkg-7", "fake-nonce"));
+    // ── real money -> song credits, for location A only ─────────────────────
+    AddFundsResponseDto addFundsResult = userService.addFunds(email,
+        new AddFundsRequest(locationA.locationId(), "pkg-7", "fake-nonce"));
     assertNotNull(addFundsResult.transactionId());
+    assertEquals(locationA.locationId(), addFundsResult.locationId());
 
-    assertAddFundsTransactionRow(email, "pkg-7", 12, 2);
+    assertAddFundsTransactionRow(email, locationA.locationId(), "pkg-7", 12, 2);
+    assertEquals(14, userService.getNumCredits(email, locationA.locationId()));
+    assertEquals(0, userService.getNumCredits(email, locationB.locationId()),
+        "credits bought for location A are not usable at location B");
+
+    // The whole purchase is location A's revenue, recorded once, like a card swipe.
+    assertMobilePurchaseRow(locationA.locationId(), addFundsResult.transactionId(),
+        new BigDecimal("7.00"), email);
+    assertLocationTransactionCount(locationB.locationId(), "MOBILE_WEB", 0);
+
+    // Location B needs its own purchase before the patron can play there.
+    userService.addFunds(email,
+        new AddFundsRequest(locationB.locationId(), "pkg-7", "fake-nonce"));
+    assertLocationTransactionCount(locationB.locationId(), "MOBILE_WEB", 1);
 
     // ── song credits -> queueing a song at a specific location ─────────────
     userService.chargeCreditsForQueueAction(email, Integer.valueOf(1), locationA.locationId());
@@ -182,9 +198,11 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     assertEquals(1, ledgerB.size(), "Location B's ledger must not see location A's spend");
     assertEquals(email, ledgerA.get(0).userEmail());
 
-    // The two spends never touched the Add-Funds ledger -- it still has exactly the one entry
-    // from earlier, proving the split is real, not just a filter on one shared table.
-    assertAddFundsTransactionRow(email, "pkg-7", 12, 2);
+    // Spending moves no money: still exactly one purchase row per location.
+    assertLocationTransactionCount(locationA.locationId(), "MOBILE_WEB", 1);
+    assertLocationTransactionCount(locationB.locationId(), "MOBILE_WEB", 1);
+    assertAddFundsTransactionRow(email, locationA.locationId(), "pkg-7", 12, 2);
+    assertEquals(14 - 6, userService.getNumCredits(email, locationA.locationId()));
   }
 
   @Test
@@ -196,8 +214,8 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
 
     String email = "closer+" + System.nanoTime() + "@example.com";
     userService.register(new RegisterRequest("Clo", "Ser", email, "password123"));
-    AddFundsResponseDto purchase =
-        userService.addFunds(email, new AddFundsRequest("pkg-7", "fake-nonce"));
+    AddFundsResponseDto purchase = userService.addFunds(email,
+        new AddFundsRequest(location.locationId(), "pkg-7", "fake-nonce"));
     userService.chargeCreditsForQueueAction(email, Integer.valueOf(1), location.locationId());
 
     Instant from = Instant.now().minusSeconds(60);
@@ -207,7 +225,7 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
 
     userService.deleteAccount(email);
 
-    // The spend still counts toward the location's revenue on master...
+    // The spend's audit record is kept on master...
     List<UserSongCreditUsageDto> afterClosing =
         userService.getCreditLedgerForLocation(location.locationId(), from, to);
     assertEquals(List.of(spend.syncId()),
@@ -218,8 +236,11 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(
             "select u.email_address, u.first_name, "
-                + "(select count(*) from user_song_credit_usage c where c.user_id = u.persistent_identity) as usages "
-                + "from user_add_funds_transaction f join user_account u on u.persistent_identity = f.user_id "
+                + "(select count(*) from user_song_credit_usage c "
+                + "where c.user_location_account_id = a.persistent_identity) as usages "
+                + "from user_add_funds_transaction f "
+                + "join user_location_account a on a.persistent_identity = f.user_location_account_id "
+                + "join user_account u on u.persistent_identity = a.user_id "
                 + "where f.payment_transaction_id = ?")) {
 
       statement.setString(1, purchase.transactionId());
@@ -232,9 +253,14 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
       }
     }
 
+    // The location's ledger row for the purchase is untouched by the account closing.
+    assertMobilePurchaseRow(location.locationId(), purchase.transactionId(),
+        new BigDecimal("7.00"), email);
+
     // The address is free again, for a brand-new account with nothing in it.
     userService.register(new RegisterRequest("Clo", "Ser", email, "password123"));
-    assertEquals(Integer.valueOf(0), userService.getProfile(email).numCredits());
+    assertTrue(userService.getProfile(email).balances().isEmpty());
+    assertEquals(0, userService.getNumCredits(email, location.locationId()));
   }
 
   @Test
@@ -268,7 +294,10 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     String email = "puller+" + System.nanoTime() + "@example.com";
     userService.register(new RegisterRequest("Pul", "Ler", email, "password123"));
     // A new account starts with no credits, and only credits actually spent are recorded.
-    userService.addFunds(email, new AddFundsRequest("pkg-7", "fake-nonce"));
+    userService.addFunds(email,
+        new AddFundsRequest(locationA.locationId(), "pkg-7", "fake-nonce"));
+    userService.addFunds(email,
+        new AddFundsRequest(locationB.locationId(), "pkg-7", "fake-nonce"));
 
     Instant since = Instant.now().minusSeconds(60);
     userService.chargeCreditsForQueueAction(email, Integer.valueOf(1), locationA.locationId());
@@ -291,6 +320,49 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
         since.toString());
     assertTrue(response.getStatusCode().is4xxClientError() || response.getStatusCode().is5xxServerError(),
         "A pull for another location's id must be rejected -- got " + response.getStatusCode());
+  }
+
+  @Test
+  void mobileTransactionPull_overHttp_returnsOnlyThatLocationsPurchases() throws Exception {
+
+    ProvisionedLocationDto locationA = locationService
+        .registerLocation(new RegisterLocationRequest(uniqueName("Purchase Bar"), 41.0, -87.0));
+    ProvisionedLocationDto locationB = locationService
+        .registerLocation(new RegisterLocationRequest(uniqueName("Elsewhere Bar"), 41.9, -87.6));
+
+    String email = "buyer+" + System.nanoTime() + "@example.com";
+    userService.register(new RegisterRequest("Buy", "Er", email, "password123"));
+    Instant since = Instant.now().minusSeconds(60);
+    AddFundsResponseDto boughtAtA = userService.addFunds(email,
+        new AddFundsRequest(locationA.locationId(), "pkg-28", "fake-nonce"));
+    userService.addFunds(email,
+        new AddFundsRequest(locationB.locationId(), "pkg-7", "fake-nonce"));
+
+    ResponseEntity<List<LocalMobileTransactionDto>> response = restTemplate.exchange(
+        "/api/locations/{locationId}/financial-ledger/mobile-transactions?since={since}",
+        HttpMethod.GET, new HttpEntity<>(locationHeaders(locationA)),
+        new ParameterizedTypeReference<List<LocalMobileTransactionDto>>() {},
+        locationA.locationId(), since.toString());
+
+    assertEquals(HttpStatus.OK, response.getStatusCode());
+    List<LocalMobileTransactionDto> mine =
+        response.getBody().stream().filter(t -> email.equals(t.userEmail())).toList();
+    assertEquals(1, mine.size(), "Location A's pull must never see location B's purchase");
+    LocalMobileTransactionDto purchase = mine.get(0);
+    assertEquals(locationA.locationId(), purchase.locationId());
+    assertEquals(0, new BigDecimal("28.00").compareTo(purchase.amount()));
+    assertEquals(boughtAtA.transactionId(), purchase.paymentReference());
+    assertEquals("pkg-28", purchase.packageCode());
+    assertNotNull(purchase.persistentIdentity(), "master's id is the slave copy's sync key");
+
+    // Location B's credentials must never read location A's purchases.
+    ResponseEntity<String> rejected = restTemplate.exchange(
+        "/api/locations/{locationId}/financial-ledger/mobile-transactions?since={since}",
+        HttpMethod.GET, new HttpEntity<>(locationHeaders(locationB)), String.class,
+        locationA.locationId(), since.toString());
+    assertTrue(rejected.getStatusCode().is4xxClientError()
+        || rejected.getStatusCode().is5xxServerError(),
+        "A pull for another location's id must be rejected -- got " + rejected.getStatusCode());
   }
 
   // Lives here rather than in its own class so it shares this class's master-mode Spring context
@@ -487,22 +559,50 @@ class MasterSlaveFinancialLedgerIntegrationTest extends AbstractServiceIntegrati
     }
   }
 
-  private void assertAddFundsTransactionRow(String email, String expectedPackageId,
-      int expectedCreditsAwarded, int expectedBonusCredits) throws SQLException {
+  private void assertAddFundsTransactionRow(String email, Integer locationId,
+      String expectedPackageId, int expectedCreditsAwarded, int expectedBonusCredits)
+      throws SQLException {
 
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(
-            "select f.package_id, f.credits_awarded, f.bonus_credits "
-                + "from user_add_funds_transaction f join user_account u on u.persistent_identity = f.user_id "
-                + "where u.email_address = ?")) {
+            "select f.package_id, f.credits_awarded, f.bonus_credits, a.location_id "
+                + "from user_add_funds_transaction f "
+                + "join user_location_account a on a.persistent_identity = f.user_location_account_id "
+                + "join user_account u on u.persistent_identity = a.user_id "
+                + "where u.email_address = ? and f.location_id = ?")) {
 
       statement.setString(1, email);
+      statement.setInt(2, locationId);
       try (ResultSet rs = statement.executeQuery()) {
         assertTrue(rs.next(), "Expected exactly one Add-Funds row for " + email);
+        assertEquals(locationId.intValue(), rs.getInt("location_id"),
+            "the purchase belongs to the account at the location it was bought for");
         assertEquals(expectedPackageId, rs.getString("package_id"));
         assertEquals(expectedCreditsAwarded, rs.getInt("credits_awarded"));
         assertEquals(expectedBonusCredits, rs.getInt("bonus_credits"));
         assertTrue(!rs.next(), "Expected only one Add-Funds row for " + email);
+      }
+    }
+  }
+
+  private void assertMobilePurchaseRow(Integer locationId, String paymentReference,
+      BigDecimal expectedAmount, String expectedEmail) throws SQLException {
+
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = connection.prepareStatement(
+            "select amount, user_email, source_transaction_id from location_transaction "
+                + "where location_id = ? and transaction_type = 'MOBILE_WEB' "
+                + "and payment_reference = ?")) {
+
+      statement.setInt(1, locationId);
+      statement.setString(2, paymentReference);
+      try (ResultSet rs = statement.executeQuery()) {
+        assertTrue(rs.next(), "Expected a MOBILE_WEB ledger row for " + paymentReference);
+        assertEquals(0, expectedAmount.compareTo(rs.getBigDecimal("amount")));
+        assertEquals(expectedEmail, rs.getString("user_email"));
+        assertEquals(0, rs.getInt("source_transaction_id"), "master's own record, not a mirror");
+        assertTrue(rs.wasNull());
+        assertTrue(!rs.next(), "Expected exactly one MOBILE_WEB row per purchase");
       }
     }
   }

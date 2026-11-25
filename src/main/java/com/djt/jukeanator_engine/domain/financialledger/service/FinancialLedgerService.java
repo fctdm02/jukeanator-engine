@@ -1,10 +1,12 @@
 package com.djt.jukeanator_engine.domain.financialledger.service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import com.djt.jukeanator_engine.domain.common.aop.PublicServiceMethod;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalMobileTransactionDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.MasterSyncOutboxEntry;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
@@ -100,6 +102,38 @@ public interface FinancialLedgerService {
    * location. Idempotent on {@code usage.syncId()}.
    */
   void receiveMobileCreditUsage(UserSongCreditUsageDto usage);
+
+  /**
+   * Master-only. Records one Web/Mobile Add Funds purchase -- {@code amount} dollars charged
+   * through the payment gateway for credits usable only at {@code locationId} -- in full, in that
+   * location's ledger, then announces it so it is mirrored to the location's slave.
+   *
+   * Called by {@code UserService.addFunds}, within the paying patron's request, after the charge
+   * succeeded.
+   *
+   * @return the recorded purchase
+   */
+  LocalMobileTransactionDto recordMobilePurchase(Integer locationId, BigDecimal amount,
+      String userEmail, String paymentReference, String packageCode, int creditsAwarded,
+      int bonusCredits);
+
+  /**
+   * Master-only. The Web/Mobile purchases master has recorded for {@code locationId} at or after
+   * {@code since} -- the slave's catch-up pull for any live mirror push it missed.
+   *
+   * @throws LocationServiceException if {@code locationId}/{@code apiKey} don't verify
+   */
+  List<LocalMobileTransactionDto> getMobileTransactionsForSync(Integer locationId, String apiKey,
+      Instant since) throws LocationServiceException;
+
+  /**
+   * Slave-only. Stores one Web/Mobile purchase master recorded for this slave's own location.
+   * Idempotent on master's id ({@code dto.persistentIdentity()}).
+   */
+  void receiveMobileTransaction(LocalMobileTransactionDto dto);
+
+  /** The most recent mirrored Web/Mobile purchase's timestamp, or {@code null} if none. */
+  Instant getLatestMobileTransactionTimestamp();
 
   /** The open (current) period's start date, or {@code null} if there is none (master). */
   Instant getOpenPeriodStartDate();

@@ -16,7 +16,7 @@ A "credit" buys different amounts in different places, so compare **songs**, not
 
 - **At the jukebox**, a normal play costs **1 credit**.
 - **On the Web/Mobile UI**, every cost is the jukebox cost multiplied by `user-interface.web-cost-multiplier` (default `2`), so a normal play costs **2 credits**.
-- **Web credits work at every location.** They are bought on the master instance and are not tied to any one location. Each location's own `web-cost-multiplier` decides what a song costs there.
+- **Web credits work only at the location they were bought for.** They are bought on the master instance, for the location the patron has selected, from that location's own packages. They cannot be used anywhere else. That location's `web-cost-multiplier` decides what a song costs there. See [per-location-accounts.md](per-location-accounts.md).
 
 ## Cost per normal song, with the defaults
 
@@ -46,7 +46,12 @@ All of these are in `application.yml`. On a jukebox, the running copy is `C:\kio
 - `user-interface.credit-card-cost-multiplier` (new, default `2`): card-reader credits = cash credits ÷ this value, rounded up. Decimals are allowed, for example `1.5`. Jukebox only, never synced to master.
 - `user-interface.web-cost-multiplier` (default `2`): Web/Mobile UI cost = jukebox cost × this value. Synced from each slave to master, per location.
 - `user-interface.display-currency-for-cost`: now applies to the jukebox screen only. The Web/Mobile UI always shows credits.
-- `add-funds.packages` (new): the Web/Mobile UI's credit packages. Set them on the instance that takes web payments (master, or standalone). One package per line:
+- `add-funds.packages`: the Web/Mobile UI's credit packages for this instance's location. Each location sells its own packages:
+  - **On a slave**, set them in the slave's own config. The slave sends them to master each time it connects, so restart the slave after changing them. Master stores them per location (`location_credit_package`).
+  - **On master**, they are the fallback for a location that has not sent any packages.
+  - **On a standalone instance**, they are the instance's own packages. Add Funds itself runs only on master.
+
+  One package per line:
 
 ```yaml
 add-funds:
@@ -105,7 +110,7 @@ With `credit-card-cost-multiplier: 1.5`, the card reader gives $5 = 12, $10 = 27
   - It warns when a package's total doesn't divide evenly by the web song cost.
   - It warns when any web package costs no more per song than the most expensive card-reader amount.
   - It warns when `credit-card-cost-multiplier` is below 1, which would make the card reader cheaper than cash.
-- **Why the check reads settings directly.** It uses this instance's own `user-interface.*` settings rather than calling `PricingService`, because it runs at startup before any user is signed in, and service calls require a signed-in principal (see `ServiceSecurityAspect`). On master it therefore checks against master's own `web-cost-multiplier`, not each location's synced value. Keep `web-cost-multiplier` the same at every location: since web credits work everywhere, no single set of package totals divides evenly at every location otherwise.
+- **Why the check reads settings directly.** It uses this instance's own `user-interface.*` settings rather than calling `PricingService`, because it runs at startup before any user is signed in, and service calls require a signed-in principal (see `ServiceSecurityAspect`). On master it therefore checks master's own packages against master's own `web-cost-multiplier`. A slave runs the same check on its own packages and its own `web-cost-multiplier`, which are exactly what its location sells, because web credits now work only at the location they were bought for (see [per-location-accounts.md](per-location-accounts.md)). Each location can therefore set its own `web-cost-multiplier`, as long as its own package totals divide evenly by it.
 - **The YAML puts one package per line** (`- { id: ..., ... }`). `ExternalConfigMerger` treats every indented `key:` line as a setting, and the one-line form keeps it from misreading the list entries.
 
 ---
@@ -133,9 +138,9 @@ With `credit-card-cost-multiplier: 1.5`, the card reader gives $5 = 12, $10 = 27
 
 ---
 
-## Not changed
+## Not changed by the three phases
 
-- **What the bar owner is paid for web plays.** The financial ledger still values web credits spent at a location at that location's cash rate (credits ÷ `credits-per-dollar`), the kiosk-equivalent value of what was played there, whatever the patron paid for the credits.
+- **What the bar owner is paid for web plays.** During these phases, the financial ledger still valued web credits spent at a location at that location's cash rate (credits ÷ `credits-per-dollar`). **This has since changed:** a location's mobile revenue is now the full price of each Add Funds purchase made for it, recorded once when it is paid, like a card-reader swipe. See "Split totals" in [per-location-accounts.md](per-location-accounts.md).
 - **The jukebox screen.** Its CARD line (`5$=9cr | 10$=20cr | 20$=40cr`) and its `display-currency-for-cost` behaviour are unchanged.
 
 ## Tests
@@ -144,7 +149,7 @@ With `credit-card-cost-multiplier: 1.5`, the card reader gives $5 = 12, $10 = 27
 - **New `CreditPackageCatalogTest`, `AddFundsPropertiesTest` and `PricingStartupCheckTest`.**
 - **`UserServiceTest`:** configured packages and validation.
 - **Web/Mobile and ledger tests updated for the new package totals and the removed `balanceUsd`:**
-  - `WebPatronPlayLifecycleTest`. With 14 credits, the patron's first package now buys one more play, so the bar's mobile revenue in that scenario is $6.67 instead of $6.00.
+  - `WebPatronPlayLifecycleTest`. With 14 credits, the patron's first package now buys one more play, so the bar's mobile revenue in that scenario was $6.67 instead of $6.00. Since the per-location refactor, the test counts purchases instead: two $7 purchases make the bar's mobile revenue $14.00.
   - `WebUiPatronLifecycleTest`
   - `WebUiMasterPatronLifecycleTest`
   - `WebUiMasterConnectedSlaveLifecycleTest`

@@ -12,6 +12,7 @@
     "assets": "capacitor-assets generate --iconBackgroundColor #000000 --iconBackgroundColorDark #000000 --splashBackgroundColor #000000 --splashBackgroundColorDark #000000"
   },
   "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
     "@capacitor/android": "^8.6.2",
     "@capacitor/core": "^8.6.2",
     "@capacitor/ios": "^8.6.2"

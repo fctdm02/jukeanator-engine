@@ -7,11 +7,13 @@ import com.djt.jukeanator_engine.domain.common.security.UserRole;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserAddFundsTransactionEntryDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserDto;
+import com.djt.jukeanator_engine.domain.user.dto.UserLocationAccountDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserRootDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserSongCreditUsageEntryDto;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserLocationAccountEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserStatus;
@@ -36,22 +38,35 @@ public final class UserMapper {
 
   public static UserDto toDto(UserEntity entity) {
 
+    List<UserLocationAccountDto> accounts = new ArrayList<>();
+    for (UserLocationAccountEntity account : entity.getLocationAccounts()) {
+      accounts.add(toDto(account));
+    }
+
     return new UserDto(
         entity.getPersistentIdentity(),
         entity.getFirstName(),
         entity.getLastName(),
         entity.getEmailAddress(),
         entity.getPasswordHash(),
-        entity.getNumCredits(),
-        entity.getSongPlayHistory(),
         entity.getSearchHistory(),
-        toPlaylistDtos(entity.getPlaylists()),
-        toUserSongCreditUsageDtos(entity.getUserSongCreditUsages()),
-        toUserAddFundsTransactionDtos(entity.getUserAddFundsTransactions()),
+        accounts,
         entity.getRole().name(),
         entity.getStatus().name(),
         entity.getVerificationTokenHash(),
         entity.getVerificationTokenExpiresAt());
+  }
+
+  public static UserLocationAccountDto toDto(UserLocationAccountEntity account) {
+
+    return new UserLocationAccountDto(
+        account.getPersistentIdentity(),
+        account.getLocationId(),
+        account.getNumCredits(),
+        account.getSongPlayHistory(),
+        toPlaylistDtos(account.getPlaylists()),
+        toUserSongCreditUsageDtos(account.getSongCreditUsages()),
+        toUserAddFundsTransactionDtos(account.getAddFundsTransactions()));
   }
 
   public static List<PlaylistDto> toPlaylistDtos(List<PlaylistEntity> entities) {
@@ -59,8 +74,8 @@ public final class UserMapper {
     List<PlaylistDto> dtos = new ArrayList<>();
 
     for (PlaylistEntity entity : entities) {
-      dtos.add(new PlaylistDto(entity.getPersistentIdentity(), entity.getOwner(),
-          entity.getName(), entity.getSongs()));
+      dtos.add(new PlaylistDto(entity.getPersistentIdentity(), entity.getName(),
+          entity.getSongs()));
     }
 
     return dtos;
@@ -95,6 +110,7 @@ public final class UserMapper {
     for (UserAddFundsTransactionEntity entity : entities) {
       dtos.add(new UserAddFundsTransactionEntryDto(
           entity.getPersistentIdentity(),
+          entity.getLocationId(),
           entity.getPackageId(),
           entity.getCreditsAwarded(),
           entity.getBonusCredits(),
@@ -127,51 +143,71 @@ public final class UserMapper {
         dto.lastName(),
         dto.emailAddress(),
         dto.passwordHash(),
-        dto.numCredits(),
         UserRole.valueOf(dto.role()));
 
-    user.setSongPlayHistory(dto.songPlayHistory());
-    user.setSearchHistory(dto.searchHistory());
+    user.setSearchHistory(new ArrayList<>(dto.searchHistory()));
 
     // A user file written before verification existed has no status: treat it as ACTIVE.
     user.setStatus(dto.status() == null ? UserStatus.ACTIVE : UserStatus.valueOf(dto.status()));
     user.setVerificationTokenHash(dto.verificationTokenHash());
     user.setVerificationTokenExpiresAt(dto.verificationTokenExpiresAt());
 
-    // The UserEntity constructor above already seeded a fresh "My Favorites" playlist; discard
-    // it in favor of the persisted playlists, which already include it.
-    user.getPlaylists().clear();
-    for (PlaylistDto playlistDto : dto.playlists()) {
-      user.restorePlaylist(new PlaylistEntity(playlistDto.persistentIdentity(),
-          playlistDto.owner(), playlistDto.name(), playlistDto.songs()));
-    }
-
-    for (UserSongCreditUsageEntryDto usageDto : dto.userSongCreditUsages()) {
-      user.addUserSongCreditUsage(new UserSongCreditUsageEntity(
-          usageDto.persistentIdentity(),
-          usageDto.locationId(),
-          usageDto.amount(),
-          usageDto.type(),
-          usageDto.timestamp(),
-          usageDto.songAlbumId(),
-          usageDto.songId(),
-          usageDto.resultingBalance(),
-          usageDto.syncId()));
-    }
-
-    for (UserAddFundsTransactionEntryDto addFundsDto : dto.userAddFundsTransactions()) {
-      user.addUserAddFundsTransaction(new UserAddFundsTransactionEntity(
-          addFundsDto.persistentIdentity(),
-          addFundsDto.packageId(),
-          addFundsDto.creditsAwarded(),
-          addFundsDto.bonusCredits(),
-          addFundsDto.amountUsd(),
-          addFundsDto.paymentSource(),
-          addFundsDto.paymentTransactionId(),
-          addFundsDto.timestamp(),
-          addFundsDto.resultingBalance()));
+    for (UserLocationAccountDto accountDto : dto.locationAccounts()) {
+      user.restoreLocationAccount(toEntity(accountDto));
     }
 
     return user;
+  }
+
+  public static UserLocationAccountEntity toEntity(UserLocationAccountDto dto) {
+
+    // The rehydration constructor seeds no playlists: the persisted ones (My Favorites included)
+    // are restored below.
+    UserLocationAccountEntity account = new UserLocationAccountEntity(dto.persistentIdentity(),
+        dto.locationId(), dto.numCredits());
+
+    account.setSongPlayHistory(
+        dto.songPlayHistory() == null ? new ArrayList<>() : new ArrayList<>(dto.songPlayHistory()));
+
+    if (dto.playlists() != null) {
+      for (PlaylistDto playlistDto : dto.playlists()) {
+        account.restorePlaylist(new PlaylistEntity(playlistDto.persistentIdentity(),
+            playlistDto.name(),
+            playlistDto.songs() == null ? new ArrayList<>() : new ArrayList<>(playlistDto.songs())));
+      }
+    }
+
+    if (dto.songCreditUsages() != null) {
+      for (UserSongCreditUsageEntryDto usageDto : dto.songCreditUsages()) {
+        account.addSongCreditUsage(new UserSongCreditUsageEntity(
+            usageDto.persistentIdentity(),
+            usageDto.locationId(),
+            usageDto.amount(),
+            usageDto.type(),
+            usageDto.timestamp(),
+            usageDto.songAlbumId(),
+            usageDto.songId(),
+            usageDto.resultingBalance(),
+            usageDto.syncId()));
+      }
+    }
+
+    if (dto.addFundsTransactions() != null) {
+      for (UserAddFundsTransactionEntryDto addFundsDto : dto.addFundsTransactions()) {
+        account.addAddFundsTransaction(new UserAddFundsTransactionEntity(
+            addFundsDto.persistentIdentity(),
+            addFundsDto.locationId(),
+            addFundsDto.packageId(),
+            addFundsDto.creditsAwarded(),
+            addFundsDto.bonusCredits(),
+            addFundsDto.amountUsd(),
+            addFundsDto.paymentSource(),
+            addFundsDto.paymentTransactionId(),
+            addFundsDto.timestamp(),
+            addFundsDto.resultingBalance()));
+      }
+    }
+
+    return account;
   }
 }

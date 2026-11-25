@@ -1,6 +1,8 @@
 package com.djt.jukeanator_engine.domain.location.model;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -10,6 +12,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
+import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 
 /**
  * A physical jukebox ("slave") location known to the master instance.
@@ -94,6 +97,12 @@ public class LocationEntity extends AbstractPersistentEntity {
   // longitude, name, ...), so those changes were silently never written by merge().
   @Transient
   private transient RootFolderEntity locationSongLibraryRoot;
+
+  // This location's Add Funds credit packages, as last pushed by its slave. Persisted separately
+  // in location_credit_package (see LocationRepository.storeCreditPackages) rather than through
+  // the field-diffing store of this row -- @Transient for the same enhancer reason as above.
+  @Transient
+  private transient List<CreditPackageDto> creditPackages = new ArrayList<>();
 
   public LocationEntity() {}
 
@@ -245,5 +254,18 @@ public class LocationEntity extends AbstractPersistentEntity {
 
   public void setLocationSongLibraryRoot(RootFolderEntity locationSongLibraryRoot) {
     this.locationSongLibraryRoot = locationSongLibraryRoot;
+  }
+
+  /** Never null; empty until this location's slave has pushed its packages. */
+  public List<CreditPackageDto> getCreditPackages() {
+    if (creditPackages == null) {
+      creditPackages = new ArrayList<>();
+    }
+    return creditPackages;
+  }
+
+  public void setCreditPackages(List<CreditPackageDto> creditPackages) {
+    this.creditPackages =
+        creditPackages == null ? new ArrayList<>() : new ArrayList<>(creditPackages);
   }
 }

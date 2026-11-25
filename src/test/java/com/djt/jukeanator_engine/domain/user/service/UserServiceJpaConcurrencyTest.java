@@ -22,7 +22,9 @@ import com.djt.jukeanator_engine.domain.songlibrary.service.SongLibraryService;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongQueueEntryDto;
 import com.djt.jukeanator_engine.domain.songqueue.event.SongAddedToQueueEvent;
-import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
+import com.djt.jukeanator_engine.domain.user.model.UserLocationAccountEntity;
+import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
+import java.util.List;
 
 /**
  * Regression test for the {@code OptimisticLockException} reported against a standalone/slave
@@ -65,6 +67,9 @@ class UserServiceJpaConcurrencyTest extends AbstractServiceIntegrationTest {
 
   @Autowired
   private SongLibraryService songLibraryService;
+
+  @Autowired
+  private UserRepository userRepository;
 
   @Test
   void concurrentHandleSongAddedToQueueEvent_forLocalUser_doesNotThrowAndPersistsBothPlays()
@@ -123,14 +128,17 @@ class UserServiceJpaConcurrencyTest extends AbstractServiceIntegrationTest {
       executor.shutdownNow();
     }
 
-    // A song this instance queued itself is tagged with this instance's own location.
+    // A song this instance queued itself is recorded on the user's account at this instance's
+    // own location -- read back from the database, so a lost update would show.
     Integer ownLocationId = songLibraryService.getOwnLocationId();
-    UserProfileDto profile = userService.getProfile(LocalPrincipal.LOCAL_USERNAME);
-    assertTrue(
-        profile.songPlayHistory().contains(new SongIdentifier(ownLocationId, albumIdA, songIdA)),
+    UserLocationAccountEntity account = userRepository.loadAggregateRoot("users")
+        .getUserByEmailAddressNullIfNotExists(LocalPrincipal.LOCAL_USERNAME)
+        .getLocationAccountNullIfNotExists(ownLocationId);
+    assertTrue(account != null, "the local user's account at its own location must be stored");
+    List<SongIdentifier> history = account.getSongPlayHistory();
+    assertTrue(history.contains(new SongIdentifier(ownLocationId, albumIdA, songIdA)),
         "song A should have been recorded in play history (lost update if missing)");
-    assertTrue(
-        profile.songPlayHistory().contains(new SongIdentifier(ownLocationId, albumIdB, songIdB)),
+    assertTrue(history.contains(new SongIdentifier(ownLocationId, albumIdB, songIdB)),
         "song B should have been recorded in play history (lost update if missing)");
   }
 

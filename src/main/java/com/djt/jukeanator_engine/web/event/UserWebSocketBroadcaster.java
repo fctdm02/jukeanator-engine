@@ -24,12 +24,12 @@ public class UserWebSocketBroadcaster {
   @EventListener
   public void handleUserCreditsChangedEvent(UserCreditsChangedEvent event) {
     messagingTemplate.convertAndSendToUser(event.emailAddress(), "/queue/credits",
-        new CreditsMessage(event.numCredits()));
+        new CreditsMessage(event.locationId(), event.numCredits()));
   }
 
   @EventListener
   public void handleRecentPlayAddedEvent(RecentPlayAddedEvent event) {
     messagingTemplate.convertAndSendToUser(event.emailAddress(), "/queue/recent-plays",
-        event.song());
+        new RecentPlayMessage(event.locationId(), event.song()));
   }
 }

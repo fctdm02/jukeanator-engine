@@ -4,7 +4,8 @@ A step-by-step trial of a master/slave pair on **two separate computers** on the
 **before** pairing a real jukebox with a public master. It exercises every master/slave data flow
 end to end, including the offline/catch-up paths, which no automated test covers against two real
 instances. See [financial-ledger-refactor-and-sync.md](financial-ledger-refactor-and-sync.md)
-(Parts C–E) for how each flow works and [multi-tenant-mode.md](multi-tenant-mode.md) for the
+(Parts C–E) for how each flow works, [per-location-accounts.md](per-location-accounts.md) for
+per-location credits and mobile purchases, and [multi-tenant-mode.md](multi-tenant-mode.md) for the
 overall master/slave design.
 
 Each machine runs one normal install on its own default port. The one extra step two separate
@@ -22,7 +23,7 @@ Tick each box as you go. Anything that fails is a finding to fix before a real p
   ```
 - [ ] Each machine has its own working copy of the project (a clone, or a copy of the built WAR) --
   they're separate hosts, so there's nothing to share between them.
-- [ ] The **master machine**'s database is on the current V1 schema (drop/recreate if Flyway
+- [ ] The **master machine**'s database is on the current schema, V2 (drop/recreate if Flyway
   reports a checksum mismatch -- see "Resetting the databases" in MasterConfig.md). The **slave machine** needs no database at all; it
   uses the filesystem repositories.
 - [ ] The two machines can reach each other on the LAN: note the master machine's IP address or
@@ -254,7 +255,7 @@ code.
 - [ ] Within seconds (pushed immediately; the 60 s sweep is the fallback), **on the master
   machine**:
   ```sql
-  SELECT transaction_type, amount_dollars, location_id, source_transaction_id
+  SELECT transaction_type, amount, location_id, source_transaction_id
   FROM jukeanator.location_transaction ORDER BY persistent_identity;
   ```
   Three `CASH` rows (and one `CREDIT_CARD` row) tagged with the location id, each with a
@@ -262,14 +263,30 @@ code.
 - [ ] **On the slave machine**, `C:\kiosk-trial\data\JukeANator_FinancialLedger.json`: those
   transactions now carry a non-null `syncedToMasterAt`.
 
-## 6. Master -> slave: mobile credit spends (item 3)
+## 6. Master -> slave: mobile purchases and credit spends (item 3)
 
-- [ ] Register a patron on master (new users start with 6 credits) -- run from either machine:
+Credits belong to one location: a patron buys them for the selected location, and they can be
+spent only there (see [per-location-accounts.md](per-location-accounts.md)).
+
+- [ ] Register a patron on master (new users start with 0 credits at every location) -- run from
+  either machine:
   ```bash
   curl -s -X POST http://<master-ip>:8080/api/users/register -H "Content-Type: application/json" -d "{\"firstName\":\"Pat\",\"lastName\":\"Ron\",\"emailAddress\":\"pat@example.com\",\"password\":\"password123\"}"
   ```
   Note the returned token. Do **not** top up credits by editing the database -- master holds users
   in memory and its next store would overwrite the edit.
+- [ ] Buy credits for the location as that patron: in the web UI served by master
+  (`http://<master-ip>:8080/app/`), select the location, open **Add Funds** (it names the
+  location and says the credits can be used only there), and pay with the Braintree sandbox test
+  card `4111 1111 1111 1111`. Master needs sandbox Braintree keys for this.
+- [ ] **On the master machine**, the purchase is in the location's ledger, once, for the full
+  package price:
+  ```sql
+  SELECT transaction_type, amount, location_id, user_email, package_code, payment_reference
+  FROM jukeanator.location_transaction WHERE transaction_type = 'MOBILE_WEB';
+  ```
+- [ ] **On the slave machine**, `C:\kiosk-trial\data\JukeANator_MobileTransactions.json` holds
+  the same purchase, with `sourceTransactionId` equal to master's `persistent_identity`.
 - [ ] Queue one song at the location as that patron -- via the web UI served by master
   (`http://<master-ip>:8080/app/`, reachable from either machine or a phone on the LAN; see step
   2), or:
@@ -285,8 +302,9 @@ code.
 - [ ] **On the slave machine**, the slave received it: `mobileCreditUsages` in
   `C:\kiosk-trial\data\JukeANator_FinancialLedger.json` holds one entry with the same
   `sourceSyncId`.
-- [ ] Slave Admin Panel -> Financial Ledger: the open period's **Mobile** total is non-zero
-  (credits spent ÷ credits-per-dollar), not $0.
+- [ ] Slave Admin Panel -> Financial Ledger: the open period's **Mobile** total equals the
+  package price paid above. Spending the credits does not change it; the spend is kept on the
+  slave for audit only.
 
 ## 7. Slave -> master: finalized split period (item 2)
 
@@ -332,7 +350,10 @@ code.
 - [ ] Mobile dedupe: once master is back, queue another song as the patron (step 6). That spend
   reaches the slave twice -- by the live push, and again by the next sweep's catch-up pull (which
   re-pulls the whole open period after the failed sweeps) -- yet must appear exactly **once** in
-  the slave's `mobileCreditUsages`, and the open period's Mobile total must count it once.
+  the slave's `mobileCreditUsages`.
+- [ ] Purchase dedupe and catch-up: stop the **slave**, buy another package for the location as
+  the patron, then start the slave. Within one sweep the purchase appears exactly **once** in the
+  slave's `JukeANator_MobileTransactions.json`, and the open period's Mobile total includes it.
 
 ## 10. Restarts never re-push
 
@@ -451,7 +472,7 @@ next change if it kept running.
 **Step 2.** On master's database, run:
 
 ```sql
-DELETE FROM location_transaction   WHERE location_id = 2;
+DELETE FROM location_transaction   WHERE location_id = 2;  -- includes MOBILE_WEB purchases
 DELETE FROM location_jukebox_split WHERE parent_location_id = 2;
 DELETE FROM user_song_credit_usage WHERE location_id = 2;
 DELETE FROM user_activity          WHERE location_id = 2;  -- optional, not financial
@@ -459,8 +480,8 @@ DELETE FROM user_activity          WHERE location_id = 2;  -- optional, not fina
 
 **Step 3.** On the slave, delete `JukeANator_FinancialLedger.json` from its data directory (for a
 JPA slave, delete all rows from its own `location_transaction`, `location_mobile_credit_usage` and
-`location_jukebox_split` tables instead). This also removes the slave's copy of the Web/Mobile
-spends. Optionally delete the `activity` folder in the same directory (for a JPA slave, the rows
+`location_jukebox_split` tables instead). Also delete `JukeANator_MobileTransactions.json` from the
+same directory. This also removes the slave's copy of the Web/Mobile purchases and spends. Optionally delete the `activity` folder in the same directory (for a JPA slave, the rows
 of its `user_activity` table) to drop the test activity as well.
 
 **Step 4.** Start the slave. With no ledger, it creates an empty one and opens a new split period
@@ -468,7 +489,9 @@ starting now. Confirm the "Connected to master" log line and no 401 or ledger er
 
 Not covered by the steps above:
 
-- Your own credit balance is `user_account.num_credits` on master. Set it back by hand if the
-  remaining test credits should not stay on your account.
-- Song play counts on the slave and the Web/Mobile play history on master
+- Your credit balance at the location is `user_location_account.num_credits` on master, along
+  with your Add Funds records (`user_add_funds_transaction`) for it. Stop master before changing
+  them by hand (it holds users in memory), and refund or void the Braintree sandbox charges if
+  needed.
+- Song play counts on the slave and the Web/Mobile play history at the location on master
   (`user_song_play_history`) still include the test plays. They have no effect on money.

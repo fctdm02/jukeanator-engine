@@ -22,6 +22,8 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 import com.djt.jukeanator_engine.domain.financialledger.config.FinancialLedgerProperties;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalMobileTransactionDto;
+import com.djt.jukeanator_engine.domain.financialledger.event.MobilePurchaseRecordedEvent;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.MasterSyncOutboxEntry;
 import com.djt.jukeanator_engine.domain.financialledger.event.JukeboxSplitFinalizedEvent;
@@ -228,8 +230,53 @@ class FinancialLedgerServiceTest {
   // ── getAllPeriods: live totals for the open period ──────────────────────
 
   @Test
-  void getAllPeriods_computesLiveMobileTotal_fromNegativeAmountsOnlyAtCreditsPerDollarRate()
+  void getAllPeriods_computesLiveMobileTotal_fromTheLocationsPurchases_notItsSpends()
       throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+
+    FinancialLedgerServiceImpl service = newService(true);
+    Instant periodStart = service.getOpenPeriodStartDate();
+
+    // Two purchases mirrored from master for this location, one for another location, and spends
+    // that must not count as money at all.
+    service.receiveMobileTransaction(purchase(101, OWN_LOCATION_ID, "7.00", periodStart));
+    service.receiveMobileTransaction(purchase(102, OWN_LOCATION_ID, "14.50", periodStart));
+    service.receiveMobileTransaction(purchase(103, Integer.valueOf(999), "28.00", periodStart));
+    service.receiveMobileCreditUsage(new UserSongCreditUsageDto("alice@example.com",
+        OWN_LOCATION_ID, -20, UserSongCreditUsageType.QUEUE_ADD, periodStart, 1, 2, 80,
+        "sync-1"));
+
+    JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
+    assertEquals(new BigDecimal("21.50"), current.mobileTotal());
+    assertEquals(new BigDecimal("21.50"), current.totalEarned());
+    assertNull(current.amountDueOwner(), "Open period's owner/operator amounts stay unset until finalized");
+  }
+
+  @Test
+  void addSplit_locksInTheMobilePurchases_andTheNextPeriodStartsAtZero() throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+    financialLedgerProperties.setJukeboxSplitPercentage(50);
+
+    FinancialLedgerServiceImpl service = newService(true);
+    service.receiveMobileTransaction(
+        purchase(101, OWN_LOCATION_ID, "7.00", service.getOpenPeriodStartDate()));
+    service.recordLocalCashCredit(1);
+
+    service.addSplit();
+
+    JukeboxSplitPeriodDto finalized = service.getAllPeriods().get(0);
+    assertEquals(new BigDecimal("7.00"), finalized.mobileTotal());
+    assertEquals(new BigDecimal("8.00"), finalized.totalEarned());
+    assertEquals(new BigDecimal("4.00"), finalized.amountDueOwner());
+    assertEquals(BigDecimal.ZERO.setScale(2), service.getAllPeriods().get(1).mobileTotal());
+  }
+
+  @Test
+  void spendsAreNeverRevenue_evenWithoutAnyPurchase() throws Exception {
 
     when(financialLedgerRepository.loadAggregateRoot(anyString()))
         .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
@@ -240,11 +287,8 @@ class FinancialLedgerServiceTest {
     FinancialLedgerServiceImpl service = newService();
     Instant afterPeriodStart = service.getAllPeriods().get(0).startDate().plusSeconds(1);
 
-    // 30 credits spent (two QUEUE_ADD/QUEUE_ACTION-style negative entries) at 3 credits/dollar =
-    // $10.00. Funds merely added (UserAddFundsTransactionEntity) never appear in this ledger at
-    // all now -- getCreditLedgerForLocation only ever returns song-credit-usage entries, so there
-    // is no longer a positive-amount row to filter out here. (creditsPerDollar=3 comes from
-    // setUp()'s default PricingConfig stub.)
+    // 30 credits spent on a standalone instance: before per-location purchases these were
+    // converted to $10.00 at the kiosk rate; now a spend moves no money.
     when(userService.getCreditLedgerForLocation(org.mockito.ArgumentMatchers.eq(OWN_LOCATION_ID),
         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(
@@ -254,34 +298,24 @@ class FinancialLedgerServiceTest {
                 UserSongCreditUsageType.QUEUE_ACTION, afterPeriodStart, null, null, 70, "sync-2")));
 
     JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
-    assertEquals(new BigDecimal("10.00"), current.mobileTotal());
-    assertEquals(new BigDecimal("10.00"), current.totalEarned());
-    assertNull(current.amountDueOwner(), "Open period's owner/operator amounts stay unset until finalized");
+    assertEquals(BigDecimal.ZERO.setScale(2), current.mobileTotal());
+    assertEquals(BigDecimal.ZERO.setScale(2), current.totalEarned());
   }
 
   @Test
-  void getAllPeriods_includesAMobileSpendTiedExactlyAtThePeriodsOwnStartDate() throws Exception {
+  void getAllPeriods_includesAPurchaseTiedExactlyAtThePeriodsOwnStartDate() throws Exception {
 
     when(financialLedgerRepository.loadAggregateRoot(anyString()))
         .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
-    when(pricingService.resolvePricingConfig(OWN_LOCATION_ID))
-        .thenReturn(new PricingConfig(2, 3, 3, 10, 2, false));
 
-    FinancialLedgerServiceImpl service = newService();
+    FinancialLedgerServiceImpl service = newService(true);
     Instant periodStart = service.getAllPeriods().get(0).startDate();
 
-    // UserService.getCreditLedgerForLocation is inclusive at `from`, and nothing prevents a
-    // legitimate spend from landing exactly on a period's own startDate (most obviously its very
-    // first moment) -- addSplit() is what actually prevents double-counting across a split (by
-    // guaranteeing the new period's startDate is always strictly after the old one's endDate), not
-    // this query's own boundary semantics, so a tie here should simply be counted normally.
-    when(userService.getCreditLedgerForLocation(org.mockito.ArgumentMatchers.eq(OWN_LOCATION_ID),
-        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-        .thenReturn(List.of(new UserSongCreditUsageDto("alice@example.com", OWN_LOCATION_ID, -9,
-            UserSongCreditUsageType.QUEUE_ADD, periodStart, null, null, 1, "sync-1")));
+    // The open period is inclusive at its start; addSplit() is what prevents double-counting
+    // across a split, by starting the new period strictly after the old one's end.
+    service.receiveMobileTransaction(purchase(101, OWN_LOCATION_ID, "3.00", periodStart));
 
-    JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
-    assertEquals(new BigDecimal("3.00"), current.mobileTotal());
+    assertEquals(new BigDecimal("3.00"), service.getAllPeriods().get(0).mobileTotal());
   }
 
   @Test
@@ -505,7 +539,7 @@ class FinancialLedgerServiceTest {
   // ── master-to-slave mobile credit usage mirror ───────────────────────────
 
   @Test
-  void receiveMobileCreditUsage_isIdempotentOnSyncId_andCountsTowardTheSlavesMobileTotal()
+  void receiveMobileCreditUsage_isIdempotentOnSyncId_andIsAnAuditRecordOnly()
       throws Exception {
 
     when(financialLedgerRepository.loadAggregateRoot(anyString()))
@@ -516,7 +550,7 @@ class FinancialLedgerServiceTest {
     // future relative to the live summary's "now" upper bound.
     Instant afterPeriodStart = service.getOpenPeriodStartDate();
 
-    // 30 credits at setUp()'s 3 credits/dollar = $10.00; the duplicate must not double-count.
+    // The duplicate must not be stored twice; none of it is money.
     service.receiveMobileCreditUsage(new UserSongCreditUsageDto("alice@example.com",
         OWN_LOCATION_ID, -20, UserSongCreditUsageType.QUEUE_ADD, afterPeriodStart, 1, 2, 80,
         "sync-a"));
@@ -528,7 +562,8 @@ class FinancialLedgerServiceTest {
         "sync-a"));
 
     JukeboxSplitPeriodDto current = service.getAllPeriods().get(0);
-    assertEquals(new BigDecimal("10.00"), current.mobileTotal());
+    assertEquals(BigDecimal.ZERO.setScale(2), current.mobileTotal(),
+        "spends are an audit trail; the revenue was the purchase");
     assertEquals(afterPeriodStart, service.getLatestMobileCreditUsageTimestamp());
     // In slave mode the mirrored copy is the source of truth -- the slave's own user store never
     // holds mobile/web spends.
@@ -584,5 +619,107 @@ class FinancialLedgerServiceTest {
 
     assertThrows(LocationServiceException.class,
         () -> service.getMobileCreditUsageForSync(Integer.valueOf(42), "wrong-key", since));
+  }
+
+  // ── Web/Mobile purchases: recorded on master, mirrored to the slave ─────
+
+  @Test
+  void recordMobilePurchase_onMaster_storesTheWholePurchase_andAnnouncesItForTheSlave()
+      throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+    when(songLibraryService.getOwnLocation()).thenReturn(null); // master
+    when(locationService.verifyApiKey(Integer.valueOf(42), "key")).thenReturn(true);
+    FinancialLedgerServiceImpl service = newService();
+    Instant before = Instant.now().minusSeconds(1);
+
+    LocalMobileTransactionDto recorded = service.recordMobilePurchase(Integer.valueOf(42),
+        new BigDecimal("28.00"), "alice@example.com", "txn-1", "pkg-28", 48, 24);
+
+    assertEquals(Integer.valueOf(42), recorded.locationId());
+    assertEquals(new BigDecimal("28.00"), recorded.amount());
+    assertNull(recorded.sourceTransactionId(), "master's own record, not a mirror");
+    assertEquals("txn-1", recorded.paymentReference());
+    assertEquals(48, recorded.creditsAwarded());
+    assertEquals(24, recorded.bonusCredits());
+    org.mockito.ArgumentCaptor<FinancialLedgerRootEntity> root =
+        org.mockito.ArgumentCaptor.forClass(FinancialLedgerRootEntity.class);
+    verify(financialLedgerRepository, org.mockito.Mockito.atLeastOnce())
+        .storeAggregateRoot(root.capture());
+    assertEquals(1, root.getValue().getLocalMobileTransactions().size());
+    verify(eventPublisher).publishEvent(new MobilePurchaseRecordedEvent(recorded));
+
+    // The slave's catch-up pull sees it.
+    assertEquals(List.of(recorded),
+        service.getMobileTransactionsForSync(Integer.valueOf(42), "key", before));
+    assertTrue(service.getMobileTransactionsForSync(Integer.valueOf(42), "key",
+        Instant.now().plusSeconds(60)).isEmpty());
+    assertThrows(LocationServiceException.class,
+        () -> service.getMobileTransactionsForSync(Integer.valueOf(42), "wrong-key", before));
+  }
+
+  @Test
+  void recordMobilePurchase_whoseStoreFails_leavesNothingBehind_andAnnouncesNothing()
+      throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+    when(songLibraryService.getOwnLocation()).thenReturn(null); // master
+    when(locationService.verifyApiKey(Integer.valueOf(42), "key")).thenReturn(true);
+    FinancialLedgerServiceImpl service = newService();
+    org.mockito.Mockito.doThrow(new RuntimeException("database unavailable"))
+        .when(financialLedgerRepository).storeAggregateRoot(org.mockito.ArgumentMatchers.any());
+
+    assertThrows(RuntimeException.class, () -> service.recordMobilePurchase(Integer.valueOf(42),
+        new BigDecimal("7.00"), "alice@example.com", "txn-1", "pkg-7", 12, 2));
+
+    verify(eventPublisher, never()).publishEvent(
+        org.mockito.ArgumentMatchers.any(MobilePurchaseRecordedEvent.class));
+    assertTrue(service.getMobileTransactionsForSync(Integer.valueOf(42), "key", Instant.EPOCH)
+        .isEmpty(), "a purchase that was never stored must not be offered to the slave");
+  }
+
+  @Test
+  void receiveMobileTransaction_isIdempotentOnMastersId_andIgnoresOtherLocations()
+      throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+    FinancialLedgerServiceImpl service = newService(true);
+    Instant periodStart = service.getOpenPeriodStartDate();
+
+    service.receiveMobileTransaction(purchase(101, OWN_LOCATION_ID, "7.00", periodStart));
+    service.receiveMobileTransaction(purchase(101, OWN_LOCATION_ID, "7.00", periodStart));
+    service.receiveMobileTransaction(purchase(102, Integer.valueOf(999), "7.00", periodStart));
+    service.receiveMobileTransaction(purchase(null, OWN_LOCATION_ID, "7.00", periodStart));
+
+    assertEquals(new BigDecimal("7.00"), service.getAllPeriods().get(0).mobileTotal());
+    assertEquals(periodStart, service.getLatestMobileTransactionTimestamp());
+
+    // A mirrored purchase is never pushed back to master.
+    assertTrue(service.getPendingMasterSync().isEmpty());
+  }
+
+  @Test
+  void purgeLocalLedger_alsoDropsMirroredPurchases() throws Exception {
+
+    when(financialLedgerRepository.loadAggregateRoot(anyString()))
+        .thenThrow(new EntityDoesNotExistException("no ledger on disk"));
+    FinancialLedgerServiceImpl service = newService(true);
+    service.receiveMobileTransaction(
+        purchase(101, OWN_LOCATION_ID, "7.00", service.getOpenPeriodStartDate()));
+
+    service.purgeLocalLedger();
+
+    assertNull(service.getLatestMobileTransactionTimestamp());
+    assertEquals(BigDecimal.ZERO.setScale(2), service.getAllPeriods().get(0).mobileTotal());
+  }
+
+  /** A purchase as master mirrors it: master's id is {@code masterId}. */
+  private static LocalMobileTransactionDto purchase(Integer masterId, Integer locationId,
+      String amount, Instant timestamp) {
+    return new LocalMobileTransactionDto(masterId, new BigDecimal(amount), timestamp, locationId,
+        null, "alice@example.com", "txn-" + masterId, "pkg-7", 12, 2);
   }
 }

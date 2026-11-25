@@ -189,9 +189,12 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     String email = uniqueEmail("night-out");
     String token = register(email);
     PatronSocket socket = connectPatron(token);
-    ui.post(token, "/api/users/add-funds", new AddFundsRequest("pkg-14", "fake-nonce")).expect(200);
-    socket.await("/user/queue/credits", m -> m.path("numCredits").asInt() == 32);
+    ui.post(token, "/api/users/add-funds", new AddFundsRequest(locationId, "pkg-14", "fake-nonce")).expect(200);
+    socket.await("/user/queue/credits", m -> m.path("numCredits").asInt() == 32
+        && m.path("locationId").asInt() == locationId);
     int balance = 32;
+    // The whole $14.00 purchase is the bar's revenue, mirrored to its jukebox's ledger at once.
+    slave.awaitPurchase("14.00");
 
     // ── The song popup's checks, answered by the bar's jukebox ──────────────────────────
     JsonNode eligibility = ui.post(token, queuePath("checkSongsEligibility"),
@@ -342,7 +345,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     PatronSocket forged = connectPatron(tamperSignature(aliceToken));
 
     // Alice buys credits and queues a song.
-    ui.post(aliceToken, "/api/users/add-funds", new AddFundsRequest("pkg-7", "fake-nonce"))
+    ui.post(aliceToken, "/api/users/add-funds", new AddFundsRequest(locationId, "pkg-7", "fake-nonce"))
         .expect(200);
     aliceSocket.await("/user/queue/credits", m -> m.path("numCredits").asInt() == 14);
     ui.post(aliceToken, queuePath("addSong"), addSongBody(SONG_A_ALBUM, SONG_A, 1, false))
@@ -356,7 +359,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     }
 
     // ...then Bob buys credits too.
-    ui.post(bobToken, "/api/users/add-funds", new AddFundsRequest("pkg-28", "fake-nonce"))
+    ui.post(bobToken, "/api/users/add-funds", new AddFundsRequest(locationId, "pkg-28", "fake-nonce"))
         .expect(200);
     bobSocket.await("/user/queue/credits", m -> m.path("numCredits").asInt() == 72);
 
@@ -384,8 +387,14 @@ class WebUiMasterConnectedSlaveLifecycleTest {
         PASSWORD)).expect(200).json().path("token").asText();
   }
 
+  /** The balance at the bar, from the profile's per-location balances. */
   private int balance(String token) {
-    return ui.get(token, "/api/users/me").expect(200).json().path("numCredits").asInt();
+    for (JsonNode balance : ui.get(token, "/api/users/me").expect(200).json().path("balances")) {
+      if (balance.path("locationId").asInt() == locationId.intValue()) {
+        return balance.path("numCredits").asInt();
+      }
+    }
+    return 0;
   }
 
   /** Mirrors app.js's queueAddCost(), priced from /api/users/pricing-config. */
@@ -541,6 +550,7 @@ class WebUiMasterConnectedSlaveLifecycleTest {
     private final SongQueueServiceImpl songQueue;
     private final Map<String, AtomicInteger> commandCounts = new java.util.concurrent.ConcurrentHashMap<>();
     private final List<JsonNode> spends = new CopyOnWriteArrayList<>();
+    private final List<JsonNode> purchases = new CopyOnWriteArrayList<>();
     private volatile StompSession session;
     private volatile SongDto nowPlaying;
 
@@ -626,6 +636,13 @@ class WebUiMasterConnectedSlaveLifecycleTest {
       return spends.size();
     }
 
+    void awaitPurchase(String amount) throws InterruptedException {
+      java.math.BigDecimal expected = new java.math.BigDecimal(amount);
+      awaitTrue("the slave to receive a purchase of $" + amount,
+          () -> purchases.stream().anyMatch(p -> p.path("locationId").asInt() == locationId
+              && expected.compareTo(p.path("amount").decimalValue()) == 0));
+    }
+
     void awaitSpend(int amount) throws InterruptedException {
       awaitTrue("the slave to receive a spend of " + amount,
           () -> spends.stream().anyMatch(s -> s.path("amount").asInt() == amount
@@ -691,6 +708,9 @@ class WebUiMasterConnectedSlaveLifecycleTest {
           return nowPlaying;
         case "recordMobileCreditUsage":
           spends.add(objectMapper.valueToTree(payload));
+          return null;
+        case "recordMobileTransaction":
+          purchases.add(objectMapper.valueToTree(payload));
           return null;
         default:
           throw new IllegalArgumentException("Unknown commandType: " + commandType);

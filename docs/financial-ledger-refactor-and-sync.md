@@ -2,6 +2,8 @@
 
 Status: Implemented.
 
+> **Since changed:** credits, song plays, playlists, credit spends and Add Funds purchases now belong to a per-location account (`user_location_account`), not to the user directly. Each Add Funds purchase is also recorded in full in its location's ledger as a `MOBILE_WEB` row in `location_transaction` (`amount_dollars` became `amount`) and mirrored to the slave. A location's Mobile split total is now the sum of those purchases, not credits spent divided by `credits-per-dollar`. The statements below that a purchase has no location, that credits work at any location, and about how the Mobile total is valued are therefore historical. See [per-location-accounts.md](per-location-accounts.md).
+
 ## Context
 
 The original ask was to extend the master/slave integration tests to cover the financial ledger:
@@ -192,7 +194,9 @@ never reached master. Part D closes that gap and extends mirroring to the remain
   latest spend already mirrored.
 - **Slave mobile total.** In slave mode, `computeMobileTotal()` sums `location_mobile_credit_usage`
   instead of the slave's own `user_song_credit_usage` (which never holds mobile/web spends there) —
-  previously a slave's split periods always showed a $0 mobile total.
+  previously a slave's split periods always showed a $0 mobile total. *(Superseded: the Mobile
+  total now sums the location's mirrored `MOBILE_WEB` purchases, and `location_mobile_credit_usage`
+  is kept for audit only. See [per-location-accounts.md](per-location-accounts.md).)*
 - **User activity, slave->master.** Same outbox idea, in `UserActivitySyncService`. Each
   activity gets a UUID `activity_id` when it is captured (`UserActivityServiceImpl.record`);
   master's copy is idempotent on `(location_id, activity_id)`
@@ -299,7 +303,9 @@ split) found ways for a location's mobile revenue to include plays nobody paid f
   spent there divided by that location's own `creditsPerDollar`, the kiosk's bill-acceptor rate.
   This holds whatever the patron paid for the credits. For example, 12 credits spent at
   3 per dollar is $4.00, even though `pkg-7` sells 13 credits for $7.00. The bar owner is paid
-  the kiosk-equivalent value of what was played.
+  the kiosk-equivalent value of what was played. *(Superseded: mobile revenue is now the full
+  price of each Add Funds purchase made for the location, recorded when it is paid. See
+  [per-location-accounts.md](per-location-accounts.md).)*
 
 `WebPatronPlayLifecycleTest` walks the whole lifecycle through the real `SongQueueController`,
 `UserServiceImpl` and `FinancialLedgerServiceImpl`, with only storage, Braintree and the queue

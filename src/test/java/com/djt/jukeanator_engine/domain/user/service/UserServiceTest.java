@@ -32,6 +32,7 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 import com.djt.jukeanator_engine.domain.common.security.InvalidPrincipalException;
 import com.djt.jukeanator_engine.domain.common.security.JwtUtil;
 import com.djt.jukeanator_engine.domain.common.security.UserRole;
+import com.djt.jukeanator_engine.domain.financialledger.service.FinancialLedgerService;
 import com.djt.jukeanator_engine.domain.location.event.OwnLocationIdChangedEvent;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SearchResultDto;
 import com.djt.jukeanator_engine.domain.songlibrary.dto.SongDto;
@@ -51,6 +52,7 @@ import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
 import com.djt.jukeanator_engine.domain.user.dto.UpdateProfileRequest;
+import com.djt.jukeanator_engine.domain.user.dto.LocationBalanceDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserHomePageDto;
 import com.djt.jukeanator_engine.domain.user.dto.UserProfileDto;
 import com.djt.jukeanator_engine.domain.user.event.LocationSongCreditUsageRecordedEvent;
@@ -68,6 +70,7 @@ import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserLocationAccountEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserStatus;
 import com.djt.jukeanator_engine.domain.user.repository.UserRepository;
@@ -89,6 +92,10 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   private static final String REGISTERED_EMAIL = "jane.doe@example.com";
   private static final String REGISTERED_PASSWORD_HASH = "hashed-password";
 
+  // Credits, plays and playlists are per location: the registered patron starts with an account
+  // (6 credits) at this location only.
+  private static final Integer LOC = Integer.valueOf(42);
+
   @Autowired
   private UserService userService;
 
@@ -101,6 +108,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   private UserRootEntity userRoot;
   private UserServiceImpl userServiceImpl;
   private PaymentGateway paymentGateway;
+  private FinancialLedgerService financialLedgerService;
 
   @BeforeEach
   void setUp() throws EntityDoesNotExistException {
@@ -114,26 +122,52 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     // Matches application-test.yml's user-interface credit-config block.
     when(pricingService.resolvePricingConfig(any()))
         .thenReturn(new PricingConfig(2, 3, 3, 10, 2, false));
+    when(pricingService.resolveCreditPackages(any()))
+        .thenReturn(CreditPackageCatalog.DEFAULT_PACKAGES);
 
     paymentGateway = mock(PaymentGateway.class);
+    financialLedgerService = mock(FinancialLedgerService.class);
 
     userRoot = new UserRootEntity();
-    userRoot.addUser(new UserEntity(Integer.valueOf(1), "Jane", "Doe", REGISTERED_EMAIL,
-        REGISTERED_PASSWORD_HASH, Integer.valueOf(6), UserRole.ROLE_USER));
+    UserEntity registered = new UserEntity(Integer.valueOf(1), "Jane", "Doe", REGISTERED_EMAIL,
+        REGISTERED_PASSWORD_HASH, UserRole.ROLE_USER);
+    registered.getOrCreateLocationAccount(LOC).setNumCredits(6);
+    userRoot.addUser(registered);
 
     when(userRepository.loadAggregateRoot(anyString())).thenReturn(userRoot);
 
     userServiceImpl = new UserServiceImpl(userRepository, passwordEncoder, jwtUtil, eventPublisher,
         songLibraryService, pricingService, false, paymentGateway);
+    userServiceImpl.setFinancialLedgerServiceSupplier(() -> financialLedgerService);
   }
 
   private UserEntity registeredUser() {
     return userRoot.getUserByEmailAddressNullIfNotExists(REGISTERED_EMAIL);
   }
 
+  /** The registered patron's account at {@code locationId} (created if needed). */
+  private UserLocationAccountEntity account(Integer locationId) {
+    return registeredUser().getOrCreateLocationAccount(locationId);
+  }
+
+  /** The registered patron's account at {@link #LOC}. */
+  private UserLocationAccountEntity account() {
+    return account(LOC);
+  }
+
+  /** The registered patron's balance at {@link #LOC}. */
+  private int credits() {
+    return registeredUser().getNumCredits(LOC);
+  }
+
+  private static AddFundsRequest addFundsAt(Integer locationId, String packageId, String nonce) {
+    return new AddFundsRequest(locationId, packageId, nonce);
+  }
+
   /** Minimal {@link SongFileEntity} whose {@code getAlbum().getId()} and own
    *  {@code getId()} resolve to the given ids, matching what
-   *  {@link UserEntity#addSongToPlaylist} needs to build a {@link SongIdentifier}. */
+   *  {@link UserLocationAccountEntity#addSongToPlaylist} needs to build a
+   *  {@link SongIdentifier}. */
   private static SongFileEntity buildSong(int albumId, int songId) {
     AlbumFolderEntity album = new AlbumFolderEntity(null, "Album" + albumId);
     album.setId(albumId);
@@ -290,8 +324,8 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     when(paymentGateway.charge(any(BigDecimal.class), anyString()))
         .thenReturn(PaymentChargeResult.success("txn-123", "PayPal"));
-    userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-7", "nonce"));
-    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, Integer.valueOf(42));
+    userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-7", "nonce"));
+    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, LOC);
     userServiceImpl.addSearchHistory(REGISTERED_EMAIL, "Billy Idol");
     UserEntity user = registeredUser();
     Integer userId = user.getPersistentIdentity();
@@ -307,12 +341,14 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     assertEquals("Closed", closed.getFirstName());
     assertEquals("Account", closed.getLastName());
     assertTrue(closed.getSearchHistory().isEmpty());
-    assertTrue(closed.getPlaylists().isEmpty());
+    UserLocationAccountEntity closedAccount = closed.getLocationAccountNullIfNotExists(LOC);
+    assertTrue(closedAccount.getPlaylists().isEmpty());
+    assertTrue(closedAccount.getSongPlayHistory().isEmpty());
 
-    // The financial records: the Braintree charge stays reconcilable, and location 42's mobile
-    // revenue for the spend is unchanged.
+    // The financial records: the Braintree charge stays reconcilable, and location 42's spend
+    // audit trail is unchanged.
     assertEquals("txn-123",
-        closed.getUserAddFundsTransactions().iterator().next().getPaymentTransactionId());
+        closedAccount.getAddFundsTransactions().iterator().next().getPaymentTransactionId());
     List<UserSongCreditUsageDto> ledger = userServiceImpl.getCreditLedgerForLocation(
         Integer.valueOf(42), Instant.now().minusSeconds(60), Instant.now().plusSeconds(60));
     assertEquals(1, ledger.size());
@@ -337,9 +373,8 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     userServiceImpl.register(new RegisterRequest("Jane", "Doe", REGISTERED_EMAIL, "password123"));
 
     UserEntity fresh = registeredUser();
-    assertEquals(0, fresh.getNumCredits(), "a new account never inherits a closed one's credits");
-    assertTrue(fresh.getUserSongCreditUsages().isEmpty());
-    assertTrue(fresh.getUserAddFundsTransactions().isEmpty());
+    assertEquals(0, fresh.getNumCredits(LOC), "a new account never inherits a closed one's credits");
+    assertTrue(fresh.getLocationAccounts().isEmpty());
     assertEquals(2, userRoot.getUsers().size());
   }
 
@@ -350,8 +385,10 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     userServiceImpl.register(new RegisterRequest("New", "Patron", "new@example.com", "password123"));
 
-    // Every credit a web user spends is paid out to the location, so none may be free.
-    assertEquals(0, userRoot.getUserByEmailAddressNullIfNotExists("new@example.com").getNumCredits());
+    // Every credit a web user spends was bought for the location, so none may be free.
+    UserEntity created = userRoot.getUserByEmailAddressNullIfNotExists("new@example.com");
+    assertTrue(created.getLocationAccounts().isEmpty(), "no location accounts until first use");
+    assertEquals(0, created.getNumCredits(LOC));
     assertEquals(0, userServiceImpl.getAffordableQueueAddCount("new@example.com", 42, 1, false));
     assertThrows(InsufficientCreditsException.class,
         () -> userServiceImpl.requireAffordableQueueAdd("new@example.com", 42, 1, false));
@@ -537,7 +574,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void addFunds_throwsForUnknownPackage() {
 
     assertThrows(PaymentException.class, () -> userServiceImpl.addFunds(REGISTERED_EMAIL,
-        new AddFundsRequest("nonexistent-pkg", "fake-nonce")));
+        addFundsAt(LOC, "nonexistent-pkg", "fake-nonce")));
 
     verify(userRepository, never()).storeAggregateRoot(userRoot);
   }
@@ -546,7 +583,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   void addFunds_throwsForMissingNonce() {
 
     assertThrows(PaymentException.class,
-        () -> userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-7", null)));
+        () -> userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-7", null)));
 
     verify(userRepository, never()).storeAggregateRoot(userRoot);
   }
@@ -557,13 +594,15 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     when(paymentGateway.charge(any(BigDecimal.class), anyString()))
         .thenReturn(PaymentChargeResult.failure("Payment declined: Do Not Honor"));
 
-    int before = registeredUser().getNumCredits();
+    int before = credits();
 
     assertThrows(PaymentException.class, () -> userServiceImpl.addFunds(REGISTERED_EMAIL,
-        new AddFundsRequest("pkg-7", "fake-nonce")));
+        addFundsAt(LOC, "pkg-7", "fake-nonce")));
 
-    assertEquals(before, registeredUser().getNumCredits());
+    assertEquals(before, credits());
     verify(userRepository, never()).storeAggregateRoot(userRoot);
+    verify(financialLedgerService, never()).recordMobilePurchase(any(), any(), any(), any(),
+        any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
     verify(eventPublisher, never()).publishEvent(any(UserCreditsChangedEvent.class));
     verify(eventPublisher, never()).publishEvent(any(PurchaseCompletedEvent.class));
   }
@@ -575,11 +614,12 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
         .thenReturn(PaymentChargeResult.success("txn-123", "PayPal"));
 
     AddFundsResponseDto response =
-        userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-7", "fake-nonce"));
+        userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-7", "fake-nonce"));
 
     // pkg-7: 12 credits + 2 bonus = 14, starting balance 6 -> 20
-    assertEquals(20, registeredUser().getNumCredits());
+    assertEquals(20, credits());
     assertEquals(Integer.valueOf(20), response.numCredits());
+    assertEquals(LOC, response.locationId());
     assertEquals(12, response.creditsAdded());
     assertEquals(2, response.bonusCreditsAdded());
     assertEquals("PayPal", response.paymentSource());
@@ -591,18 +631,18 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   }
 
   @Test
-  void addFunds_recordsTheTransactionForBraintreeReconciliation_neverLocationAttributed() {
+  void addFunds_recordsThePurchaseOnTheLocationAccount_forBraintreeReconciliation() {
 
-    when(songLibraryService.getOwnLocationId()).thenReturn(Integer.valueOf(42));
     when(paymentGateway.charge(any(BigDecimal.class), anyString()))
         .thenReturn(PaymentChargeResult.success("txn-123", "Visa •••• 1111"));
 
     AddFundsResponseDto response =
-        userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-28", "fake-nonce"));
+        userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-28", "fake-nonce"));
 
-    assertEquals(1, registeredUser().getUserAddFundsTransactions().size());
+    assertEquals(1, account().getAddFundsTransactions().size());
     UserAddFundsTransactionEntity transaction =
-        registeredUser().getUserAddFundsTransactions().iterator().next();
+        account().getAddFundsTransactions().iterator().next();
+    assertEquals(LOC, transaction.getLocationId());
     assertEquals("pkg-28", transaction.getPackageId());
     assertEquals(48, transaction.getCreditsAwarded());
     assertEquals(24, transaction.getBonusCredits());
@@ -612,9 +652,98 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     assertEquals(6 + 48 + 24, transaction.getResultingBalance());
     assertEquals(response.timestamp(), transaction.getTimestamp());
     assertEquals(REGISTERED_EMAIL, transaction.getUserEmail());
-    // Buying credits is not a play anywhere -- no location's revenue moves until they are spent.
-    assertTrue(registeredUser().getUserSongCreditUsages().isEmpty());
+    // Buying credits is not a play: no spend is recorded.
+    assertTrue(account().getSongCreditUsages().isEmpty());
     verify(eventPublisher, never()).publishEvent(any(LocationSongCreditUsageRecordedEvent.class));
+  }
+
+  @Test
+  void addFunds_recordsTheWholePurchaseInThatLocationsFinancialLedger() {
+
+    when(paymentGateway.charge(any(BigDecimal.class), anyString()))
+        .thenReturn(PaymentChargeResult.success("txn-123", "PayPal"));
+
+    userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-28", "fake-nonce"));
+
+    // Once, for the full package price -- like a swipe on the location's own card reader.
+    verify(financialLedgerService).recordMobilePurchase(LOC, new BigDecimal("28.00"),
+        REGISTERED_EMAIL, "txn-123", "pkg-28", 48, 24);
+  }
+
+  @Test
+  void addFunds_creditsOnlyTheChosenLocation() {
+
+    when(paymentGateway.charge(any(BigDecimal.class), anyString()))
+        .thenReturn(PaymentChargeResult.success("txn-123", "PayPal"));
+    Integer otherLocation = Integer.valueOf(99);
+
+    userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(otherLocation, "pkg-7", "fake-nonce"));
+
+    assertEquals(14, registeredUser().getNumCredits(otherLocation));
+    assertEquals(6, credits(), "the balance at another location is untouched");
+    assertTrue(account().getAddFundsTransactions().isEmpty());
+    verify(financialLedgerService).recordMobilePurchase(eq(otherLocation), any(), any(), any(),
+        any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
+  }
+
+  @Test
+  void addFunds_withoutALocation_isRefusedBeforeCharging() {
+
+    when(songLibraryService.getOwnLocationId()).thenReturn(null); // master: no own location
+
+    assertThrows(PaymentException.class, () -> userServiceImpl.addFunds(REGISTERED_EMAIL,
+        addFundsAt(null, "pkg-7", "fake-nonce")));
+
+    verify(paymentGateway, never()).charge(any(), any());
+    verify(userRepository, never()).storeAggregateRoot(any());
+  }
+
+  @Test
+  void addFunds_sellsOnlyThatLocationsPackages() {
+
+    when(pricingService.resolveCreditPackages(Integer.valueOf(99))).thenReturn(
+        List.of(new CreditPackageDto("pkg-99", 10, 0, new BigDecimal("5.00"), null)));
+
+    // pkg-7 is sold at location 42 but not at 99.
+    assertThrows(PaymentException.class, () -> userServiceImpl.addFunds(REGISTERED_EMAIL,
+        addFundsAt(Integer.valueOf(99), "pkg-7", "fake-nonce")));
+    verify(paymentGateway, never()).charge(any(), any());
+  }
+
+  @Test
+  void addFunds_whenTheLedgerCannotRecordIt_voidsTheChargeAndGrantsNothing() {
+
+    when(paymentGateway.charge(any(BigDecimal.class), anyString()))
+        .thenReturn(PaymentChargeResult.success("txn-123", "PayPal"));
+    when(paymentGateway.voidCharge("txn-123")).thenReturn(true);
+    when(financialLedgerService.recordMobilePurchase(any(), any(), any(), any(), any(),
+        org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
+        .thenThrow(new RuntimeException("ledger unavailable"));
+
+    PaymentException e = assertThrows(PaymentException.class,
+        () -> userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-7", "nonce")));
+
+    assertTrue(e.getMessage().contains("payment was cancelled"), e.getMessage());
+    verify(paymentGateway).voidCharge("txn-123");
+    assertEquals(6, credits(), "the balance must be restored");
+    assertTrue(account().getAddFundsTransactions().isEmpty());
+    verify(eventPublisher, never()).publishEvent(any(UserCreditsChangedEvent.class));
+    verify(eventPublisher, never()).publishEvent(any(PurchaseCompletedEvent.class));
+  }
+
+  @Test
+  void addFunds_atANewLocation_whoseLedgerWriteFails_leavesNoEmptyAccountBehind() {
+
+    when(paymentGateway.charge(any(BigDecimal.class), anyString()))
+        .thenReturn(PaymentChargeResult.success("txn-123", "PayPal"));
+    when(financialLedgerService.recordMobilePurchase(any(), any(), any(), any(), any(),
+        org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
+        .thenThrow(new RuntimeException("ledger unavailable"));
+
+    assertThrows(PaymentException.class, () -> userServiceImpl.addFunds(REGISTERED_EMAIL,
+        addFundsAt(Integer.valueOf(99), "pkg-7", "nonce")));
+
+    assertNull(registeredUser().getLocationAccountNullIfNotExists(Integer.valueOf(99)));
   }
 
   @Test
@@ -623,12 +752,16 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     when(paymentGateway.charge(any(BigDecimal.class), anyString()))
         .thenReturn(PaymentChargeResult.success("txn-123", "PayPal"));
 
-    userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-7", "fake-nonce"));
+    userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-7", "fake-nonce"));
 
-    InOrder inOrder = inOrder(paymentGateway, userRepository, eventPublisher);
+    InOrder inOrder =
+        inOrder(paymentGateway, userRepository, financialLedgerService, eventPublisher);
     inOrder.verify(paymentGateway).charge(any(BigDecimal.class), anyString());
     inOrder.verify(userRepository).storeAggregateRoot(userRoot);
-    inOrder.verify(eventPublisher).publishEvent(new UserCreditsChangedEvent(REGISTERED_EMAIL, 20));
+    inOrder.verify(financialLedgerService).recordMobilePurchase(any(), any(), any(), any(), any(),
+        org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
+    inOrder.verify(eventPublisher)
+        .publishEvent(new UserCreditsChangedEvent(REGISTERED_EMAIL, LOC, 20));
     inOrder.verify(eventPublisher).publishEvent(any(PurchaseCompletedEvent.class));
   }
 
@@ -642,12 +775,12 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
         .storeAggregateRoot(userRoot);
 
     PaymentException e = assertThrows(PaymentException.class,
-        () -> userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-7", "nonce")));
+        () -> userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-7", "nonce")));
 
     assertTrue(e.getMessage().contains("payment was cancelled"), e.getMessage());
     verify(paymentGateway).voidCharge("txn-123");
-    assertEquals(6, registeredUser().getNumCredits(), "the balance must be restored");
-    assertTrue(registeredUser().getUserAddFundsTransactions().isEmpty(),
+    assertEquals(6, credits(), "the balance must be restored");
+    assertTrue(account().getAddFundsTransactions().isEmpty(),
         "no purchase may be left in memory for a later store to write");
     verify(eventPublisher, never()).publishEvent(any(UserCreditsChangedEvent.class));
     verify(eventPublisher, never()).publishEvent(any(PurchaseCompletedEvent.class));
@@ -663,11 +796,11 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
         .storeAggregateRoot(userRoot);
 
     PaymentException e = assertThrows(PaymentException.class,
-        () -> userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-7", "nonce")));
+        () -> userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-7", "nonce")));
 
     assertTrue(e.getMessage().contains("contact support"), e.getMessage());
-    assertEquals(6, registeredUser().getNumCredits());
-    assertTrue(registeredUser().getUserAddFundsTransactions().isEmpty());
+    assertEquals(6, credits());
+    assertTrue(account().getAddFundsTransactions().isEmpty());
   }
 
   @Test
@@ -677,10 +810,10 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
         eventPublisher, songLibraryService, pricingService, false, new NoOpPaymentGateway());
 
     assertThrows(PaymentException.class,
-        () -> standalone.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-7", "nonce")));
+        () -> standalone.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-7", "nonce")));
 
-    assertEquals(6, registeredUser().getNumCredits());
-    assertTrue(registeredUser().getUserAddFundsTransactions().isEmpty());
+    assertEquals(6, credits());
+    assertTrue(account().getAddFundsTransactions().isEmpty());
     verify(userRepository, never()).storeAggregateRoot(any());
   }
 
@@ -703,6 +836,24 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     assertEquals("Janet", registeredUser().getFirstName());
     assertEquals("Doerson", registeredUser().getLastName());
     verify(userRepository).storeAggregateRoot(userRoot);
+  }
+
+  @Test
+  void getProfile_listsTheBalanceAtEveryLocationThePatronHasUsed() {
+
+    account(Integer.valueOf(99)).setNumCredits(14);
+
+    UserProfileDto profile = userServiceImpl.getProfile(REGISTERED_EMAIL);
+
+    assertEquals(List.of(new LocationBalanceDto(LOC, null, 6),
+        new LocationBalanceDto(Integer.valueOf(99), null, 14)), profile.balances());
+  }
+
+  @Test
+  void getNumCredits_isTheBalanceAtTheGivenLocationOnly() {
+
+    assertEquals(6, userServiceImpl.getNumCredits(REGISTERED_EMAIL, LOC));
+    assertEquals(0, userServiceImpl.getNumCredits(REGISTERED_EMAIL, Integer.valueOf(99)));
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -735,6 +886,40 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     assertEquals(List.of(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME), homePage.myPlaylists());
     assertEquals(List.of("beatles"), homePage.searchHistory());
     assertTrue(homePage.myRecentPlays().isEmpty());
+    assertEquals(6, homePage.numCredits());
+  }
+
+  @Test
+  void getHomePage_showsOnlyTheRequestedLocationsRecentPlaysAndPlaylists() throws Exception {
+
+    when(songLibraryService.getMusicByPopularity(any()))
+        .thenReturn(new SearchResultDto(List.of(), List.of(), List.of()));
+    account().addSongToSongPlayHistory(new SongIdentifier(LOC, 1, 1));
+    account().createPlaylist("Here Only");
+    UserLocationAccountEntity elsewhere = account(Integer.valueOf(99));
+    elsewhere.addSongToSongPlayHistory(new SongIdentifier(99, 2, 2));
+    elsewhere.createPlaylist("Elsewhere Only");
+    SongDto here = buildSongDto(1, 1);
+    when(songLibraryService.getSongById(LOC, 1, 1)).thenReturn(here);
+
+    UserHomePageDto homePage = userServiceImpl.getHomePage(REGISTERED_EMAIL, LOC);
+
+    assertEquals(List.of(here), homePage.myRecentPlays());
+    assertEquals(List.of(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, "Here Only"),
+        homePage.myPlaylists());
+    verify(songLibraryService, never()).getSongById(eq(Integer.valueOf(99)), any(), any());
+  }
+
+  @Test
+  void getHomePage_withNoLocationSelected_hasNoLocationSpecificSections() {
+
+    when(songLibraryService.getOwnLocationId()).thenReturn(null); // master
+
+    UserHomePageDto homePage = userServiceImpl.getHomePage(REGISTERED_EMAIL, null);
+
+    assertTrue(homePage.myRecentPlays().isEmpty());
+    assertTrue(homePage.myPlaylists().isEmpty());
+    assertEquals(0, homePage.numCredits());
   }
 
   @Test
@@ -744,29 +929,13 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   }
 
   @Test
-  void getCreditPackages_defaultsToTheBuiltInPackages() {
-
-    assertEquals(CreditPackageCatalog.DEFAULT_PACKAGES, userServiceImpl.getCreditPackages());
-  }
-
-  @Test
-  void setCreditPackages_replacesThePackagesOnSale() {
+  void getCreditPackages_areTheLocationsOwnPackages() {
 
     CreditPackageDto pkg = new CreditPackageDto("pkg-10", 20, 0, new BigDecimal("10.00"), null);
-    userServiceImpl.setCreditPackages(List.of(pkg));
+    when(pricingService.resolveCreditPackages(Integer.valueOf(99))).thenReturn(List.of(pkg));
 
-    assertEquals(List.of(pkg), userServiceImpl.getCreditPackages());
-  }
-
-  @Test
-  void setCreditPackages_rejectsAnInvalidList() {
-
-    CreditPackageDto pkg = new CreditPackageDto("pkg-10", 20, 0, new BigDecimal("10.00"), null);
-
-    assertThrows(IllegalStateException.class,
-        () -> userServiceImpl.setCreditPackages(List.of(pkg, pkg)));
-    assertEquals(CreditPackageCatalog.DEFAULT_PACKAGES, userServiceImpl.getCreditPackages(),
-        "a rejected list leaves the packages on sale unchanged");
+    assertEquals(List.of(pkg), userServiceImpl.getCreditPackages(Integer.valueOf(99)));
+    assertEquals(CreditPackageCatalog.DEFAULT_PACKAGES, userServiceImpl.getCreditPackages(LOC));
   }
 
   @Test
@@ -774,11 +943,11 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     when(paymentGateway.charge(any(BigDecimal.class), anyString()))
         .thenReturn(PaymentChargeResult.success("txn-123", "PayPal"));
-    userServiceImpl.setCreditPackages(
+    when(pricingService.resolveCreditPackages(LOC)).thenReturn(
         List.of(new CreditPackageDto("pkg-10", 20, 4, new BigDecimal("10.00"), null)));
 
     AddFundsResponseDto response =
-        userServiceImpl.addFunds(REGISTERED_EMAIL, new AddFundsRequest("pkg-10", "fake-nonce"));
+        userServiceImpl.addFunds(REGISTERED_EMAIL, addFundsAt(LOC, "pkg-10", "fake-nonce"));
 
     assertEquals(Integer.valueOf(30), response.numCredits()); // 6 + 20 + 4
     verify(paymentGateway).charge(eq(new BigDecimal("10.00")), eq("fake-nonce"));
@@ -825,36 +994,38 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void createPlaylist_createsNewPlaylistForUserAndPersists() throws Exception {
 
-    boolean result = userServiceImpl.createPlaylist(REGISTERED_EMAIL, "Road Trip");
+    boolean result = userServiceImpl.createPlaylist(REGISTERED_EMAIL, LOC, "Road Trip");
 
     assertTrue(result);
-    assertNotNull(registeredUser().getPlaylistByNameNullIfNotExists("Road Trip"));
+    assertNotNull(account().getPlaylistByNameNullIfNotExists("Road Trip"));
+    assertNull(account(Integer.valueOf(99)).getPlaylistByNameNullIfNotExists("Road Trip"),
+        "a playlist belongs to one location");
     verify(userRepository).storeAggregateRoot(userRoot);
   }
 
   @Test
   void addSongToPlaylist_addsSongAndPersists() throws Exception {
 
-    registeredUser().createPlaylist("Road Trip");
+    account().createPlaylist("Road Trip");
     SongFileEntity song = buildSong(1, 100);
 
-    boolean result = userServiceImpl.addSongToPlaylist(REGISTERED_EMAIL, "Road Trip", 9, song);
+    boolean result = userServiceImpl.addSongToPlaylist(REGISTERED_EMAIL, "Road Trip", LOC, song);
 
     assertTrue(result);
-    assertEquals(List.of(new SongIdentifier(9, 1, 100)),
-        registeredUser().getPlaylistByName("Road Trip").getSongs());
+    assertEquals(List.of(new SongIdentifier(LOC, 1, 100)),
+        account().getPlaylistByName("Road Trip").getSongs());
     verify(userRepository).storeAggregateRoot(userRoot);
   }
 
   @Test
   void removeSongFromPlaylist_removesSongAndPersists() throws Exception {
 
-    PlaylistEntity playlist = registeredUser().createPlaylist("Road Trip");
-    playlist.addSong(new SongIdentifier(9, 1, 100));
+    PlaylistEntity playlist = account().createPlaylist("Road Trip");
+    playlist.addSong(new SongIdentifier(LOC, 1, 100));
     SongFileEntity song = buildSong(1, 100);
 
     boolean result =
-        userServiceImpl.removeSongFromPlaylist(REGISTERED_EMAIL, "Road Trip", 9, song);
+        userServiceImpl.removeSongFromPlaylist(REGISTERED_EMAIL, "Road Trip", LOC, song);
 
     assertTrue(result);
     assertTrue(playlist.getSongs().isEmpty());
@@ -864,12 +1035,12 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void deletePlaylist_removesPlaylistAndPersists() throws Exception {
 
-    registeredUser().createPlaylist("Road Trip");
+    account().createPlaylist("Road Trip");
 
-    boolean result = userServiceImpl.deletePlaylist(REGISTERED_EMAIL, "Road Trip");
+    boolean result = userServiceImpl.deletePlaylist(REGISTERED_EMAIL, LOC, "Road Trip");
 
     assertTrue(result);
-    assertNull(registeredUser().getPlaylistByNameNullIfNotExists("Road Trip"));
+    assertNull(account().getPlaylistByNameNullIfNotExists("Road Trip"));
     verify(userRepository).storeAggregateRoot(userRoot);
   }
 
@@ -878,32 +1049,32 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     SongFileEntity song = buildSong(2, 200);
 
-    boolean result = userServiceImpl.addSongToMyFavoritesPlaylist(REGISTERED_EMAIL, 9, song);
+    boolean result = userServiceImpl.addSongToMyFavoritesPlaylist(REGISTERED_EMAIL, LOC, song);
 
     assertTrue(result);
-    assertTrue(registeredUser().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
-        .getSongs().contains(new SongIdentifier(9, 2, 200)));
+    assertTrue(account().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
+        .getSongs().contains(new SongIdentifier(LOC, 2, 200)));
     verify(userRepository).storeAggregateRoot(userRoot);
   }
 
   @Test
   void removeSongFromMyFavoritesPlaylist_removesSongFromFavoritesAndPersists() throws Exception {
 
-    registeredUser().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
-        .addSong(new SongIdentifier(9, 2, 200));
+    account().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
+        .addSong(new SongIdentifier(LOC, 2, 200));
     SongFileEntity song = buildSong(2, 200);
 
-    boolean result = userServiceImpl.removeSongFromMyFavoritesPlaylist(REGISTERED_EMAIL, 9, song);
+    boolean result = userServiceImpl.removeSongFromMyFavoritesPlaylist(REGISTERED_EMAIL, LOC, song);
 
     assertTrue(result);
-    assertFalse(registeredUser().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
-        .getSongs().contains(new SongIdentifier(9, 2, 200)));
+    assertFalse(account().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
+        .getSongs().contains(new SongIdentifier(LOC, 2, 200)));
   }
 
   @Test
   void getPlaylists_returnsSummaryForEachPlaylist() {
 
-    List<PlaylistSummaryDto> playlists = userServiceImpl.getPlaylists(REGISTERED_EMAIL);
+    List<PlaylistSummaryDto> playlists = userServiceImpl.getPlaylists(REGISTERED_EMAIL, LOC);
 
     assertEquals(1, playlists.size());
     assertEquals(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, playlists.get(0).name());
@@ -911,15 +1082,38 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   }
 
   @Test
+  void getPlaylists_atANewLocation_createsAnAccountWithItsOwnMyFavorites() {
+
+    List<PlaylistSummaryDto> playlists =
+        userServiceImpl.getPlaylists(REGISTERED_EMAIL, Integer.valueOf(99));
+
+    assertEquals(List.of(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME),
+        playlists.stream().map(PlaylistSummaryDto::name).toList());
+    assertNotNull(registeredUser().getLocationAccountNullIfNotExists(Integer.valueOf(99)));
+    verify(userRepository).storeAggregateRoot(userRoot);
+  }
+
+  @Test
+  void playlistMethods_onMasterWithNoLocation_areRefused() {
+
+    when(songLibraryService.getOwnLocationId()).thenReturn(null); // master
+
+    assertThrows(IllegalArgumentException.class,
+        () -> userServiceImpl.getPlaylists(REGISTERED_EMAIL, null));
+    assertThrows(IllegalArgumentException.class,
+        () -> userServiceImpl.createPlaylist(REGISTERED_EMAIL, null, "Road Trip"));
+  }
+
+  @Test
   void getPlaylistSongs_returnsSongsResolvedFromSongLibrary() throws Exception {
 
-    registeredUser().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
-        .addSong(new SongIdentifier(9, 3, 300));
+    account().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
+        .addSong(new SongIdentifier(LOC, 3, 300));
     SongDto songDto = buildSongDto(3, 300);
-    when(songLibraryService.getSongById(any(), eq(3), eq(300))).thenReturn(songDto);
+    when(songLibraryService.getSongById(eq(LOC), eq(3), eq(300))).thenReturn(songDto);
 
-    List<SongDto> songs =
-        userServiceImpl.getPlaylistSongs(REGISTERED_EMAIL, PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
+    List<SongDto> songs = userServiceImpl.getPlaylistSongs(REGISTERED_EMAIL, LOC,
+        PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
 
     assertEquals(List.of(songDto), songs);
   }
@@ -927,14 +1121,14 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void reorderPlaylistSongs_keepsOnlyExistingSongsInGivenOrderAndPersists() throws Exception {
 
-    PlaylistEntity playlist = registeredUser().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
-    SongIdentifier a = new SongIdentifier(9, 1, 1);
-    SongIdentifier b = new SongIdentifier(9, 2, 2);
+    PlaylistEntity playlist = account().getPlaylistByName(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
+    SongIdentifier a = new SongIdentifier(LOC, 1, 1);
+    SongIdentifier b = new SongIdentifier(LOC, 2, 2);
     playlist.addSong(a);
     playlist.addSong(b);
 
-    userServiceImpl.reorderPlaylistSongs(REGISTERED_EMAIL, PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME,
-        List.of(b, a, new SongIdentifier(9, 9, 9)));
+    userServiceImpl.reorderPlaylistSongs(REGISTERED_EMAIL, LOC,
+        PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME, List.of(b, a, new SongIdentifier(LOC, 9, 9)));
 
     assertEquals(List.of(b, a), playlist.getSongs());
     verify(userRepository).storeAggregateRoot(userRoot);
@@ -943,11 +1137,13 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void getFavoriteSongIdentifiers_returnsFavoritesPlaylistSongs() {
 
-    SongIdentifier fav = new SongIdentifier(9, 4, 400);
-    registeredUser().getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
+    SongIdentifier fav = new SongIdentifier(LOC, 4, 400);
+    account().getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME)
         .addSong(fav);
 
-    assertEquals(List.of(fav), userServiceImpl.getFavoriteSongIdentifiers(REGISTERED_EMAIL));
+    assertEquals(List.of(fav), userServiceImpl.getFavoriteSongIdentifiers(REGISTERED_EMAIL, LOC));
+    assertTrue(userServiceImpl.getFavoriteSongIdentifiers(REGISTERED_EMAIL, Integer.valueOf(99))
+        .isEmpty(), "favorites are per location");
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -963,9 +1159,8 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, false));
 
-    UserEntity user = registeredUser();
-    assertTrue(user.getSongPlayHistory().contains(new SongIdentifier(42, 5, 500)));
-    assertEquals(4, user.getNumCredits()); // 6 - (normal play: fixed 1 * webCostMultiplier 2)
+    assertTrue(account().getSongPlayHistory().contains(new SongIdentifier(42, 5, 500)));
+    assertEquals(4, credits()); // 6 - (normal play: fixed 1 * webCostMultiplier 2)
     verify(eventPublisher).publishEvent(any(UserCreditsChangedEvent.class));
     verify(userRepository).storeAggregateRoot(userRoot);
   }
@@ -978,8 +1173,25 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, false),
         Integer.valueOf(42));
 
-    UserSongCreditUsageEntity transaction = registeredUser().getUserSongCreditUsages().iterator().next();
+    UserSongCreditUsageEntity transaction = account().getSongCreditUsages().iterator().next();
     assertEquals(Integer.valueOf(42), transaction.getLocationId());
+  }
+
+  @Test
+  void handleSongAddedToQueueEvent_chargesTheBalanceAtThatLocationOnly() {
+
+    account(Integer.valueOf(99)).setNumCredits(10);
+    SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(6, 600), 1, null);
+
+    userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, false),
+        Integer.valueOf(99));
+
+    assertEquals(8, registeredUser().getNumCredits(Integer.valueOf(99)));
+    assertEquals(6, credits(), "the balance at another location is untouched");
+    assertTrue(account(Integer.valueOf(99)).getSongPlayHistory()
+        .contains(new SongIdentifier(99, 6, 600)));
+    assertTrue(account().getSongPlayHistory().isEmpty());
+    verify(eventPublisher).publishEvent(new UserCreditsChangedEvent(REGISTERED_EMAIL, 99, 8));
   }
 
   @Test
@@ -988,22 +1200,23 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     // A priority play queued at priority 2 jumped a priority-1 song, so it is priced at level 1.
     SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(7, 700), 2, null);
 
-    userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, true));
+    userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, true), LOC);
 
     // 6 - ((priority 2 - 1) * priorityCostMultiplier 2 * webCostMultiplier 2) = 2
-    assertEquals(2, registeredUser().getNumCredits());
+    assertEquals(2, credits());
   }
 
   @Test
   void chargeCreditsForQueueAction_deductsCreditsBasedOnPriorityAndPersists() {
 
-    registeredUser().setNumCredits(20);
+    when(songLibraryService.getOwnLocationId()).thenReturn(LOC); // standalone: own location
+    account().setNumCredits(20);
 
     userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 2);
 
     // cost = max(1, priority(2) * 3) * webCostMultiplier(2) = 12
-    assertEquals(8, registeredUser().getNumCredits());
-    assertEquals(-12, registeredUser().getUserSongCreditUsages().iterator().next().getAmount());
+    assertEquals(8, credits());
+    assertEquals(-12, account().getSongCreditUsages().iterator().next().getAmount());
     verify(userRepository).storeAggregateRoot(userRoot);
   }
 
@@ -1014,8 +1227,8 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     // recorded credit is paid out to the location, so the entry must match what the balance lost.
     userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 2, Integer.valueOf(42));
 
-    assertEquals(0, registeredUser().getNumCredits());
-    UserSongCreditUsageEntity usage = registeredUser().getUserSongCreditUsages().iterator().next();
+    assertEquals(0, credits());
+    UserSongCreditUsageEntity usage = account().getSongCreditUsages().iterator().next();
     assertEquals(-6, usage.getAmount(), "only the 6 credits held may be recorded, not the 12 cost");
     assertEquals(0, usage.getResultingBalance());
   }
@@ -1023,12 +1236,12 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void chargeCreditsForQueueAction_withNoBalance_recordsNoUsageAndAnnouncesNothing() {
 
-    registeredUser().setNumCredits(0);
+    account().setNumCredits(0);
 
     userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, Integer.valueOf(42));
 
-    assertEquals(0, registeredUser().getNumCredits());
-    assertTrue(registeredUser().getUserSongCreditUsages().isEmpty());
+    assertEquals(0, credits());
+    assertTrue(account().getSongCreditUsages().isEmpty());
     verify(eventPublisher, never()).publishEvent(any(LocationSongCreditUsageRecordedEvent.class));
     verify(eventPublisher, never()).publishEvent(any(UserCreditsChangedEvent.class));
   }
@@ -1036,29 +1249,34 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void handleSongAddedToQueueEvent_whenBalanceFallsShort_recordsOnlyTheCreditsActuallyDeducted() {
 
-    registeredUser().setNumCredits(1);
+    account().setNumCredits(1);
     SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(5, 500), 1, null);
 
     userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, false),
         Integer.valueOf(42));
 
-    assertEquals(0, registeredUser().getNumCredits());
-    assertEquals(-1, registeredUser().getUserSongCreditUsages().iterator().next().getAmount());
+    assertEquals(0, credits());
+    assertEquals(-1, account().getSongCreditUsages().iterator().next().getAmount());
   }
 
   @Test
   void chargeCreditsForQueueAction_withLocationId_tagsCreditTransactionWithLocation() {
 
+    account(Integer.valueOf(7)).setNumCredits(6);
+
     userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, Integer.valueOf(7));
 
-    UserSongCreditUsageEntity transaction = registeredUser().getUserSongCreditUsages().iterator().next();
+    UserSongCreditUsageEntity transaction =
+        account(Integer.valueOf(7)).getSongCreditUsages().iterator().next();
     assertEquals(Integer.valueOf(7), transaction.getLocationId());
+    assertEquals(6, credits(), "location 42's balance is untouched");
   }
 
   @Test
   void getCreditLedgerForLocation_returnsOnlyMatchingLocationWithinTimeRange() {
 
-    registeredUser().setNumCredits(100);
+    account(Integer.valueOf(101)).setNumCredits(100);
+    account(Integer.valueOf(102)).setNumCredits(100);
     userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, Integer.valueOf(101));
     userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, Integer.valueOf(102));
 
@@ -1075,17 +1293,17 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void handleSongAddedToQueueEvent_forOwnQueue_tagsTheSpendAndPlayWithTheOwnLocation() {
 
-    // Standalone: the song was added to this instance's own queue, so the spend is this
-    // location's mobile revenue -- an untagged spend would never be counted in its ledger.
+    // Standalone: the song was added to this instance's own queue, so the spend and play belong
+    // to this instance's own location account.
     when(songLibraryService.getOwnLocationId()).thenReturn(Integer.valueOf(42));
     SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(5, 500), 1, null);
 
     userServiceImpl.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, false));
 
-    UserSongCreditUsageEntity usage = registeredUser().getUserSongCreditUsages().iterator().next();
+    UserSongCreditUsageEntity usage = account().getSongCreditUsages().iterator().next();
     assertEquals(Integer.valueOf(42), usage.getLocationId());
     assertEquals(-2, usage.getAmount());
-    assertTrue(registeredUser().getSongPlayHistory().contains(new SongIdentifier(42, 5, 500)));
+    assertTrue(account().getSongPlayHistory().contains(new SongIdentifier(42, 5, 500)));
     assertEquals(1, userServiceImpl.getCreditLedgerForLocation(Integer.valueOf(42),
         Instant.now().minusSeconds(60), Instant.now().plusSeconds(60)).size());
   }
@@ -1114,17 +1332,17 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 1, false);
     userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 2, true);
 
-    registeredUser().setNumCredits(2);
+    account().setNumCredits(2);
     userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 1, false); // exactly enough
 
-    assertEquals(2, registeredUser().getNumCredits(), "a check never charges");
+    assertEquals(2, credits(), "a check never charges");
     verify(userRepository, never()).storeAggregateRoot(any());
   }
 
   @Test
   void requireAffordableQueueAdd_refusesWhenTheBalanceFallsShort() {
 
-    registeredUser().setNumCredits(3);
+    account().setNumCredits(3);
 
     // priority 2 play: (2 - 1) * priorityCostMultiplier 2 * webCostMultiplier 2 = 4
     InsufficientCreditsException e = assertThrows(InsufficientCreditsException.class,
@@ -1132,9 +1350,19 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     assertEquals(4, e.getCost());
     assertEquals(3, e.getBalance());
 
-    registeredUser().setNumCredits(0);
+    account().setNumCredits(0);
     assertThrows(InsufficientCreditsException.class,
         () -> userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 1, false));
+  }
+
+  @Test
+  void requireAffordableQueueAdd_refusesAtALocationWhereThePatronHasNoCredits() {
+
+    // 6 credits at location 42 buy nothing at location 99.
+    InsufficientCreditsException e = assertThrows(InsufficientCreditsException.class,
+        () -> userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 99, 1, false));
+    assertEquals(0, e.getBalance());
+    assertEquals(0, userServiceImpl.getAffordableQueueAddCount(REGISTERED_EMAIL, 99, 1, false));
   }
 
   @Test
@@ -1142,7 +1370,8 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     when(pricingService.resolvePricingConfig(Integer.valueOf(43)))
         .thenReturn(new PricingConfig(2, 3, 3, 10, 5, false));
-    registeredUser().setNumCredits(4);
+    account().setNumCredits(4);
+    account(Integer.valueOf(43)).setNumCredits(4);
 
     userServiceImpl.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 1, false); // costs 2
     assertThrows(InsufficientCreditsException.class,
@@ -1176,7 +1405,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     UserServiceImpl slaveUserService = new UserServiceImpl(userRepository, passwordEncoder,
         jwtUtil, eventPublisher, songLibraryService, pricingService, true, paymentGateway);
     userRoot.addUser(new UserEntity(Integer.valueOf(2), "Ada", "Min", "admin@example.com",
-        "hash", Integer.valueOf(0), UserRole.ROLE_ADMIN));
+        "hash", UserRole.ROLE_ADMIN));
 
     // A slave never charges a web user (credits are master-owned), so a patron must not queue
     // here at all -- otherwise every play would be free.
@@ -1202,7 +1431,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     // app.allow-slave-url-queue-operations=true -- local/testing only.
     UserServiceImpl slaveUserService = new UserServiceImpl(userRepository, passwordEncoder,
         jwtUtil, eventPublisher, songLibraryService, pricingService, true, paymentGateway, true);
-    registeredUser().setNumCredits(0);
+    account().setNumCredits(0);
 
     slaveUserService.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 1, true);
     slaveUserService.requireAffordableQueueAction(REGISTERED_EMAIL, 1, 42);
@@ -1214,7 +1443,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     SongQueueEntryDto entry = new SongQueueEntryDto(REGISTERED_EMAIL, buildSongDto(5, 500), 1, null);
     slaveUserService.handleSongAddedToQueueEvent(new SongAddedToQueueEvent(entry, false), 42);
     slaveUserService.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, 42);
-    assertTrue(registeredUser().getUserSongCreditUsages().isEmpty());
+    assertTrue(account().getSongCreditUsages().isEmpty());
   }
 
   @Test
@@ -1222,7 +1451,7 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
 
     UserServiceImpl standalone = new UserServiceImpl(userRepository, passwordEncoder, jwtUtil,
         eventPublisher, songLibraryService, pricingService, false, paymentGateway, true);
-    registeredUser().setNumCredits(0);
+    account().setNumCredits(0);
 
     assertThrows(InsufficientCreditsException.class,
         () -> standalone.requireAffordableQueueAdd(REGISTERED_EMAIL, 42, 1, false));
@@ -1231,10 +1460,10 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
   @Test
   void getAffordableQueueAddCount_isTheBalanceDividedByTheCost() {
 
-    registeredUser().setNumCredits(7);
+    account().setNumCredits(7);
 
     assertEquals(3, userServiceImpl.getAffordableQueueAddCount(REGISTERED_EMAIL, 42, 1, false));
-    registeredUser().setNumCredits(1);
+    account().setNumCredits(1);
     assertEquals(0, userServiceImpl.getAffordableQueueAddCount(REGISTERED_EMAIL, 42, 1, false));
   }
 
@@ -1249,32 +1478,39 @@ public class UserServiceTest extends AbstractServiceIntegrationTest {
     Integer confirmedLocationId = Integer.valueOf(42);
     Integer otherLocationId = Integer.valueOf(99);
 
-    UserEntity user = registeredUser();
-    user.addSongToSongPlayHistory(new SongIdentifier(previousLocationId, 1, 2));
-    user.addSongToSongPlayHistory(new SongIdentifier(otherLocationId, 3, 4));
+    // A fresh patron (the registered one already has an account at 42, the confirmed id).
+    UserEntity user = new UserEntity(Integer.valueOf(2), "Pat", "Ron", "pat@example.com", "hash",
+        UserRole.ROLE_USER);
+    userRoot.addUser(user);
 
-    PlaylistEntity favorites = user.createMyFavoritesPlaylist();
+    UserLocationAccountEntity previous = user.getOrCreateLocationAccount(previousLocationId);
+    previous.addSongToSongPlayHistory(new SongIdentifier(previousLocationId, 1, 2));
+    PlaylistEntity favorites =
+        previous.getPlaylistByNameNullIfNotExists(PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME);
     favorites.addSong(new SongIdentifier(previousLocationId, 5, 6));
-    favorites.addSong(new SongIdentifier(otherLocationId, 7, 8));
+    previous.setNumCredits(100);
 
-    user.setNumCredits(100);
-    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, previousLocationId);
-    userServiceImpl.chargeCreditsForQueueAction(REGISTERED_EMAIL, 1, otherLocationId);
+    UserLocationAccountEntity other = user.getOrCreateLocationAccount(otherLocationId);
+    other.addSongToSongPlayHistory(new SongIdentifier(otherLocationId, 3, 4));
+    other.setNumCredits(100);
+
+    userServiceImpl.chargeCreditsForQueueAction("pat@example.com", 1, previousLocationId);
+    userServiceImpl.chargeCreditsForQueueAction("pat@example.com", 1, otherLocationId);
     clearInvocations(userRepository);
 
     userServiceImpl.handleOwnLocationIdChangedEvent(
         new OwnLocationIdChangedEvent(previousLocationId, confirmedLocationId));
 
-    assertEquals(List.of(new SongIdentifier(confirmedLocationId, 1, 2),
-        new SongIdentifier(otherLocationId, 3, 4)), user.getSongPlayHistory());
-    assertEquals(List.of(new SongIdentifier(confirmedLocationId, 5, 6),
-        new SongIdentifier(otherLocationId, 7, 8)), favorites.getSongs());
+    assertEquals(confirmedLocationId, previous.getLocationId());
+    assertEquals(List.of(new SongIdentifier(confirmedLocationId, 1, 2)),
+        previous.getSongPlayHistory());
+    assertEquals(List.of(new SongIdentifier(confirmedLocationId, 5, 6)), favorites.getSongs());
+    assertEquals(confirmedLocationId,
+        previous.getSongCreditUsages().iterator().next().getLocationId());
 
-    List<Integer> usageLocationIds = user.getUserSongCreditUsages().stream()
-        .map(UserSongCreditUsageEntity::getLocationId)
-        .sorted()
-        .toList();
-    assertEquals(List.of(confirmedLocationId, otherLocationId), usageLocationIds);
+    assertEquals(otherLocationId, other.getLocationId());
+    assertEquals(List.of(new SongIdentifier(otherLocationId, 3, 4)), other.getSongPlayHistory());
+    assertEquals(otherLocationId, other.getSongCreditUsages().iterator().next().getLocationId());
 
     verify(userRepository).storeAggregateRoot(userRoot);
   }

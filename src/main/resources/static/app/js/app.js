@@ -7,6 +7,10 @@
   const API_BASE = ((window.JUKEANATOR_CONFIG && window.JUKEANATOR_CONFIG.apiBaseUrl) || '')
     .replace(/\/+$/, '');
 
+  // True inside the native iOS/Android app: Capacitor's native bridge defines window.Capacitor.
+  const IN_NATIVE_APP = !!(window.Capacitor && window.Capacitor.isNativePlatform
+    && window.Capacitor.isNativePlatform());
+
   // ── State ───────────────────────────────────────────────────────────────
   const state = {
     token: localStorage.getItem('jwt'),
@@ -24,9 +28,9 @@
     hotHereArtists: [],    // cached from home page API; refreshed on loadHomePage
     hotHereAlbums: [],     // cached from home page API; refreshed on loadHomePage
     hotHereSongs: [],      // cached from home page API; refreshed on loadHomePage
-    numCredits: 0,         // cached credit count; refreshed on loadCredits()
+    numCredits: 0,         // credits at the selected location; refreshed on loadCredits()
     myPlaylists: [],       // [{name, songCount, firstSongAlbumId}] from GET /api/users/playlists
-    favoriteSongIds: new Set(), // Set of 'albumId_songId' strings
+    favoriteSongIds: new Set(), // Set of 'albumId_songId' strings (selected location only)
     queueHasSongs: false,   // drives "View Queue" button visibility; kept live via /topic/queue
     pricingConfig: null,    // {priorityCostMultiplier, webCostMultiplier, creditsPerDollar, ...}
                             // from GET /api/users/pricing-config; refreshed at boot and on
@@ -187,6 +191,25 @@
     return state.locationId != null ? `?locationId=${encodeURIComponent(state.locationId)}` : '';
   }
 
+  /**
+   * `path` with the selected location appended: a patron's credits, recent plays and playlists
+   * belong to one location (JukeANator has no central library), so these calls always say which.
+   */
+  function withLocation(path) {
+    if (state.locationId == null) return path;
+    return path + (path.includes('?') ? '&' : '?')
+      + `locationId=${encodeURIComponent(state.locationId)}`;
+  }
+
+  /** The patron's credit balance at `locationId`, from a /api/users/me profile (0 if none). */
+  function balanceAt(profile, locationId) {
+    const balance = (profile?.balances || []).find(b => b.locationId === locationId);
+    return balance ? balance.numCredits : 0;
+  }
+
+  // Remembered so a reload (or the next visit) reopens the location whose credits the patron has.
+  const SELECTED_LOCATION_KEY = 'selectedLocationId';
+
   async function api(path, options = {}) {
     const res = await fetch(API_BASE + locationScopedPath(path), {
       ...options,
@@ -294,7 +317,9 @@
         }),
         (err) => reject(geoFenceError(err.code === err.PERMISSION_DENIED
           ? 'This location only accepts songs from patrons who are there. Please allow location '
-            + 'access for this site in your browser settings, then try again.'
+            + (IN_NATIVE_APP
+              ? 'access for JukeANator in your phone\'s Settings app, then try again.'
+              : 'access for this site in your browser settings, then try again.')
           : 'Your device location could not be determined. Please try again.')),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
     });
@@ -636,6 +661,7 @@
 
   function renderSubScreen(screen, params = {}) {
     activeContentPanelScrollHandler = null;
+    cancelActiveVoiceSearch();
     switch (screen) {
       case 'my-account':        renderMyAccount(params);        break;
       case 'manage-account':    renderManageAccount(params);    break;
@@ -682,6 +708,7 @@
   // ── Main frame ──────────────────────────────────────────────────────────
   async function renderMain(tab = 'music') {
     activeContentPanelScrollHandler = null;
+    cancelActiveVoiceSearch();
     state.currentMainTab = tab;
     state.navStack = [];
     currentAuthView = null;
@@ -707,6 +734,7 @@
           <div class="search-bar">
             <span class="search-icon">&#128269;</span>
             <input type="text" placeholder="Search for music" id="searchInput">
+            ${voiceButtonHtml('homeVoiceBtn')}
           </div>
         </div>
 
@@ -755,6 +783,17 @@
       navigateSub('search-entry');
     });
 
+    // The microphone opens the search screen already listening.
+    document.getElementById('homeVoiceBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (state.locationId == null && state.locations.length) {
+        showLocationPickerSheet();
+        return;
+      }
+      state.voiceSearchOnEntry = true;
+      navigateSub('search-entry');
+    });
+
     await Promise.all([
       loadCredits(document.getElementById('creditsValue')),
       loadNowPlaying(document.getElementById('nowPlayingWidget')),
@@ -777,8 +816,8 @@
       if (state.token) {
         const [homePage, playlists, favIds] = await Promise.all([
           api(`/api/users/home${locationQuery()}`),
-          api('/api/users/playlists').catch(() => []),
-          api('/api/users/playlists/favorites/songs').catch(() => []),
+          api(withLocation('/api/users/playlists')).catch(() => []),
+          api(withLocation('/api/users/playlists/favorites/songs')).catch(() => []),
         ]);
         state.searchHistory    = homePage.searchHistory    || [];
         state.recentPlays      = homePage.myRecentPlays    || [];
@@ -1083,7 +1122,7 @@
     }
     try {
       const profile = await api('/api/users/me');
-      state.numCredits = profile.numCredits ?? 0;
+      state.numCredits = balanceAt(profile, state.locationId);
       if (widget) widget.textContent = creditsWidgetText(state.numCredits);
     } catch {
       state.numCredits = 0;
@@ -1153,9 +1192,16 @@
 
   // ── Add Funds tab content ───────────────────────────────────────────────
   async function loadAddFunds(container) {
+    // Credits are bought for one location and can be used only there, so a location must be
+    // selected first.
+    if (state.locationId == null) {
+      container.innerHTML = '<div class="stub-placeholder">Select a location to add funds. '
+        + 'Credits are bought for one location and can be used only there.</div>';
+      return;
+    }
     container.innerHTML = '<div class="stub-placeholder">Loading packages…</div>';
     try {
-      const packages = await api('/api/users/credit-packages');
+      const packages = await api(`/api/users/credit-packages${locationQuery()}`);
       renderAddFundsContent(container, packages);
     } catch {
       container.innerHTML = '<div class="stub-placeholder">Could not load packages.</div>';
@@ -1189,8 +1235,12 @@
         </div>`;
     }
 
+    const locationName = state.currentLocation?.name || 'this location';
     container.innerHTML = `
       <div class="add-funds-content">
+        <div class="add-funds-location-notice">
+          Credits for <strong>${escHtml(locationName)}</strong>. They can be used only at this location.
+        </div>
         <div id="packagesContainer">
           ${packages.map(packageCardHtml).join('')}
         </div>
@@ -1227,8 +1277,14 @@
       return;
     }
 
-    const numCredits = profile.numCredits ?? 0;
-    const balance = `${numCredits} Credits`;
+    const numCredits = balanceAt(profile, state.locationId);
+    const currentName = state.currentLocation?.name;
+    const balance = `${numCredits} Credits${currentName ? ` at ${escHtml(currentName)}` : ''}`;
+    // Credits at the patron's other locations, so they know where their balances are.
+    const otherBalances = (profile.balances || [])
+      .filter(b => b.locationId !== state.locationId && b.numCredits > 0)
+      .map(b => `<div class="funds-other">${b.numCredits} Credits at ${escHtml(b.locationName || ('location ' + b.locationId))}</div>`)
+      .join('');
 
     contentPanel.querySelector('.sub-content').innerHTML = `
       <div class="account-funds-box">
@@ -1236,6 +1292,7 @@
         <div>
           <div class="funds-label">Current Funds:</div>
           <div class="funds-amount">${balance}</div>
+          ${otherBalances}
         </div>
       </div>
 
@@ -1469,7 +1526,7 @@
   // Links to the other legal screen carry data-nav and are wired by renderLegal().
 
   const TERMS_HTML = `
-    <p><i>Effective November 20, 2026</i></p>
+    <p><i>Effective November 25, 2026</i></p>
     <p>These Terms and Conditions apply to the JukeANator Web/Mobile app provided by Digital Jukebox Technologies, LLC
     (&quot;DJT&quot;, &quot;we&quot;).</p>
 
@@ -1478,7 +1535,8 @@
     responsible for keeping your password confidential and for all activity under your account.</p>
 
     <h5>Credits</h5>
-    <p>Credits purchased in the Web/Mobile app are used to queue songs on JukeANator jukeboxes that accept requests from the app. Credits
+    <p>Credits are purchased in the Web/Mobile app for one jukebox location, the location selected in the app at the time of purchase,
+    and can be used only to queue songs on that location's JukeANator jukebox. They cannot be used at any other location. Credits
     have no cash value, cannot be transferred to another account and are non-refundable, except as required by law or where a charge was
     made in error. The jukebox owner sets the songs available, the credit cost of each play and whether requests are accepted, and a
     request may be declined (for example, when the queue is full or you are not at the location). If you believe you were charged in error,
@@ -1505,7 +1563,7 @@
     support (at) jukeanator.com.</p>`;
 
   const PRIVACY_HTML = `
-    <p><i>Effective November 20, 2026</i></p>
+    <p><i>Effective November 25, 2026</i></p>
     <p>This Privacy Policy describes how Digital Jukebox Technologies, LLC (&quot;DJT&quot;, &quot;we&quot;) collects, uses and protects
     personal information when you use the www.jukeanator.com website, the JukeANator Web/Mobile app and JukeANator jukeboxes.</p>
 
@@ -1513,11 +1571,16 @@
     <ul>
       <li><b>Account information (Web/Mobile app):</b> first name, last name, email address and password. Passwords are stored only in
       encrypted (hashed) form.</li>
-      <li><b>App activity:</b> your credit balance, credit purchases, the songs you queue, your play and search history and your
-      playlists, so the app can show them back to you.</li>
+      <li><b>App activity:</b> your credit balance and credit purchases at each jukebox location, the songs you queue, your play and
+      search history and your playlists, so the app can show them back to you.</li>
       <li><b>Location:</b> at jukeboxes that accept song requests only from people on the premises, the app asks your device for its
       location when you queue a song and sends it with that request so the jukebox can confirm that you are nearby. Your location is
       checked and is not stored. If you deny location access, you will not be able to queue songs at those jukeboxes.</li>
+      <li><b>Voice search:</b> if you tap the microphone in the search bar, the app uses your device's speech
+      recognition to turn what you say into search words. The recognized words are used as your search, the same as a typed search.
+      Depending on your device and browser, the speech recognition service (for example Apple on an iPhone, or Google on Android and
+      in Chrome) may process the audio on its own servers under its own privacy policy. DJT does not receive or store recordings of
+      your voice. The microphone is used only while voice search is listening, and you can always type your search instead.</li>
       <li><b>Technical information:</b> as with most websites, our servers record information such as your IP address, browser type
       and operating system.</li>
     </ul>
@@ -1890,6 +1953,238 @@
     }
   }
 
+  // ── Voice search ────────────────────────────────────────────────────────
+  // A microphone button inside the search bars. In the native app it uses the phone's own speech
+  // recognizer (Apple's on iOS, Google's on Android) through the
+  // @capacitor-community/speech-recognition plugin, called through Capacitor's native bridge
+  // because this UI is plain script (no bundler, no @capacitor/core). In a browser it uses the Web
+  // Speech API where the browser has one (Chrome, Edge, Safari). Anywhere else the button is not
+  // shown. The phone keyboard's own dictation key works in the search field either way.
+  const SPEECH_PLUGIN = 'SpeechRecognition';
+  const VOICE_SILENCE_MS = 1500;   // stop this long after the last recognized word (iOS never stops on its own)
+  const VOICE_NO_SPEECH_MS = 7000; // give up when nothing is said at all
+  const VOICE_MAX_MS = 15000;      // a search is a few words; never listen longer than this
+  const BrowserSpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  const MIC_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" '
+    + 'stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'
+    + '<rect x="9" y="3" width="6" height="11.5" rx="3"/>'
+    + '<path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/></svg>';
+
+  let activeVoiceSession = null;
+
+  function nativeSpeechAvailable() {
+    const cap = window.Capacitor;
+    return IN_NATIVE_APP && typeof cap.nativePromise === 'function'
+      && typeof cap.addListener === 'function' && Array.isArray(cap.PluginHeaders)
+      && cap.PluginHeaders.some((h) => h.name === SPEECH_PLUGIN);
+  }
+
+  function voiceSearchSupported() {
+    if (IN_NATIVE_APP) return nativeSpeechAvailable();
+    return !!BrowserSpeechRecognition && window.isSecureContext;
+  }
+
+  function voiceButtonHtml(id) {
+    if (!voiceSearchSupported()) return '';
+    return `<button type="button" class="voice-search-btn" id="${id}" aria-label="Search by voice"
+                     aria-pressed="false" title="Search by voice">${MIC_ICON_SVG}</button>`;
+  }
+
+  function voiceError(code) {
+    const err = new Error(code);
+    err.voiceCode = code;
+    return err;
+  }
+
+  /** Stops any voice search still listening, e.g. when the patron leaves the search screen. */
+  function cancelActiveVoiceSearch() {
+    if (activeVoiceSession) activeVoiceSession.cancel();
+  }
+
+  /**
+   * Starts listening. handlers.onText(text) gets the words recognized so far; handlers.onEnd({ text,
+   * error, cancelled }) is called once, when listening ends. Resolves to { cancel() }, or rejects
+   * with an error carrying voiceCode when listening cannot start.
+   */
+  function startVoiceCapture(handlers) {
+    return nativeSpeechAvailable() ? startNativeVoiceCapture(handlers)
+      : startBrowserVoiceCapture(handlers);
+  }
+
+  async function startNativeVoiceCapture(handlers) {
+    const cap = window.Capacitor;
+    const call = (method, options = {}) => cap.nativePromise(SPEECH_PLUGIN, method, options);
+
+    const { available } = await call('available');
+    if (!available) throw voiceError('unavailable');
+    let { speechRecognition: permission } = await call('checkPermissions');
+    if (permission !== 'granted') ({ speechRecognition: permission } = await call('requestPermissions'));
+    if (permission !== 'granted') throw voiceError('not-allowed');
+
+    let text = '';
+    let ended = false;
+    let cancelled = false;
+    const timers = {};
+    const listeners = [];
+    const schedule = (name, ms, fn) => { clearTimeout(timers[name]); timers[name] = setTimeout(fn, ms); };
+    const finish = (error) => {
+      if (ended) return;
+      ended = true;
+      Object.values(timers).forEach(clearTimeout);
+      listeners.forEach((listener) => listener.remove());
+      call('stop').catch(() => {});
+      handlers.onEnd({ text: text.trim(), error, cancelled });
+    };
+
+    listeners.push(cap.addListener(SPEECH_PLUGIN, 'partialResults', (data) => {
+      const match = data && Array.isArray(data.matches) ? data.matches[0] : null;
+      if (ended || !match) return;
+      text = match;
+      handlers.onText(text);
+      clearTimeout(timers.noSpeech);
+      schedule('silence', VOICE_SILENCE_MS, () => finish(null));
+    }));
+    // Android stops by itself at the end of speech; its final words can follow the 'stopped' state.
+    listeners.push(cap.addListener(SPEECH_PLUGIN, 'listeningState', (data) => {
+      if (data && data.status === 'stopped') schedule('settle', 600, () => finish(null));
+    }));
+    schedule('noSpeech', VOICE_NO_SPEECH_MS, () => finish(text ? null : 'no-speech'));
+    schedule('max', VOICE_MAX_MS, () => finish(null));
+
+    try {
+      await call('start', {
+        language: navigator.language || 'en-US', maxResults: 1, partialResults: true, popup: false,
+      });
+    } catch (err) {
+      finish('failed');
+      throw voiceError(/permission/i.test(String(err && err.message)) ? 'not-allowed' : 'failed');
+    }
+    return { cancel() { cancelled = true; finish(null); } };
+  }
+
+  async function startBrowserVoiceCapture(handlers) {
+    const recognition = new BrowserSpeechRecognition();
+    recognition.lang = navigator.language || 'en-US';
+    recognition.interimResults = true;
+    recognition.continuous = false; // the browser ends the session when the patron stops talking
+    recognition.maxAlternatives = 1;
+
+    let text = '';
+    let error = null;
+    let cancelled = false;
+    const maxTimer = setTimeout(() => recognition.stop(), VOICE_MAX_MS);
+    recognition.onresult = (event) => {
+      if (cancelled) return; // a late result after the patron stopped listening
+      text = Array.from(event.results).map((result) => result[0].transcript).join('');
+      handlers.onText(text);
+    };
+    recognition.onerror = (event) => { error = event.error; };
+    recognition.onend = () => {
+      clearTimeout(maxTimer);
+      handlers.onEnd({ text: text.trim(), error, cancelled });
+    };
+    try {
+      recognition.start();
+    } catch {
+      clearTimeout(maxTimer);
+      throw voiceError('failed');
+    }
+    return { cancel() { cancelled = true; recognition.abort(); } };
+  }
+
+  async function reportVoiceError(code, input, { quiet = false } = {}) {
+    if (!code || code === 'no-speech' || code === 'aborted') return;
+    const permission = code === 'not-allowed' || code === 'service-not-allowed';
+    // A voice search started automatically in a browser may be refused only because the tap that
+    // asked for it was a screen ago; there, quietly fall back to typing.
+    if (quiet && !(permission && IN_NATIVE_APP)) {
+      if (input.isConnected) input.focus();
+      return;
+    }
+    let message = 'Voice search did not work. Please try again, or type your search.';
+    if (permission) {
+      message = IN_NATIVE_APP
+        ? 'To search by voice, allow the microphone and speech recognition for JukeANator in your phone\'s Settings app.'
+        : 'To search by voice, allow microphone access for this site in your browser settings.';
+    } else if (code === 'unavailable' || code === 'audio-capture') {
+      message = 'Voice search is not available on this device. Please type your search.';
+    } else if (code === 'network') {
+      message = 'Voice search needs an internet connection. Please type your search.';
+    }
+    await showAppAlert({ title: 'Voice Search', message });
+  }
+
+  /**
+   * Wires a microphone button to a search field. While listening the button glows, the field reads
+   * "Listening…", and recognized words fill in as they are heard; when the patron stops talking,
+   * onSearch(text) runs. Tapping the button while listening stops without searching, keeping the
+   * words heard so far. Returns { start(options) }.
+   */
+  function wireVoiceSearch(button, input, { onSearch, onInputChanged = () => {} }) {
+    const placeholder = input.placeholder;
+    let session = null;
+    let busy = false;
+
+    const setListening = (on) => {
+      button.classList.toggle('listening', on);
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+      button.setAttribute('aria-label', on ? 'Stop listening' : 'Search by voice');
+      button.title = on ? 'Stop listening' : 'Search by voice';
+      input.placeholder = on ? 'Listening…' : placeholder;
+    };
+
+    async function start({ quiet = false } = {}) {
+      if (busy) return;
+      busy = true;
+      cancelActiveVoiceSearch();
+      setListening(true);
+      input.blur(); // put the keyboard away while listening
+      let done = false;
+      try {
+        const started = await startVoiceCapture({
+          onText: (text) => {
+            if (!input.isConnected) { cancelActiveVoiceSearch(); return; }
+            input.value = text;
+            onInputChanged();
+          },
+          onEnd: ({ text, error, cancelled }) => {
+            done = true;
+            busy = false;
+            if (activeVoiceSession === session) activeVoiceSession = null;
+            session = null;
+            if (!input.isConnected) return;
+            setListening(false);
+            if (cancelled) return;
+            if (text) {
+              input.value = text;
+              onInputChanged();
+              onSearch(text);
+            } else {
+              reportVoiceError(error, input, { quiet });
+            }
+          },
+        });
+        if (!done) {
+          session = started;
+          activeVoiceSession = started;
+        }
+      } catch (err) {
+        busy = false;
+        if (input.isConnected) setListening(false);
+        reportVoiceError((err && err.voiceCode) || 'failed', input, { quiet });
+      }
+    }
+
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (session) session.cancel();
+      else start();
+    });
+    return { start };
+  }
+
   async function renderSearchEntry() {
     const MIN_SEARCH_CHARS = 3;
     const history = await loadSearchHistory();
@@ -1914,6 +2209,7 @@
               <input type="search" class="search-input-field" id="searchEntryInput"
                      placeholder="Search for music" autocomplete="off" enterkeyhint="search">
               <button class="search-clear-btn" id="searchClearBtn" style="display:none">&#10005;</button>
+              ${voiceButtonHtml('searchVoiceBtn')}
             </div>
           </div>
           <div class="search-history-list" id="searchHistoryList">
@@ -1977,9 +2273,24 @@
         }
       });
 
-      // Give the search bar keyboard focus immediately — on touch devices this
-      // is what triggers the browser's native on-screen keyboard.
-      input.focus();
+      const voiceBtn = document.getElementById('searchVoiceBtn');
+      const voice = voiceBtn
+        ? wireVoiceSearch(voiceBtn, input, {
+          onSearch: (text) => executeSearch(text),
+          onInputChanged: () => { clearBtn.style.display = input.value ? 'flex' : 'none'; },
+        })
+        : null;
+
+      const startListening = voice && state.voiceSearchOnEntry;
+      state.voiceSearchOnEntry = false;
+      if (startListening) {
+        // Arrived from the home screen's microphone: start listening instead of typing.
+        voice.start({ quiet: true });
+      } else {
+        // Give the search bar keyboard focus immediately — on touch devices this
+        // is what triggers the browser's native on-screen keyboard.
+        input.focus();
+      }
     }
 
     async function executeSearch(query) {
@@ -2863,8 +3174,8 @@
     if (!state.token) return;
     try {
       const [playlists, favIds] = await Promise.all([
-        api('/api/users/playlists').catch(() => []),
-        api('/api/users/playlists/favorites/songs').catch(() => []),
+        api(withLocation('/api/users/playlists')).catch(() => []),
+        api(withLocation('/api/users/playlists/favorites/songs')).catch(() => []),
       ]);
       state.myPlaylists     = playlists || [];
       state.favoriteSongIds = new Set((favIds || []).map(si => `${si.albumId}_${si.songId}`));
@@ -2964,7 +3275,7 @@
   }
 
   function playlistSongsPath(name) {
-    return `/api/users/playlists/${encodeURIComponent(name)}/songs`;
+    return withLocation(`/api/users/playlists/${encodeURIComponent(name)}/songs`);
   }
 
   // ── Sub-screen: Playlist (view) ─────────────────────────────────────────
@@ -3057,7 +3368,7 @@
           if (value === name) return null;
           if (value === 'My Favorites') return 'That name is reserved.';
           try {
-            await api(`/api/users/playlists/${encodeURIComponent(name)}`, {
+            await api(withLocation(`/api/users/playlists/${encodeURIComponent(name)}`), {
               method: 'PUT',
               body: JSON.stringify({ playlistName: value }),
             });
@@ -3086,7 +3397,7 @@
       });
       if (!confirmed) return;
       try {
-        await api(`/api/users/playlists/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        await api(withLocation(`/api/users/playlists/${encodeURIComponent(name)}`), { method: 'DELETE' });
         await refreshPlaylistsState();
         goBack();
       } catch (err) {
@@ -3227,7 +3538,7 @@
     let storedIds = [];
     try {
       [storedIds] = await Promise.all([
-        api(`/api/users/playlists/${encodeURIComponent(name)}/songIdentifiers`).then(ids => ids || []),
+        api(withLocation(`/api/users/playlists/${encodeURIComponent(name)}/songIdentifiers`)).then(ids => ids || []),
         loadCredits(null),
       ]);
     } catch {
@@ -3422,6 +3733,12 @@
   async function selectLocation(loc) {
     state.currentLocation = loc;
     state.locationId = loc.locationId;
+    rememberSelectedLocation();
+    // Credits, recent plays and playlists are per location: drop the previous location's.
+    state.numCredits = 0;
+    state.recentPlays = [];
+    state.myPlaylists = [];
+    state.favoriteSongIds = new Set();
     subscribeToLocation();
     await Promise.all([loadPricingConfig(), loadGeoFenceStatus()]);
     renderMain(state.currentMainTab);
@@ -3448,6 +3765,7 @@
       const next = defaultLocation(locations);
       state.currentLocation = next;
       state.locationId = next ? next.locationId : null;
+      rememberSelectedLocation();
       subscribeToLocation(); // drops the old location's topics; subscribes to next, if any
       await Promise.all([loadPricingConfig(), loadGeoFenceStatus()]);
     }
@@ -3459,8 +3777,17 @@
    * are never picked and do not count. Otherwise none, and the patron chooses from the picker.
    */
   function defaultLocation(locations) {
+    // The location the patron last selected, if it is still listed.
+    const saved = Number(localStorage.getItem(SELECTED_LOCATION_KEY));
+    const remembered = locations.find(l => l.locationId === saved);
+    if (remembered) return remembered;
     const publicLocations = locations.filter(l => !l.privateLocation);
     return publicLocations.length === 1 && publicLocations[0].online ? publicLocations[0] : null;
+  }
+
+  function rememberSelectedLocation() {
+    if (state.locationId != null) localStorage.setItem(SELECTED_LOCATION_KEY, String(state.locationId));
+    else localStorage.removeItem(SELECTED_LOCATION_KEY);
   }
 
   /** The picker opens when there is a choice to make, or when no location is selected yet. */
@@ -3673,7 +4000,8 @@
       try {
         const response = await api('/api/users/add-funds', {
           method: 'POST',
-          body: JSON.stringify({ packageId: pkg.id, paymentMethodNonce: nonce }),
+          // The credits are bought for, and usable only at, the selected location.
+          body: JSON.stringify({ locationId: state.locationId, packageId: pkg.id, paymentMethodNonce: nonce }),
         });
         dismissPaymentMethodSheet();
         onSuccess(response);
@@ -3999,7 +4327,7 @@
       placeholder: 'Playlist name',
       onSave: async (value) => {
         try {
-          await api('/api/users/playlists', {
+          await api(withLocation('/api/users/playlists'), {
             method: 'POST',
             body: JSON.stringify({ playlistName: value }),
           });
@@ -4038,13 +4366,19 @@
       if (state.token) {
         client.subscribe('/user/queue/credits', (frame) => {
           const msg = JSON.parse(frame.body);
+          // Balances are per location: only the selected location's is shown.
+          if (msg.locationId != null && msg.locationId !== state.locationId) return;
           state.numCredits = msg.numCredits ?? 0;
           const widget = document.getElementById('creditsValue');
           if (widget) widget.textContent = creditsWidgetText(state.numCredits);
         });
 
         client.subscribe('/user/queue/recent-plays', (frame) => {
-          const song = JSON.parse(frame.body);
+          const msg = JSON.parse(frame.body);
+          // Recent plays are per location: ignore a song queued at another location.
+          if (msg.locationId != null && msg.locationId !== state.locationId) return;
+          const song = msg.song;
+          if (!song) return;
           // One entry per song: a replayed song moves to the front instead of appearing twice.
           state.recentPlays = state.recentPlays.filter(
               s => !(s.albumId === song.albumId && s.songId === song.songId));

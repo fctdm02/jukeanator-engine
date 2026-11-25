@@ -14,8 +14,8 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
  * One append-only record of a user spending already-owned song credits to add a song to (or
- * otherwise act on) a location's queue via the mobile/web UI, owned by the {@link UserEntity} it
- * belongs to. Deliberately distinct from {@link UserAddFundsTransactionEntity}, which records the
+ * otherwise act on) a location's queue via the mobile/web UI, owned by the patron's
+ * {@link UserLocationAccountEntity} at that location. Deliberately distinct from {@link UserAddFundsTransactionEntity}, which records the
  * earlier, separate act of a user obtaining those credits with real money -- see that class's
  * javadoc. Mobile/web-originated only -- {@code UserServiceImpl.deductCredits} explicitly skips
  * the local walk-up (JFC/Swing) user, so this table (renamed from {@code mobile_transactions};
@@ -34,12 +34,11 @@ public class UserSongCreditUsageEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
-  // Persistence-only back-reference -- the FK column JPA needs to own the UserEntity <->
-  // transaction relationship. UserEntity.addUserSongCreditUsage() is the single place that keeps
-  // this back-reference in sync (see setUser()).
+  // Persistence-only back-reference -- UserLocationAccountEntity.addSongCreditUsage() keeps it
+  // in sync.
   @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "user_id")
-  private UserEntity user;
+  @JoinColumn(name = "user_location_account_id", nullable = false)
+  private UserLocationAccountEntity locationAccount;
 
   @Column(name = "location_id")
   private Integer locationId;
@@ -91,8 +90,8 @@ public class UserSongCreditUsageEntity extends AbstractPersistentEntity {
     this.syncId = syncId;
   }
 
-  void setUser(UserEntity user) {
-    this.user = user;
+  void setLocationAccount(UserLocationAccountEntity locationAccount) {
+    this.locationAccount = locationAccount;
   }
 
   @Override
@@ -101,14 +100,14 @@ public class UserSongCreditUsageEntity extends AbstractPersistentEntity {
   }
 
   public String getUserEmail() {
-    return user != null ? user.getEmailAddress() : null;
+    return locationAccount != null ? locationAccount.getUserEmail() : null;
   }
 
   public Integer getLocationId() {
     return locationId;
   }
 
-  // Package-private: only UserEntity.changeLocationId re-tags a usage.
+  // Package-private: only UserLocationAccountEntity.changeLocationId re-tags a usage.
   void changeLocationId(Integer oldLocationId, Integer newLocationId) {
     if (Objects.equals(oldLocationId, this.locationId)) {
       this.locationId = newLocationId;

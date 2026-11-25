@@ -15,6 +15,7 @@ import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRoo
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalMobileTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocationMobileCreditUsageEntity;
 
 /**
@@ -110,6 +111,19 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
         }
       }
 
+      Set<Integer> persistedMobileTransactionIds = new HashSet<>(entityManager
+          .createQuery("select t.persistentIdentity from LocalMobileTransactionEntity t",
+              Integer.class)
+          .getResultList());
+
+      for (LocalMobileTransactionEntity transaction : root.getLocalMobileTransactions()) {
+        if (persistedMobileTransactionIds.contains(transaction.getPersistentIdentity())) {
+          entityManager.merge(transaction);
+        } else {
+          insertNewMobileTransaction(transaction);
+        }
+      }
+
       Set<Integer> persistedMobileIds = new HashSet<>(entityManager
           .createQuery("select u.persistentIdentity from LocationMobileCreditUsageEntity u",
               Integer.class)
@@ -195,18 +209,44 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
       String discriminatorValue) {
 
     entityManager.createNativeQuery("insert into location_transaction "
-        + "(persistent_identity, version, transaction_type, amount_dollars, timestamp, "
+        + "(persistent_identity, version, transaction_type, amount, timestamp, "
         + "location_id, source_transaction_id, synced_to_master_at) "
-        + "values (:id, :version, :transactionType, :amountDollars, :timestamp, :locationId, "
+        + "values (:id, :version, :transactionType, :amount, :timestamp, :locationId, "
         + ":sourceTransactionId, :syncedToMasterAt)")
         .setParameter("id", transaction.getPersistentIdentity())
         .setParameter("version", transaction.getVersion())
         .setParameter("transactionType", discriminatorValue)
-        .setParameter("amountDollars", transaction.getAmountDollars())
+        .setParameter("amount", transaction.getAmount())
         .setParameter("timestamp", transaction.getTimestamp())
         .setParameter("locationId", transaction.getLocationId())
         .setParameter("sourceTransactionId", transaction.getSourceTransactionId())
         .setParameter("syncedToMasterAt", transaction.getSyncedToMasterAt())
+        .executeUpdate();
+  }
+
+  // Native insert for the same pre-assigned-id reason as the inserts above.
+  private void insertNewMobileTransaction(LocalMobileTransactionEntity transaction) {
+
+    entityManager.createNativeQuery("insert into location_transaction "
+        + "(persistent_identity, version, transaction_type, amount, timestamp, location_id, "
+        + "source_transaction_id, synced_to_master_at, user_email, payment_reference, "
+        + "package_code, credits_awarded, bonus_credits) "
+        + "values (:id, :version, :transactionType, :amount, :timestamp, :locationId, "
+        + ":sourceTransactionId, :syncedToMasterAt, :userEmail, :paymentReference, "
+        + ":packageCode, :creditsAwarded, :bonusCredits)")
+        .setParameter("id", transaction.getPersistentIdentity())
+        .setParameter("version", transaction.getVersion())
+        .setParameter("transactionType", LocalMobileTransactionEntity.DISCRIMINATOR)
+        .setParameter("amount", transaction.getAmount())
+        .setParameter("timestamp", transaction.getTimestamp())
+        .setParameter("locationId", transaction.getLocationId())
+        .setParameter("sourceTransactionId", transaction.getSourceTransactionId())
+        .setParameter("syncedToMasterAt", transaction.getSyncedToMasterAt())
+        .setParameter("userEmail", transaction.getUserEmail())
+        .setParameter("paymentReference", transaction.getPaymentReference())
+        .setParameter("packageCode", transaction.getPackageCode())
+        .setParameter("creditsAwarded", transaction.getCreditsAwarded())
+        .setParameter("bonusCredits", transaction.getBonusCredits())
         .executeUpdate();
   }
 
@@ -247,6 +287,10 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
           .createQuery("from LocalCreditTransactionEntity", LocalCreditTransactionEntity.class)
           .getResultList();
 
+      List<LocalMobileTransactionEntity> mobileTransactions = entityManager
+          .createQuery("from LocalMobileTransactionEntity", LocalMobileTransactionEntity.class)
+          .getResultList();
+
       List<LocationMobileCreditUsageEntity> mobileCreditUsages = entityManager
           .createQuery("from LocationMobileCreditUsageEntity", LocationMobileCreditUsageEntity.class)
           .getResultList();
@@ -255,6 +299,7 @@ public final class FinancialLedgerRepositoryJpaImpl implements FinancialLedgerRe
       periods.forEach(root::addSplitPeriod);
       cashTransactions.forEach(root::addLocalCashTransaction);
       creditCardTransactions.forEach(root::addLocalCreditCardTransaction);
+      mobileTransactions.forEach(root::addLocalMobileTransaction);
       mobileCreditUsages.forEach(root::addMobileCreditUsage);
       return root;
     });

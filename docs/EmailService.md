@@ -135,7 +135,7 @@ This file.
 Email sending lived inside the `user` domain and only sent the Add Funds receipt. The goal was a top-level `email` domain, a sibling of `location`, `user`, `financialledger` and the others, that owns all outbound mail and serves three use cases:
 
 1. **Create Account verification** (web/mobile): accounts start `PENDING` and become `ACTIVE` when the emailed link is opened; PENDING accounts cannot log in.
-2. **Add Funds receipt** (web/mobile): already implemented; moved into the new domain with unchanged content.
+2. **Add Funds receipt** (web/mobile): already implemented; moved into the new domain with unchanged content. *(Since changed: the receipt now names the location the credits were bought for, says they can be used only there, and shows the new balance at that location. `sendPurchaseReceiptEmail` gained a `locationName` parameter. See [per-location-accounts.md](per-location-accounts.md).)*
 3. **Financial Ledger split summary** (Swing): sent automatically in the background after a split is finalized.
 
 No new dependencies: `spring-boot-starter-mail`, `spring.mail.*` and `@EnableAsync` were already present.

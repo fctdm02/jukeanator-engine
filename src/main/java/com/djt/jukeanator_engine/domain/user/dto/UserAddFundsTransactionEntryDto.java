@@ -10,7 +10,8 @@ import java.util.Objects;
  * under its owning {@link UserDto} -- the filesystem-repository counterpart to
  * {@link UserSongCreditUsageEntryDto} for the Add-Funds side of the ledger.
  */
-public record UserAddFundsTransactionEntryDto(Integer persistentIdentity, String packageId,
+public record UserAddFundsTransactionEntryDto(Integer persistentIdentity, Integer locationId,
+    String packageId,
     int creditsAwarded, int bonusCredits, BigDecimal amountUsd, String paymentSource,
     String paymentTransactionId, Instant timestamp, int resultingBalance)
     implements Serializable {

@@ -2,6 +2,7 @@ package com.djt.jukeanator_engine.domain.user.model;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Objects;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -11,15 +12,14 @@ import jakarta.persistence.Table;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
- * One append-only Add-Funds record, owned by the {@link UserEntity} it belongs to: a user spending
- * real money (charged via {@code PaymentGateway}, e.g. Braintree) to obtain song credits usable at
- * any location. Deliberately distinct from {@link UserSongCreditUsageEntity}, which records the
- * later, separate act of spending already-owned song credits to queue a song at a particular
- * location -- see this package's design note in {@code UserServiceImpl} for why the two must never
- * be conflated under one ambiguous "credit transaction" concept.
+ * One append-only Add-Funds record: a patron spending real money (charged via
+ * {@code PaymentGateway}, e.g. Braintree) to obtain song credits usable only at one location.
+ * Owned by the patron's {@link UserLocationAccountEntity} at that location. Deliberately distinct
+ * from {@link UserSongCreditUsageEntity}, which records the later, separate act of spending
+ * already-owned credits to queue a song.
  *
- * <p>No {@code locationId} -- funds added here are not coupled to any location; only the later
- * song-credit spend is (see {@link UserSongCreditUsageEntity#getLocationId()}).
+ * <p>The full purchase amount is also recorded once in that location's financial ledger (see
+ * {@code LocalMobileTransactionEntity}), exactly like a swipe on the location's own card reader.
  *
  * @author tmyers
  */
@@ -29,12 +29,16 @@ public class UserAddFundsTransactionEntity extends AbstractPersistentEntity {
 
   private static final long serialVersionUID = 1L;
 
-  // Persistence-only back-reference -- the FK column JPA needs to own the UserEntity <->
-  // transaction relationship. UserEntity.addUserAddFundsTransaction() is the single place that
-  // keeps this back-reference in sync (see setUser()).
+  // Persistence-only back-reference -- UserLocationAccountEntity.addAddFundsTransaction() keeps
+  // it in sync.
   @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "user_id")
-  private UserEntity user;
+  @JoinColumn(name = "user_location_account_id", nullable = false)
+  private UserLocationAccountEntity locationAccount;
+
+  // The location the credits were bought for (and are usable at), denormalized from the account
+  // for reporting.
+  @Column(name = "location_id", nullable = false)
+  private Integer locationId;
 
   @Column(name = "package_id")
   private String packageId;
@@ -62,10 +66,12 @@ public class UserAddFundsTransactionEntity extends AbstractPersistentEntity {
 
   protected UserAddFundsTransactionEntity() {} // for JPA
 
-  public UserAddFundsTransactionEntity(Integer persistentIdentity, String packageId,
-      int creditsAwarded, int bonusCredits, BigDecimal amountUsd, String paymentSource,
-      String paymentTransactionId, Instant timestamp, int resultingBalance) {
+  public UserAddFundsTransactionEntity(Integer persistentIdentity, Integer locationId,
+      String packageId, int creditsAwarded, int bonusCredits, BigDecimal amountUsd,
+      String paymentSource, String paymentTransactionId, Instant timestamp,
+      int resultingBalance) {
     super(persistentIdentity);
+    this.locationId = locationId;
     this.packageId = packageId;
     this.creditsAwarded = creditsAwarded;
     this.bonusCredits = bonusCredits;
@@ -76,8 +82,8 @@ public class UserAddFundsTransactionEntity extends AbstractPersistentEntity {
     this.resultingBalance = resultingBalance;
   }
 
-  void setUser(UserEntity user) {
-    this.user = user;
+  void setLocationAccount(UserLocationAccountEntity locationAccount) {
+    this.locationAccount = locationAccount;
   }
 
   @Override
@@ -86,7 +92,18 @@ public class UserAddFundsTransactionEntity extends AbstractPersistentEntity {
   }
 
   public String getUserEmail() {
-    return user != null ? user.getEmailAddress() : null;
+    return locationAccount != null ? locationAccount.getUserEmail() : null;
+  }
+
+  public Integer getLocationId() {
+    return locationId;
+  }
+
+  // Package-private: only UserLocationAccountEntity.changeLocationId re-tags a purchase.
+  void changeLocationId(Integer oldLocationId, Integer newLocationId) {
+    if (Objects.equals(oldLocationId, this.locationId)) {
+      this.locationId = newLocationId;
+    }
   }
 
   public String getPackageId() {

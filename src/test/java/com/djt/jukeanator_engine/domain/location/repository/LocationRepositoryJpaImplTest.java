@@ -25,6 +25,7 @@ import jakarta.persistence.EntityManagerFactory;
 import com.zaxxer.hikari.HikariDataSource;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
+import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 
 /**
@@ -49,6 +50,8 @@ class LocationRepositoryJpaImplTest {
   private static final int OTHER_LOCATION_ID = 900003;
 
   private static final int USER_ID = 900001;
+  // Per-location fixtures add the insertLocationTaggedRows offset (0 or 1) to these.
+  private static final int ACCOUNT_ID = 900001;
   private static final int PLAYLIST_ID = 900001;
 
   // Every non-FK location-tagged column changeLocationId() re-points, as {table, column}.
@@ -60,6 +63,9 @@ class LocationRepositoryJpaImplTest {
       { "user_song_play_history", "location_id" },
       { "user_playlist_song", "location_id" },
       { "user_song_credit_usage", "location_id" },
+      { "user_add_funds_transaction", "location_id" },
+      { "user_location_account", "location_id" },
+      { "location_credit_package", "location_id" },
       { "user_activity", "location_id" },
       { "song_background_music", "location_id" },
       { "song_background_music", "source_location_id" } };
@@ -90,11 +96,18 @@ class LocationRepositoryJpaImplTest {
       execute("delete from location_transaction where location_id = ?", locationId);
       execute("delete from user_activity where location_id = ?", locationId);
       execute("delete from song_background_music where location_id = ?", locationId);
+      execute("delete from location_credit_package where location_id = ?", locationId);
     }
-    execute("delete from user_song_play_history where user_id = ?", USER_ID);
-    execute("delete from user_song_credit_usage where user_id = ?", USER_ID);
-    execute("delete from user_playlist_song where playlist_id = ?", PLAYLIST_ID);
-    execute("delete from user_playlist where persistent_identity = ?", PLAYLIST_ID);
+    for (int offset = 0; offset <= 1; offset++) {
+      int accountId = ACCOUNT_ID + offset;
+      execute("delete from user_song_play_history where user_location_account_id = ?", accountId);
+      execute("delete from user_song_credit_usage where user_location_account_id = ?", accountId);
+      execute("delete from user_add_funds_transaction where user_location_account_id = ?",
+          accountId);
+      execute("delete from user_playlist_song where playlist_id = ?", PLAYLIST_ID + offset);
+      execute("delete from user_playlist where persistent_identity = ?", PLAYLIST_ID + offset);
+      execute("delete from user_location_account where persistent_identity = ?", accountId);
+    }
     execute("delete from user_account where persistent_identity = ?", USER_ID);
     for (Integer locationId : locationIds) {
       execute("delete from location where id = ?", locationId);
@@ -173,6 +186,38 @@ class LocationRepositoryJpaImplTest {
     }
 
     assertForeignKeyChecksEnabledOnEveryPooledConnection();
+  }
+
+  // ── credit packages ──────────────────────────────────────────────────────
+
+  @Test
+  void storeCreditPackages_replacesTheLocationsPackages_andEveryLoadAttachesThemInOrder()
+      throws Exception {
+
+    insertLocation(OLD_LOCATION_ID, "packages");
+    insertLocation(OTHER_LOCATION_ID, "packages-other");
+    LocationRepositoryJpaImpl repository = newRepository();
+    CreditPackageDto small =
+        new CreditPackageDto("pkg-7", 12, 2, new java.math.BigDecimal("7.00"), null);
+    CreditPackageDto large =
+        new CreditPackageDto("pkg-28", 48, 24, new java.math.BigDecimal("28.00"), "Best Value");
+
+    repository.storeCreditPackages(OLD_LOCATION_ID, List.of(large, small));
+    repository.storeCreditPackages(OTHER_LOCATION_ID, List.of(small));
+    // A re-push reusing the same package codes replaces, rather than collides with, the rows.
+    repository.storeCreditPackages(OLD_LOCATION_ID, List.of(small, large));
+
+    LocationRootEntity root = newRepository().loadAggregateRoot("ignored");
+    assertEquals(List.of(small, large),
+        root.getLocationByIdNullIfNotExists(OLD_LOCATION_ID).getCreditPackages());
+    assertEquals(List.of(small),
+        root.getLocationByIdNullIfNotExists(OTHER_LOCATION_ID).getCreditPackages());
+    assertEquals(2, count("select count(*) from location_credit_package where location_id = ?",
+        OLD_LOCATION_ID));
+
+    repository.storeCreditPackages(OLD_LOCATION_ID, List.of());
+    assertEquals(0, count("select count(*) from location_credit_package where location_id = ?",
+        OLD_LOCATION_ID));
   }
 
   // ── storeAggregateRoot (Edit Location Info) ──────────────────────────────
@@ -360,11 +405,9 @@ class LocationRepositoryJpaImplTest {
 
   private void insertUser() throws SQLException {
     execute("insert into user_account (persistent_identity, first_name, last_name, "
-        + "email_address, password_hash, num_credits, role) "
-        + "values (?, 'Rekey', 'Test', 'rekey-test@example.com', 'hash', 6, 'ROLE_USER')",
+        + "email_address, password_hash, role) "
+        + "values (?, 'Rekey', 'Test', 'rekey-test@example.com', 'hash', 'ROLE_USER')",
         USER_ID);
-    execute("insert into user_playlist (persistent_identity, user_id, owner, name) "
-        + "values (?, ?, 'rekey-test@example.com', 'My Favorites')", PLAYLIST_ID, USER_ID);
   }
 
   /**
@@ -387,15 +430,29 @@ class LocationRepositoryJpaImplTest {
     execute("insert into location_jukebox_split (persistent_identity, parent_location_id, "
         + "start_date) values (?, ?, ?)", id, locationId, now);
     execute("insert into location_transaction (persistent_identity, transaction_type, "
-        + "amount_dollars, timestamp, location_id) values (?, 'CASH', 1, ?, ?)",
+        + "amount, timestamp, location_id) values (?, 'CASH', 1, ?, ?)",
         id, now, locationId);
-    execute("insert into user_song_play_history (user_id, play_order, album_id, song_id, "
-        + "location_id) values (?, ?, 1, 1, ?)", USER_ID, offset, locationId);
+    // The patron's account at this location, and everything it owns.
+    int accountId = ACCOUNT_ID + offset;
+    int playlistId = PLAYLIST_ID + offset;
+    execute("insert into user_location_account (persistent_identity, user_id, location_id, "
+        + "num_credits) values (?, ?, ?, 6)", accountId, USER_ID, locationId);
+    execute("insert into user_playlist (persistent_identity, user_location_account_id, name) "
+        + "values (?, ?, 'My Favorites')", playlistId, accountId);
+    execute("insert into user_song_play_history (user_location_account_id, play_order, "
+        + "album_id, song_id, location_id) values (?, 0, 1, 1, ?)", accountId, locationId);
     execute("insert into user_playlist_song (playlist_id, song_order, album_id, song_id, "
-        + "location_id) values (?, ?, 1, 1, ?)", PLAYLIST_ID, offset, locationId);
-    execute("insert into user_song_credit_usage (persistent_identity, user_id, location_id, "
-        + "amount, type, timestamp, song_album_id, song_id, resulting_balance) "
-        + "values (?, ?, ?, -1, 'QUEUE_ADD', ?, 1, 1, 5)", id, USER_ID, locationId, now);
+        + "location_id) values (?, 0, 1, 1, ?)", playlistId, locationId);
+    execute("insert into user_song_credit_usage (persistent_identity, user_location_account_id, "
+        + "location_id, amount, type, timestamp, song_album_id, song_id, resulting_balance) "
+        + "values (?, ?, ?, -1, 'QUEUE_ADD', ?, 1, 1, 5)", id, accountId, locationId, now);
+    execute("insert into user_add_funds_transaction (persistent_identity, "
+        + "user_location_account_id, location_id, package_id, credits_awarded, bonus_credits, "
+        + "amount_usd, timestamp, resulting_balance) values (?, ?, ?, 'pkg-7', 12, 2, 7.00, ?, 14)",
+        id, accountId, locationId, now);
+    execute("insert into location_credit_package (persistent_identity, location_id, "
+        + "package_code, price_usd, credits, bonus_credits, display_order) "
+        + "values (?, ?, 'pkg-7', 7.00, 12, 2, 0)", id, locationId);
     execute("insert into user_activity (persistent_identity, location_id, source, username, "
         + "activity_type, occurred_at) values (?, ?, 'SWING_UI', 'LOCAL', 'TAB_NAVIGATION', ?)",
         id, locationId, now);

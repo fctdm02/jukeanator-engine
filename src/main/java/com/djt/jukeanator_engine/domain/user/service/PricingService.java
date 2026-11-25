@@ -1,5 +1,8 @@
 package com.djt.jukeanator_engine.domain.user.service;
 
+import java.util.List;
+import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
+
 /**
  * Resolves the effective credit-pricing config for a location, so credit-charging/display logic
  * never has to know whether it's running standalone/slave (same JVM as the JFC/Swing UI, whose
@@ -15,4 +18,12 @@ public interface PricingService {
    * instance's own {@code user-interface.*} YAML defaults.
    */
   PricingConfig resolvePricingConfig(Integer locationId);
+
+  /**
+   * The Add Funds credit packages sold for {@code locationId}, in display order. On
+   * standalone/slave, this instance's own {@code add-funds.packages}. On master, the packages that
+   * location's slave last pushed, falling back to master's own {@code add-funds.packages} (or the
+   * built-in defaults) until it has.
+   */
+  List<CreditPackageDto> resolveCreditPackages(Integer locationId);
 }

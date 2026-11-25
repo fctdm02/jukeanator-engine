@@ -45,6 +45,8 @@ import com.djt.jukeanator_engine.domain.songlibrary.model.RootFolderEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.model.SongFileEntity;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepository;
 import com.djt.jukeanator_engine.domain.songlibrary.repository.SongLibraryRepositoryJpaImpl;
+import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
+import com.djt.jukeanator_engine.domain.user.service.CreditPackageCatalog;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -694,6 +696,21 @@ public class LocationServiceImpl implements LocationService {
     location.setDisplayCurrencyForCost(pricingConfig.displayCurrencyForCost());
 
     this.locationRepository.storeAggregateRoot(this.locationRoot);
+
+    if (pricingConfig.creditPackages() != null) {
+      List<CreditPackageDto> packages;
+      try {
+        packages = CreditPackageCatalog.validate(pricingConfig.creditPackages());
+      } catch (IllegalStateException e) {
+        log.warn("Ignoring invalid credit packages from location {}: {}", locationId,
+            e.getMessage());
+        return;
+      }
+      if (!packages.equals(location.getCreditPackages())) {
+        this.locationRepository.storeCreditPackages(locationId, packages);
+        location.setCreditPackages(packages);
+      }
+    }
   }
 
   @Override

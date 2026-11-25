@@ -9,7 +9,9 @@ import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 
 /**
  * Singleton in-memory aggregate root holding every jukebox-split period, every local (cash /
- * credit-card-reader) credit transaction, and (on a slave) every mirrored mobile/web credit spend.
+ * credit-card-reader) credit transaction, every Web/Mobile Add Funds purchase (recorded on master,
+ * mirrored to its location's slave), and (on a slave) every mirrored mobile/web credit spend,
+ * which is kept as an audit trail only -- revenue comes from the purchases.
  * Not itself JPA-mapped -- {@code FinancialLedgerRepositoryJpaImpl} loads {@link
  * JukeboxSplitPeriodEntity}, {@link LocalCashTransactionEntity}, {@link
  * LocalCreditTransactionEntity}, and {@link LocationMobileCreditUsageEntity} rows directly and
@@ -24,6 +26,7 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
   private final List<JukeboxSplitPeriodEntity> splitPeriods = new ArrayList<>();
   private final List<LocalCashTransactionEntity> localCashTransactions = new ArrayList<>();
   private final List<LocalCreditTransactionEntity> localCreditCardTransactions = new ArrayList<>();
+  private final List<LocalMobileTransactionEntity> localMobileTransactions = new ArrayList<>();
   private final List<LocationMobileCreditUsageEntity> mobileCreditUsages = new ArrayList<>();
 
   public FinancialLedgerRootEntity() {
@@ -43,6 +46,7 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
     splitPeriods.clear();
     localCashTransactions.clear();
     localCreditCardTransactions.clear();
+    localMobileTransactions.clear();
     mobileCreditUsages.clear();
   }
 
@@ -115,6 +119,48 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
         && sourcePeriodId.equals(p.getSourcePeriodId()));
   }
 
+  /** Every Web/Mobile Add Funds purchase held here (all locations on master, its own on a slave). */
+  public List<LocalMobileTransactionEntity> getLocalMobileTransactions() {
+    return Collections.unmodifiableList(localMobileTransactions);
+  }
+
+  public void addLocalMobileTransaction(LocalMobileTransactionEntity transaction) {
+    localMobileTransactions.add(transaction);
+  }
+
+  /** Withdraws a purchase whose store failed (matched by identity). */
+  public boolean removeLocalMobileTransaction(LocalMobileTransactionEntity transaction) {
+    return localMobileTransactions.removeIf(t -> t == transaction);
+  }
+
+  /**
+   * True if master's purchase {@code sourceTransactionId} for {@code locationId} has already been
+   * mirrored here -- makes a retried master-to-slave push (or catch-up pull) a safe no-op.
+   */
+  public boolean hasLocalMobileTransactionFromSource(Integer locationId,
+      Integer sourceTransactionId) {
+    return hasTransactionFromSource(localMobileTransactions, locationId, sourceTransactionId);
+  }
+
+  /**
+   * Web/Mobile purchases for {@code locationId} in {@code [from, to]} (inclusive at both ends).
+   */
+  public List<LocalMobileTransactionEntity> getLocalMobileTransactionsBetween(Integer locationId,
+      Instant from, Instant to) {
+    return localMobileTransactions.stream()
+        .filter(t -> locationId.equals(t.getLocationId()))
+        .filter(t -> !t.getTimestamp().isBefore(from) && !t.getTimestamp().isAfter(to))
+        .toList();
+  }
+
+  /** The most recent Web/Mobile purchase's timestamp, or {@code null} if there are none. */
+  public Instant getLatestLocalMobileTransactionTimestamp() {
+    return localMobileTransactions.stream()
+        .map(LocalMobileTransactionEntity::getTimestamp)
+        .max(Comparator.naturalOrder())
+        .orElse(null);
+  }
+
   public List<LocationMobileCreditUsageEntity> getMobileCreditUsages() {
     return Collections.unmodifiableList(mobileCreditUsages);
   }
@@ -157,6 +203,7 @@ public class FinancialLedgerRootEntity extends AbstractPersistentEntity {
   public void changeLocationId(Integer oldLocationId, Integer newLocationId) {
     changeLocationId(localCashTransactions, oldLocationId, newLocationId);
     changeLocationId(localCreditCardTransactions, oldLocationId, newLocationId);
+    changeLocationId(localMobileTransactions, oldLocationId, newLocationId);
     mobileCreditUsages.stream()
         .filter(u -> oldLocationId.equals(u.getLocationId()))
         .forEach(u -> u.changeLocationId(newLocationId));

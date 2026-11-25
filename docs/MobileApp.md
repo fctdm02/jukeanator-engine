@@ -73,10 +73,16 @@ The icon is the "J" from the JukeANator wordmark and the splash screen is the wh
 
 To change the artwork, replace the files in `mobile/assets` (or edit and re-run the script), then run the `npm run assets` command again and rebuild the app. The command overwrites `mobile/android/app/src/main/AndroidManifest.xml` formatting; that change is harmless.
 
+## Native features
+
+- **Geo-fence location.** The web UI reads the position with `navigator.geolocation`. In the Android app, Capacitor's WebView asks the patron for the location permissions declared in `AndroidManifest.xml`. iOS needs `NSLocationWhenInUseUsageDescription` in `Info.plist`.
+- **Voice search.** A microphone button in the search bars uses the phone's own speech recognizer through the `@capacitor-community/speech-recognition` plugin. `app.js` calls it through Capacitor's native bridge (`Capacitor.nativePromise`), because the UI loads no bundler or `@capacitor/core`, and shows the button only when the plugin is in the build. On Android the plugin adds the microphone permission itself. iOS needs `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` in `Info.plist`. After pulling a change to `mobile/package.json`, run `npm install` in `mobile` before `npm run android`.
+
 ## Still to do
 
 - iOS icons and splash screens: on the Mac, `npm run assets -- --ios` after `npx cap add ios`.
-- Native plugins: Geolocation (geo-fence), a barcode scanner for jukebox QR codes, and push notifications.
+- Native plugins: a barcode scanner for jukebox QR codes, and push notifications. The geo-fence already works in the Android app through the WebView's location access (`AndroidManifest.xml` declares the location permissions); iOS needs `NSLocationWhenInUseUsageDescription` in `Info.plist` after `npx cap add ios`.
+- Store submission: see [apple-appstore-submission-checklist.md](apple-appstore-submission-checklist.md) and [google-appstore-submission-checklist.md](google-appstore-submission-checklist.md).
 - Verify each Add Funds payment method inside the app's WebView: card entry (Hosted Fields) first; PayPal, Venmo and Google Pay may need native plugins.
 - Store accounts: Apple Developer Program and Google Play Console.
 - Once the store listings exist, set `mobile-app.ios-store-url` and `mobile-app.android-store-url` in the production `application.yml` so the `/get-app` QR code sends phones to the stores.

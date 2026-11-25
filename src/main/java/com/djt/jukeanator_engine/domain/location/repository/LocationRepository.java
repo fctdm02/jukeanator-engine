@@ -1,7 +1,9 @@
 package com.djt.jukeanator_engine.domain.location.repository;
 
+import java.util.List;
 import com.djt.jukeanator_engine.domain.common.repository.AggregateRootRepository;
 import com.djt.jukeanator_engine.domain.location.model.LocationRootEntity;
+import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 
 /**
  * @author tmyers
@@ -27,4 +29,11 @@ public interface LocationRepository extends AggregateRootRepository<LocationRoot
   default void changeLocationId(Integer oldLocationId, Integer newLocationId) {
     // no-op by default
   }
+
+  /**
+   * Replaces {@code locationId}'s stored Add Funds credit packages with {@code packages} (in
+   * display order). Credit packages are persisted apart from the location row itself; every
+   * {@link #loadAggregateRoot} attaches them to their {@code LocationEntity}.
+   */
+  void storeCreditPackages(Integer locationId, List<CreditPackageDto> packages);
 }

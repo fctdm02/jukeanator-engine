@@ -324,7 +324,7 @@ The complete path from the current state to both apps being available in the sto
 ### 5. Decide how purchased credits are presented
 
 - Apple and Google exempt payments for physical services from in-app purchase (Apple guideline 3.1.3(e)), which is why Braintree can be used instead, avoiding the 15 to 30 percent store commission.
-- Credits are currently one balance per user, usable at any location. A reviewer may consider that virtual currency, which would require Apple and Google in-app purchase. Options: keep the global balance and explain that credits only buy song plays on physical jukeboxes at a venue, or tie purchases to the current location in the app.
+- Credits are tied to one location (done; see [docs/per-location-accounts.md](docs/per-location-accounts.md)). Add Funds buys credits for the selected location, the screen says they can be used only there, and the purchase is recorded in that location's financial ledger like a card-reader payment. This presents credits as prepaid song plays on one physical jukebox at one venue, rather than virtual currency, which would require Apple and Google in-app purchase.
 - Before building the store submission, describe the model to Apple (App Review contact or a pre-submission question) and get an answer in writing.
 
 ### 6. Create the store accounts

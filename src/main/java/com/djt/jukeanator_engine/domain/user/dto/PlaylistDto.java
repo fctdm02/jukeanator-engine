@@ -7,10 +7,10 @@ import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
 /**
  * Plain, human-readable JSON representation of a {@code PlaylistEntity}, nested under its owning
- * {@link UserDto}.
+ * {@link UserLocationAccountDto}.
  */
-public record PlaylistDto(Integer persistentIdentity, String owner, String name,
-    List<SongIdentifier> songs) implements Serializable {
+public record PlaylistDto(Integer persistentIdentity, String name, List<SongIdentifier> songs)
+    implements Serializable {
 
   @Override
   public boolean equals(Object obj) {
@@ -19,11 +19,12 @@ public record PlaylistDto(Integer persistentIdentity, String owner, String name,
     if (obj == null || getClass() != obj.getClass())
       return false;
     PlaylistDto other = (PlaylistDto) obj;
-    return Objects.equals(name, other.name) && Objects.equals(owner, other.owner);
+    return Objects.equals(persistentIdentity, other.persistentIdentity)
+        && Objects.equals(name, other.name);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, owner);
+    return Objects.hash(persistentIdentity, name);
   }
 }

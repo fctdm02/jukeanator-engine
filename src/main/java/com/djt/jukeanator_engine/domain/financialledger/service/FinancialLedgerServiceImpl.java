@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.financialledger.service;
 
+import static java.util.Objects.requireNonNull;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -12,10 +13,12 @@ import org.springframework.context.event.EventListener;
 import com.djt.jukeanator_engine.domain.financialledger.config.FinancialLedgerProperties;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.JukeboxSplitPeriodSyncDto;
+import com.djt.jukeanator_engine.domain.financialledger.dto.LocalMobileTransactionDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.LocalTransactionSyncDto;
 import com.djt.jukeanator_engine.domain.financialledger.dto.MasterSyncOutboxEntry;
 import com.djt.jukeanator_engine.domain.financialledger.event.JukeboxSplitFinalizedEvent;
 import com.djt.jukeanator_engine.domain.financialledger.event.LocalFinancialTransactionRecordedEvent;
+import com.djt.jukeanator_engine.domain.financialledger.event.MobilePurchaseRecordedEvent;
 import com.djt.jukeanator_engine.domain.financialledger.exception.FinancialLedgerException;
 import com.djt.jukeanator_engine.domain.financialledger.mapper.FinancialLedgerMapper;
 import com.djt.jukeanator_engine.domain.financialledger.model.AbstractLocationTransactionEntity;
@@ -23,6 +26,7 @@ import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRoo
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalMobileTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocationMobileCreditUsageEntity;
 import com.djt.jukeanator_engine.domain.financialledger.repository.FinancialLedgerRepository;
 import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistException;
@@ -265,6 +269,7 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     int periods = ledgerRoot.getSplitPeriods().size();
     int cash = ledgerRoot.getLocalCashTransactions().size();
     int card = ledgerRoot.getLocalCreditCardTransactions().size();
+    int mobilePurchases = ledgerRoot.getLocalMobileTransactions().size();
     int mobile = ledgerRoot.getMobileCreditUsages().size();
 
     ledgerRoot.clear();
@@ -272,9 +277,9 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     openNewPeriod(Instant.now());
     financialLedgerRepository.storeAggregateRoot(ledgerRoot);
 
-    log.warn("Purged the local financial ledger ({} split periods, {} cash and {} card "
-        + "transactions, {} mirrored mobile spends); a new split period starts now", periods, cash,
-        card, mobile);
+    log.warn("Purged the local financial ledger ({} split periods, {} cash, {} card and {} "
+        + "mobile purchase transactions, {} mirrored mobile spends); a new split period starts "
+        + "now", periods, cash, card, mobilePurchases, mobile);
   }
 
   @Override
@@ -315,6 +320,89 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
         usage.timestamp(), usage.songAlbumId(), usage.songId()));
 
     financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+  }
+
+  @Override
+  public synchronized LocalMobileTransactionDto recordMobilePurchase(Integer locationId,
+      BigDecimal amount, String userEmail, String paymentReference, String packageCode,
+      int creditsAwarded, int bonusCredits) {
+
+    requireNonNull(locationId, "locationId cannot be null");
+    requireNonNull(amount, "amount cannot be null");
+
+    Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
+    LocalMobileTransactionEntity transaction = new LocalMobileTransactionEntity(
+        persistentIdentity, amount, Instant.now(), locationId, null, userEmail, paymentReference,
+        packageCode, creditsAwarded, bonusCredits);
+    ledgerRoot.addLocalMobileTransaction(transaction);
+
+    try {
+      financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+    } catch (RuntimeException e) {
+      ledgerRoot.removeLocalMobileTransaction(transaction);
+      throw e;
+    }
+
+    LocalMobileTransactionDto dto = FinancialLedgerMapper.toDto(transaction);
+    eventPublisher.publishEvent(new MobilePurchaseRecordedEvent(dto));
+    return dto;
+  }
+
+  @Override
+  public synchronized List<LocalMobileTransactionDto> getMobileTransactionsForSync(
+      Integer locationId, String apiKey, Instant since) throws LocationServiceException {
+
+    requireValidLocation(locationId, apiKey);
+
+    Instant from = since != null ? since : Instant.EPOCH;
+    return ledgerRoot.getLocalMobileTransactionsBetween(locationId, from, Instant.now()).stream()
+        .filter(t -> t.getSourceTransactionId() == null) // master's own records only
+        .map(FinancialLedgerMapper::toDto)
+        .toList();
+  }
+
+  @Override
+  public synchronized void receiveMobileTransaction(LocalMobileTransactionDto dto) {
+
+    requireNonNull(dto, "dto cannot be null");
+    if (dto.persistentIdentity() == null) {
+      log.warn("Skipping mobile purchase with no master id -- it can't be mirrored idempotently");
+      return;
+    }
+
+    // Master only ever sends this slave its own location's purchases; anything else is a
+    // misrouted push and must never be attributed to this location.
+    Integer ownLocationId = songLibraryService.getOwnLocationId();
+    if (ownLocationId == null || !ownLocationId.equals(dto.locationId())) {
+      log.warn("Skipping mobile purchase {} for locationId {} -- this instance's own locationId "
+          + "is {}", dto.persistentIdentity(), dto.locationId(), ownLocationId);
+      return;
+    }
+
+    if (ledgerRoot.hasLocalMobileTransactionFromSource(ownLocationId, dto.persistentIdentity())) {
+      return; // already mirrored -- safe no-op on a live push plus catch-up pull
+    }
+
+    JukeboxSplitPeriodEntity currentPeriod = ledgerRoot.getCurrentPeriod();
+    if (currentPeriod != null && dto.timestamp().isBefore(currentPeriod.getStartDate())) {
+      // Reached this slave only after the period it belongs to was finalized (the slave was
+      // offline). That period's totals are locked, so this purchase is not in any split.
+      log.warn("Mobile purchase {} (${} at {}) arrived after its split period was finalized; it "
+          + "is not included in any split total", dto.persistentIdentity(), dto.amount(),
+          dto.timestamp());
+    }
+
+    Integer persistentIdentity = financialLedgerRepository.nextPersistentIdentity();
+    ledgerRoot.addLocalMobileTransaction(new LocalMobileTransactionEntity(persistentIdentity,
+        dto.amount(), dto.timestamp(), ownLocationId, dto.persistentIdentity(), dto.userEmail(),
+        dto.paymentReference(), dto.packageCode(), dto.creditsAwarded(), dto.bonusCredits()));
+
+    financialLedgerRepository.storeAggregateRoot(ledgerRoot);
+  }
+
+  @Override
+  public synchronized Instant getLatestMobileTransactionTimestamp() {
+    return ledgerRoot.getLatestLocalMobileTransactionTimestamp();
   }
 
   @Override
@@ -422,7 +510,7 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     BigDecimal cash = BigDecimal.ZERO;
     for (LocalCashTransactionEntity transaction : ledgerRoot.getLocalCashTransactionsSince(from)) {
       if (!transaction.getTimestamp().isAfter(to)) {
-        cash = cash.add(BigDecimal.valueOf(transaction.getAmountDollars()));
+        cash = cash.add(transaction.getAmount());
       }
     }
 
@@ -430,7 +518,7 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
     for (LocalCreditTransactionEntity transaction :
         ledgerRoot.getLocalCreditCardTransactionsSince(from)) {
       if (!transaction.getTimestamp().isAfter(to)) {
-        card = card.add(BigDecimal.valueOf(transaction.getAmountDollars()));
+        card = card.add(transaction.getAmount());
       }
     }
 
@@ -448,32 +536,17 @@ public class FinancialLedgerServiceImpl implements FinancialLedgerService {
       return BigDecimal.ZERO;
     }
 
-    // Both sources are inclusive at both ends -- safe here because addSplit() guarantees adjacent
-    // periods' boundaries never actually coincide (the new period's startDate is always strictly
-    // after the closing period's endDate), so a mobile credit can never fall within both periods'
-    // [from, to] ranges at once.
-    int creditsUsed;
-    if (slaveMode) {
-      // A slave's own user store never records mobile/web spends (user accounts and credits are
-      // master-owned) -- master mirrors them down into this ledger instead.
-      creditsUsed = ledgerRoot.getMobileCreditUsagesBetween(ownLocationId, from, to).stream()
-          .filter(u -> u.getAmount() < 0)
-          .mapToInt(u -> -u.getAmount())
-          .sum();
-    } else {
-      creditsUsed = userService.getCreditLedgerForLocation(ownLocationId, from, to).stream()
-          .filter(t -> t.amount() < 0)
-          .mapToInt(t -> -t.amount())
-          .sum();
+    // Mobile revenue is the Web/Mobile Add Funds purchases made for this location -- each recorded
+    // once, in full, when it was paid (on master, mirrored down to this slave), exactly like the
+    // card reader's -- not the credits patrons later spend, which would count bonus credits as
+    // money and defer revenue until the songs were played. Inclusive at both ends, safe because
+    // addSplit() keeps adjacent periods' boundaries from coinciding.
+    BigDecimal mobile = BigDecimal.ZERO;
+    for (LocalMobileTransactionEntity transaction :
+        ledgerRoot.getLocalMobileTransactionsBetween(ownLocationId, from, to)) {
+      mobile = mobile.add(transaction.getAmount());
     }
-
-    int creditsPerDollar = pricingService.resolvePricingConfig(ownLocationId).creditsPerDollar();
-    if (creditsPerDollar <= 0) {
-      return BigDecimal.ZERO;
-    }
-
-    return BigDecimal.valueOf(creditsUsed)
-        .divide(BigDecimal.valueOf(creditsPerDollar), 2, RoundingMode.HALF_UP);
+    return mobile;
   }
 
   private record PeriodTotals(BigDecimal cash, BigDecimal card, BigDecimal mobile,

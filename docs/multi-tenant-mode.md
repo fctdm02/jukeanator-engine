@@ -217,7 +217,7 @@ The web/mobile app calls the now-public `GET /api/locations` on master and gets 
 Once they pick "Rock on Third," every subsequent library call goes to `/api/locations/{locationId}/song-library/...` on master. These reads are served straight from that location's last-synced snapshot on master's own disk — no round trip to the slave, so browsing is fast even over a flaky connection.
 
 ## 7. Patron buys credits and queues a song
-Credit purchase/balance is entirely master-side (`/api/users/*`). Adding a song hits `POST /api/locations/{locationId}/song-queue/addSong` on master, which:
+Credit purchase/balance is entirely master-side (`/api/users/*`). *(Since changed: credits are bought for, and usable only at, the selected location, and each purchase is recorded in that location's financial ledger and mirrored to its slave. See [per-location-accounts.md](per-location-accounts.md).)* Adding a song hits `POST /api/locations/{locationId}/song-queue/addSong` on master, which:
 - pushes a live command down the persistent connection to that specific slave
 - the slave executes it against its own real local queue (the same queue the JFC touchscreen uses) and replies
 - master charges the patron's credits and writes a ledger entry tagged with that `locationId`
@@ -226,7 +226,7 @@ Credit purchase/balance is entirely master-side (`/api/users/*`). Adding a song 
 If the slave's connection is down at that moment, the patron gets an immediate, clean "location offline" error — no hanging.
 
 ## 8. Bar-owner accounting
-An admin can pull `GET /api/locations/{locationId}/credit-ledger?from=...&to=...` to see every credit spend tied to that location — user, song, amount, resulting balance.
+*(Since changed: the location's Mobile split total is now the Add Funds purchases made for it, not the credits spent there. See [per-location-accounts.md](per-location-accounts.md).)* An admin can pull `GET /api/locations/{locationId}/credit-ledger?from=...&to=...` to see every credit spend tied to that location — user, song, amount, resulting balance.
 
 ## The offline guarantee, at every step
 If master is unreachable — at slave startup or any time later — the physical jukebox's touchscreen, bill acceptor, local queue, and player keep working exactly as they always have. The master relationship only affects *remote* web/mobile access to that location; it's never a dependency for the location running on its own.

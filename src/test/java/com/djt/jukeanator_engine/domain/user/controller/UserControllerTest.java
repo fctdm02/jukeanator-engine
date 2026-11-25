@@ -40,6 +40,7 @@ import com.djt.jukeanator_engine.domain.user.dto.AuthResponse;
 import com.djt.jukeanator_engine.domain.user.dto.ChangePasswordRequest;
 import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.domain.user.dto.HomePageDto;
+import com.djt.jukeanator_engine.domain.user.dto.LocationBalanceDto;
 import com.djt.jukeanator_engine.domain.user.dto.LoginRequest;
 import com.djt.jukeanator_engine.domain.user.dto.PlaylistSummaryDto;
 import com.djt.jukeanator_engine.domain.user.dto.RegisterRequest;
@@ -131,28 +132,30 @@ class UserControllerTest extends AbstractControllerTest {
   void me_returnsProfileForAuthenticatedPrincipal() throws Exception {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
-    UserProfileDto profile =
-        new UserProfileDto(1, "Jane", "Doe", "jane@example.com", 10, List.of());
+    UserProfileDto profile = new UserProfileDto(1, "Jane", "Doe", "jane@example.com",
+        List.of(new LocationBalanceDto(12, "Main Street Pub", 10)));
     when(userService.getProfile("jane@example.com")).thenReturn(profile);
 
     mockMvc.perform(get("/api/users/me"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.emailAddress", is("jane@example.com")))
-        .andExpect(jsonPath("$.numCredits", is(10)));
+        .andExpect(jsonPath("$.balances[0].locationId", is(12)))
+        .andExpect(jsonPath("$.balances[0].locationName", is("Main Street Pub")))
+        .andExpect(jsonPath("$.balances[0].numCredits", is(10)));
   }
 
   @Test
   void createPlaylist_delegatesToService() throws Exception {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
-    when(userService.createPlaylist("jane@example.com", "Road Trip")).thenReturn(true);
+    when(userService.createPlaylist("jane@example.com", 12, "Road Trip")).thenReturn(true);
 
-    mockMvc.perform(post("/api/users/playlists")
+    mockMvc.perform(post("/api/users/playlists").param("locationId", "12")
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(Map.of("playlistName", "Road Trip"))))
         .andExpect(status().isNoContent());
 
-    verify(userService).createPlaylist("jane@example.com", "Road Trip");
+    verify(userService).createPlaylist("jane@example.com", 12, "Road Trip");
   }
 
   @Test
@@ -285,21 +288,22 @@ class UserControllerTest extends AbstractControllerTest {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     UserHomePageDto homePage = new UserHomePageDto(List.of(), List.of("My Favorites"), List.of(),
-        List.of(), List.of(), List.of("beatles"));
+        List.of(), List.of(), List.of("beatles"), 14);
     when(userService.getHomePage("jane@example.com", 12)).thenReturn(homePage);
 
     mockMvc.perform(get("/api/users/home").param("locationId", "12"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.myPlaylists[0]", is("My Favorites")))
-        .andExpect(jsonPath("$.searchHistory[0]", is("beatles")));
+        .andExpect(jsonPath("$.searchHistory[0]", is("beatles")))
+        .andExpect(jsonPath("$.numCredits", is(14)));
   }
 
   @Test
   void getCreditPackages_returnsListFromService() throws Exception {
-    when(userService.getCreditPackages()).thenReturn(
+    when(userService.getCreditPackages(12)).thenReturn(
         List.of(new CreditPackageDto("small", 10, 0, new BigDecimal("4.99"), null)));
 
-    mockMvc.perform(get("/api/users/credit-packages"))
+    mockMvc.perform(get("/api/users/credit-packages").param("locationId", "12"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].id", is("small")))
         .andExpect(jsonPath("$[0].credits", is(10)))
@@ -310,10 +314,10 @@ class UserControllerTest extends AbstractControllerTest {
   void getPlaylists_returnsSummariesFromService() throws Exception {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
-    when(userService.getPlaylists("jane@example.com"))
+    when(userService.getPlaylists("jane@example.com", 12))
         .thenReturn(List.of(new PlaylistSummaryDto("My Favorites", 3, 5)));
 
-    mockMvc.perform(get("/api/users/playlists"))
+    mockMvc.perform(get("/api/users/playlists").param("locationId", "12"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].name", is("My Favorites")))
         .andExpect(jsonPath("$[0].songCount", is(3)))
@@ -324,10 +328,10 @@ class UserControllerTest extends AbstractControllerTest {
   void getFavoriteSongIdentifiers_returnsListFromService() throws Exception {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
-    when(userService.getFavoriteSongIdentifiers("jane@example.com"))
+    when(userService.getFavoriteSongIdentifiers("jane@example.com", 7))
         .thenReturn(List.of(new SongIdentifier(7, 3, 4)));
 
-    mockMvc.perform(get("/api/users/playlists/favorites/songs"))
+    mockMvc.perform(get("/api/users/playlists/favorites/songs").param("locationId", "7"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].locationId", is(7)))
         .andExpect(jsonPath("$[0].albumId", is(3)))
@@ -339,10 +343,11 @@ class UserControllerTest extends AbstractControllerTest {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     SongDto song = new SongDto(1, "Genre", 1, "Artist", 2, "Album", "/cover.jpg", 3, "Song", 1, 5);
-    when(userService.getPlaylistSongs("jane@example.com", "My Favorites"))
+    when(userService.getPlaylistSongs("jane@example.com", 12, "My Favorites"))
         .thenReturn(List.of(song));
 
-    mockMvc.perform(get("/api/users/playlists/{playlistName}/songs", "My Favorites"))
+    mockMvc.perform(get("/api/users/playlists/{playlistName}/songs", "My Favorites")
+            .param("locationId", "12"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].songName", is("Song")));
   }
@@ -362,7 +367,7 @@ class UserControllerTest extends AbstractControllerTest {
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
     UpdateProfileRequest request = new UpdateProfileRequest("Janet", "Doe");
     UserProfileDto updated =
-        new UserProfileDto(1, "Janet", "Doe", "jane@example.com", 10, List.of());
+        new UserProfileDto(1, "Janet", "Doe", "jane@example.com", List.of());
     when(userService.updateProfile("jane@example.com", request)).thenReturn(updated);
 
     mockMvc.perform(put("/api/users/me")
@@ -401,9 +406,9 @@ class UserControllerTest extends AbstractControllerTest {
   void addFunds_delegatesToServiceAndReturnsResponseBody() throws Exception {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
-    AddFundsRequest request = new AddFundsRequest("pkg-7", "fake-nonce");
+    AddFundsRequest request = new AddFundsRequest(12, "pkg-7", "fake-nonce");
     AddFundsResponseDto responseDto = new AddFundsResponseDto(20, 12, 2,
-        "PayPal", "txn-123", java.time.Instant.now());
+        "PayPal", "txn-123", java.time.Instant.now(), 12, "Main Street Pub");
     when(userService.addFunds("jane@example.com", request)).thenReturn(responseDto);
 
     mockMvc.perform(post("/api/users/add-funds")
@@ -411,6 +416,7 @@ class UserControllerTest extends AbstractControllerTest {
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.numCredits", is(20)))
+        .andExpect(jsonPath("$.locationId", is(12)))
         .andExpect(jsonPath("$.paymentSource", is("PayPal")));
 
     verify(userService).addFunds("jane@example.com", request);
@@ -420,7 +426,7 @@ class UserControllerTest extends AbstractControllerTest {
   void addFunds_returns402WhenPaymentDeclined() throws Exception {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
-    AddFundsRequest request = new AddFundsRequest("pkg-7", "fake-nonce");
+    AddFundsRequest request = new AddFundsRequest(12, "pkg-7", "fake-nonce");
     when(userService.addFunds("jane@example.com", request))
         .thenThrow(new PaymentException("Payment declined: Do Not Honor"));
 
@@ -478,12 +484,13 @@ class UserControllerTest extends AbstractControllerTest {
   void deletePlaylist_delegatesToService() throws Exception {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken("jane@example.com", null, List.of()));
-    when(userService.deletePlaylist("jane@example.com", "Road Trip")).thenReturn(true);
+    when(userService.deletePlaylist("jane@example.com", 12, "Road Trip")).thenReturn(true);
 
-    mockMvc.perform(delete("/api/users/playlists/{playlistName}", "Road Trip"))
+    mockMvc.perform(delete("/api/users/playlists/{playlistName}", "Road Trip")
+            .param("locationId", "12"))
         .andExpect(status().isNoContent());
 
-    verify(userService).deletePlaylist("jane@example.com", "Road Trip");
+    verify(userService).deletePlaylist("jane@example.com", 12, "Road Trip");
   }
 
   @Test
@@ -493,10 +500,11 @@ class UserControllerTest extends AbstractControllerTest {
     List<SongIdentifier> songs = List.of(new SongIdentifier(null, 3, 4), new SongIdentifier(null, 3, 5));
 
     mockMvc.perform(put("/api/users/playlists/{playlistName}/songs", "My Favorites")
+            .param("locationId", "12")
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(songs)))
         .andExpect(status().isNoContent());
 
-    verify(userService).reorderPlaylistSongs("jane@example.com", "My Favorites", songs);
+    verify(userService).reorderPlaylistSongs("jane@example.com", 12, "My Favorites", songs);
   }
 }

@@ -14,6 +14,10 @@ import jakarta.persistence.Table;
 import com.djt.jukeanator_engine.domain.common.model.AbstractPersistentEntity;
 import com.djt.jukeanator_engine.domain.songqueue.dto.SongIdentifier;
 
+/**
+ * A patron's playlist at one location -- owned by a {@link UserLocationAccountEntity}, so every
+ * song in it is from that location's library. Names are unique within the account.
+ */
 @Entity
 @Table(name = "user_playlist")
 public class PlaylistEntity extends AbstractPersistentEntity {
@@ -22,16 +26,11 @@ public class PlaylistEntity extends AbstractPersistentEntity {
 
   public static final String MY_FAVORITES_PLAYLIST_NAME = "My Favorites";
 
-  // Persistence-only back-reference -- the FK column JPA needs to own the UserEntity <-> playlist
-  // relationship. Domain logic identifies ownership via the `owner` (email) column below, exactly
-  // as it did before this class was JPA-mapped; UserEntity.createPlaylist() is the single place
-  // that keeps this back-reference in sync (see setUser()).
+  // Persistence-only back-reference -- UserLocationAccountEntity.createPlaylist()/
+  // restorePlaylist() keep it in sync.
   @ManyToOne(fetch = FetchType.EAGER)
-  @JoinColumn(name = "user_id")
-  private UserEntity user;
-
-  @Column(nullable = false)
-  private String owner;
+  @JoinColumn(name = "user_location_account_id", nullable = false)
+  private UserLocationAccountEntity locationAccount;
 
   @Column(nullable = false)
   private String name;
@@ -43,32 +42,34 @@ public class PlaylistEntity extends AbstractPersistentEntity {
 
   protected PlaylistEntity() {} // for JPA
 
-  public PlaylistEntity(Integer persistentIdentity, String owner, String name) {
-    this(persistentIdentity, owner, name, new ArrayList<>());
+  public PlaylistEntity(Integer persistentIdentity, String name) {
+    this(persistentIdentity, name, new ArrayList<>());
   }
 
-  public PlaylistEntity(Integer persistentIdentity, String owner, String name,
-      List<SongIdentifier> songs) {
+  public PlaylistEntity(Integer persistentIdentity, String name, List<SongIdentifier> songs) {
     super(persistentIdentity);
-    this.owner = owner;
     this.name = name;
-    this.owner = owner;
-    this.songs = songs;
+    this.songs = songs == null ? new ArrayList<>() : songs;
   }
 
-  void setUser(UserEntity user) {
-    this.user = user;
+  void setLocationAccount(UserLocationAccountEntity locationAccount) {
+    this.locationAccount = locationAccount;
+  }
+
+  public Integer getLocationId() {
+    return locationAccount != null ? locationAccount.getLocationId() : null;
   }
 
   public String getOwner() {
-    return owner;
+    return locationAccount != null ? locationAccount.getUserEmail() : null;
   }
 
   public String getName() {
     return name;
   }
 
-  // Package-private: only UserEntity.renamePlaylist renames a playlist (it enforces uniqueness).
+  // Package-private: only UserLocationAccountEntity.renamePlaylist renames a playlist (it
+  // enforces uniqueness).
   void setName(String name) {
     this.name = name;
   }
@@ -89,7 +90,7 @@ public class PlaylistEntity extends AbstractPersistentEntity {
     return this.songs.remove(songIdentifier);
   }
 
-  // Package-private: only UserEntity.changeLocationId re-tags a playlist.
+  // Package-private: only UserLocationAccountEntity.changeLocationId re-tags a playlist.
   void changeLocationId(Integer oldLocationId, Integer newLocationId) {
     if (this.songs != null) {
       this.songs.replaceAll(s -> s.withLocationIdChanged(oldLocationId, newLocationId));
@@ -98,6 +99,6 @@ public class PlaylistEntity extends AbstractPersistentEntity {
 
   @Override
   public String getNaturalIdentity() {
-    return new StringBuilder().append(this.owner).append(this.name).toString();
+    return getOwner() + "@" + getLocationId() + "/" + this.name;
   }
 }

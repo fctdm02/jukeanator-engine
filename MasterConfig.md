@@ -858,14 +858,25 @@ systemctl stop jukeanator
 mysql jukeanator
 ```
 
-To activate an account and give it credits:
+To activate an account:
 
 ```
 UPDATE user_account
    SET status = 'ACTIVE', verification_token_hash = NULL, verification_token_expires_at = NULL,
-       num_credits = 99, version = version + 1, date_updated = NOW()
+       version = version + 1, date_updated = NOW()
  WHERE email_address = 'guest@example.com';
 ```
+
+Credits belong to one location (see [docs/per-location-accounts.md](docs/per-location-accounts.md)), so there is no account-wide balance to set. The account's balance at a location is in `user_location_account`, That row is created the first time the signed-in account selects the location in the web UI (loading its home page creates it). To give a test account credits at a location:
+
+```
+UPDATE user_location_account a
+  JOIN user_account u ON u.persistent_identity = a.user_id
+   SET a.num_credits = 99, a.version = a.version + 1, a.date_updated = NOW()
+ WHERE u.email_address = 'guest@example.com' AND a.location_id = 2;
+```
+
+Credits given this way have no Add Funds purchase behind them, so they never appear in the location's financial ledger. Use them for testing only.
 
 To make an account an administrator (needed for `/admin/licenses.html`):
 

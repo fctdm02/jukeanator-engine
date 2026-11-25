@@ -1,8 +1,11 @@
 package com.djt.jukeanator_engine.domain.user.service;
 
+import java.util.List;
 import com.djt.jukeanator_engine.config.AppProperties;
 import com.djt.jukeanator_engine.domain.location.model.LocationEntity;
 import com.djt.jukeanator_engine.domain.location.service.LocationService;
+import com.djt.jukeanator_engine.domain.user.config.AddFundsProperties;
+import com.djt.jukeanator_engine.domain.user.dto.CreditPackageDto;
 import com.djt.jukeanator_engine.ui.config.JukeANatorUserInterfaceProperties;
 
 public class PricingServiceImpl implements PricingService {
@@ -10,12 +13,29 @@ public class PricingServiceImpl implements PricingService {
   private final AppProperties appProperties;
   private final JukeANatorUserInterfaceProperties userInterfaceProperties;
   private final LocationService locationService;
+  private final List<CreditPackageDto> ownCreditPackages;
 
   public PricingServiceImpl(AppProperties appProperties,
-      JukeANatorUserInterfaceProperties userInterfaceProperties, LocationService locationService) {
+      JukeANatorUserInterfaceProperties userInterfaceProperties, LocationService locationService,
+      AddFundsProperties addFundsProperties) {
     this.appProperties = appProperties;
     this.userInterfaceProperties = userInterfaceProperties;
     this.locationService = locationService;
+    this.ownCreditPackages = CreditPackageCatalog.validate(addFundsProperties.toCreditPackages());
+  }
+
+  @Override
+  public List<CreditPackageDto> resolveCreditPackages(Integer locationId) {
+
+    if (!appProperties.isMaster()) {
+      return ownCreditPackages;
+    }
+    LocationEntity location =
+        locationId == null ? null : locationService.getLocationByIdNullIfNotExists(locationId);
+    if (location == null || location.getCreditPackages().isEmpty()) {
+      return ownCreditPackages;
+    }
+    return List.copyOf(location.getCreditPackages());
   }
 
   @Override

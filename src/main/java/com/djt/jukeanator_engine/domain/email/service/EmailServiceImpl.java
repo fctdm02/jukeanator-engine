@@ -34,11 +34,11 @@ public class EmailServiceImpl implements EmailService {
   @Override
   public void sendPurchaseReceiptEmail(String toAddress, String firstName, int credits,
       int bonusCredits, BigDecimal amountUsd, String paymentSource, String transactionId,
-      Instant timestamp, int newBalance) {
+      Instant timestamp, int newBalance, String locationName) {
 
     send(new String[] {toAddress}, "Your JukeANator receipt", buildReceiptBody(firstName, credits,
-        bonusCredits, amountUsd, paymentSource, transactionId, timestamp, newBalance),
-        "purchase receipt");
+        bonusCredits, amountUsd, paymentSource, transactionId, timestamp, newBalance,
+        locationName), "purchase receipt");
   }
 
   @Override
@@ -125,7 +125,7 @@ public class EmailServiceImpl implements EmailService {
 
   private String buildReceiptBody(String firstName, int credits, int bonusCredits,
       BigDecimal amountUsd, String paymentSource, String transactionId, Instant timestamp,
-      int newBalance) {
+      int newBalance, String locationName) {
 
     StringBuilder body = new StringBuilder();
     body.append("Hi ").append(firstName).append(",\n\n");
@@ -135,11 +135,17 @@ public class EmailServiceImpl implements EmailService {
       body.append(" (+").append(bonusCredits).append(" bonus)");
     }
     body.append('\n');
+    if (locationName != null) {
+      // Credits are bought for one location and can be used only there.
+      body.append("Location: ").append(locationName)
+          .append(" (these credits can be used only at this location)\n");
+    }
     body.append("Amount charged: $").append(money(amountUsd)).append('\n');
     body.append("Payment method: ").append(paymentSource).append('\n');
     body.append("Transaction ID: ").append(transactionId).append('\n');
     body.append("Date: ").append(TIMESTAMP_FORMAT.format(timestamp)).append('\n');
-    body.append("New balance: ").append(newBalance).append(" credits\n\n");
+    body.append("New balance").append(locationName != null ? " at " + locationName : "")
+        .append(": ").append(newBalance).append(" credits\n\n");
     body.append("Enjoy playing music!\n");
     return body.toString();
   }

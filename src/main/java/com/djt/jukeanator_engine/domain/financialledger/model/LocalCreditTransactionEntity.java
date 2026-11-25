@@ -1,5 +1,6 @@
 package com.djt.jukeanator_engine.domain.financialledger.model;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
@@ -25,7 +26,8 @@ public class LocalCreditTransactionEntity extends AbstractLocationTransactionEnt
 
   public LocalCreditTransactionEntity(Integer persistentIdentity, int amountDollars,
       Instant timestamp, Integer locationId, Integer sourceTransactionId) {
-    super(persistentIdentity, amountDollars, timestamp, locationId, sourceTransactionId);
+    super(persistentIdentity, BigDecimal.valueOf(amountDollars), timestamp, locationId,
+        sourceTransactionId);
   }
 
   @Override

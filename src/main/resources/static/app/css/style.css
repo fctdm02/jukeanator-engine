@@ -701,6 +701,14 @@ input.pw-valid:focus {
   font-weight: 700;
 }
 
+/* Balances at the patron's other locations, under the selected location's. */
+.funds-other {
+  color: var(--text);
+  font-size: 0.85rem;
+  opacity: 0.75;
+  margin-top: 0.15rem;
+}
+
 .menu-section-label {
   color: var(--muted);
   font-size: 0.82rem;
@@ -859,6 +867,15 @@ input.pw-valid:focus {
 /* Add Funds content */
 .add-funds-content {
   padding: 0.5rem 0 1rem;
+}
+
+/* Credits are bought for one location: say which, above the packages. */
+.add-funds-location-notice {
+  background: rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
 }
 
 .package-card {
@@ -1068,6 +1085,75 @@ input {
   padding: 0;
   line-height: 1;
   flex-shrink: 0;
+}
+
+/* ── Voice search: the microphone at the right end of a search bar ────────── */
+
+.voice-search-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  /* Negative margins keep the bar's height and right inset as they were. */
+  margin: -6px -8px -6px 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
+}
+
+.voice-search-btn svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.voice-search-btn:hover {
+  color: var(--text);
+}
+
+.voice-search-btn:active {
+  transform: scale(0.92);
+}
+
+.voice-search-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.voice-search-btn.listening {
+  color: #fff;
+  background: var(--accent);
+}
+
+/* A soft ring that keeps pulsing outward while the microphone is listening. */
+.voice-search-btn.listening::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+  animation: voice-search-pulse 1.4s ease-out infinite;
+}
+
+@keyframes voice-search-pulse {
+  from { transform: scale(1);   opacity: 0.75; }
+  to   { transform: scale(1.75); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-search-btn.listening::after {
+    animation: none;
+    opacity: 0;
+  }
 }
 
 /* Recent searches */

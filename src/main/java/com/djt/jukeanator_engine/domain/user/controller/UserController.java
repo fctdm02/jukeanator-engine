@@ -154,9 +154,14 @@ public class UserController {
     return ResponseEntity.ok(userService.getProfile(emailAddress));
   }
 
+  /**
+   * The Add Funds packages sold for {@code locationId} -- the location the credits would be bought
+   * for and usable at (defaults to this instance's own location on standalone/slave).
+   */
   @GetMapping("/credit-packages")
-  public ResponseEntity<java.util.List<CreditPackageDto>> getCreditPackages() {
-    return ResponseEntity.ok(userService.getCreditPackages());
+  public ResponseEntity<java.util.List<CreditPackageDto>> getCreditPackages(
+      @RequestParam(required = false) Integer locationId) {
+    return ResponseEntity.ok(userService.getCreditPackages(resolveLocationId(locationId)));
   }
 
   /**
@@ -227,30 +232,35 @@ public class UserController {
 
   @PostMapping("/playlists")
   public ResponseEntity<Void> createPlaylist(@AuthenticationPrincipal String emailAddress,
-      @RequestBody Map<String, String> body) throws EntityAlreadyExistsException {
+      @RequestParam(required = false) Integer locationId, @RequestBody Map<String, String> body)
+      throws EntityAlreadyExistsException {
     String playlistName = body.get("playlistName");
     if (playlistName != null && !playlistName.isBlank()) {
-      userService.createPlaylist(emailAddress, playlistName.strip());
+      userService.createPlaylist(emailAddress, resolveLocationId(locationId),
+          playlistName.strip());
     }
     return ResponseEntity.noContent().build();
   }
 
   @DeleteMapping("/playlists/{playlistName}")
   public ResponseEntity<Void> deletePlaylist(@AuthenticationPrincipal String emailAddress,
-      @PathVariable String playlistName) throws EntityDoesNotExistException {
-    userService.deletePlaylist(emailAddress, playlistName);
+      @PathVariable String playlistName, @RequestParam(required = false) Integer locationId)
+      throws EntityDoesNotExistException {
+    userService.deletePlaylist(emailAddress, resolveLocationId(locationId), playlistName);
     return ResponseEntity.noContent().build();
   }
 
   @PutMapping("/playlists/{playlistName}")
   public ResponseEntity<Void> renamePlaylist(@AuthenticationPrincipal String emailAddress,
-      @PathVariable String playlistName, @RequestBody Map<String, String> body)
+      @PathVariable String playlistName, @RequestParam(required = false) Integer locationId,
+      @RequestBody Map<String, String> body)
       throws EntityDoesNotExistException, EntityAlreadyExistsException {
     String newPlaylistName = body.get("playlistName");
     if (newPlaylistName == null || newPlaylistName.isBlank()) {
       return ResponseEntity.badRequest().build();
     }
-    userService.renamePlaylist(emailAddress, playlistName, newPlaylistName.strip());
+    userService.renamePlaylist(emailAddress, resolveLocationId(locationId), playlistName,
+        newPlaylistName.strip());
     return ResponseEntity.noContent().build();
   }
 
@@ -315,60 +325,66 @@ public class UserController {
 
   @GetMapping("/playlists")
   public ResponseEntity<List<PlaylistSummaryDto>> getPlaylists(
-      @AuthenticationPrincipal String emailAddress) {
-    return ResponseEntity.ok(userService.getPlaylists(emailAddress));
+      @AuthenticationPrincipal String emailAddress, @RequestParam(required = false) Integer locationId) {
+    return ResponseEntity.ok(userService.getPlaylists(emailAddress, resolveLocationId(locationId)));
   }
 
   @GetMapping("/playlists/favorites/songs")
   public ResponseEntity<List<SongIdentifier>> getFavoriteSongIdentifiers(
-      @AuthenticationPrincipal String emailAddress) {
-    return ResponseEntity.ok(userService.getFavoriteSongIdentifiers(emailAddress));
+      @AuthenticationPrincipal String emailAddress, @RequestParam(required = false) Integer locationId) {
+    return ResponseEntity.ok(
+        userService.getFavoriteSongIdentifiers(emailAddress, resolveLocationId(locationId)));
   }
 
   @GetMapping("/playlists/{playlistName}/songs")
   public ResponseEntity<List<SongDto>> getPlaylistSongs(
       @AuthenticationPrincipal String emailAddress,
-      @PathVariable String playlistName) throws EntityDoesNotExistException {
-    return ResponseEntity.ok(userService.getPlaylistSongs(emailAddress, playlistName));
+      @PathVariable String playlistName, @RequestParam(required = false) Integer locationId)
+      throws EntityDoesNotExistException {
+    return ResponseEntity.ok(
+        userService.getPlaylistSongs(emailAddress, resolveLocationId(locationId), playlistName));
   }
 
   /** The playlist's song identifiers (with locationId) -- used to play the playlist. */
   @GetMapping("/playlists/{playlistName}/songIdentifiers")
   public ResponseEntity<List<SongIdentifier>> getPlaylistSongIdentifiers(
       @AuthenticationPrincipal String emailAddress,
-      @PathVariable String playlistName) throws EntityDoesNotExistException {
-    return ResponseEntity.ok(userService.getPlaylistSongIdentifiers(emailAddress, playlistName));
+      @PathVariable String playlistName, @RequestParam(required = false) Integer locationId)
+      throws EntityDoesNotExistException {
+    return ResponseEntity.ok(userService.getPlaylistSongIdentifiers(emailAddress,
+        resolveLocationId(locationId), playlistName));
   }
 
   @PutMapping("/playlists/{playlistName}/songs")
   public ResponseEntity<Void> reorderPlaylistSongs(
       @AuthenticationPrincipal String emailAddress,
-      @PathVariable String playlistName,
+      @PathVariable String playlistName, @RequestParam(required = false) Integer locationId,
       @RequestBody List<SongIdentifier> songs) throws EntityDoesNotExistException {
-    userService.reorderPlaylistSongs(emailAddress, playlistName, songs);
+    userService.reorderPlaylistSongs(emailAddress, resolveLocationId(locationId), playlistName,
+        songs);
     return ResponseEntity.noContent().build();
   }
 
   /**
    * One image URL per playlist: a redirect to My Favorites' own image, to the cover art of the
-   * playlist's first song at the location that song came from, or to the generic playlist image.
+   * playlist's first song (at {@code locationId}, the playlist's location), or to the generic
+   * playlist image.
    */
   @GetMapping("/playlists/{playlistName}/coverArt")
   public ResponseEntity<Void> getPlaylistCoverArt(
       @AuthenticationPrincipal String emailAddress,
-      @PathVariable String playlistName) {
+      @PathVariable String playlistName, @RequestParam(required = false) Integer locationId) {
     if (PlaylistEntity.MY_FAVORITES_PLAYLIST_NAME.equals(playlistName)) {
       return redirect("/images/MyFavorites_Playlist.png");
     }
     try {
-      List<SongIdentifier> songs =
-          userService.getPlaylistSongIdentifiers(emailAddress, playlistName);
-      if (!songs.isEmpty()) {
-        SongIdentifier first = songs.get(0);
-        Integer locationId = resolveLocationId(first);
-        if (locationId != null) {
-          return redirect("/api/locations/" + locationId + "/song-library/albums/"
-              + first.getAlbumId() + "/coverArt");
+      Integer playlistLocationId = resolveLocationId(locationId);
+      if (playlistLocationId != null) {
+        List<SongIdentifier> songs = userService.getPlaylistSongIdentifiers(emailAddress,
+            playlistLocationId, playlistName);
+        if (!songs.isEmpty()) {
+          return redirect("/api/locations/" + playlistLocationId + "/song-library/albums/"
+              + songs.get(0).getAlbumId() + "/coverArt");
         }
       }
     } catch (EntityDoesNotExistException e) {

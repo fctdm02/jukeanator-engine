@@ -47,7 +47,8 @@ class EmailServiceImplTest {
   void purchaseReceipt_goesToThePurchaser() {
 
     new EmailServiceImpl(mailSender, FROM, List.of()).sendPurchaseReceiptEmail("pat@example.com",
-        "Pat", 20, 5, new BigDecimal("10"), "Visa 1234", "tx-1", Instant.now(), 25);
+        "Pat", 20, 5, new BigDecimal("10"), "Visa 1234", "tx-1", Instant.now(), 25,
+        "Main Street Pub");
 
     SimpleMailMessage message = sentMessage();
     assertEquals(FROM, message.getFrom());

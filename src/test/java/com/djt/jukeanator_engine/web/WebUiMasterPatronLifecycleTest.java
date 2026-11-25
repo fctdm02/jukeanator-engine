@@ -181,47 +181,57 @@ class WebUiMasterPatronLifecycleTest {
     assertEquals("fake-client-token", ui.get(token, "/api/users/payment/client-token")
         .expect(200).json().path("clientToken").asText());
     JsonNode purchase = ui.post(token, "/api/users/add-funds",
-        new AddFundsRequest("pkg-7", "fake-nonce")).expect(200).json();
+        new AddFundsRequest(locationId, "pkg-7", "fake-nonce")).expect(200).json();
     assertEquals(14, purchase.path("numCredits").asInt());
+    assertEquals(locationId.intValue(), purchase.path("locationId").asInt());
     assertEquals(14, balance(token));
 
-    // ── Playlists hold songs tagged with the location they came from ──────────────────────
-    ui.get(token, "/api/users/home").expect(200);
+    // ── Playlists belong to the patron's account at the picked location ───────────────────
+    // Master has no location of its own, so every playlist call names the picked one.
+    ui.get(token, "/api/users/home?locationId={locationId}", locationId).expect(200);
+    ui.get(token, "/api/users/playlists").expect(400);
     ui.post(token, "/api/users/playlists/favorites/songs", songRef(501, 9002)).expect(204);
-    ui.post(token, "/api/users/playlists", Map.of("playlistName", "Tavern Night")).expect(204);
-    ui.post(token, "/api/users/playlists/{name}/songs", songRef(502, 9003), "Tavern Night")
-        .expect(204);
-    ui.post(token, "/api/users/playlists/{name}/songs", songRef(501, 9001), "Tavern Night")
-        .expect(204);
+    ui.post(token, "/api/users/playlists?locationId={locationId}",
+        Map.of("playlistName", "Tavern Night"), locationId).expect(204);
+    ui.post(token, "/api/users/playlists/{name}/songs?locationId={locationId}",
+        songRef(502, 9003), "Tavern Night", locationId).expect(204);
+    ui.post(token, "/api/users/playlists/{name}/songs?locationId={locationId}",
+        songRef(501, 9001), "Tavern Night", locationId).expect(204);
 
     // A song the location's library does not have.
     ui.post(token, "/api/users/playlists/favorites/songs", songRef(501, 4242)).expect(404);
 
-    JsonNode favorites = ui.get(token, "/api/users/playlists/favorites/songs").expect(200).json();
+    JsonNode favorites = ui.get(token,
+        "/api/users/playlists/favorites/songs?locationId={locationId}", locationId)
+        .expect(200).json();
     assertEquals(List.of("501/9002"), keys(favorites));
     assertEquals(locationId.intValue(), favorites.get(0).path("locationId").asInt());
 
     // The playlist screens resolve each song against its own location's library -- master has
     // no library of its own to look them up in.
-    JsonNode favoriteSongs = ui.get(token, "/api/users/playlists/{name}/songs", MY_FAVORITES)
+    JsonNode favoriteSongs = ui.get(token,
+        "/api/users/playlists/{name}/songs?locationId={locationId}", MY_FAVORITES, locationId)
         .expect(200).json();
     assertEquals(List.of("501/9002"), keys(favoriteSongs));
     assertEquals("Song B", favoriteSongs.get(0).path("songName").asText());
-    JsonNode tavernNight = ui.get(token, "/api/users/playlists/{name}/songs", "Tavern Night")
+    JsonNode tavernNight = ui.get(token,
+        "/api/users/playlists/{name}/songs?locationId={locationId}", "Tavern Night", locationId)
         .expect(200).json();
     assertEquals(List.of("502/9003", "501/9001"), keys(tavernNight));
 
-    ui.put(token, "/api/users/playlists/{name}/songs",
+    ui.put(token, "/api/users/playlists/{name}/songs?locationId={locationId}",
         List.of(Map.of("albumId", 501, "songId", 9001), Map.of("albumId", 502, "songId", 9003)),
-        "Tavern Night").expect(204);
-    JsonNode reordered = ui.get(token, "/api/users/playlists/{name}/songIdentifiers",
-        "Tavern Night").expect(200).json();
+        "Tavern Night", locationId).expect(204);
+    JsonNode reordered = ui.get(token,
+        "/api/users/playlists/{name}/songIdentifiers?locationId={locationId}", "Tavern Night",
+        locationId).expect(200).json();
     assertEquals(List.of("501/9001", "502/9003"), keys(reordered));
     for (JsonNode id : reordered) {
       assertEquals(locationId.intValue(), id.path("locationId").asInt());
     }
 
-    JsonNode playlists = ui.get(token, "/api/users/playlists").expect(200).json();
+    JsonNode playlists = ui.get(token, "/api/users/playlists?locationId={locationId}",
+        locationId).expect(200).json();
     assertEquals(List.of(MY_FAVORITES, "Tavern Night"),
         list(playlists).stream().map(p -> p.path("name").asText()).toList());
     assertEquals(501, playlists.get(1).path("firstSongAlbumId").asInt());
@@ -234,7 +244,7 @@ class WebUiMasterPatronLifecycleTest {
     String token = ui.post(null, "/api/users/register",
         new RegisterRequest("Pat", "Ron", email, PASSWORD)).expect(200).json()
         .path("token").asText();
-    ui.post(token, "/api/users/add-funds", new AddFundsRequest("pkg-7", "fake-nonce"))
+    ui.post(token, "/api/users/add-funds", new AddFundsRequest(locationId, "pkg-7", "fake-nonce"))
         .expect(200);
 
     // The Song Queue screen and Now Playing widget: 503, which app.js shows as an empty queue.
@@ -309,7 +319,7 @@ class WebUiMasterPatronLifecycleTest {
     String token = ui.post(null, "/api/users/register",
         new RegisterRequest("Pat", "Ron", email, PASSWORD)).expect(200).json()
         .path("token").asText();
-    ui.post(token, "/api/users/add-funds", new AddFundsRequest("pkg-7", "fake-nonce"))
+    ui.post(token, "/api/users/add-funds", new AddFundsRequest(locationId, "pkg-7", "fake-nonce"))
         .expect(200);
 
     stomp.await(userDestination(email, "/queue/credits"),
@@ -348,8 +358,14 @@ class WebUiMasterPatronLifecycleTest {
   // Helpers
   // ─────────────────────────────────────────────────────────────────────────
 
+  /** The balance at the picked location, from the profile's per-location balances. */
   private int balance(String token) {
-    return ui.get(token, "/api/users/me").expect(200).json().path("numCredits").asInt();
+    for (JsonNode balance : ui.get(token, "/api/users/me").expect(200).json().path("balances")) {
+      if (balance.path("locationId").asInt() == locationId.intValue()) {
+        return balance.path("numCredits").asInt();
+      }
+    }
+    return 0;
   }
 
   private Map<String, Object> songRef(int albumId, int songId) {

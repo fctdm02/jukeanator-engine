@@ -14,6 +14,7 @@ import com.djt.jukeanator_engine.domain.common.exception.EntityDoesNotExistExcep
 import com.djt.jukeanator_engine.domain.user.model.PlaylistEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserAddFundsTransactionEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserEntity;
+import com.djt.jukeanator_engine.domain.user.model.UserLocationAccountEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserRootEntity;
 import com.djt.jukeanator_engine.domain.user.model.UserSongCreditUsageEntity;
 
@@ -124,58 +125,67 @@ public final class UserRepositoryJpaImpl implements UserRepository {
         if (persistedIds.contains(user.getPersistentIdentity())) {
 
           // The same placeholder-id problem described above applies just as much to a single new
-          // PlaylistEntity/UserSongCreditUsageEntity/UserAddFundsTransactionEntity added onto an
-          // otherwise-already-persisted user (e.g. UserServiceImpl.deductCredits() assigning
-          // UserEntity.nextUserSongCreditUsageIdentity()): merge() on a non-null id it doesn't
-          // recognize issues an UPDATE that matches zero rows instead of an INSERT, throwing
-          // OptimisticLockException. Unlike the brand-new-user persist() path below, merge() also
-          // returns a copy rather than mutating `user` in place, so its cascade wouldn't write the
-          // real generated id back onto our long-lived in-memory userRoot anyway -- persist() each
-          // new child directly first (which does mutate in place) so it's already a managed,
-          // real-id'd entity by the time merge(user) cascades over the rest of the (unchanged)
-          // collection.
+          // UserLocationAccountEntity, or a new PlaylistEntity/UserSongCreditUsageEntity/
+          // UserAddFundsTransactionEntity added onto an already-persisted account (e.g.
+          // UserServiceImpl.deductCredits() assigning nextSongCreditUsageIdentity()): merge() on a
+          // non-null id it doesn't recognize issues an UPDATE that matches zero rows instead of an
+          // INSERT, throwing OptimisticLockException. merge() also returns a copy rather than
+          // mutating `user` in place, so its cascade wouldn't write the real generated id back onto
+          // our long-lived in-memory userRoot anyway -- persist() each new entity directly first
+          // (which does mutate in place) so it's already a managed, real-id'd entity by the time
+          // merge(user) cascades over the rest of the graph.
           //
-          // Only a child whose id is NOT among this user's persisted ids is treated as new, so a
-          // placeholder must never equal one of them -- which is why every placeholder is minted
-          // one past the highest id already in its scope (see UserEntity.nextIdentity) rather than
-          // from a collection size, which can land on an existing real id and then either merge()
-          // over that row or be silently dropped from a HashSet keyed by id.
+          // Only an entity whose id is NOT among its parent's persisted ids is treated as new, so
+          // a placeholder must never equal one of them -- which is why every placeholder is minted
+          // one past the highest id already in its scope (see UserEntity.nextIdentity).
           boolean reIdentified = false;
-          Set<Integer> persistedUsageIds = new HashSet<>(entityManager
-              .createQuery("select t.persistentIdentity from UserSongCreditUsageEntity t "
-                  + "where t.user.persistentIdentity = :userId", Integer.class)
-              .setParameter("userId", user.getPersistentIdentity())
-              .getResultList());
-          for (UserSongCreditUsageEntity usage : user.getUserSongCreditUsages()) {
-            if (!persistedUsageIds.contains(usage.getPersistentIdentity())) {
-              usage.setPersistentIdentity(null);
-              entityManager.persist(usage);
-              reIdentified = true;
-            }
-          }
+          Set<Integer> persistedAccountIds = idsOf(
+              "select a.persistentIdentity from UserLocationAccountEntity a "
+                  + "where a.user.persistentIdentity = :parentId",
+              user.getPersistentIdentity());
 
-          Set<Integer> persistedAddFundsIds = new HashSet<>(entityManager
-              .createQuery("select t.persistentIdentity from UserAddFundsTransactionEntity t "
-                  + "where t.user.persistentIdentity = :userId", Integer.class)
-              .setParameter("userId", user.getPersistentIdentity())
-              .getResultList());
-          for (UserAddFundsTransactionEntity transaction : user.getUserAddFundsTransactions()) {
-            if (!persistedAddFundsIds.contains(transaction.getPersistentIdentity())) {
-              transaction.setPersistentIdentity(null);
-              entityManager.persist(transaction);
-              reIdentified = true;
-            }
-          }
+          for (UserLocationAccountEntity account : user.getLocationAccounts()) {
 
-          Set<Integer> persistedPlaylistIds = new HashSet<>(entityManager
-              .createQuery("select p.persistentIdentity from PlaylistEntity p "
-                  + "where p.user.persistentIdentity = :userId", Integer.class)
-              .setParameter("userId", user.getPersistentIdentity())
-              .getResultList());
-          for (PlaylistEntity playlist : user.getPlaylists()) {
-            if (!persistedPlaylistIds.contains(playlist.getPersistentIdentity())) {
-              playlist.setPersistentIdentity(null);
-              entityManager.persist(playlist);
+            if (!persistedAccountIds.contains(account.getPersistentIdentity())) {
+              // A brand-new account can have no persisted children: clear every placeholder and
+              // let persist() cascade over the whole account.
+              clearPlaceholderIds(account);
+              entityManager.persist(account);
+              reIdentified = true;
+              continue;
+            }
+
+            Integer accountId = account.getPersistentIdentity();
+            Set<Integer> persistedUsageIds = idsOf(
+                "select t.persistentIdentity from UserSongCreditUsageEntity t "
+                    + "where t.locationAccount.persistentIdentity = :parentId", accountId);
+            for (UserSongCreditUsageEntity usage : account.getSongCreditUsages()) {
+              if (!persistedUsageIds.contains(usage.getPersistentIdentity())) {
+                usage.setPersistentIdentity(null);
+                entityManager.persist(usage);
+                reIdentified = true;
+              }
+            }
+
+            Set<Integer> persistedAddFundsIds = idsOf(
+                "select t.persistentIdentity from UserAddFundsTransactionEntity t "
+                    + "where t.locationAccount.persistentIdentity = :parentId", accountId);
+            for (UserAddFundsTransactionEntity transaction : account.getAddFundsTransactions()) {
+              if (!persistedAddFundsIds.contains(transaction.getPersistentIdentity())) {
+                transaction.setPersistentIdentity(null);
+                entityManager.persist(transaction);
+                reIdentified = true;
+              }
+            }
+
+            Set<Integer> persistedPlaylistIds = idsOf(
+                "select p.persistentIdentity from PlaylistEntity p "
+                    + "where p.locationAccount.persistentIdentity = :parentId", accountId);
+            for (PlaylistEntity playlist : account.getPlaylists()) {
+              if (!persistedPlaylistIds.contains(playlist.getPersistentIdentity())) {
+                playlist.setPersistentIdentity(null);
+                entityManager.persist(playlist);
+              }
             }
           }
 
@@ -188,14 +198,8 @@ public final class UserRepositoryJpaImpl implements UserRepository {
           entityManager.merge(user);
         } else {
           user.setPersistentIdentity(null);
-          for (PlaylistEntity playlist : user.getPlaylists()) {
-            playlist.setPersistentIdentity(null);
-          }
-          for (UserSongCreditUsageEntity usage : user.getUserSongCreditUsages()) {
-            usage.setPersistentIdentity(null);
-          }
-          for (UserAddFundsTransactionEntity transaction : user.getUserAddFundsTransactions()) {
-            transaction.setPersistentIdentity(null);
+          for (UserLocationAccountEntity account : user.getLocationAccounts()) {
+            clearPlaceholderIds(account);
           }
           entityManager.persist(user);
           reIdentifiedUsers.add(user);
@@ -204,10 +208,30 @@ public final class UserRepositoryJpaImpl implements UserRepository {
     });
 
     // UserSongCreditUsageEntity/UserAddFundsTransactionEntity hash by persistentIdentity, and the
-    // persist() calls above just changed it on entities already sitting in their user's HashSet --
-    // leaving them in stale buckets, where contains()/remove() can no longer find them. Rehash.
+    // persist() calls above just changed it on entities already sitting in their account's
+    // HashSet -- leaving them in stale buckets, where contains()/remove() can no longer find them.
+    // Rehash.
     for (UserEntity user : reIdentifiedUsers) {
       user.rehashChildCollections();
+    }
+  }
+
+  private Set<Integer> idsOf(String jpql, Integer parentId) {
+    return new HashSet<>(entityManager.createQuery(jpql, Integer.class)
+        .setParameter("parentId", parentId)
+        .getResultList());
+  }
+
+  private static void clearPlaceholderIds(UserLocationAccountEntity account) {
+    account.setPersistentIdentity(null);
+    for (PlaylistEntity playlist : account.getPlaylists()) {
+      playlist.setPersistentIdentity(null);
+    }
+    for (UserSongCreditUsageEntity usage : account.getSongCreditUsages()) {
+      usage.setPersistentIdentity(null);
+    }
+    for (UserAddFundsTransactionEntity transaction : account.getAddFundsTransactions()) {
+      transaction.setPersistentIdentity(null);
     }
   }
 

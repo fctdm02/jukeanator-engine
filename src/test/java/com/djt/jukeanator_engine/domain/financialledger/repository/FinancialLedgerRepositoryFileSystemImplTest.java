@@ -1,6 +1,7 @@
 package com.djt.jukeanator_engine.domain.financialledger.repository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -19,6 +20,7 @@ import com.djt.jukeanator_engine.domain.financialledger.model.FinancialLedgerRoo
 import com.djt.jukeanator_engine.domain.financialledger.model.JukeboxSplitPeriodEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCashTransactionEntity;
 import com.djt.jukeanator_engine.domain.financialledger.model.LocalCreditTransactionEntity;
+import com.djt.jukeanator_engine.domain.financialledger.model.LocalMobileTransactionEntity;
 
 /** Unit tests for {@link FinancialLedgerRepositoryFileSystemImpl}. */
 class FinancialLedgerRepositoryFileSystemImplTest {
@@ -125,6 +127,68 @@ class FinancialLedgerRepositoryFileSystemImplTest {
 
     Integer nextId = reopened.nextPersistentIdentity();
     assertTrue(nextId.intValue() > 50, "Expected an id greater than the existing max (50), got: " + nextId);
+  }
+
+  @Test
+  void mobilePurchases_roundTripInTheirOwnFile_leavingTheLedgerFileFormatUnchanged(
+      @TempDir Path basePath) throws Exception {
+
+    FinancialLedgerRepositoryFileSystemImpl repository =
+        new FinancialLedgerRepositoryFileSystemImpl(basePath.toString());
+    FinancialLedgerRootEntity root = new FinancialLedgerRootEntity();
+    Instant timestamp = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    root.addLocalMobileTransaction(new LocalMobileTransactionEntity(Integer.valueOf(5),
+        new BigDecimal("7.50"), timestamp, Integer.valueOf(9), Integer.valueOf(1234),
+        "alice@example.com", "txn-1", "pkg-7", 12, 2));
+
+    repository.storeAggregateRoot(root);
+
+    assertTrue(Files.exists(
+        basePath.resolve(FinancialLedgerRepositoryFileSystemImpl.MOBILE_TRANSACTIONS_FILENAME)));
+    assertFalse(Files.readString(
+        basePath.resolve(FinancialLedgerRootEntity.FINANCIAL_LEDGER_FILENAME)).contains("txn-1"),
+        "purchases are kept out of the ledger file, so its format never changes");
+
+    FinancialLedgerRootEntity reloaded = repository.loadAggregateRoot("FinancialLedgerRootEntity");
+    assertEquals(1, reloaded.getLocalMobileTransactions().size());
+    LocalMobileTransactionEntity purchase = reloaded.getLocalMobileTransactions().get(0);
+    assertEquals(Integer.valueOf(5), purchase.getPersistentIdentity());
+    assertEquals(0, new BigDecimal("7.50").compareTo(purchase.getAmount()));
+    assertEquals(timestamp, purchase.getTimestamp());
+    assertEquals(Integer.valueOf(9), purchase.getLocationId());
+    assertEquals(Integer.valueOf(1234), purchase.getSourceTransactionId());
+    assertEquals("alice@example.com", purchase.getUserEmail());
+    assertEquals("txn-1", purchase.getPaymentReference());
+    assertEquals("pkg-7", purchase.getPackageCode());
+    assertEquals(Integer.valueOf(12), purchase.getCreditsAwarded());
+    assertEquals(Integer.valueOf(2), purchase.getBonusCredits());
+
+    // New ids continue past the purchase's, so they never collide with it.
+    assertTrue(repository.nextPersistentIdentity().intValue() > 5);
+  }
+
+  @Test
+  void aLedgerFileWithNoPurchasesFile_loadsWithNoPurchases(@TempDir Path basePath)
+      throws Exception {
+
+    FinancialLedgerRepositoryFileSystemImpl repository =
+        new FinancialLedgerRepositoryFileSystemImpl(basePath.toString());
+    root(repository);
+    Files.delete(
+        basePath.resolve(FinancialLedgerRepositoryFileSystemImpl.MOBILE_TRANSACTIONS_FILENAME));
+
+    FinancialLedgerRootEntity reloaded = repository.loadAggregateRoot("FinancialLedgerRootEntity");
+
+    assertTrue(reloaded.getLocalMobileTransactions().isEmpty());
+    assertEquals(1, reloaded.getLocalCashTransactions().size());
+  }
+
+  /** Stores a ledger holding one cash transaction (as a slave from before purchases would). */
+  private static void root(FinancialLedgerRepositoryFileSystemImpl repository) {
+    FinancialLedgerRootEntity root = new FinancialLedgerRootEntity();
+    root.addLocalCashTransaction(new LocalCashTransactionEntity(Integer.valueOf(1), 1,
+        Instant.now(), Integer.valueOf(9)));
+    repository.storeAggregateRoot(root);
   }
 
   @Test
