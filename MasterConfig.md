@@ -297,6 +297,8 @@ sshd -t && systemctl reload ssh
 
 Keep the current session open and check in a second window that `ssh jukeanator-prod` still works before closing it. If the key is ever lost, the provider's web console still accepts the root password.
 
+To set up SSH on a new or replacement PC (with or without a backup of the key), and to browse the production database in DBeaver, see [docs/production-database-access.md](docs/production-database-access.md).
+
 ### Step 2: Base system
 
 Update the system, keep the clock in UTC, and turn on automatic security updates:

@@ -71,9 +71,29 @@ Edit it so that it lists only what the submitted build actually does.
 
 ### Accounts
 
-- [ ] Decide between a personal and an organization developer account. An organization account needs a D-U-N-S number (free; can take a week or more). A new personal account must run a closed test with at least 12 testers for 14 days before it can publish to production.
-- [ ] Create the Google Play Console account (25 USD one-time, play.google.com/console) and complete identity verification.
-- [ ] Optional: ask Google Play developer support about the payment model before the first submission, and keep the answer in writing.
+The developer account was created on 2026-11-26. A personal developer account from about ten years ago (an early JukeANator prototype) was closed by Google for inactivity on 2024-03-20; it cannot be reopened and was declared as another account during sign-up.
+
+- [ ] (done 2026-11-26) Account type: **organization**, for Digital Jukebox Technologies, L.L.C. (D-U-N-S registered). An organization account does not need the closed test with 12 testers for 14 days that new personal accounts need.
+- [ ] (done 2026-11-26) Owner Google account: **tom.myers@jukeanator.com**, created at https://accounts.google.com/signup with "Use your existing email" (no Gmail mailbox). The address is a Postfix forward on the production server (`/etc/postfix/virtual`) to the owner's Yahoo inbox, so all Google mail for it arrives there. The owner cannot be changed later. Use it in its own browser (Edge) so it does not mix with a personal Google account.
+- [ ] Turn on 2-Step Verification for tom.myers@jukeanator.com (https://myaccount.google.com/security) and keep the backup codes with the password.
+- [ ] (done 2026-11-26) Signed up at https://play.google.com/console/signup and paid the 25 USD fee. Answers given, kept consistent with Part 1a:
+  - Developer name (shown on Google Play): JukeANator.
+  - Payments profile: created from the Dun and Bradstreet record, so the legal name ("Digital Jukebox Technologies, L.L.C.") and the Royal Oak address match it.
+  - Public profile and contact email: support@jukeanator.com (also forwarded to Yahoo). The developer phone number, name, address and D-U-N-S number are public.
+  - Apps: 1 app; earns money through "Other" (payments for song plays on physical jukeboxes at venues, through Braintree), deliberately not "In-app purchases"; app categories: None of the above (not a financial app).
+- [ ] (done 2026-11-26) Trader status declared as **Trader** (EU Digital Services Act). The public profile details are shown to users in the EEA and UK under "About the provider".
+- [ ] (done 2026-11-26) Organization website verified. jukeanator.com is a Domain property in Google Search Console (https://search.google.com/search-console, owner tom.myers@jukeanator.com), verified through Cloudflare, which added a `google-site-verification=...` TXT record at the root of the zone. **Never delete that TXT record**: removing it removes the verification.
+- [ ] (done 2026-11-26) Identity verification: the organization with the IRS EIN letter, and the owner's personal details and ID. Google approved it the same day ("Your identity has been verified" email to tom.myers@).
+- [ ] (done 2026-11-26) Phone numbers verified (Account details, Contact details tab): the contact phone number (private) and the developer phone number (public). Both email addresses (support@) also show as verified.
+- [ ] (done 2026-11-26) App created in Play Console: name JukeANator, package `com.jukeanator.app` (permanent), default language English (United States), App, Free. Declarations accepted: Developer Program Policies, Play App Signing Terms of Service, US export laws. Nothing is uploaded or published yet.
+- [ ] (checked 2026-11-26) Package name: the old prototype was `com.djt.jukeanator.mobile` (shown as "Suspended by Google" in the old account). Package names stay taken forever, but the new app uses `com.jukeanator.app` (`mobile/capacitor.config.json`, `mobile/android/app/build.gradle`), so there is no conflict. Do not reuse the old id.
+- [ ] Optional: ask Google Play developer support about the payment model before the first submission, and keep the answer in writing. In Play Console, open the Help (question mark) menu and choose Contact support, or start from https://support.google.com/googleplay/android-developer.
+
+Other consoles used later in this checklist:
+
+- Google Pay and Wallet Console, for the Google Pay merchant id: https://pay.google.com/business/console
+- Firebase console, for push notifications and `google-services.json`: https://console.firebase.google.com
+- Play Console Help Center, for policies and requirements: https://support.google.com/googleplay/android-developer
 
 ### Server (production)
 
@@ -99,9 +119,10 @@ Edit it so that it lists only what the submitted build actually does.
 
 - [ ] (done) Capacitor project in `mobile/android`; application id `com.jukeanator.app` (permanent once uploaded); app icon and splash screen.
 - [ ] (done) `targetSdkVersion` 36 (`mobile/android/variables.gradle`), which meets Google's target API level requirement for new apps. Check the requirement again before each yearly deadline.
-- [ ] Set `versionCode` and `versionName` in `mobile/android/app/build.gradle`. Increase `versionCode` for every upload.
-- [ ] `npm run android`, then in Android Studio, Build, Generate Signed App Bundle, Android App Bundle. Create the upload keystore when prompted, and keep it and its passwords outside git, backed up; losing it blocks future updates.
-- [ ] Opt in to Play App Signing when creating the first release (Google keeps the app signing key; the keystore above is only the upload key).
+- [ ] `versionCode` and `versionName` in `mobile/android/app/build.gradle`. The first upload (2026-11-26) used `versionCode 1`, `versionName "1.0"`. **Increase `versionCode` before every new upload** (Play rejects a bundle whose version code was already used), and raise `versionName` as wanted.
+- [ ] (done 2026-11-26) Upload keystore created: `C:\Users\jukeanator\keystores\jukeanator-upload.jks`, key alias `upload`, valid 25 years. Outside git. Keep a second copy (USB drive or private cloud folder) and both passwords in the password manager and on paper; losing it blocks updates until Google support resets the upload key. When creating a keystore in Android Studio, do not put a comma in any certificate field (for example the Organization): Android Studio does not escape it and fails with "Failed to create keystore".
+- [ ] How to build a signed bundle (each release): in `mobile`, `npm.cmd run sync` (or `npm.cmd run android` if Android Studio is not open); in Android Studio, File, Sync Project with Gradle Files; then Build, Generate Signed App Bundle or APK, Android App Bundle, choose the existing keystore and alias `upload`, Next, click **release** in Build Variants so it is highlighted, Create. Output: `mobile/android/app/release/app-release.aab` (ignored by git).
+- [ ] (done 2026-11-26) Play App Signing: the first release used the Google-generated app signing key; the keystore above is only the upload key.
 
 ### Test on real Android phones
 
@@ -111,8 +132,9 @@ Edit it so that it lists only what the submitted build actually does.
 - [ ] Add Funds with each payment method that will be offered (card first). Hide the rest. Check that the receipt email arrives and names the location.
 - [ ] Credits bought at one location do not show or work at another.
 - [ ] A small and a large phone, Android 7 (`minSdkVersion` 24) if a device is available, the system back button, poor network (an offline location gives a clear message).
-- [ ] Internal testing track: upload the `.aab`, install it from Play on the test phones.
-- [ ] Closed testing track: at least 12 testers for at least 14 days if the account is a new personal account.
+- [ ] (done 2026-11-26) Internal testing track: release 1 (1.0) available to internal testers (no Google review). Tester email list "JukeANator testers" (up to 100 Google accounts; add friends later under Internal testing, Testers, edit the list; the opt-in link stays the same). Until the store listing is set up and reviewed, testers see the temporary app name "com.jukeanator.app (unreviewed)".
+- [ ] Install release 1 from Google Play on the S24+: first uninstall the copy installed from Android Studio (debug-signed, so Play cannot update it), then open the opt-in link (Internal testing, Testers, Copy link) on the phone with the tester Google account, Accept invitation, install.
+- [ ] Closed testing track: optional for this organization account (the 12 testers for 14 days rule applies only to new personal accounts). Useful later as a closer preview of review, with an email list or a Google Group.
 
 ### Play Console: App content (Policy section)
 
